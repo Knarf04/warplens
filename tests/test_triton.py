@@ -67,3 +67,26 @@ def test_tensor_wrapper(gpu):
     with pytest.raises(NotImplementedError, match="approximate timing model"):
         gpu.get_benchmarker()
     assert gpu.get_current_target().arch == 100
+
+
+def test_matmul_is_also_right_under_the_timing_model():
+    # Timing changes the order in which cp.async copies complete; cp.async.wait_group must
+    # still wait for the right groups (it once counted pending groups instead).
+    driver = wt.install("B200", timing=True)
+    try:
+        got, reference, stats = example.matmul(driver, 128, 64, 96)
+    finally:
+        wt.uninstall()
+    np.testing.assert_allclose(got, reference, rtol=1e-4, atol=1e-4)
+    assert not stats.findings and stats.timing.time_ns > 0
+
+
+def test_warplens_run_executes_a_triton_script():
+    import subprocess
+    import sys
+    done = subprocess.run([sys.executable, "-m", "warplens.cli", "run", str(EXAMPLE)],
+                          capture_output=True, text=True, timeout=600)
+    assert done.returncode == 0, done.stderr[-1500:]
+    assert "vector add: max abs error vs NumPy 0" in done.stdout and "matmul: max abs error" in done.stdout
+    assert "2 kernel launch(es) simulated on B200, 0 finding(s)" in done.stderr
+    assert "matmul_kernel: 4 CTA(s)" in done.stderr

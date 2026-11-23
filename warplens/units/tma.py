@@ -181,16 +181,18 @@ def _cp_async(w, ins, mask) -> None:
             w.cp_open = []
         return
     if mods == ("wait_group",) and len(ops) == 1:
-        allowed = _scalar(w, ins, ops[0], int(lanes[0]))
-        pending = [g for g in w.cp_groups if not all(o.done for o in g)]
-        if len(pending) > allowed:
+        # Every group except the N most recently committed must be complete. Which groups
+        # those are is fixed by commit order, not by which copies happen to finish first.
+        newest = _scalar(w, ins, ops[0], int(lanes[0]))
+        older = w.cp_groups[:len(w.cp_groups) - newest] if newest else w.cp_groups
+        pending = [g for g in older if not all(o.done for o in g)]
+        if pending:
             w.blocked = Wait("bulk group", ins, retry=True,
                              detail=lambda: f"{len(pending)} cp.async group(s) still in flight")
             return
-        for group in w.cp_groups:
-            if all(o.done for o in group):
-                w.seen.update(o.id for o in group)
-        w.cp_groups = pending
+        for group in older:
+            w.seen.update(o.id for o in group)
+        w.cp_groups = w.cp_groups[len(older):]
         return
     if len(mods) != 3 or mods[0] not in ("ca", "cg") or mods[1:] != ("shared", "global") \
             or len(ops) not in (3, 4):

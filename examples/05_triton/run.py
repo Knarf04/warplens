@@ -1,7 +1,8 @@
 """Triton kernels on a simulated Blackwell GPU: a vector add and a matmul.
 
     pip install triton
-    python examples/05_triton/run.py
+    python examples/05_triton/run.py        # installs the warplens driver itself
+    warplens run examples/05_triton/run.py  # or let `warplens run` install it
 
 Triton compiles each kernel for sm_100a on this machine and warplens executes the PTX.
 For the matmul, Triton emits a tcgen05 MMA: the same tensor core the CUTLASS examples use.
@@ -72,9 +73,12 @@ def matmul(gpu, M=256, N=128, K=96, block=(128, 64, 32)):
 
 
 if __name__ == "__main__":
-    gpu = wt.install("B200")
+    active = triton.runtime.driver.active
+    ours = not isinstance(active, wt.WarplensDriver)  # False under `warplens run`
+    gpu = wt.install("B200") if ours else active
     for name, run in (("vector add", vector_add), ("matmul", matmul)):
         got, reference, stats = run(gpu)
         print(f"{name}: max abs error vs NumPy {np.abs(got - reference).max():.3g}; "
               f"{stats.ctas} CTA(s), {stats.instructions} warp-instructions, {len(stats.findings)} finding(s)")
-    wt.uninstall()
+    if ours:
+        wt.uninstall()

@@ -22,11 +22,12 @@ class Wait:
 
 class AsyncOp:
     """One TMA copy in flight (or finished)."""
-    __slots__ = ("id", "kind", "warp", "ins", "lane", "done")
+    __slots__ = ("id", "kind", "warp", "ins", "lane", "done", "swizzle")
 
     def __init__(self, op_id: int, kind: str, warp, ins, lane: int):
         self.id, self.kind, self.warp, self.ins, self.lane = op_id, kind, warp, ins, lane
         self.done = False
+        self.swizzle = None  # swizzle bits of a TMA tensor load (None: not known)
 
 
 @dataclass(slots=True)

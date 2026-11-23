@@ -135,6 +135,30 @@ def _operand_bytes(w, ins, desc: int, rows: int, dtype: np.dtype, which: str) ->
     return idx.astype(np.intp)
 
 
+_SWIZZLE_NAMES = {0: "no swizzle", 1: "32B swizzle", 2: "64B swizzle", 3: "128B swizzle"}
+
+
+def _check_operand(w, ins, lane: int, which: str, idx: np.ndarray, bits: int) -> None:
+    """Is the shared memory an MMA is about to read what its descriptor claims?"""
+    from .tma import _require_seen
+    cta = w.cta
+    smem = cta.smem
+    writers = smem.async_writer[idx]
+    for op_id in np.unique(writers[writers > 0]):
+        load = cta.async_ops[int(op_id)]
+        if load.swizzle is not None and load.swizzle != bits:
+            cta.findings.add(
+                "mma-swizzle-mismatch",
+                f"operand {which}'s descriptor says {_SWIZZLE_NAMES[bits]}, but the TMA load at "
+                f"line {load.ins.line} wrote this buffer with {_SWIZZLE_NAMES[load.swizzle]}; "
+                "the MMA will read the elements in the wrong order", w, ins, [lane])
+    _require_seen(w, ins, [lane], writers, f"tcgen05.mma operand {which} reads")
+    if smem.has_uninitialized_bytes(idx):
+        cta.findings.add("smem-uninitialized-read",
+                         f"tcgen05.mma operand {which} reads shared memory that was never written",
+                         w, ins, [lane])
+
+
 def _accumulator_lanes(m_dim: int) -> np.ndarray:
     m = np.arange(m_dim)
     return m if m_dim == 128 else 32 * (m // 16) + m % 16
@@ -195,6 +219,8 @@ def _mma(w, ins, lane: int) -> None:
     tmem = _tmem(cta)
     idx_a = _operand_bytes(w, ins, desc_a, m_dim, formats[a_fmt], "A")
     idx_b = _operand_bytes(w, ins, desc_b, n_dim, formats[b_fmt], "B")
+    for which, idx, desc in (("A", idx_a, desc_a), ("B", idx_b, desc_b)):
+        _check_operand(w, ins, lane, which, idx, _LAYOUTS[desc >> 61][0])
     lanes = d_lane + _accumulator_lanes(m_dim)
     if lanes.max() >= LANES or d_col + n_dim > COLUMNS:
         raise ExecutionError(f"tcgen05.mma result ({m_dim} x {n_dim}) at lane {d_lane}, column "
@@ -206,13 +232,6 @@ def _mma(w, ins, lane: int) -> None:
     cells = (lanes[keep][:, None], d_col + np.arange(n_dim)[None, :])
 
     smem = cta.smem
-    from .tma import _require_seen
-    for which, idx in (("A", idx_a), ("B", idx_b)):
-        if smem.has_uninitialized_bytes(idx):
-            cta.findings.add("smem-uninitialized-read",
-                             f"tcgen05.mma operand {which} reads shared memory that this CTA never wrote",
-                             w, ins, [lane])
-        _require_seen(w, ins, [lane], smem.async_writer[idx], f"tcgen05.mma operand {which} reads")
     operation = cta.new_async("mma", w, ins, lane)
     smem.async_reader[idx_a] = operation.id
     smem.async_reader[idx_b] = operation.id

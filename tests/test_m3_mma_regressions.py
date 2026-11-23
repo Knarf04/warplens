@@ -65,7 +65,7 @@ def _run(sim, *, scale=None, kind="f16", first=True, mask=None, modifier=None,
     out = sim.empty((128, 8), "f32")
     stats = sim.launch(mod, "k", grid=1, block=128,
                        args=[sim.from_numpy(image), out, da, db, idesc, len(image),
-                             32, 8, 1, 1, 0, 1, 0], async_delay=async_delay)
+                             32, 8, 1, 1, 0, 1, 0, 0], async_delay=async_delay)
     return out.numpy(), stats, k
 
 

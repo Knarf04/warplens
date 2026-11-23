@@ -49,6 +49,10 @@ class TensorMap(DeviceArray):
         super().__init__(device, addr, (_tensor_map.SIZE,), np.dtype(np.uint8))
         self.info = info
 
+    def tobytes(self) -> bytes:
+        """The 128-byte tensor map, for kernels that take it by value inside a struct."""
+        return _tensor_map.encode(self.info)
+
     def __repr__(self) -> str:
         return f"TensorMap({self.info}, addr={self.addr:#x})"
 

@@ -478,3 +478,31 @@ def test_tensor_operand_and_discarded_destination_parse():
     assert isinstance(store.operands[0], TensorRef) and store.operands[0].base == Reg("%m")
     assert len(store.operands[0].coords) == 2 and arrive.operands[0] == Sym("_")
     assert store.mods[-1] == "bulk_group" and "shared::cta" in store.mods
+
+
+def test_tensor_map_passed_by_value_in_a_struct_parameter(sim):
+    # As CUTLASS does: the tensor map sits inside a kernel argument, and the kernel
+    # takes that parameter's address with `mov` + `cvta.param`.
+    data = np.arange(64, dtype=np.uint32)
+    src, dst = sim.from_numpy(data), sim.empty(16, "u32")
+    mod = kernel("""
+        .reg .b64 %s, %d; .reg .b32 %buf, %bar; .reg .pred %p;
+        .shared .align 1024 .b8 buf[64];
+        .shared .align 8 .u64 bar;
+        mov.b64 %s, atom; cvta.param.u64 %s, %s;
+        add.u64 %s, %s, 128;
+        ld.param.u64 %d, [dst];
+        mov.b32 %buf, buf; mov.b32 %bar, bar;
+        mbarrier.init.shared::cta.b64 [%bar], 1;
+        mbarrier.arrive.expect_tx.shared::cta.b64 _, [%bar], 64;
+        cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%buf], [%s, {32}], [%bar];
+        mbarrier.try_wait.parity.shared::cta.b64 %p, [%bar], 0;
+        cp.async.bulk.tensor.1d.global.shared::cta.bulk_group [%d, {0}], [%buf];
+        cp.async.bulk.commit_group;
+        cp.async.bulk.wait_group 0;
+        ret;
+    """, ".param .u32 pad, .param .align 128 .b8 atom[256], .param .u64 dst")
+    atom = b"\0" * 128 + sim.tensor_map_tiled(src, 16).tobytes()  # tensor map at offset 128
+    stats = sim.launch(mod, "k", grid=1, block=1, args=[7, atom, sim.tensor_map_tiled(dst, 16)])
+    np.testing.assert_array_equal(dst.numpy(), data[32:48])
+    assert not stats.findings

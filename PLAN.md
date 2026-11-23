@@ -2,7 +2,7 @@
 
 **Understand a Blackwell GPU by watching it run, on your CPU.**
 
-> Status: M0 to M2 done, M3 partly done (2026-11-23): CUTLASS tutorial 01 runs correctly; tutorial 02 and the TMEM layout view are open (docs/m3.md). M1's `ncu` cross-check matches on bank conflicts but not on the total wavefront count (validation/README.md). M2 and M3 are not validated on Blackwell hardware.
+> Status: M0 to M2 done, M3 mostly done (2026-11-23): CUTLASS tutorials 01 and 02 run correctly; the other ld/st shapes and the TMEM layout view are open (docs/m3.md). M1's `ncu` cross-check matches on bank conflicts but not on the total wavefront count (validation/README.md). M2 and M3 are not validated on Blackwell hardware.
 > GitHub description: *Understand a Blackwell GPU by watching it run, on your CPU.*
 > Topics: `cuda` `gpu` `blackwell` `simulator` `ptx` `cutlass` `triton` `tensor-cores` `gpu-programming`
 

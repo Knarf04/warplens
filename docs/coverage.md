@@ -27,7 +27,7 @@ that names the instruction and its PTX line.
 
 | Group | Instructions | Notes |
 | --- | --- | --- |
-| Moves | `mov` (including the address of a variable, and packing or unpacking a `{vector}`), `cvta[.to].{global,shared,local}` | |
+| Moves | `mov` (including the address of a variable, and packing or unpacking a `{vector}`), `cvta[.to].{global,shared,local,param}` | |
 | Integer | `add`, `sub`, `mul.{lo,hi,wide}`, `mad.{lo,hi,wide}`, `div`, `rem`, `min`, `max`, `neg`, `abs` | no `.sat`, no carry forms |
 | Float | `add`, `sub`, `mul`, `div`, `fma`, `mad`, `min`, `max`, `neg`, `abs`, `sqrt` | round-to-nearest only; `fma` and floating `mad` round once |
 | Bitwise | `and`, `or`, `xor`, `not`, `shl`, `shr` | also on `.pred` (not shifts) |

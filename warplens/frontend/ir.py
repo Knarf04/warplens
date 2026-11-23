@@ -112,6 +112,7 @@ class Param:
     is_ptr: bool = False
     size: int = 0  # bytes
     by_value: bool = False  # a struct passed by value (`.b8 name[24]`)
+    align: int = 0  # declared alignment, 0 if none
 
 
 @dataclass(slots=True)

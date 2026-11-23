@@ -46,6 +46,16 @@ class Program:
         self.local_bytes = offset
         self.global_symbols = global_symbols or {}
 
+        # Parameter space: where each parameter sits when its address is taken.
+        self.param_offsets: dict[str, int] = {}
+        offset = 0
+        for p in fn.params:
+            offset = _align_up(offset, p.align or min(p.size, 8) or 1)
+            self.param_offsets[p.name] = offset
+            offset += p.size
+        self._param_bytes = offset
+        self._blob: tuple[int, bytes] | None = None
+
         # Shared-memory layout: sized variables in declaration order, then the
         # dynamically sized `.extern .shared name[]` region requested at launch.
         self.symbols: dict[str, int] = {}
@@ -63,6 +73,15 @@ class Program:
             if v.size is None:
                 self.symbols[v.name] = self.smem_dynamic_base
         self.uses_dynamic_smem = any(v.size is None for v in variables)
+
+    def param_blob(self, params: dict[str, bytes]) -> bytes:
+        """All parameters of one launch laid out in parameter space."""
+        if self._blob is None or self._blob[0] != id(params):
+            blob = bytearray(self._param_bytes)
+            for name, offset in self.param_offsets.items():
+                blob[offset:offset + len(params[name])] = params[name]
+            self._blob = (id(params), bytes(blob))
+        return self._blob[1]
 
     def smem_bytes(self, dynamic: int) -> int:
         return self.smem_dynamic_base + dynamic if dynamic else self.smem_static

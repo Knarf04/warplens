@@ -105,14 +105,15 @@ def _mov(w, ins, mask):
 def _cvta(w, ins, mask):
     # Address-space conversion. Global addresses are already generic addresses;
     # shared addresses are offsets that sit in a fixed window of the generic space.
-    ty, extra = _type(ins, allowed={"to", "global", "shared", "local"}, kinds="u")
+    ty, extra = _type(ins, allowed={"to", "global", "shared", "local", "param"}, kinds="u")
     spaces = [e for e in extra if e != "to"]
     if len(spaces) != 1 or (ty != "u64" and spaces[0] != "global"):
         raise unsupported(ins)
     d, a = _operands(ins, 2)
     value = w.read(a, ty)
     if spaces[0] != "global":
-        window = np.uint64(GENERIC_WINDOW if spaces[0] == "shared" else LOCAL_WINDOW)
+        window = np.uint64({"shared": GENERIC_WINDOW, "local": LOCAL_WINDOW,
+                            "param": PARAM_WINDOW}[spaces[0]])
         value = value - window if "to" in extra else value + window
     w.write(d, value, mask)
 
@@ -366,8 +367,13 @@ LOCAL_WINDOW = 0x1_4000_0000  # where per-thread local memory appears in the gen
 _LOCAL_WINDOW_BYTES = 1 << 24
 
 
+PARAM_WINDOW = 0x1_8000_0000  # where the kernel's parameters appear in the generic space
+
+
 def route(address: int) -> tuple[str, int]:
     """Which memory a generic address refers to, and the address within it."""
+    if PARAM_WINDOW <= address < PARAM_WINDOW + _LOCAL_WINDOW_BYTES:
+        return "param", address - PARAM_WINDOW
     if GENERIC_WINDOW <= address < GENERIC_WINDOW + MAX_SMEM_BYTES:
         return "shared", address - GENERIC_WINDOW
     if LOCAL_WINDOW <= address < LOCAL_WINDOW + _LOCAL_WINDOW_BYTES:

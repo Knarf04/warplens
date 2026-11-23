@@ -67,7 +67,7 @@ class Warp:
 
     def _symbol(self, sym: Sym) -> int:
         prog = self.program
-        for table in (prog.symbols, prog.local_symbols, prog.global_symbols):
+        for table in (prog.symbols, prog.local_symbols, prog.global_symbols, prog.param_offsets):
             if sym.name in table:
                 return table[sym.name]
         raise ExecutionError(f"`{sym.name}` is not a variable this kernel can address")
@@ -76,6 +76,11 @@ class Warp:
         """`count` bytes at a generic address, as seen by one lane."""
         from ..units.alu import route
         space, offset = route(address)
+        if space == "param":  # a struct passed by value, addressed through `cvta.param`
+            blob = self.program.param_blob(self.params)
+            if offset + count > len(blob):
+                raise ExecutionError(f"read past the end of the kernel's parameters at offset {offset}")
+            return blob[offset:offset + count]
         if space == "local":
             if offset + count > self.local.shape[1]:
                 raise ExecutionError(f"read past the end of local memory at offset {offset}")

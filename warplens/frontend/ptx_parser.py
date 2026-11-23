@@ -228,8 +228,9 @@ class _Parser:
 
     def param(self) -> Param:
         self.expect(".param")
+        align = 0
         if self.accept(".align"):  # by-value structs: `.param .align 8 .b8 name[24]`
-            self.expect_kind("num", "an alignment")
+            align = int(self.expect_kind("num", "an alignment").value)
         ty_tok = self.expect_kind("word", "a parameter type")
         ty = ty_tok.value.lstrip(".")
         if ty not in NP_TYPES or ty == "pred":
@@ -247,7 +248,8 @@ class _Parser:
             size *= int(self.expect_kind("num", "an array size").value)
             self.expect("]")
             by_value = True
-        return Param(name=t.value, type=ty, is_ptr=is_ptr, size=size, by_value=by_value)
+        return Param(name=t.value, type=ty, is_ptr=is_ptr, size=size, by_value=by_value,
+                     align=align if by_value else 0)
 
     def extern_func(self, start: _Tok) -> str:
         """`.extern .func (ret) name (params);` Only the name is kept."""

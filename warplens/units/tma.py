@@ -52,7 +52,7 @@ def _tensor_map(w, ins, operand: TensorRef, lane: int, nd: int):
     if len(operand.coords) != nd:
         raise ExecutionError(f"{nd}d TMA instruction with {len(operand.coords)} coordinate(s)")
     addr = int(w.read_address(operand.base)[lane])
-    raw = w.mem.read(addr + np.arange(tm.SIZE, dtype=np.uint64), _UINT[1]).tobytes()
+    raw = w.read_bytes(addr, tm.SIZE, lane)  # global memory, or a by-value kernel parameter
     info = tm.decode(raw)
     if info.rank != nd:
         raise ExecutionError(f"{nd}d TMA instruction used with a {info.rank}-dimensional tensor map")

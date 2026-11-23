@@ -58,4 +58,15 @@ jobs:
         run: examples/03_cutlass_mma/build.sh --programs
       - name: Build the shim libraries
         run: warplens/shim/build.sh
-      - run: pytest -q -rs
+      - name: Run the whole suite; no test may skip
+        run: |
+          set -o pipefail
+          status=0
+          pytest -q -rs 2>&1 | tee pytest.log || status=$?
+          if [ "$status" != 0 ]; then
+            # Put the failure summary where it can be read without downloading the log.
+            summary=$(grep -E '^(FAILED|ERROR|SKIPPED|E  |WARPLENS_NO_SKIPS|  tests/|[0-9]+ (passed|failed))' pytest.log \
+                      | head -60 | cut -c1-400 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=pytest summary::${summary}"
+          fi
+          exit "$status"

@@ -15,14 +15,14 @@ from conftest import kernel
 LAYOUTS = {"none": (0, 0, 16), "32B": (6, 1, 32), "64B": (4, 2, 64), "128B": (2, 3, 128)}
 PARAMS = (".param .u64 img, .param .u64 out, .param .u64 da, .param .u64 db, .param .u32 idesc, "
           ".param .u32 nbytes, .param .u32 ncols, .param .u32 n, .param .u32 twice, "
-          ".param .u32 wait, .param .u32 shift, .param .u32 free")
+          ".param .u32 wait, .param .u32 shift, .param .u32 free, .param .u32 dlane")
 
 
 def mma_kernel(kind="f16"):
     return kernel(f"""
         .reg .b64 %img, %out, %da, %db, %off;
         .reg .b32 %idesc, %nb, %nc, %n, %twice, %wait, %shift, %free;
-        .reg .b32 %t, %w, %buf, %bar, %tp, %base, %taddr, %i, %v, %x;
+        .reg .b32 %t, %w, %buf, %bar, %tp, %base, %taddr, %i, %v, %x, %dlane, %maddr;
         .reg .pred %p, %one, %two, %q, %no, %yes, %dowait, %dofree;
         .shared .align 1024 .b8 buf[49152];
         .shared .align 8 .u64 bar;
@@ -45,8 +45,11 @@ def mma_kernel(kind="f16"):
         @%one cp.async.bulk.shared::cluster.global.mbarrier::complete_tx::bytes [%buf], [%img], %nb, [%bar];
         mbarrier.try_wait.parity.shared::cta.b64 %p, [%bar], 0;
         ld.shared.u32 %base, [%tp];
-        @%one tcgen05.mma.cta_group::1.kind::{kind} [%base], %da, %db, %idesc, {{0, 0, 0, 0}}, %no;
-        @%two tcgen05.mma.cta_group::1.kind::{kind} [%base], %da, %db, %idesc, {{0, 0, 0, 0}}, %yes;
+        ld.param.u32 %dlane, [dlane];
+        shl.b32 %dlane, %dlane, 16;
+        add.u32 %maddr, %base, %dlane;
+        @%one tcgen05.mma.cta_group::1.kind::{kind} [%maddr], %da, %db, %idesc, {{0, 0, 0, 0}}, %no;
+        @%two tcgen05.mma.cta_group::1.kind::{kind} [%maddr], %da, %db, %idesc, {{0, 0, 0, 0}}, %yes;
         @%one tcgen05.commit.cta_group::1.mbarrier::arrive::one.shared::cluster.b64 [%bar];
         @%dowait mbarrier.try_wait.parity.shared::cta.b64 %p, [%bar], 1;
         shl.b32 %x, %w, 21;
@@ -89,7 +92,7 @@ def place(matrix, layout, start, image):
 
 
 def run(sim, m=128, n=32, layout="128B", dtype=np.float16, twice=0, wait=1, shift=0, free=1,
-        negate_a=False, ncols=None, seed=0, block=128):
+        negate_a=False, ncols=None, seed=0, block=128, dlane=0):
     rng = np.random.default_rng(seed)
     k = 32 // np.dtype(dtype).itemsize
     a = rng.uniform(-2, 2, (m, k)).astype(dtype)
@@ -102,7 +105,7 @@ def run(sim, m=128, n=32, layout="128B", dtype=np.float16, twice=0, wait=1, shif
     out = sim.from_numpy(np.full((128, n), np.nan, dtype=np.float32))
     stats = sim.launch(mma_kernel("f16" if dtype == np.float16 else "tf32"), "k", grid=1, block=block,
                        args=[sim.from_numpy(image), out, desc_a, desc_b, idesc, len(image),
-                             ncols or max(32, 1 << (n - 1).bit_length()), n, twice, wait, shift, free])
+                             ncols or max(32, 1 << (n - 1).bit_length()), n, twice, wait, shift, free, dlane])
     expect = a.astype(np.float32) @ b.astype(np.float32).T * (-1 if negate_a else 1) * (2 if twice else 1)
     return out.numpy(), expect, stats
 
@@ -122,6 +125,24 @@ def test_mma_64_rows_use_the_low_16_lanes_of_each_warp(sim):
     # The upper 16 lanes of each warp were never written.
     assert [f.kind for f in stats.findings] == ["tmem-uninitialized-read"]
     assert sorted(set(stats.findings[0].lanes)) == list(range(16, 32))
+
+
+def test_layout_f_as_the_course_notes_state_it(sim):
+    """"Study Notes for Modern GPU Programming For MLSys", cta_group::1 with M = 64 (Layout F):
+    lane = (m/16)*32 + a + m%16 with a in {0, 16}; for a = 0, rows 0-15 -> lanes 0-15,
+    16-31 -> 32-47, 32-47 -> 64-79, 48-63 -> 96-111. A second tile with a = 16 uses the
+    other 16 lanes of each quadrant, in the same columns."""
+    from warplens.viz.tmem import accumulator_rows
+    m = np.arange(64)
+    for a in (0, 16):
+        got, expect, _ = run(sim, m=64, n=32, dlane=a)
+        lanes = (m // 16) * 32 + a + m % 16
+        np.testing.assert_allclose(got[lanes], expect, rtol=1e-5, atol=1e-5)
+        assert (got[np.setdiff1d(np.arange(128), lanes)] == 0).all()  # the other lanes stay unwritten
+        assert accumulator_rows(64, a)[lanes].tolist() == m.tolist()
+    rows = accumulator_rows(64)
+    assert [rows[l] for l in (0, 15, 32, 47, 64, 79, 96, 111)] == [0, 15, 16, 31, 32, 47, 48, 63]
+    assert accumulator_rows(128).tolist() == list(range(128))  # M = 128: row m -> lane m
 
 
 def test_accumulate_negate_and_tf32(sim):

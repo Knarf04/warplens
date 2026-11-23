@@ -18,13 +18,20 @@ import numpy as np
 from ..units.tcgen05 import LANES, _accumulator_lanes, transfer_cells
 
 
-def accumulator_rows(m_dim: int) -> np.ndarray:
+def accumulator_rows(m_dim: int, lane_offset: int = 0) -> np.ndarray:
     """For each of the 128 lanes, the result row of a `cta_group::1` MMA stored
-    there, or -1 if the MMA leaves the lane untouched."""
+    there, or -1 if the MMA leaves the lane untouched.
+
+    `lane_offset` is the lane part of the MMA's TMEM address. For M = 64 (PTX's
+    "Layout F") it is 0 or 16 and selects the low or high 16 lanes of each
+    warp's 32, so two 64-row results can share the same columns.
+    """
     if m_dim not in (64, 128):
         raise ValueError("M must be 64 or 128 for cta_group::1")
+    if lane_offset not in ((0, 16) if m_dim == 64 else (0,)):
+        raise ValueError("the lane offset must be 0, or 16 for M = 64")
     rows = np.full(LANES, -1)
-    rows[_accumulator_lanes(m_dim)] = np.arange(m_dim)
+    rows[lane_offset + _accumulator_lanes(m_dim)] = np.arange(m_dim)
     return rows
 
 
@@ -38,9 +45,14 @@ def _runs(rows: np.ndarray):
             start = lane
 
 
-def accumulator_text(m_dim: int, n_dim: int) -> str:
-    rows = accumulator_rows(m_dim)
-    lines = [f"TMEM layout of a {m_dim} x {n_dim} tcgen05.mma result (cta_group::1, float32)",
+def _title(m_dim: int, n_dim: int, lane_offset: int) -> str:
+    extra = (f", Layout F, lane offset {lane_offset}" if m_dim == 64 else "")
+    return f"TMEM layout of a {m_dim} x {n_dim} tcgen05.mma result (cta_group::1{extra})"
+
+
+def accumulator_text(m_dim: int, n_dim: int, lane_offset: int = 0) -> str:
+    rows = accumulator_rows(m_dim, lane_offset)
+    lines = [_title(m_dim, n_dim, lane_offset),
              f"  result column n is TMEM column n: {n_dim} columns of 32 bits",
              "  lanes      warp  holds"]
     for first, last, row in _runs(rows):
@@ -49,14 +61,13 @@ def accumulator_text(m_dim: int, n_dim: int) -> str:
     return "\n".join(lines)
 
 
-def accumulator_svg(m_dim: int, n_dim: int) -> str:
-    rows = accumulator_rows(m_dim)
+def accumulator_svg(m_dim: int, n_dim: int, lane_offset: int = 0) -> str:
+    rows = accumulator_rows(m_dim, lane_offset)
     cell, left, top, width = 5, 150, 40, 360
     colors = ["#4c78a8", "#f58518", "#54a24b", "#b279a2"]
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{left + width + 190}" '
            f'height="{top + LANES * cell + 30}" font-family="sans-serif" font-size="12">',
-           f'<text x="10" y="20" font-size="14">TMEM layout of a {m_dim} x {n_dim} tcgen05.mma '
-           'result (cta_group::1)</text>']
+           f'<text x="10" y="20" font-size="14">{_title(m_dim, n_dim, lane_offset)}</text>']
     for first, last, row in _runs(rows):
         y, h = top + first * cell, (last - first + 1) * cell
         fill = colors[first // 32] if row >= 0 else "#eeeeee"
@@ -93,6 +104,8 @@ def main(argv=None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("m", nargs="?", type=int, default=128, help="MMA rows: 64 or 128")
     parser.add_argument("n", nargs="?", type=int, default=64, help="MMA columns")
+    parser.add_argument("--lane-offset", type=int, default=0,
+                        help="lane part of the MMA's TMEM address: 0, or 16 for M = 64")
     parser.add_argument("--svg", metavar="FILE", help="write the accumulator layout as SVG")
     parser.add_argument("--transfer", nargs=2, metavar=("SHAPE", "COUNT"),
                         help="show a load/store shape instead, e.g. 16x128b 2")
@@ -101,10 +114,10 @@ def main(argv=None) -> int:
         if args.transfer:
             print(transfer_text(args.transfer[0], int(args.transfer[1])))
             return 0
-        print(accumulator_text(args.m, args.n))
+        print(accumulator_text(args.m, args.n, args.lane_offset))
         if args.svg:
             with open(args.svg, "w") as f:
-                f.write(accumulator_svg(args.m, args.n))
+                f.write(accumulator_svg(args.m, args.n, args.lane_offset))
             print(f"wrote {args.svg}")
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)

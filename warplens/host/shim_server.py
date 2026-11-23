@@ -16,16 +16,45 @@ from .device import Device
  TENSOR_MAP) = range(1, 11)
 LAUNCH_FAILURE = 719  # cudaErrorLaunchFailure
 INVALID_VALUE = 1  # cudaErrorInvalidValue
+MEMORY_ALLOCATION = 2  # cudaErrorMemoryAllocation
+
+
+def _read_exact(stream, size: int) -> bytes:
+    parts, remaining = [], size
+    while remaining:
+        part = stream.read(remaining)
+        if not part:
+            break
+        parts.append(part)
+        remaining -= len(part)
+    return b"".join(parts)
+
+
+def _write_all(stream, data: bytes) -> None:
+    remaining = memoryview(data)
+    while remaining:
+        written = stream.write(remaining)
+        if not written:
+            raise ConnectionError("lost the connection to the CUDA program")
+        remaining = remaining[written:]
 
 
 def ptx_from_fatbin(blob: bytes) -> list[str]:
     """The PTX texts in a fat binary (what `nvcc -gencode ...,code=compute_XX` embeds)."""
+    if len(blob) < 16:
+        raise WarplensError("truncated CUDA fat binary header")
     magic, _, header_size, size = struct.unpack_from("<IHHQ", blob, 0)
     if magic != 0xBA55ED50:
         raise WarplensError("not a CUDA fat binary")
+    if header_size < 16 or header_size > len(blob) or size > len(blob) - header_size:
+        raise WarplensError("invalid CUDA fat binary size")
     texts, at, end = [], header_size, header_size + size
     while at < end:
+        if end - at < 20:
+            raise WarplensError("truncated CUDA fat binary entry")
         kind, _, entry_header, payload = struct.unpack_from("<HHIQ", blob, at)
+        if entry_header < 20 or entry_header > end - at or payload > end - at - entry_header:
+            raise WarplensError("invalid CUDA fat binary entry size")
         (compressed,) = struct.unpack_from("<I", blob, at + 16)
         body = blob[at + entry_header:at + entry_header + payload]
         if kind == 1:
@@ -43,37 +72,41 @@ class ShimServer:
         self.device = Device(model)
         self.timing = timing
         self.modules: list = []
-        self.functions: list[tuple[int, str]] = []
+        self.functions: list[tuple[int, int, str]] = []
         self.launches: list[tuple[str, object]] = []  # (kernel name, LaunchStats)
         self.needs_ptx = False
         import os
         self.debug = bool(os.environ.get("WARPLENS_SHIM_DEBUG"))  # log every request
 
     def serve(self, sock) -> None:
-        stream = sock.makefile("rwb", buffering=0)
-        while True:
-            head = stream.read(8)
-            if len(head) < 8:
-                return
-            op, size = struct.unpack("<II", head)
-            payload = b""
-            while len(payload) < size:
-                chunk = stream.read(size - len(payload))
-                if not chunk:
+        with sock.makefile("rwb", buffering=0) as stream:
+            while True:
+                head = _read_exact(stream, 8)
+                if len(head) < 8:
                     return
-                payload += chunk
-            try:
-                status, reply = 0, self.handle(op, payload)
-            except WarplensError as e:
-                status, reply = (LAUNCH_FAILURE if op == LAUNCH else INVALID_VALUE), str(e).encode()
-            if self.debug:
-                import sys
-                print(f"warplens shim: op {op}, {size} byte(s) in -> status {status}, "
-                      f"{len(reply)} byte(s) out" + (f": {reply[:300].decode(errors='replace')}" if status else ""),
-                      file=sys.stderr)
-            stream.write(struct.pack("<iI", status, len(reply)) + reply)
+                op, size = struct.unpack("<II", head)
+                payload = _read_exact(stream, size)
+                if len(payload) != size:
+                    return
+                try:
+                    status, reply = 0, self.handle(op, payload)
+                except WarplensError as e:
+                    status, reply = (LAUNCH_FAILURE if op == LAUNCH else INVALID_VALUE), str(e).encode()
+                except MemoryError:
+                    status, reply = MEMORY_ALLOCATION, b"host memory exhausted by the simulated CUDA request"
+                if self.debug:
+                    import sys
+                    print(f"warplens shim: op {op}, {size} byte(s) in -> status {status}, "
+                          f"{len(reply)} byte(s) out" + (f": {reply[:300].decode(errors='replace')}" if status else ""),
+                          file=sys.stderr)
+                _write_all(stream, struct.pack("<iI", status, len(reply)) + reply)
 
     def handle(self, op: int, data: bytes) -> bytes:
+        sizes = {MALLOC: 8, FREE: 8, READ: 16, COPY: 24, FILL: 20, TENSOR_MAP: 140}
+        minimum = {REGISTER_FUNCTION: 4, WRITE: 8, LAUNCH: 48}
+        if ((op in sizes and len(data) != sizes[op]) or
+                (op in minimum and len(data) < minimum[op])):
+            raise WarplensError(f"invalid payload size {len(data)} for shim request {op}")
         memory = self.device.memory
         if op == REGISTER_FATBIN:
             texts = ptx_from_fatbin(data)
@@ -86,7 +119,12 @@ class ShimServer:
             return struct.pack("<I", len(self.modules) - 1)
         if op == REGISTER_FUNCTION:
             (module,) = struct.unpack_from("<I", data)
-            name = data[4:].decode()
+            if module >= len(self.modules):
+                raise WarplensError(f"unknown module {module}")
+            try:
+                name = data[4:].decode()
+            except UnicodeDecodeError:
+                raise WarplensError("kernel name is not UTF-8") from None
             for index, parsed in enumerate(self.modules[module]):
                 if name in parsed.functions:
                     self.functions.append((module, index, name))
@@ -95,32 +133,49 @@ class ShimServer:
             raise WarplensError(f"kernel `{name}` is not in the program's PTX")
         if op == MALLOC:
             (size,) = struct.unpack("<Q", data)
+            if size > np.iinfo(np.intp).max:
+                raise MemoryError
             return struct.pack("<Q", memory.alloc(max(size, 1)))
         if op == FREE:
-            return b""  # addresses are never reused, so stale pointers keep faulting cleanly
+            (address,) = struct.unpack("<Q", data)
+            memory.free(address)
+            return b""
         if op == WRITE:
             (address,) = struct.unpack_from("<Q", data)
             body = np.frombuffer(data, dtype=np.uint8, offset=8)
+            memory.validate_range(address, len(body), "write")
             memory.write(np.uint64(address) + np.arange(len(body), dtype=np.uint64), body)
             return b""
         if op == READ:
             address, size = struct.unpack("<QQ", data)
+            memory.validate_range(address, size, "read")
+            if size > 0xffffffff:
+                raise WarplensError("shim read exceeds the 32-bit response length; split the transfer")
             return memory.read(np.uint64(address) + np.arange(size, dtype=np.uint64),
                                np.dtype(np.uint8)).tobytes()
         if op == COPY:
             dst, src, size = struct.unpack("<QQQ", data)
+            memory.validate_range(src, size, "read")
+            memory.validate_range(dst, size, "write")
             span = np.arange(size, dtype=np.uint64)
             memory.write(np.uint64(dst) + span, memory.read(np.uint64(src) + span, np.dtype(np.uint8)))
             return b""
         if op == FILL:
             address, size, value = struct.unpack("<QQI", data)
+            memory.validate_range(address, size, "write")
             memory.write(np.uint64(address) + np.arange(size, dtype=np.uint64),
-                         np.full(size, value, dtype=np.uint8))
+                         np.full(size, value & 0xff, dtype=np.uint8))
             return b""
         if op == LAUNCH:
             function, gx, gy, gz, bx, by, bz, kx, ky, kz, smem = struct.unpack_from("<10IQ", data)
+            if function >= len(self.functions):
+                raise WarplensError(f"unknown kernel function {function}")
             module, index, name = self.functions[function]
             parsed = self.modules[module][index]
+            expected = 48 + sum(p.size for p in parsed.functions[name].params)
+            if len(data) != expected:
+                raise WarplensError(f"kernel `{name}` launch needs {expected - 48} argument bytes, "
+                                    f"got {len(data) - 48}")
             args, at = [], 48
             for p in parsed.functions[name].params:
                 args.append(data[at:at + p.size])
@@ -138,6 +193,6 @@ class ShimServer:
             steps = struct.unpack_from("<5I", data, 120)
             info = tensor_map.from_driver(data_type=data_type, rank=rank, address=address, dims=dims,
                                           strides=strides, box=box, steps=steps, swizzle=swizzle,
-                                          nan_fill=bool(fill), interleave=interleave)
+                                          nan_fill=fill, interleave=interleave)
             return tensor_map.encode(info)
         raise WarplensError(f"unknown shim request {op}")

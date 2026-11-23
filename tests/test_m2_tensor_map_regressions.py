@@ -33,10 +33,10 @@ def test_tensor_map_accepts_numpy_integer_geometry(sim):
 
 def test_tensor_map_dimension_limit_round_trips():
     # Exercise descriptor encoding without allocating a multi-gigabyte array.
-    info = tm.make_tiled(address=16, shape=(2**31,), dtype=np.dtype("u1"), box=(16,))
+    info = tm.make_tiled(address=16, shape=(2**32,), dtype=np.dtype("u1"), box=(16,))
     assert tm.decode(tm.encode(info)) == info
-    for dimension in (2**31 + 1, 2**32):
-        with pytest.raises(warplens.LaunchError, match=r"between 1 and 2\^31"):
+    for dimension in (2**32 + 1, 2**33):
+        with pytest.raises(warplens.LaunchError, match=r"between 1 and 2\^32"):
             tm.make_tiled(address=16, shape=(dimension,), dtype=np.dtype("u1"), box=(16,))
 
 

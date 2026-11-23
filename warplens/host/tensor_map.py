@@ -19,9 +19,9 @@ from ..errors import ExecutionError, LaunchError
 
 SIZE = 128
 MAX_RANK = 5
-MAX_DIM = 2**31  # cuTensorMapEncodeTiled, CUDA 13.5
-MAGIC = b"WLTM"
-_FORMAT = "<4s5B7xQ5I4x4Q5H5B"  # magic, rank/elem/float/swizzle/nan, address, dims, strides, box, steps
+MAX_DIM = 2**32  # cuTensorMapEncodeTiled, CUDA 13.5
+MAGIC = b"WLT2"
+_FORMAT = "<4s5B7xQ5Q4Q5H5B"  # magic, rank/elem/float/swizzle/nan, address, dims, strides, box, steps
 assert struct.calcsize(_FORMAT) <= SIZE
 
 # Swizzle mode -> (name, span in bytes of the inner box dimension, number of swizzled bits)
@@ -82,15 +82,16 @@ def decode(raw: bytes) -> TensorMapInfo:
     # Descriptor memory can be overwritten by a kernel. Validate the decoded
     # fields before they become array sizes, divisors, or dtype lookup keys.
     try:
-        expected = make_tiled(address=address, shape=info.dims[::-1],
-                              dtype=np.dtype(f"{'f' if is_float else 'u'}{elem_size}"),
-                              box=info.box[::-1], swizzle=SWIZZLE_MODES[swizzle][0],
-                              element_strides=info.steps[::-1],
-                              oob_fill="nan" if nan_fill else "zero")
+        # CUDA frontends can describe padded tensors. Validate explicit strides
+        # rather than reconstructing the contiguous strides of the Python API.
+        data_type = ({2: 6, 4: 7, 8: 8} if is_float else {1: 0, 2: 1, 4: 2, 8: 4})[elem_size]
+        expected = from_driver(data_type=data_type, rank=rank, address=address, dims=info.dims,
+                               strides=info.strides, box=info.box, steps=info.steps,
+                               swizzle=swizzle, nan_fill=nan_fill)
     except LaunchError as e:
         raise ExecutionError(f"invalid tensor map: {e}") from e
-    if info.strides != expected.strides or info.steps != expected.steps:
-        raise ExecutionError("invalid tensor-map strides")
+    if info.steps != expected.steps:
+        raise ExecutionError("invalid tensor-map element strides")
     return info
 
 
@@ -136,7 +137,7 @@ def make_tiled(*, address: int, shape, dtype: np.dtype, box, swizzle=None, eleme
     if address % 16:
         raise LaunchError("the tensor's address must be 16-byte aligned")
     if any(not 1 <= d <= MAX_DIM for d in dims):
-        raise LaunchError(f"tensor dimensions must be between 1 and 2^31, got {dims[::-1]}")
+        raise LaunchError(f"tensor dimensions must be between 1 and 2^32, got {dims[::-1]}")
     if any(not 1 <= b <= 256 for b in box):
         raise LaunchError(f"box dimensions must be between 1 and 256, got {box[::-1]}")
     if any(not 1 <= s <= 8 for s in steps):
@@ -176,13 +177,28 @@ def from_driver(*, data_type: int, rank: int, address: int, dims, strides, box, 
     if not 1 <= rank <= MAX_RANK or swizzle not in SWIZZLE_MODES:
         raise LaunchError(f"invalid tensor map: rank {rank}, swizzle {swizzle}")
     elem, is_float = DRIVER_TYPES[data_type]
-    dims, box, steps = tuple(dims[:rank]), tuple(box[:rank]), tuple(steps[:rank])
-    strides = tuple(strides[:rank - 1])
-    if address % 16 or any(s % 16 or s >= 2**40 for s in strides):
-        raise LaunchError("tensor-map address and strides must be multiples of 16")
-    if any(not 1 <= d <= 2**32 for d in dims) or any(not 1 <= b <= 256 for b in box) \
+    dims, box, steps = (_integer_tuple(values, name)[:rank] for values, name in
+                        ((dims, "tensor dimensions"), (box, "box dimensions"),
+                         (steps, "element strides")))
+    strides = _integer_tuple(strides, "byte strides")[:rank - 1]
+    if len(dims) != rank or len(box) != rank or len(steps) != rank or len(strides) != rank - 1:
+        raise LaunchError("tensor-map geometry must provide one entry per dimension")
+    if not isinstance(address, (int, np.integer)) or not 0 <= address < 2**64 or address % 16:
+        raise LaunchError("tensor-map address must be a 16-byte aligned unsigned 64-bit integer")
+    if any(s <= 0 or s % 16 or s >= 2**40 for s in strides):
+        raise LaunchError("tensor-map strides must be positive multiples of 16 below 2^40")
+    if any(not 1 <= d <= MAX_DIM for d in dims) or any(not 1 <= b <= 256 for b in box) \
             or any(not 1 <= s <= 8 for s in steps):
         raise LaunchError(f"tensor-map dimensions out of range: dims {dims}, box {box}, strides {steps}")
+    preceding = elem
+    for dimension, stride in zip(dims, strides):
+        if stride < preceding * dimension:
+            raise LaunchError("tensor-map byte strides must include the preceding dimension")
+        preceding = stride
+    if nan_fill not in (0, 1):
+        raise LaunchError("invalid tensor-map out-of-bounds fill mode")
+    if data_type == 9 and nan_fill:
+        raise LaunchError("BF16 tensor maps with NaN out-of-bounds fill are not supported")
     inner = box[0] * elem
     span = SWIZZLE_MODES[swizzle][1]
     if inner % 16 or (span is not None and inner > span):

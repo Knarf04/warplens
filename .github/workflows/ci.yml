@@ -61,18 +61,19 @@ jobs:
       - name: Run the whole suite; no test may skip
         run: |
           set -o pipefail
-          status=0
-          pytest -q -rs 2>&1 | tee pytest.log || status=$?
-          if [ "$status" != 0 ]; then
-            # Put the failure summary where it can be read without downloading the log, as a
-            # few short annotations (a long one is dropped). The tail of the log is included
-            # because a crashed interpreter leaves no summary lines to match.
-            { grep -E '^(FAILED|ERROR|SKIPPED|E  |Fatal Python error|WARPLENS_NO_SKIPS|  tests/|[0-9]+ (passed|failed))' pytest.log | head -30
-              echo "--- last lines of the log ---"; tail -20 pytest.log; } \
-              | tr -cd '\11\12\40-\176' | cut -c1-200 | sed 's/%/%25/g; s/::/: :/g' > summary.txt || true
-            split -l 10 summary.txt summary.part.
-            for part in summary.part.*; do
-              echo "::error title=pytest ${part##*.}::$(awk '{printf "%s%%0A", $0}' "$part")"
-            done
-          fi
-          exit "$status"
+          pytest -q -rs 2>&1 | tee pytest.log
+      # Put the failure summary where it can be read without downloading the log, as a few
+      # short annotations. The tail of the log is included because a crashed interpreter
+      # leaves no summary lines to match. A separate step, so it runs however pytest ended.
+      - name: Report the pytest failure
+        if: failure()
+        shell: bash {0}
+        run: |
+          echo "::notice title=pytest log::$(wc -l < pytest.log) lines"
+          { grep -E '^(FAILED|ERROR|SKIPPED|E  |Fatal Python error|WARPLENS_NO_SKIPS|  tests/|[0-9]+ (passed|failed))' pytest.log | head -30
+            echo "--- last lines of the log ---"; tail -20 pytest.log; } \
+            | tr -cd '\11\12\40-\176' | cut -c1-200 | sed 's/%/%25/g; s/::/: :/g' > summary.txt
+          split -l 10 summary.txt summary.part.
+          for part in summary.part.*; do
+            echo "::error title=pytest ${part##*.}::$(awk '{printf "%s%%0A", $0}' "$part")"
+          done

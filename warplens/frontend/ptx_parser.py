@@ -35,6 +35,8 @@ _TOKEN = re.compile(
 SPECIAL_REGISTERS = {
     "tid": True, "ntid": True, "ctaid": True, "nctaid": True,
     "laneid": False, "warpid": False, "nwarpid": False,
+    "clusterid": True, "nclusterid": True, "cluster_ctaid": True, "cluster_nctaid": True,
+    "cluster_ctarank": False, "cluster_nctarank": False, "is_explicit_cluster": False,
 }
 
 _LINKAGE = {".visible", ".weak", ".extern", ".common"}

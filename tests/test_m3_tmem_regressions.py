@@ -151,7 +151,7 @@ def test_blocked_allocation_resumes_after_another_warp_frees_memory(sim):
 @pytest.mark.parametrize("operation", [
     ALLOC.replace("alloc.", "alloc.exclusive."),
     FREE.replace("dealloc.", "dealloc.exclusive."),
-    "tcgen05.relinquish_alloc_permit.cta_group::2.sync.aligned;",
+    "tcgen05.relinquish_alloc_permit.cta_group::3.sync.aligned;",
     "tcgen05.wait::ld.sync.aligned.unsupported;",
     "tcgen05.st.sync.aligned.32x32b.x1.b64 [%base], {%v};",
     "tcgen05.ld.sync.aligned.32x32b.x1.unsupported.b32 {%v}, [%base];",

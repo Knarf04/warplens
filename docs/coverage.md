@@ -46,4 +46,15 @@ that names the instruction and its PTX line.
 ## Special registers
 
 `%tid`, `%ntid`, `%ctaid`, `%nctaid` (each with `.x/.y/.z`), `%laneid`,
-`%warpid`, `%nwarpid`.
+`%warpid`, `%nwarpid`; for clusters `%clusterid`, `%nclusterid`,
+`%cluster_ctaid`, `%cluster_nctaid` (each with `.x/.y/.z`), `%cluster_ctarank`,
+`%cluster_nctarank`, `%is_explicit_cluster`.
+
+## Clusters
+
+| Group | Instructions | Notes |
+| --- | --- | --- |
+| Cluster barrier | `barrier.cluster.arrive`, `barrier.cluster.wait` (with `.aligned`) | |
+| Distributed shared memory | `mapa.shared::cluster`, `ld`/`st.shared::cluster`, `mbarrier.arrive.shared::cluster` | other mbarrier operations cannot be remote |
+| TMA | `.multicast::cluster` on tensor loads, also with `.cta_group::2` | not on raw `cp.async.bulk` |
+| tcgen05 | `cta_group::2` forms of `alloc`, `dealloc`, `relinquish_alloc_permit`, `mma` (M = 128 or 256), `commit`; `commit` with `.multicast::cluster` | no `clusterlaunchcontrol` |

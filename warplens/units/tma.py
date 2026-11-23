@@ -22,7 +22,7 @@ from ..frontend.ir import Imm, TensorRef
 from ..host import tensor_map as tm
 from .alu import _address, op, unsupported
 
-_LOAD_FLAGS = frozenset({"mbarrier::complete_tx::bytes", "L2::cache_hint"})
+_LOAD_FLAGS = frozenset({"mbarrier::complete_tx::bytes", "L2::cache_hint", "multicast::cluster"})
 _STORE_FLAGS = frozenset({"bulk_group", "L2::cache_hint"})
 _UINT = {1: np.dtype(np.uint8), 2: np.dtype(np.uint16), 4: np.dtype(np.uint32), 8: np.dtype(np.uint64)}
 
@@ -76,9 +76,10 @@ def _check_alignment(w, ins, info, start: int, lane: int) -> None:
 
 
 def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
-          swizzle: int | None = None, source=None) -> None:
-    """Issue an asynchronous write of `data` to shared bytes `idx`, reporting to `bar`."""
-    cta = w.cta
+          swizzle: int | None = None, source=None, target=None) -> None:
+    """Issue an asynchronous write of `data` to shared bytes `idx`, reporting to `bar`.
+    `target` is the CTA whose shared memory is written, when it is not the issuer's."""
+    cta = target or w.cta
     _require_seen(w, ins, [lane], cta.smem.async_writer[idx], "TMA load overwrites")
     for op_id in np.unique(cta.smem.async_reader[idx]):
         if op_id > 0 and int(op_id) not in w.seen:
@@ -204,6 +205,11 @@ def _cp(w, ins, mask):
             raise unsupported(ins)
         nd = int(rest[1][0])
         rest = rest[2:]
+    cta_group = next((m for m in rest if m.startswith("cta_group::")), None)
+    if cta_group is not None:  # a load whose completion is reported for a pair of CTAs
+        rest.remove(cta_group)
+        if cta_group not in ("cta_group::1", "cta_group::2"):
+            raise unsupported(ins, f"TMA with .{cta_group}")
     if len(rest) < 2:
         raise unsupported(ins)
     dst, src, *flags = rest
@@ -223,11 +229,18 @@ def _cp(w, ins, mask):
 
     for lane in lanes:
         if to_shared and nd:  # [smem], [tensor_map, {coords}], [mbarrier]
-            if len(ops) != 3 + hint:
-                raise unsupported(ins, "expected [dst], [tensor_map, {coords}], [mbarrier]")
+            multicast = "multicast::cluster" in flags
+            if len(ops) != 3 + hint + multicast:
+                raise unsupported(ins, "expected [dst], [tensor_map, {coords}], [mbarrier][, mask]")
             start = int(_address(w, ins, ops[0])[lane])
             info, coords = _tensor_map(w, ins, ops[1], lane, nd)
-            bar = cta.mbarrier(int(_address(w, ins, ops[2])[lane]), w, ins, [lane])
+            bar_offset = int(_address(w, ins, ops[2])[lane])
+            # With multicast, the same box lands at the same offset in every CTA of the
+            # cluster whose rank is set in the mask, and reports to each one's mbarrier.
+            targets = [cta]
+            if multicast:
+                ranks = int(w.read_address(ops[3])[lane]) & 0xFFFF  # a 16-bit operand
+                targets = [cta.peer(r) for r in range(16) if ranks >> r & 1]
             _check_alignment(w, ins, info, start, lane)
             idx = _smem_bytes(w, ins, start, info.box_bytes, info.swizzle, "load")
             addrs, inside = tm.element_addresses(info, coords)
@@ -236,8 +249,13 @@ def _cp(w, ins, mask):
             if info.nan_fill:
                 values[:] = np.array(np.nan, dtype=f"f{info.elem_size}").view(dt)
             values[inside] = w.mem.read(addrs[inside], dt)
-            _load(w, ins, lane, start, idx, values.view(np.uint8), bar, swizzle=info.swizzle,
-                  source=addrs[inside])
+            for target in targets:
+                # A .cta_group::2 load reports to the mbarrier of the even-ranked CTA of the
+                # receiving pair, which is the one that waits and issues the MMA.
+                reports_to = target.peer(target.rank & ~1) if cta_group == "cta_group::2" else target
+                _load(w, ins, lane, start, idx, values.view(np.uint8),
+                      reports_to.mbarrier(bar_offset, w, ins, [lane]), swizzle=info.swizzle,
+                      source=addrs[inside], target=target)
         elif to_shared:  # [smem], [global], size, [mbarrier]
             if len(ops) != 4 + hint:
                 raise unsupported(ins, "expected [dst], [src], size, [mbarrier]")

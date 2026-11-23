@@ -112,11 +112,13 @@ class Device:
 
     def launch(self, ptx, entry: str, *, grid, block, args=(), smem: int = 0, trace=None,
                max_steps: int | None = None, async_delay: int = 4, timing=False,
-               active_sms: int | None = None) -> LaunchStats:
+               active_sms: int | None = None, cluster=None) -> LaunchStats:
         """Run kernel `entry` from `ptx` (a path or a parsed Module) to completion.
 
         `smem` is the dynamic shared memory per CTA in bytes, as passed to a
-        real launch; it sizes `extern __shared__` arrays.
+        real launch; it sizes `extern __shared__` arrays. `cluster` is the
+        cluster shape in CTAs, as passed to a cluster launch; the grid must be
+        a whole number of clusters.
 
         With `timing=True` the launch also runs an approximate timing model of
         this device (`stats.timing`); pass a `timing.config.GpuConfig` to use
@@ -141,7 +143,8 @@ class Device:
             self._programs[key] = Program(module, module.functions[entry], self._globals[id(module)])
         return run_kernel(self._programs[key], self.memory, grid=grid, block=block,
                           args=args, smem=smem, trace=trace, max_steps=max_steps,
-                          async_delay=async_delay, timing=self._timing(timing, active_sms))
+                          async_delay=async_delay, timing=self._timing(timing, active_sms),
+                          cluster=cluster)
 
     def _timing(self, timing, active_sms):
         if timing is None or timing is False:

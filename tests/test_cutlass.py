@@ -30,3 +30,16 @@ def test_tutorial_gemm_matches_numpy(tutorial, dims, alpha, beta):
     np.testing.assert_allclose(got, reference, rtol=1e-4, atol=1e-4)
     assert not stats.findings
     assert stats.output  # the tutorials print their layouts from thread 0
+
+
+@pytest.mark.parametrize("tutorial", [3, 4])  # 3: TMA multicast in 4 x 4 clusters; 4: two-SM MMA
+@pytest.mark.parametrize("dims, alpha, beta", [
+    ((512, 1024, 64), 1.0, 0.0),  # one cluster of 16 CTAs
+    ((512, 1024, 192), 0.5, -2.0),  # several K tiles, and the alpha/beta epilogue
+])
+def test_cluster_tutorial_gemm_matches_numpy(tutorial, dims, alpha, beta):
+    if not (EXAMPLE / f"tutorial_0{tutorial}.ptx").exists():
+        pytest.skip(f"tutorial_0{tutorial}.ptx not built")
+    got, reference, stats = load_runner()(tutorial, *dims, alpha=alpha, beta=beta)
+    np.testing.assert_allclose(got, reference, rtol=1e-4, atol=1e-4)
+    assert not stats.findings and stats.ctas == 16

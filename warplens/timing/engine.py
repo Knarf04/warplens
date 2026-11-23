@@ -2,43 +2,46 @@
 
 from __future__ import annotations
 
-from ..core.engine import Engine
-from ..errors import DeadlockError, ExecutionError
+from ..core.engine import Engine, deadlock
+from ..errors import ExecutionError
 
 
 class TimedEngine(Engine):
-    def run(self, cta) -> None:
-        warps = cta.warps
-        line = cta.timeline
-        queue = cta.async_queue  # entries [completion time, operation, callback], sorted by time
+    def run(self, group) -> None:
+        warps = group.warps
+        lines = [cta.timeline for cta in group.ctas]
         for w in warps:
             w.time = 0.0
         while True:
             runnable = [w for w in warps if w.blocked is None and not w.done]
-            if not runnable and not queue:
+            source = group.next_async()  # each CTA's queue is sorted by completion time
+            if not runnable and source is None:
                 if all(w.done for w in warps):
-                    cta.finish()
+                    group.finish()
                     return
-                if cta.release_barriers():
+                if group.release_barriers():
                     continue
-                for bar in cta.mbarriers.values():
-                    bar.finish(when="the kernel deadlocked")
-                raise DeadlockError(
-                    f"deadlock in CTA {cta.id}: every unfinished warp is blocked and "
-                    f"nothing can release them\n{cta.describe_blocked()}", cta.findings.items)
+                raise deadlock(group)
             waiting = [w for w in warps if w.blocked is not None]
             warp = min(runnable, key=lambda w: w.time) if runnable else None
-            if queue and (warp is None or queue[0][0] <= warp.time):
-                line.now = queue[0][0]
-                cta._complete(queue.pop(0))
+            if source is not None and (warp is None or source.async_queue[0][0] <= warp.time):
+                now = source.async_queue[0][0]
+                for line in lines:
+                    line.now = now
+                source._complete(source.async_queue.pop(0))
+                warp = None
             else:
+                line = warp.cta.timeline
                 ins = warp.program.instrs[warp.stack.top.pc]
-                line.now = warp.time
+                for other in lines:
+                    other.now = warp.time
                 warp.step()
                 line.charge(warp, ins)
-                line.now = warp.time
+                now = warp.time
+                for other in lines:
+                    other.now = now
                 if warp.blocked is not None:
-                    line.blocked(warp, warp.time)
+                    line.blocked(warp, now)
                 elif warp.done:
                     line.finished(warp)
                 self.steps += 1
@@ -46,9 +49,9 @@ class TimedEngine(Engine):
                     raise ExecutionError(
                         f"kernel did not finish within max_steps={self.max_steps} warp "
                         "instructions (infinite loop?)")
-            cta.release_barriers()
+            group.release_barriers()
             for w in waiting:
                 if w.blocked is None:
-                    line.resumed(w, line.now)
-            if warp is not None and warp.blocked is None and warp.warp_id in line.wait_start:
-                line.resumed(warp, line.now)  # blocked and released within the same step
+                    w.cta.timeline.resumed(w, now)
+            if warp is not None and warp.blocked is None and warp.warp_id in warp.cta.timeline.wait_start:
+                warp.cta.timeline.resumed(warp, now)  # blocked and released within the same step

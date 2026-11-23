@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from ..check.report import Finding, Findings
+from ..core.cluster import Cluster
 from ..core.cta import Cta
 from ..core.engine import Engine
 from ..core.program import Program
@@ -18,6 +19,7 @@ from ..units.smem import MAX_SMEM_BYTES
 from ..units.smem_banks import SmemReport
 
 MAX_THREADS_PER_BLOCK = 1024
+MAX_CLUSTER_CTAS = 16  # a multicast mask has 16 bits
 
 
 @dataclass(slots=True)
@@ -107,7 +109,8 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, bytes]:
 
 
 def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace=None,
-               max_steps: int | None = None, async_delay: int = 4, timing=None) -> LaunchStats:
+               max_steps: int | None = None, async_delay: int = 4, timing=None,
+               cluster=None) -> LaunchStats:
     if (not isinstance(async_delay, (int, np.integer))
             or isinstance(async_delay, (bool, np.bool_)) or async_delay < 0):
         raise LaunchError(f"async_delay must be a non-negative integer, got {async_delay!r}")
@@ -142,35 +145,53 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
     stats = LaunchStats(ctas=gx * gy * gz, warps=gx * gy * gz * nwarps,
                         threads=gx * gy * gz * threads, smem_bytes=smem_bytes)
     findings = Findings()
+    explicit_cluster = cluster is not None
+    cluster = dim3(cluster, "cluster") if explicit_cluster else (1, 1, 1)
+    if cluster[0] * cluster[1] * cluster[2] > MAX_CLUSTER_CTAS:
+        raise LaunchError(f"cluster {cluster} has more than {MAX_CLUSTER_CTAS} CTAs")
+    if gx % cluster[0] or gy % cluster[1] or gz % cluster[2]:
+        raise LaunchError(f"grid {(gx, gy, gz)} is not a whole number of clusters of shape {cluster}")
     output: list[str] = []
     if timing is None:
         engine = Engine(max_steps)
     else:
         from ..timing.engine import TimedEngine
         engine = TimedEngine(max_steps)
+    kx, ky, kz = cluster
+    cluster_specials = {"cluster_nctaid.x": const(kx), "cluster_nctaid.y": const(ky),
+                        "cluster_nctaid.z": const(kz), "cluster_nctarank": const(kx * ky * kz),
+                        "nclusterid.x": const(gx // kx), "nclusterid.y": const(gy // ky),
+                        "nclusterid.z": const(gz // kz),
+                        "is_explicit_cluster": const(int(explicit_cluster))}
     with np.errstate(all="ignore"):
-        for cz in range(gz):
-            for cy in range(gy):
-                for cx in range(gx):
-                    ids = {"ctaid.x": const(cx), "ctaid.y": const(cy), "ctaid.z": const(cz)}
-                    cta = Cta((cx, cy, cz), smem_bytes, stats.smem, findings, async_delay)
-                    cta.output = output
-                    if timing is not None:
-                        cta.timeline = timing.timeline(cta.id)
-                    warps = cta.warps
-                    for wi in range(nwarps):
-                        t = tuple(c[wi] for c in tid)
-                        specials = {**shared, **ids, "warpid": const(wi),
-                                    "tid.x": t[0], "tid.y": t[1], "tid.z": t[2]}
-                        warps.append(Warp(program, cta=cta, warp_id=wi, tid=t,
+        for qz, qy, qx in np.ndindex(gz // kz, gy // ky, gx // kx):  # one cluster at a time
+            group = Cluster((qx, qy, qz), cluster)
+            for rz, ry, rx in np.ndindex(kz, ky, kx):  # its CTAs in rank order
+                cx, cy, cz = qx * kx + rx, qy * ky + ry, qz * kz + rz
+                ids = {"ctaid.x": const(cx), "ctaid.y": const(cy), "ctaid.z": const(cz),
+                       "clusterid.x": const(qx), "clusterid.y": const(qy), "clusterid.z": const(qz),
+                       "cluster_ctaid.x": const(rx), "cluster_ctaid.y": const(ry),
+                       "cluster_ctaid.z": const(rz),
+                       "cluster_ctarank": const(rx + kx * (ry + ky * rz))}
+                cta = Cta((cx, cy, cz), smem_bytes, stats.smem, findings, async_delay)
+                cta.output = output
+                group.add(cta)
+                if timing is not None:
+                    cta.timeline = timing.timeline(cta.id)
+                for wi in range(nwarps):
+                    t = tuple(c[wi] for c in tid)
+                    specials = {**shared, **cluster_specials, **ids, "warpid": const(wi),
+                                "tid.x": t[0], "tid.y": t[1], "tid.z": t[2]}
+                    cta.warps.append(Warp(program, cta=cta, warp_id=wi, tid=t,
                                           mask=valid[wi], specials=specials, params=params,
                                           mem=mem, trace=trace))
-                    engine.run(cta)
-                    for w in warps:
-                        stats.instructions += w.instructions
-                        stats.lane_instructions += w.lane_instructions
-                        stats.divergent_branches += w.divergences
-                        stats.max_simt_depth = max(stats.max_simt_depth, w.stack.max_depth)
+                group.warps.extend(cta.warps)
+            engine.run(group)
+            for w in group.warps:
+                stats.instructions += w.instructions
+                stats.lane_instructions += w.lane_instructions
+                stats.divergent_branches += w.divergences
+                stats.max_simt_depth = max(stats.max_simt_depth, w.stack.max_depth)
     stats.findings = findings.items
     if timing is not None:
         stats.timing = timing.report()

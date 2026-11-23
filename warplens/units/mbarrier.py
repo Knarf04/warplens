@@ -53,7 +53,19 @@ def _mbarrier(w, ins, mask):
 
     def bars(operand):
         addr = offsets(operand)
-        return [(int(l), cta.mbarrier(int(addr[l]), w, ins, [int(l)])) for l in lanes]
+        if "shared::cluster" not in ins.mods:
+            return [(int(l), cta.mbarrier(int(addr[l]), w, ins, [int(l)])) for l in lanes]
+        # A cluster-wide address (from mapa) may name another CTA's mbarrier.
+        from .smem import CLUSTER_STRIDE
+        found = []
+        for l in lanes:
+            rank_plus_1, offset = divmod(int(addr[l]), CLUSTER_STRIDE)
+            target = cta if rank_plus_1 == 0 else cta.peer(rank_plus_1 - 1)
+            if target is not cta and kind[:1] != ("arrive",):
+                raise ExecutionError(f"mbarrier.{'.'.join(kind)} on another CTA's mbarrier; only "
+                                     "arrive may be remote")
+            found.append((int(l), target.mbarrier(offset, w, ins, [int(l)])))
+        return found
 
     def count(operand):
         return w.read(operand, "u32")

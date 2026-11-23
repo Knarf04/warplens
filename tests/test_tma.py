@@ -422,10 +422,10 @@ def test_tma_errors(sim):
     big = sim.tensor_map_tiled(sim.empty((256, 128), "u8"), (256, 128))
     with pytest.raises(warplens.ExecutionError, match=r"runs past\s+the CTA's 16392 bytes"):
         sim.launch(box_kernel(2), "k", grid=1, block=1, args=[big, big, 32768, 0, 0])
-    with pytest.raises(warplens.UnsupportedError, match="multicast::cluster"):
+    with pytest.raises(warplens.UnsupportedError, match="im2col"):
         sim.launch(kernel("""
             .reg .b64 %s; .reg .b32 %a;
-            cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes.multicast::cluster [%a], [%s, {0}], [%a], 3;
+            cp.async.bulk.tensor.1d.shared::cluster.global.im2col.mbarrier::complete_tx::bytes [%a], [%s, {0}], [%a];
             ret;"""), "k", grid=1, block=1)
     del dst
 

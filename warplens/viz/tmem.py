@@ -35,6 +35,45 @@ def accumulator_rows(m_dim: int, lane_offset: int = 0) -> np.ndarray:
     return rows
 
 
+def locate(m: int, n: int, m_dim: int, n_dim: int, pair: bool = False, lane_offset: int = 0):
+    """Where element (m, n) of an MMA result lives: (CTA within the pair, lane, column).
+
+    For `cta_group::1` the CTA is always 0. For `cta_group::2` the even-ranked CTA holds
+    the first half of the rows and the odd-ranked one the second half. With M = 256 each
+    holds 128 rows on its 128 lanes. With M = 128 (PTX's "Layout B") each holds 64 rows,
+    which fill only half the lanes, so the columns are folded: the first N/2 columns sit
+    on lanes 0-63 and the rest on lanes 64-127, in N/2 TMEM columns.
+    """
+    if not (0 <= m < m_dim and 0 <= n < n_dim):
+        raise ValueError(f"({m}, {n}) is outside a {m_dim} x {n_dim} result")
+    if not pair:
+        return 0, int(accumulator_rows(m_dim, lane_offset).tolist().index(m)), n
+    if m_dim not in (128, 256):
+        raise ValueError("M must be 128 or 256 for cta_group::2")
+    half = m_dim // 2
+    cta, row = divmod(m, half)
+    if m_dim == 256:
+        return cta, row, n
+    return cta, row + 64 * (n >= n_dim // 2), n % (n_dim // 2)
+
+
+def pair_text(m_dim: int, n_dim: int) -> str:
+    """The TMEM layout of a cta_group::2 MMA result, for both CTAs of the pair."""
+    locate(0, 0, m_dim, n_dim, pair=True)  # validates M
+    half = m_dim // 2
+    lines = [f"TMEM layout of a {m_dim} x {n_dim} tcgen05.mma result (cta_group::2"
+             + (", Layout B)" if m_dim == 128 else ")"),
+             "  CTA    lanes      holds"]
+    for cta, name in enumerate(("even", "odd ")):
+        rows = f"rows {cta * half}-{cta * half + half - 1}"
+        if m_dim == 256:
+            lines.append(f"  {name}   0-127      {rows}, columns 0-{n_dim - 1} in TMEM columns 0-{n_dim - 1}")
+        else:
+            lines.append(f"  {name}   0-63       {rows}, columns 0-{n_dim // 2 - 1} in TMEM columns 0-{n_dim // 2 - 1}")
+            lines.append(f"  {name}   64-127     {rows}, columns {n_dim // 2}-{n_dim - 1} in TMEM columns 0-{n_dim // 2 - 1}")
+    return "\n".join(lines)
+
+
 def _runs(rows: np.ndarray):
     """Consecutive lanes holding consecutive rows (or all unused), as (first lane, last lane, first row)."""
     start = 0
@@ -106,6 +145,8 @@ def main(argv=None) -> int:
     parser.add_argument("n", nargs="?", type=int, default=64, help="MMA columns")
     parser.add_argument("--lane-offset", type=int, default=0,
                         help="lane part of the MMA's TMEM address: 0, or 16 for M = 64")
+    parser.add_argument("--pair", action="store_true",
+                        help="a cta_group::2 MMA over two CTAs (M = 128 or 256)")
     parser.add_argument("--svg", metavar="FILE", help="write the accumulator layout as SVG")
     parser.add_argument("--transfer", nargs=2, metavar=("SHAPE", "COUNT"),
                         help="show a load/store shape instead, e.g. 16x128b 2")
@@ -113,6 +154,9 @@ def main(argv=None) -> int:
     try:
         if args.transfer:
             print(transfer_text(args.transfer[0], int(args.transfer[1])))
+            return 0
+        if args.pair:
+            print(pair_text(args.m, args.n))
             return 0
         print(accumulator_text(args.m, args.n, args.lane_offset))
         if args.svg:

@@ -61,6 +61,8 @@ class Cta:
         self.output: list[str] = []  # text printed by the kernel
         self.tmem = None  # units.tcgen05.Tmem, created on first use
         self.timeline = None  # timing.model.Timeline when the launch is timed
+        self.cluster = None  # core.cluster.Cluster this CTA belongs to
+        self.rank = 0  # position in the cluster
         self.smem = SharedMemory(smem_bytes)
         self.smem_report = smem_report
         self.findings = findings
@@ -111,12 +113,20 @@ class Cta:
         if bar is None:
             from ..errors import ExecutionError
             raise ExecutionError(f"mbarrier at shared offset {offset} is used before mbarrier.init")
-        if bar.init_warp != warp.warp_id and bar.init_epoch == self.smem.epoch:
+        if warp.cta is self and bar.init_warp != warp.warp_id and bar.init_epoch == self.smem.epoch:
             self.findings.add(
                 "mbarrier-init-race",
                 f"mbarrier at shared offset {offset} was initialized by warp {bar.init_warp} and "
                 "is used by another warp with no barrier in between", warp, ins, lanes)
         return bar
+
+    def peer(self, rank: int, ins=None):
+        """The CTA with this rank in the cluster."""
+        ctas = self.cluster.ctas
+        if not 0 <= rank < len(ctas):
+            from ..errors import ExecutionError
+            raise ExecutionError(f"CTA rank {rank} does not exist in a cluster of {len(ctas)} CTA(s)")
+        return ctas[rank]
 
     def phase_completed(self) -> None:
         """An mbarrier phase completed: wake its waiters; it also orders shared-memory accesses."""

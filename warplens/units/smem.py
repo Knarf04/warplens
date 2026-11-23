@@ -22,6 +22,11 @@ MAX_SMEM_BYTES = 228 * 1024
 # Shadow "writer" value for bytes last written by TMA rather than by a warp.
 ASYNC_PROXY = -2
 
+# Cluster-wide shared addresses (`shared::cluster`): an address below CLUSTER_STRIDE is the
+# CTA's own shared memory; `mapa` produces (rank + 1) * CLUSTER_STRIDE + offset for the
+# shared memory of the CTA with that rank in the cluster.
+CLUSTER_STRIDE = 1 << 20
+
 # Where shared memory appears in the generic address space (`cvta.shared`).
 GENERIC_WINDOW = 0x1_0000_0000
 

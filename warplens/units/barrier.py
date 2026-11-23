@@ -16,8 +16,23 @@ def _uniform(w, ins, operand, mask, what: str) -> int:
     return int(values[0]) if len(values) else 0
 
 
+def _cluster_barrier(w, ins, mask):
+    """barrier.cluster.arrive / barrier.cluster.wait: a barrier over every thread of the cluster."""
+    mods = [m for m in ins.mods[1:] if m not in ("aligned", "release", "acquire", "relaxed")]
+    if mods not in (["arrive"], ["wait"]) or ins.operands:
+        raise unsupported(ins)
+    if not mask.any():
+        return
+    if mods == ["arrive"]:
+        w.cta.cluster.barrier_arrive(w)
+    else:
+        w.cta.cluster.barrier_wait(w, ins)
+
+
 @op("bar", "barrier")
 def _bar(w, ins, mask):
+    if ins.opcode == "barrier" and ins.mods[:1] == ("cluster",):
+        return _cluster_barrier(w, ins, mask)
     mods = tuple(m for m in ins.mods if m != "cta")
     if ins.opcode == "barrier" and mods in (("sync", "aligned"), ("arrive", "aligned")):
         mods = mods[:1]  # explicit spelling of the alignment implicit in `bar`

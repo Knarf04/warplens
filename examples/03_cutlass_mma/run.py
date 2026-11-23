@@ -1,13 +1,18 @@
-"""Run CUTLASS's first two Blackwell tutorials (tcgen05 GEMMs) on the CPU, unmodified.
+"""Run CUTLASS's first four Blackwell tutorials (tcgen05 GEMMs) on the CPU, unmodified.
 
     conda run -n warplens examples/03_cutlass_mma/build.sh    # once
     python examples/03_cutlass_mma/run.py [tutorial] [M N K]
 
-Both kernels compute D = alpha * A * B^T + beta * C with half-precision A (M x K)
-and B (N x K) and float32 C and D, one 128 x 256 tile per CTA.
+All four compute D = alpha * A * B^T + beta * C with half-precision A (M x K)
+and B (N x K) and float32 C and D, one 128 x 256 tile of D per CTA.
 
-    tutorial 1  01_mma_sm100.cu      threads copy A and B into shared memory
-    tutorial 2  02_mma_tma_sm100.cu  TMA loads them, reporting to an mbarrier
+    tutorial 1  01_mma_sm100.cu                threads copy A and B into shared memory
+    tutorial 2  02_mma_tma_sm100.cu            TMA loads them, reporting to an mbarrier
+    tutorial 3  03_mma_tma_multicast_sm100.cu  4 x 4 clusters: each CTA loads a quarter of a
+                                               tile and TMA multicasts it to the CTAs that share it
+    tutorial 4  04_mma_tma_2sm_sm100.cu        the same, with one 256 x 256 MMA per pair of CTAs
+
+Tutorials 3 and 4 need M to be a multiple of 512 and N a multiple of 1024.
 
 warplens has no libcuda shim yet, so this script plays the tutorials' host side:
 it builds the kernels' by-value arguments by hand.
@@ -43,11 +48,12 @@ def coord_tensor(array) -> bytes:
     return struct.pack("<iii", rows, cols, cols)
 
 
-def tma_atom(sim, array, tile_rows: int) -> bytes:
+def tma_atom(sim, array, box_rows: int) -> bytes:
     """A CuTe TMA copy atom: the 128-byte tensor map, padded to the atom's 256 bytes.
-    The box is one shared-memory tile, K-major with 128-byte swizzle, as the kernel
-    lays out its operands for tcgen05.mma."""
-    tensor_map = sim.tensor_map_tiled(array, (tile_rows, TILE_K), swizzle="128B")
+    The box is K-major with 128-byte swizzle, as the kernel lays out its operands for
+    tcgen05.mma: a whole shared-memory tile, or the part of one that a CTA loads when
+    the tile is multicast."""
+    tensor_map = sim.tensor_map_tiled(array, (box_rows, TILE_K), swizzle="128B")
     return tensor_map.tobytes().ljust(256, b"\0")
 
 
@@ -64,26 +70,37 @@ def run(tutorial=1, M=128, N=256, K=64, alpha=1.0, beta=0.0, seed=0):
     entry = next(name for name in module.functions if "gemm_device" in name)
     # The TiledMMA argument carries the tcgen05 instruction descriptor:
     # float32 accumulators, M = 128 (stored / 16), N = 256 (stored / 8).
-    idesc = (1 << 4) | ((TILE_N >> 3) << 17) | ((TILE_M >> 4) << 24)
+    # Tutorial 4 multiplies 256 rows at a time, 128 from each CTA of a pair.
+    mma_m = 2 * TILE_M if tutorial == 4 else TILE_M
+    idesc = (1 << 4) | ((TILE_N >> 3) << 17) | ((mma_m >> 4) << 24)
     tiled_mma = struct.pack("<II", idesc, 1)
+    cluster = None
     if tutorial == 1:
         args = [gmem_tensor(dA), gmem_tensor(dB), gmem_tensor(dC), gmem_tensor(dD),
                 b"\0", tiled_mma, b"\0", alpha, beta]
     else:
+        # TMA boxes. Without clusters a CTA loads its whole tile. In the 4 x 4 clusters of
+        # tutorials 3 and 4, an A tile is shared by 4 CTAs and each loads a quarter of its
+        # rows; a B tile is 256 rows shared by 4 CTAs (tutorial 3), or 128 rows per CTA
+        # shared by 2 (tutorial 4), so each loads 64.
+        box_a, box_b = (TILE_M, TILE_N) if tutorial == 2 else (TILE_M // 4, 64)
+        cluster = None if tutorial == 2 else (4, 4, 1)
+        if cluster and (M % 512 or N % 1024):
+            raise ValueError("tutorials 3 and 4 need M to be a multiple of 512 and N of 1024")
         args = [coord_tensor(dA), coord_tensor(dB), gmem_tensor(dC), gmem_tensor(dD),
-                b"\0", tiled_mma, b"\0", tma_atom(sim, dA, TILE_M), tma_atom(sim, dB, TILE_N),
+                b"\0", tiled_mma, b"\0", tma_atom(sim, dA, box_a), tma_atom(sim, dB, box_b),
                 alpha, beta]
     stats = sim.launch(module, entry, grid=(-(-M // TILE_M), -(-N // TILE_N)), block=128,
-                       smem=64 * 1024, args=args)
+                       smem=64 * 1024, args=args, cluster=cluster)
     reference = alpha * (A.astype(np.float32) @ B.astype(np.float32).T) + beta * C
     return dD.numpy(), reference, stats
 
 
 if __name__ == "__main__":
     numbers = [int(x) for x in sys.argv[1:]]
-    tutorials = [numbers.pop(0)] if len(numbers) in (1, 4) else [1, 2]
-    dims = numbers or [256, 512, 128]
+    tutorials = [numbers.pop(0)] if len(numbers) in (1, 4) else [1, 2, 3, 4]
     for tutorial in tutorials:
+        dims = numbers or ([256, 512, 128] if tutorial < 3 else [512, 1024, 128])
         if not ptx_path(tutorial).exists():
             sys.exit(f"{ptx_path(tutorial).name} not found; run examples/03_cutlass_mma/build.sh first")
         got, reference, stats = run(tutorial, *dims)

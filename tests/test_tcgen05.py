@@ -212,7 +212,7 @@ def test_allocation_size_must_be_a_power_of_two_of_at_least_32(sim):
 
 def test_unsupported_tcgen05_forms_are_errors(sim):
     for line, why in [
-        ("tcgen05.alloc.cta_group::2.sync.aligned.shared::cta.b32 [%a], 32;", "cta_group::2"),
+        ("tcgen05.alloc.cta_group::3.sync.aligned.shared::cta.b32 [%a], 32;", "cta_group::1 or"),
         ("tcgen05.ld.sync.aligned.16x32bx2.x1.b32 {%a}, [%a], 1;", "implemented shapes are"),
         ("tcgen05.ld.sync.aligned.32x32b.x1.pack::16b.b32 {%a}, [%a];", "without packing"),
         ("tcgen05.ld.sync.aligned.16x128b.x1.b32 {%a}, [%a];", r"expected 2 register\(s\)"),

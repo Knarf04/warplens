@@ -25,6 +25,7 @@ from ..core.cta import Wait
 from ..errors import ExecutionError
 from ..frontend.ir import Sym
 from .alu import _address, op, unsupported
+from .smem import GENERIC_WINDOW, MAX_SMEM_BYTES
 
 _NOISE = frozenset({"shared", "shared::cta", "shared::cluster", "b64",
                     "release", "relaxed", "acquire", "cta", "cluster"})
@@ -40,17 +41,27 @@ def _mbarrier(w, ins, mask):
         return
     cta, ops = w.cta, ins.operands
 
+    def offsets(operand):
+        addr = _address(w, ins, operand)
+        if not any(m in ins.mods for m in ("shared", "shared::cta", "shared::cluster")):
+            window = np.uint64(GENERIC_WINDOW)
+            shared = (addr >= window) & (addr < window + np.uint64(MAX_SMEM_BYTES))
+            if not shared[mask].all():
+                raise ExecutionError("generic mbarrier address does not point to shared memory")
+            addr = addr - window
+        return addr
+
     def bars(operand):
-        offsets = _address(w, ins, operand)
-        return [(int(l), cta.mbarrier(int(offsets[l]), w, ins, [int(l)])) for l in lanes]
+        addr = offsets(operand)
+        return [(int(l), cta.mbarrier(int(addr[l]), w, ins, [int(l)])) for l in lanes]
 
     def count(operand):
         return w.read(operand, "u32")
 
     if kind == ("init",) and len(ops) == 2:
-        offsets, n = _address(w, ins, ops[0]), count(ops[1])
+        addr, n = offsets(ops[0]), count(ops[1])
         for l in lanes:
-            cta.mbarrier_init(int(offsets[l]), int(n[l]), w, ins)
+            cta.mbarrier_init(int(addr[l]), int(n[l]), w, ins)
     elif kind in (("arrive",), ("arrive", "expect_tx")) and 2 <= len(ops) <= 3:
         expect = kind[-1] == "expect_tx"
         if expect and len(ops) != 3:
@@ -83,7 +94,8 @@ def _mbarrier(w, ins, mask):
             done = (bar.phase & 1) != (int(arg[l]) & 1) if parity else bar.phase != int(arg[l])
             result[l] = done
             if done:
-                w.seen |= bar.knowledge
+                if "relaxed" not in ins.mods:
+                    w.seen |= bar.completed_knowledge
             else:
                 waiting.append(bar)
         if blocking and waiting:
@@ -92,10 +104,10 @@ def _mbarrier(w, ins, mask):
             return
         w.write(ops[0], result, mask)
     elif kind == ("inval",) and len(ops) == 1:
-        offsets = _address(w, ins, ops[0])
+        addr = offsets(ops[0])
         for l in lanes:
-            cta.mbarrier(int(offsets[l]), w, ins, [int(l)])
-            del cta.mbarriers[int(offsets[l])]
+            cta.mbarrier(int(addr[l]), w, ins, [int(l)])
+            del cta.mbarriers[int(addr[l])]
     else:
         raise unsupported(ins)
 
@@ -104,16 +116,23 @@ def _mbarrier(w, ins, mask):
 def _fence(w, ins, mask):
     """Fences order accesses made through different proxies or by different threads.
 
-    Only `fence.proxy.async` changes checker state: it makes this warp's earlier
-    ordinary writes to shared memory visible to TMA. The others are accepted
-    and have no effect in a simulator that executes one instruction at a time.
+    An async proxy fence covering shared memory makes this warp's earlier
+    ordinary writes visible to TMA. A global-only fence does not cover shared
+    memory. Other explicitly supported fences have no effect in this model.
     """
     mods = ins.mods
     if not mask.any():
         return
-    if mods[:2] == ("proxy", "async"):
-        w.cta.smem.fence_async(w.warp_id)
-    elif mods[:1] in (("mbarrier_init",), ("acq_rel",), ("sc",)) or mods[:1] == ("proxy",):
+    if ins.operands:
+        raise unsupported(ins)
+    if mods in (("proxy", "async"), ("proxy", "async", "shared::cta"),
+                ("proxy", "async", "shared::cluster"), ("proxy", "async", "global")):
+        if mods[-1] != "global":
+            w.cta.smem.fence_async(w.warp_id)
+    elif mods in (("mbarrier_init", "release", "cluster"), ("proxy", "alias")):
+        pass
+    elif len(mods) == 2 and mods[0] in ("acq_rel", "sc") and mods[1] in (
+            "cta", "cluster", "gpu", "sys"):
         pass
     else:
         raise unsupported(ins)
@@ -121,7 +140,7 @@ def _fence(w, ins, mask):
 
 class Mbarrier:
     __slots__ = ("cta", "offset", "expected", "pending", "tx", "phase", "init_warp",
-                 "init_epoch", "knowledge", "in_flight")
+                 "init_epoch", "knowledge", "completed_knowledge", "in_flight", "tx_source")
 
     def __init__(self, cta, offset: int, expected: int, warp_id: int):
         self.cta = cta
@@ -132,21 +151,28 @@ class Mbarrier:
         self.phase = 0
         self.init_warp = warp_id
         self.init_epoch = cta.smem.epoch
-        self.knowledge: set[int] = set()  # async operations a successful waiter may rely on
+        self.knowledge: set[int] = set()  # async operations contributed to the current phase
+        self.completed_knowledge: set[int] = set()  # the immediately preceding completed phase
         self.in_flight = 0  # TMA loads that will still report to this barrier
+        self.tx_source = None  # completion responsible for an unresolved negative tx-count
 
     def describe(self) -> str:
         text = (f"mbarrier at shared offset {self.offset} is in phase {self.phase}, still needs "
                 f"{self.pending} arrival(s) and {self.tx} byte(s) of TMA data")
-        if self.tx > 0 and not self.in_flight:
+        if self.tx < 0:
+            text += (f"; {-self.tx} completion byte(s) have not been accounted for by expect_tx "
+                     "(expect_tx too small or missing?)")
+        elif self.tx > 0 and not self.in_flight:
             text += "; no TMA load in flight will deliver them (expect_tx too large?)"
         return text
 
     def expect_tx(self, n: int) -> None:
         self.tx += n
+        self._check()
 
     def arrive(self, n: int, warp, ins, lanes) -> None:
-        self.knowledge |= warp.seen
+        if "relaxed" not in ins.mods:
+            self.knowledge |= warp.seen
         if n > self.pending:
             self.cta.findings.add(
                 "mbarrier-over-arrival",
@@ -156,20 +182,29 @@ class Mbarrier:
         self._check()
 
     def complete_tx(self, n: int, warp, ins, lanes) -> None:
-        if n > self.tx:
-            self.cta.findings.add(
-                "mbarrier-tx-mismatch",
-                f"{n} byte(s) delivered to an mbarrier phase that expected only {max(self.tx, 0)} "
-                "more. expect_tx is missing, too small, or came after the phase completed, so "
-                "the phase can complete before the data has arrived", warp, ins, lanes)
         self.tx -= n
+        if self.tx < 0:
+            self.tx_source = (warp, ins, lanes)
         self._check()
 
+    def finish(self) -> None:
+        # Completions may precede expect_tx, so a temporary negative tx-count is
+        # valid. Only diagnose unbalanced credits after the kernel has finished.
+        if self.tx < 0 and self.tx_source is not None:
+            warp, ins, lanes = self.tx_source
+            self.cta.findings.add(
+                "mbarrier-tx-mismatch",
+                f"the kernel returned with {-self.tx} completion byte(s) not accounted for by "
+                f"expect_tx on the mbarrier at shared offset {self.offset}; expect_tx is missing "
+                "or too small", warp, ins, lanes)
+
     def _check(self) -> None:
-        if self.pending <= 0 and self.tx <= 0:
+        if self.pending <= 0 and self.tx == 0:
             self.phase += 1
             self.pending += self.expected
-            self.tx = 0
+            self.completed_knowledge = self.knowledge
+            self.knowledge = set()
+            self.tx_source = None
             self.cta.phase_completed()
 
 

@@ -79,6 +79,13 @@ class SharedMemory:
     def index(self, offsets: np.ndarray, size: int, verb: str) -> np.ndarray:
         return self._index(offsets, size, verb)
 
+    def has_uninitialized_bytes(self, idx: np.ndarray) -> bool:
+        """Whether bytes have neither an ordinary writer nor a queued TMA load.
+
+        A pending TMA load is checked separately for missing synchronization.
+        """
+        return bool(((self._writer[idx] == -1) & (self.async_writer[idx] == 0)).any())
+
     def begin_async_write(self, idx: np.ndarray, op_id: int) -> None:
         self.async_writer[idx] = op_id
         self.async_active = True

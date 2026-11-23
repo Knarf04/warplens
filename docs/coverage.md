@@ -16,7 +16,7 @@ that names the instruction and its PTX line.
 | performance directives before the body (`.maxntid`, ...), `.pragma` | ignored |
 | `.shared` variables, in a function or at module level, and `.extern .shared name[]` / `name[0]` | yes; alignments and sizes accept PTX integer literals |
 | paired destinations (`%r1\|%p1`) | yes |
-| nested `{ }` blocks with their own registers and labels (inline assembly) | yes |
+| nested `{ }` blocks with their own registers, shared variables and labels (inline assembly) | yes |
 | register names without `%`, `_` as a discarded destination, `[tensor_map, {coords}]` operands | yes |
 | `.func` and `call`, `.global` / `.const` / `.local` variables | no |
 | array parameters | no |
@@ -36,7 +36,7 @@ that names the instruction and its PTX line.
 | Shuffle | `shfl.sync.{up,down,bfly,idx}.b32` with optional predicate destination | no rendezvous across divergent paths; see `m1.md` |
 | mbarrier | `mbarrier.init`, `.arrive` (with count), `.arrive.expect_tx`, `.expect_tx`, `.complete_tx`, `.test_wait`, `.try_wait` (both with `.parity`), `.inval` | no `arrive_drop`, `.noComplete`, `pending_count` |
 | TMA | `cp.async.bulk.tensor.{1..5}d` load (`shared <- global`, `.mbarrier::complete_tx::bytes`) and store (`global <- shared`, `.bulk_group`), tile mode; `cp.async.bulk` without a tensor map; `.commit_group`, `.wait_group[.read]`; `prefetch.tensormap` and `cp.async.bulk.prefetch` (no-ops) | no multicast, im2col, `cp.reduce`, `tensormap.replace`; `.L2::cache_hint` ignored |
-| Fences | `fence.proxy.async`; `fence.mbarrier_init`, `fence.acq_rel`, `fence.sc`, `fence.proxy.*` accepted with no effect | |
+| Fences | `fence.proxy.async[.global/.shared::cta/.shared::cluster]`; `fence.mbarrier_init.release.cluster`, `fence.{acq_rel,sc}.{cta,cluster,gpu,sys}`, `fence.proxy.alias` | only async fences affecting shared memory change checker state; other proxy modes are unsupported |
 | Control | `bra`, `bra.uni`, `ret`, `exit` | no `brx.idx`, no `call` |
 
 ## Special registers

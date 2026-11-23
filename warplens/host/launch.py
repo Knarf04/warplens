@@ -84,6 +84,10 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, tuple[int, int]]:
 
 def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace=None,
                max_steps: int | None = None, async_delay: int = 4) -> LaunchStats:
+    if (not isinstance(async_delay, (int, np.integer))
+            or isinstance(async_delay, (bool, np.bool_)) or async_delay < 0):
+        raise LaunchError(f"async_delay must be a non-negative integer, got {async_delay!r}")
+    async_delay = int(async_delay)
     gx, gy, gz = dim3(grid, "grid")
     bx, by, bz = dim3(block, "block")
     threads = bx * by * bz

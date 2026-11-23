@@ -8,38 +8,58 @@ from ..errors import ExecutionError
 
 class TimedEngine(Engine):
     def run(self, group) -> None:
+        """`group` is a core.cluster.Cluster; each of its CTAs has its own Timeline (its SM)."""
         warps = group.warps
         lines = [cta.timeline for cta in group.ctas]
+
+        def set_now(when: float) -> None:
+            for line in lines:
+                line.now = when
+
+        def issue_time(w) -> float:
+            return max(w.time, w.cta.timeline.slots[w.warp_id % 4].free)
+
         for w in warps:
             w.time = 0.0
         while True:
-            runnable = [w for w in warps if w.blocked is None and not w.done]
             source = group.next_async()  # each CTA's queue is sorted by completion time
+            if all(w.done for w in warps):
+                # Retiring the cluster must still report operations left in flight.
+                # Only completions reached before the final instruction finishes
+                # can retire normally; finish() diagnoses and drains the rest.
+                retired = max(w.time for w in warps)
+                while source is not None and source.async_queue[0][0] <= retired:
+                    set_now(source.async_queue[0][0])
+                    source._complete(source.async_queue.pop(0))
+                    source = group.next_async()
+                set_now(retired)
+                group.finish()
+                return
+            runnable = [w for w in warps if w.blocked is None and not w.done]
             if not runnable and source is None:
-                if all(w.done for w in warps):
-                    group.finish()
-                    return
                 if group.release_barriers():
                     continue
                 raise deadlock(group)
             waiting = [w for w in warps if w.blocked is not None]
-            warp = min(runnable, key=lambda w: w.time) if runnable else None
-            if source is not None and (warp is None or source.async_queue[0][0] <= warp.time):
+            # Issue-slot contention delays the instruction itself, including
+            # its functional effects and any asynchronous work it launches.
+            # Prefer the longest-ready warp when two share the same issue time.
+            warp = min(runnable, key=lambda w: (issue_time(w), w.time)) if runnable else None
+            when = issue_time(warp) if warp is not None else None
+            if source is not None and (warp is None or source.async_queue[0][0] <= when):
                 now = source.async_queue[0][0]
-                for line in lines:
-                    line.now = now
+                set_now(now)
                 source._complete(source.async_queue.pop(0))
                 warp = None
             else:
+                warp.time = when
                 line = warp.cta.timeline
                 ins = warp.program.instrs[warp.stack.top.pc]
-                for other in lines:
-                    other.now = warp.time
+                set_now(when)
                 warp.step()
                 line.charge(warp, ins)
                 now = warp.time
-                for other in lines:
-                    other.now = now
+                set_now(now)
                 if warp.blocked is not None:
                     line.blocked(warp, now)
                 elif warp.done:

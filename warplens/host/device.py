@@ -151,5 +151,8 @@ class Device:
             return None
         from ..timing.config import GpuConfig
         from ..timing.model import Timing
+        if timing is not True and not isinstance(timing, GpuConfig):
+            raise LaunchError("timing must be True, False, None or a GpuConfig, "
+                              f"got {type(timing).__name__}")
         config = timing if isinstance(timing, GpuConfig) else GpuConfig.load(self.model)
         return Timing(config, active_sms)

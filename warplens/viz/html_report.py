@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from html import escape
 
+from ..timing.config import TIMING_PARAMS
 from ..timing.model import RESOURCE_SOURCES, SATURATED
+from .trace_perfetto import slice_lanes
 
 _COLORS = {"run": "#9ecae1", "wait": "#fdd0a2", "TMA": "#74c476", "MMA": "#9e9ac8"}
 _STYLE = """
@@ -32,9 +34,10 @@ def _timeline_svg(report) -> str:
         return ""
     cta = min(s.cta for s in slices)
     slices = [s for s in slices if s.cta == cta]
-    tracks = sorted({s.track for s in slices}, key=lambda t: (not t.startswith("warp"), t))
+    lanes = list(slice_lanes(slices))
+    tracks = sorted({track for _, track in lanes}, key=lambda t: (not t.startswith("warp"), t))
     span = max(s.end for s in slices) or 1.0
-    left, width, row = 110, 880, 22
+    left, width, row = 180, 810, 22
     height = len(tracks) * row + 34
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{left + width + 10}" height="{height}" '
            'font-family="sans-serif" font-size="11">']
@@ -42,8 +45,8 @@ def _timeline_svg(report) -> str:
         y = 4 + i * row
         out.append(f'<text x="{left - 6}" y="{y + 13}" text-anchor="end">{escape(track)}</text>')
         out.append(f'<rect x="{left}" y="{y}" width="{width}" height="{row - 5}" fill="#f7f7f7"/>')
-        for s in slices:
-            if s.track != track:
+        for s, display_track in lanes:
+            if display_track != track:
                 continue
             x = left + s.start / span * width
             w = max((s.end - s.start) / span * width, 0.6)
@@ -69,24 +72,31 @@ def _timeline_svg(report) -> str:
 def render_html(report, title: str = "warplens timing report") -> str:
     cfg = report.config
     r = report.roofline()
+    timing_keys = tuple(sorted(TIMING_PARAMS))
+    time_sources = _links(cfg, timing_keys) + ', <a href="#launch-active-sms">active_sms</a>'
+    compute_keys = (*report.compute_source_keys, "sm_count")
     rows = []
     for name, value in report.utilization.items():
         hot = ' class="hot"' if value >= SATURATED else ""
         rows.append(f'<tr><td>{name}</td><td class="num">{value:.0%}</td>'
                     f'<td><div class="bar"><div{hot} style="width:{min(value, 1) * 220:.0f}px"></div></div></td>'
-                    f'<td>{_links(cfg, RESOURCE_SOURCES[name])}</td></tr>')
+                    f'<td>{_links(cfg, RESOURCE_SOURCES[name])}'
+                    + (', <a href="#launch-active-sms">active_sms</a>' if name == "HBM" else "")
+                    + '</td></tr>')
     numbers = [
-        ("Kernel time", f"{report.time_ns:,.0f} ns", ("clock_ghz", "tma_latency_ns", "tma_bytes_per_clk",
-                                                     "hbm_bandwidth_tb_s", "tensor_core_tflops_f16")),
-        ("Kernel time in clocks", f"{report.clocks:,.0f}", ("clock_ghz",)),
-        ("SMs assumed to share HBM", f"{report.active_sms}", ("sm_count",)),
-        ("Achieved rate per SM", f"{r['achieved_flops_per_s'] / 1e12:.2f} TFLOP/s", ("clock_ghz",)),
+        ("Kernel time", f"{report.time_ns:,.0f} ns", time_sources),
+        ("Kernel time in clocks", f"{report.clocks:,.0f}", time_sources),
+        ("Mean asynchronous pipeline window", f"{report.pipeline_ns:,.0f} ns", time_sources),
+        ("SMs assumed to share HBM", f'<span id="launch-active-sms">{report.active_sms}</span>',
+         f'Launch parameter <code>active_sms</code>; defaults to {_links(cfg, ("sm_count",))}'),
+        ("Pipeline rate per SM", f"{r['achieved_flops_per_s'] / 1e12:.2f} TFLOP/s", time_sources),
         ("Compute ceiling per SM", f"{r['compute_ceiling_flops_per_s'] / 1e12:.2f} TFLOP/s",
-         ("tensor_core_tflops_f16", "sm_count")),
+         _links(cfg, compute_keys)),
         ("Memory ceiling per SM", f"{r['memory_ceiling_flops_per_s'] / 1e12:.2f} TFLOP/s at "
-                                  f"{r['flops_per_byte']:.1f} FLOP/byte", ("hbm_bandwidth_tb_s", "sm_count")),
+                                  f"{r['flops_per_byte']:.1f} FLOP/byte",
+         _links(cfg, ("hbm_bandwidth_tb_s",)) + ', <a href="#launch-active-sms">active_sms</a>'),
     ]
-    number_rows = "".join(f'<tr><td>{n}</td><td class="num">{v}</td><td>{_links(cfg, k)}</td></tr>'
+    number_rows = "".join(f'<tr><td>{n}</td><td class="num">{v}</td><td>{k}</td></tr>'
                           for n, v, k in numbers)
     config_rows = []
     for p in cfg.params.values():
@@ -99,17 +109,25 @@ def render_html(report, title: str = "warplens timing report") -> str:
 <h1>{escape(title)}</h1>
 <p class="warn">Simulated by warplens's approximate timing model for {escape(cfg.name)}. It shows where time
 goes under the stated parameters; it is not a measurement and has not been calibrated against hardware.
-Values marked * are assumptions because the real ones are not public.</p>
+Values marked * are model assumptions, including measurements borrowed from another GPU.</p>
 <h2>Verdict</h2><p><b>{escape(report.verdict)}</b></p>
 <p>{report.ctas} CTA(s) simulated, each alone on one SM.</p>
 <h2>Resources</h2>
 <table><tr><th>Resource</th><th>Busy</th><th></th><th>Derived from</th></tr>{''.join(rows)}</table>
 <p class="note">Busy is the fraction of time the resource was working: for the TMA engine, HBM, L2 and
 Tensor Core, of the interval in which asynchronous work was in flight; otherwise of the whole kernel.
-A resource busy at least {SATURATED:.0%} of the time is called the bottleneck.</p>
+A resource busy at least {SATURATED:.0%} of the time is called the bottleneck. Resource links identify
+the service-cost parameters; the denominator also depends on the timing parameters below.</p>
 <h2>Numbers</h2>
 <table><tr><th>Quantity</th><th>Value</th><th>Derived from</th></tr>{number_rows}</table>
+<p class="note">Pipeline rate divides the mean MMA FLOPs per CTA by the mean asynchronous pipeline
+window, excluding kernel setup and epilogue time. FLOPs and TMA bytes come from the executed kernel;
+the memory ceiling treats all those bytes as HBM traffic. For mixed MMA kinds, the compute ceiling
+uses their FLOP-weighted service times. Listed timing parameters can affect the scheduled duration;
+parameters for unused operations do not contribute.</p>
 <h2>Timeline</h2>{_timeline_svg(report)}
+<p class="note">Overlapping asynchronous operation lifetimes use extra display lanes; these are
+not additional hardware engines. Their bars include completion latency, not only resource busy time.</p>
 <h2>Configuration and sources</h2>
 <table><tr><th>Entry</th><th>Value</th><th>Unit</th><th>Source</th><th>Note</th></tr>{''.join(config_rows)}</table>
 </body></html>

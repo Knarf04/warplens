@@ -9,6 +9,7 @@ prediction for a real B200.
 """
 
 import sys
+import operator
 from pathlib import Path
 
 import numpy as np
@@ -21,6 +22,14 @@ M, N, K = 128, 64, 1024  # one CTA, 16 tiles along K
 
 
 def run(stages, **timing):
+    try:
+        if isinstance(stages, (bool, np.bool_)):
+            raise TypeError
+        stages = operator.index(stages)
+    except TypeError:
+        raise ValueError("stages must be an integer from 1 to 4") from None
+    if not 1 <= stages <= 4:
+        raise ValueError("stages must be an integer from 1 to 4")
     rng = np.random.default_rng(0)
     A = rng.uniform(-1, 1, (M, K)).astype(np.float16)
     B = rng.uniform(-1, 1, (N, K)).astype(np.float16)

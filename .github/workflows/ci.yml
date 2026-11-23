@@ -19,3 +19,16 @@ jobs:
       # No CUDA needed: tests run the .ptx files checked in under examples/.
       - run: pip install -e ".[dev]"
       - run: pytest -q
+
+  triton:
+    runs-on: ubuntu-latest
+    env:
+      CUDA_VISIBLE_DEVICES: ""
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,triton]"
+      # Exercise the optional frontend, including install/cleanup, without a GPU.
+      - run: pytest -q tests/test_triton*.py

@@ -73,12 +73,14 @@ def matmul(gpu, M=256, N=128, K=96, block=(128, 64, 32)):
 
 
 if __name__ == "__main__":
-    active = triton.runtime.driver.active
-    ours = not isinstance(active, wt.WarplensDriver)  # False under `warplens run`
+    active = wt.active_driver()
+    ours = active is None  # False under `warplens run`; never probe for a hardware driver.
     gpu = wt.install("B200") if ours else active
-    for name, run in (("vector add", vector_add), ("matmul", matmul)):
-        got, reference, stats = run(gpu)
-        print(f"{name}: max abs error vs NumPy {np.abs(got - reference).max():.3g}; "
-              f"{stats.ctas} CTA(s), {stats.instructions} warp-instructions, {len(stats.findings)} finding(s)")
-    if ours:
-        wt.uninstall()
+    try:
+        for name, run in (("vector add", vector_add), ("matmul", matmul)):
+            got, reference, stats = run(gpu)
+            print(f"{name}: max abs error vs NumPy {np.abs(got - reference).max():.3g}; "
+                  f"{stats.ctas} CTA(s), {stats.instructions} warp-instructions, {len(stats.findings)} finding(s)")
+    finally:
+        if ours:
+            wt.uninstall()

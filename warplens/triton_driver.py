@@ -17,6 +17,7 @@ involved. Tensors are `gpu.tensor(...)` objects rather than torch tensors. Needs
 from __future__ import annotations
 
 import struct
+import weakref
 
 import numpy as np
 
@@ -30,6 +31,13 @@ try:
     from triton.backends.driver import DriverBase
 except ImportError as exc:  # pragma: no cover
     raise ImportError("warplens.triton_driver needs the `triton` package (pip install triton)") from exc
+
+
+# JITFunction caches binders, targets and launchers by the driver's device key.
+# A simulator must never reuse a real CUDA device's cache (usually device 0).
+_DEVICE = object()
+_installed: list = []
+_loaded_kernels = weakref.WeakSet()
 
 
 class Tensor:
@@ -79,6 +87,27 @@ def _encode(value, ptx_type: str) -> bytes:
     return (int(value) % (1 << (8 * size))).to_bytes(size, "little")
 
 
+def _arguments(value, kind, device):
+    """Flatten Triton's tuple ABI and remove constexpr leaves."""
+    if isinstance(kind, (tuple, list)):
+        if not isinstance(value, (tuple, list)) or len(value) != len(kind):
+            raise LaunchError("Triton tuple argument does not match its compiled signature")
+        return [item for v, k in zip(value, kind) for item in _arguments(v, k, device)]
+    if kind == "constexpr":
+        return []
+    if kind.startswith("*"):
+        if isinstance(value, Tensor):
+            if value.array.device is not device:
+                raise LaunchError("the Triton tensor belongs to a different simulated device")
+        elif hasattr(value, "data_ptr"):
+            raise LaunchError("use a warplens tensor for simulated pointer arguments")
+        elif value is None:
+            value = 0
+    elif kind.startswith(("tensordesc", "nvTmaDesc")):
+        raise LaunchError("Triton tensor descriptor arguments are not supported")
+    return [value]
+
+
 def _make_launcher():
     class Launcher:
         """What Triton calls to launch one compiled kernel. Triton caches compiled kernels,
@@ -87,40 +116,65 @@ def _make_launcher():
         def __init__(self, src, metadata):
             self.src, self.metadata = src, metadata
             self.module = None
+            for kernel in src.fn.device_caches[_DEVICE][0].values():
+                if getattr(kernel, "src", None) is src:
+                    _loaded_kernels.add(kernel)
 
         def _ptx(self, function):
             if self.module is None:
-                for kernels, *_ in self.src.fn.device_caches.values():
-                    for kernel in kernels.values():
-                        if getattr(kernel, "function", None) is function:
-                            self.module = parse_ptx(kernel.asm["ptx"], name=f"{self.metadata.name}.ptx")
+                kernels = self.src.fn.device_caches[_DEVICE][0]
+                for kernel in kernels.values():
+                    if getattr(kernel, "function", None) is function:
+                        # Triton's destructor uses the currently active driver,
+                        # but this fake module is not a hardware resource.
+                        kernel._module_pid = None
+                        self.module = parse_ptx(kernel.asm["ptx"], name=f"{self.metadata.name}.ptx")
+                        break
                 if self.module is None:
                     raise LaunchError(f"could not find the PTX of Triton kernel `{self.metadata.name}`")
             return self.module
 
         def __call__(self, grid_x, grid_y, grid_z, stream, function, packed_metadata,
                      launch_metadata, enter_hook, exit_hook, *args):
-            driver = triton.runtime.driver.active
-            if not isinstance(driver, WarplensDriver):
+            driver = active_driver()
+            if driver is None:
                 raise LaunchError("this kernel was compiled for the warplens driver, which is no "
                                   "longer active; call warplens.triton_driver.install() again")
             module = self._ptx(function)
             params = module.functions[self.metadata.name].params
-            values = [a for a, kind in zip(args, self.src.signature.values()) if kind != "constexpr"]
-            # After the user's arguments Triton passes two scratch pointers; neither is used here.
-            values += [0] * (len(params) - len(values))
+            if len(args) != len(self.src.signature):
+                raise LaunchError("Triton arguments do not match the compiled signature")
+            values = [v for a, kind in zip(args, self.src.signature.values())
+                      for v in _arguments(a, kind, driver.device)]
+            # Triton 3.9 appends global and profile scratch pointers to the ABI.
+            values += [0, 0]
             if len(values) != len(params):
                 raise LaunchError(f"Triton kernel `{self.metadata.name}` takes {len(params)} "
                                   f"parameters in PTX but {len(values)} were supplied")
             if getattr(self.metadata, "global_scratch_size", 0):
                 raise LaunchError("Triton kernels that need a global scratch buffer are not supported")
-            cluster = getattr(self.metadata, "cluster_dims", None)
-            cluster = tuple(cluster) if cluster and tuple(cluster) != (1, 1, 1) else None
+            if getattr(self.metadata, "profile_scratch_size", 0):
+                raise LaunchError("Triton kernels that need a profile scratch buffer are not supported")
+            if enter_hook is not None:
+                enter_hook(launch_metadata)
+            # Triton's native launcher treats any empty grid as a no-op.
+            if 0 in (grid_x, grid_y, grid_z):
+                if exit_hook is not None:
+                    exit_hook(launch_metadata)
+                return
+            # Triton's grid counts programs (clusters), not physical CTAs. Its
+            # CUDA launcher groups num_ctas consecutive x coordinates per program.
+            num_ctas = getattr(self.metadata, "num_ctas", 1)
+            cluster = (num_ctas, 1, 1) if num_ctas > 1 else None
             driver.last_stats = driver.device.launch(
-                module, self.metadata.name, grid=(grid_x, grid_y, grid_z),
+                module, self.metadata.name, grid=(grid_x * num_ctas, grid_y, grid_z),
                 block=self.metadata.num_warps * 32, smem=self.metadata.shared, cluster=cluster,
                 args=[_encode(v, p.type) for v, p in zip(values, params)], **driver.launch_options)
             driver.launches.append((self.metadata.name, driver.last_stats))
+            if driver.last_stats.output:
+                print(driver.last_stats.output, end="")
+            if exit_hook is not None:
+                exit_hook(launch_metadata)
 
     return Launcher
 
@@ -136,7 +190,7 @@ class WarplensDriver(DriverBase):
         self.utils = _Utils(self)
         self.launcher_cls = _make_launcher()
         self.get_current_stream = lambda device: 0
-        self.get_current_device = lambda: 0
+        self.get_current_device = lambda: _DEVICE
         super().__init__()
 
     # -- what Triton asks of a driver ------------------------------------------------------
@@ -179,10 +233,24 @@ def install(model: str = "B200", **launch_options) -> WarplensDriver:
     """Make Triton compile for, and launch on, a simulated GPU. Returns the driver.
     `launch_options` are passed to every `Device.launch`, e.g. `timing=True`."""
     driver = WarplensDriver(model, **launch_options)
+    # Reading .active would initialize the default hardware driver on CPU-only
+    # machines. Triton 3.9 keeps the uninitialized state as _active=None.
+    _installed.append(triton.runtime.driver._active)
     triton.runtime.driver.set_active(driver)
     return driver
 
 
 def uninstall() -> None:
-    """Give Triton back its default driver."""
-    triton.runtime.driver.reset_active()
+    """Restore the state preceding install(), without initializing hardware."""
+    if _installed:
+        # Include kernels whose handles were initialized but never launched.
+        # Keep their module marker for Triton's _init_handles() fast path.
+        for kernel in _loaded_kernels:
+            kernel._module_pid = None
+        triton.runtime.driver.set_active(_installed.pop())
+
+
+def active_driver() -> WarplensDriver | None:
+    """The installed simulator, or None; never probes for a hardware driver."""
+    driver = triton.runtime.driver._active
+    return driver if isinstance(driver, WarplensDriver) else None

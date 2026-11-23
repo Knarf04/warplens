@@ -67,7 +67,12 @@ class SmemReport:
 
     def record(self, ins, kernel: str, offsets: np.ndarray, size: int, *, pc: int) -> int:
         """Returns the wavefronts this access took."""
-        if not len(offsets):
+        return self.record_groups(ins, kernel, [offsets], size, pc=pc)
+
+    def record_groups(self, ins, kernel: str, groups: list[np.ndarray], size: int, *, pc: int) -> int:
+        """One instruction with independently serviced groups, e.g. ldmatrix's matrices."""
+        groups = [offsets for offsets in groups if len(offsets)]
+        if not groups:
             return 0
         # PTX permits several instructions on one source line. Their costs
         # must remain separate, including distinct load/store counters.
@@ -75,7 +80,13 @@ class SmemReport:
         entry = self.instructions.get(key)
         if entry is None:
             entry = self.instructions[key] = InstrBanks(ins.line, ins.text, kernel, ins.opcode)
-        waves, ideal, per_bank = analyze(offsets, size)
+        waves = ideal = 0
+        per_bank = np.zeros(BANKS, dtype=np.int64)
+        for offsets in groups:
+            group_waves, group_ideal, group_banks = analyze(offsets, size)
+            waves += group_waves
+            ideal += group_ideal
+            per_bank += group_banks
         entry.executions += 1
         entry.wavefronts += waves
         entry.ideal += ideal

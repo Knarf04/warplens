@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..core.cta import NUM_BARRIERS
+from ..core.cta import NUM_BARRIERS, WARP_SIZE
 from ..errors import ExecutionError
 from .alu import op, unsupported
 
@@ -19,6 +19,8 @@ def _uniform(w, ins, operand, mask, what: str) -> int:
 @op("bar", "barrier")
 def _bar(w, ins, mask):
     mods = tuple(m for m in ins.mods if m != "cta")
+    if ins.opcode == "barrier" and mods in (("sync", "aligned"), ("arrive", "aligned")):
+        mods = mods[:1]  # explicit spelling of the alignment implicit in `bar`
     if mods not in (("sync",), ("arrive",)):
         raise unsupported(ins)
     wait = mods == ("sync",)
@@ -30,6 +32,12 @@ def _bar(w, ins, mask):
     if barrier >= NUM_BARRIERS:
         raise ExecutionError(f"barrier number {barrier} is out of range (0-{NUM_BARRIERS - 1})")
     count = _uniform(w, ins, ins.operands[1], mask, "barrier thread count") if len(ins.operands) == 2 else None
+    if count is not None and count % WARP_SIZE:
+        raise ExecutionError(f"barrier thread count {count} must be a multiple of {WARP_SIZE}")
+    if count == 0:
+        if not wait:
+            raise ExecutionError("bar.arrive requires a non-zero barrier thread count")
+        count = None  # zero encodes the all-CTA form, just like an omitted count
 
     live = w.live_lanes()
     if not np.array_equal(live, mask):

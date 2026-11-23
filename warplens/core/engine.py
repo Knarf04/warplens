@@ -30,7 +30,9 @@ class Engine:
                     f"nothing can release them\n{cta.describe_blocked()}")
             for w in runnable:
                 w.step()
-            cta.release_barriers()
+                # Reset a completed phase before another warp can arrive. A
+                # counted barrier can complete more than once in one round.
+                cta.release_barriers()
             self.steps += len(runnable)
             if limit is not None and self.steps > limit:
                 raise ExecutionError(

@@ -2,7 +2,7 @@
 
 **Understand a Blackwell GPU by watching it run, on your CPU.**
 
-> Status: M0 to M6 done (2026-11-23), with gaps recorded per milestone: M6's CuTe DSL work is a spike and compiled programs need specific build flags (docs/m6.md); M5 has no CLC (docs/m5.md); M1's `ncu` cross-check matches on bank conflicts but not on the total wavefront count (validation/README.md); M4's timing model is uncalibrated and its expected three-phase trend does not hold in one scenario (docs/m4.md). M2 to M6 are not validated on Blackwell hardware.
+> Status: M0 to M6 done (2026-11-23), with gaps recorded in docs/m1.md to docs/m6.md. Nothing Blackwell-specific has run on Blackwell hardware. What remains before v1.0 and before a hardware run is in section 11.
 > GitHub description: *Understand a Blackwell GPU by watching it run, on your CPU.*
 > Topics: `cuda` `gpu` `blackwell` `simulator` `ptx` `cutlass` `triton` `tensor-cores` `gpu-programming`
 
@@ -245,3 +245,119 @@ Suggested order of public visibility: announce after **M3**. "Run the CUTLASS Bl
 - Hopper (sm_90a) mode: wgmma, the same TMA/mbarrier engine. This is cheap once M2 exists and broadens the audience.
 - Optional SASS-level input via `nvdisasm` for timing studies.
 - Calibration suite to run on real B200/B300 when available.
+
+## 11. Path to hardware validation on a rented B200
+
+The aim: finish everything locally, then rent a B200 for one scripted run that
+produces files, with no debugging on the clock.
+
+### Where the project stands (2026-11-23)
+
+Solid:
+
+- All six milestones are built. The simulator runs real code from three
+  independent code generators without modification: the four CUTLASS Blackwell
+  tutorials (including 16-CTA clusters and the two-SM MMA), a Triton matmul,
+  and two of the TIRx GEMM kernels from the book *Modern GPU Programming for
+  MLSys*. Their agreement is the strongest evidence there is.
+- Everything Ampere shares with Blackwell has been checked bit for bit on an
+  RTX 3080 Ti: shuffles, barriers, `printf`, TF32 conversion, `ldmatrix`,
+  `bfe`, `prmt`, `cp.async`, and the bank-conflict counters.
+
+Weak:
+
+- TMA, mbarrier, tcgen05, TMEM and clusters rest on reading CUTLASS sources and
+  on kernels producing correct output. That misses whatever the kernels do not
+  exercise. The TMEM lane rule was wrong until the book's kernels contradicted
+  it; expect more of that kind.
+- The timing model is uncalibrated and several parameters are assumptions.
+- `main` is still the initial commit; work is on stacked branches.
+- The tests for CUTLASS, Triton and compiled programs are skipped in CI.
+- TIRx and CuTe DSL kernels compile to PTX that runs, but their launch has to be
+  repeated by hand.
+
+### Steps before renting
+
+**A. Stabilize the code**
+
+1. Merge the branch stack into `main`.
+2. Make CI run the full suite, including the tests that are skipped today.
+3. Finish the launch path for TIRx and CuTe DSL, so one script runs unchanged
+   in the simulator and on the GPU. Preferred route: extend the `libcuda` shim
+   to the driver calls both runtimes make. First measure which calls those are,
+   and whether CuTe DSL hands the driver PTX or machine code.
+4. Decide whether `clusterlaunchcontrol` is in scope. It is the one planned
+   instruction family not implemented.
+
+**B. Write down every claim to test**
+
+5. Collect the assumptions in `docs/m2.md` to `docs/m6.md` and
+   `docs/numerics.md` into one validation matrix: the claim, the probe that
+   tests it, the predicted output, the pass criterion.
+6. Include claims taken from review without verification: behaviour of an
+   undersized `expect_tx`, TMEM allocation sizes not increasing, UE8M0 tie
+   rounding, which CTA may issue a two-CTA MMA.
+
+**C. Build the Blackwell probe suite** (modeled on `validation/ampere/`: small
+kernels, a host program that prints results, a comparison script)
+
+7. TMA: swizzle by address versus by offset, with a deliberately misaligned
+   buffer; out-of-bounds fill and the NaN fill constant; whether `complete_tx`
+   counts filled bytes; element strides; ranks 1 to 5.
+8. mbarrier: phase parity; over-arrival; an undersized `expect_tx`, under a
+   timeout.
+9. TMEM: the lane-window rule, including addresses that name another window;
+   Layout F at both offsets; all four load/store shapes; allocation rules.
+10. MMA: K-major and MN-major operands in every swizzle mode; whether results
+    match the simulator bit for bit or only to rounding; what `kind::tf32` does
+    with low mantissa bits; `cvt.rn` and `cvt.rz` to TF32.
+11. Clusters: multicast targets; the cluster barrier; the two-CTA MMA with
+    M = 256 and with M = 128 (Layout B); the leader/peer TMA accounting.
+12. Small formats: the GPU's own FP8 and FP4 conversions against
+    `warplens.numerics`.
+13. End to end: the four CUTLASS tutorials, the Triton matmul, and the book's
+    `hgemm_v1` to `v9`, with outputs saved for comparison.
+14. Timing calibration: microbenchmarks for TMA latency and throughput, MMA
+    rate and shared-memory access, plus `ncu` counters.
+
+**D. Make the run unattended**
+
+15. Give every probe a timeout; some test behaviour that may hang.
+16. One script builds, runs everything, and packs the raw outputs into an
+    archive.
+17. Run every probe in the simulator first and commit the predicted outputs
+    before the rental, so that a mismatch is unambiguous.
+18. Dry-run the whole harness locally: the Ampere-compatible probes on the
+    3080 Ti, and the rest at least through the assembler for `sm_100a`.
+
+**E. Prepare the remote environment**
+
+19. A setup script with pinned versions: CUDA toolkit and driver, Triton, TIRx,
+    the CuTe DSL.
+20. Confirm the instance is a real B200 (`sm_100a`), not a consumer Blackwell
+    card (`sm_120`), which lacks parts of this.
+21. Confirm `ncu` can read performance counters there. It needed root on the
+    development machine, and containers on rented machines often block it.
+22. Estimate the run time and plan how results get back.
+
+**F. Decide in advance what happens with mismatches**
+
+23. What counts as a pass for each row of the matrix: bit-exact, within a
+    tolerance, or informational.
+24. Budget for a second, shorter rental. The first run will surface
+    discrepancies, and fixing them needs re-checking.
+
+### Can be done now, without a B200
+
+- The unexplained 4160-wavefront offset in the `ncu` comparison (M1) can be
+  narrowed down on the 3080 Ti with a probe that varies the block shape.
+  Settling it first means the Blackwell `ncu` run tests one thing, not two.
+
+### Still owed for v1.0 besides the above
+
+- A tutorial notebook that follows the book's chapters. The book's kernels are
+  TIRx; step 3 decides whether the notebook can run them directly. The book's
+  repository has no license file, so its code should be fetched from the
+  reader's clone or from pip, not copied here.
+- A single user guide; `docs/` currently has one write-up per milestone.
+- Reserve the PyPI name.

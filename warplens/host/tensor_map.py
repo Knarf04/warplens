@@ -19,6 +19,7 @@ from ..errors import ExecutionError, LaunchError
 
 SIZE = 128
 MAX_RANK = 5
+MAX_DIM = 2**31  # cuTensorMapEncodeTiled, CUDA 13.5
 MAGIC = b"WLTM"
 _FORMAT = "<4s5B7xQ5I4x4Q5H5B"  # magic, rank/elem/float/swizzle/nan, address, dims, strides, box, steps
 assert struct.calcsize(_FORMAT) <= SIZE
@@ -65,25 +66,57 @@ def encode(info: TensorMapInfo) -> bytes:
 
 
 def decode(raw: bytes) -> TensorMapInfo:
+    if len(raw) != SIZE:
+        raise ExecutionError(f"a tensor map must contain {SIZE} bytes, got {len(raw)}")
     fields = struct.unpack_from(_FORMAT, raw)
     magic, rank, elem_size, is_float, swizzle, nan_fill, address = fields[:7]
     if magic != MAGIC or not 1 <= rank <= MAX_RANK:
         raise ExecutionError("the tensor-map operand does not point at a tensor map created by "
                              "Device.tensor_map_tiled")
     dims, strides, box, steps = fields[7:12], fields[12:16], fields[16:21], fields[21:26]
-    return TensorMapInfo(rank, elem_size, bool(is_float), swizzle, bool(nan_fill), address,
+    info = TensorMapInfo(rank, elem_size, bool(is_float), swizzle, bool(nan_fill), address,
                          dims[:rank], strides[:rank - 1], box[:rank], steps[:rank])
+    if (elem_size not in (1, 2, 4, 8) or is_float not in (0, 1) or nan_fill not in (0, 1)
+            or (is_float and elem_size == 1) or swizzle not in SWIZZLE_MODES):
+        raise ExecutionError("invalid tensor-map data type, fill mode or swizzle")
+    # Descriptor memory can be overwritten by a kernel. Validate the decoded
+    # fields before they become array sizes, divisors, or dtype lookup keys.
+    try:
+        expected = make_tiled(address=address, shape=info.dims[::-1],
+                              dtype=np.dtype(f"{'f' if is_float else 'u'}{elem_size}"),
+                              box=info.box[::-1], swizzle=SWIZZLE_MODES[swizzle][0],
+                              element_strides=info.steps[::-1],
+                              oob_fill="nan" if nan_fill else "zero")
+    except LaunchError as e:
+        raise ExecutionError(f"invalid tensor map: {e}") from e
+    if info.strides != expected.strides or info.steps != expected.steps:
+        raise ExecutionError("invalid tensor-map strides")
+    return info
+
+
+def _integer_tuple(values, what: str) -> tuple[int, ...]:
+    try:
+        values = tuple(values)
+    except TypeError:
+        raise LaunchError(f"{what} must be a sequence of integers") from None
+    if any(not isinstance(v, (int, np.integer)) or isinstance(v, (bool, np.bool_))
+           for v in values):
+        raise LaunchError(f"{what} must contain integers, got {values!r}")
+    return tuple(int(v) for v in values)
 
 
 def make_tiled(*, address: int, shape, dtype: np.dtype, box, swizzle=None, element_strides=None,
                oob_fill: str = "zero") -> TensorMapInfo:
     """Validate like cuTensorMapEncodeTiled. `shape`, `box` and `element_strides`
     are in NumPy order (outermost first) and are reversed into TMA order here."""
+    shape = _integer_tuple(shape, "tensor dimensions")
     rank = len(shape)
     if not 1 <= rank <= MAX_RANK:
         raise LaunchError(f"a tensor map needs 1 to {MAX_RANK} dimensions, got {rank}")
-    box = (box,) if isinstance(box, (int, np.integer)) else tuple(box)
-    steps = (1,) * rank if element_strides is None else tuple(element_strides)
+    box = _integer_tuple((box,) if isinstance(box, (int, np.integer)) else box,
+                         "box dimensions")
+    steps = (1,) * rank if element_strides is None else \
+        _integer_tuple(element_strides, "element strides")
     if len(box) != rank or len(steps) != rank:
         raise LaunchError(f"box and element_strides need one entry per dimension ({rank})")
     dims, box, steps = tuple(shape)[::-1], box[::-1], steps[::-1]
@@ -102,8 +135,8 @@ def make_tiled(*, address: int, shape, dtype: np.dtype, box, swizzle=None, eleme
 
     if address % 16:
         raise LaunchError("the tensor's address must be 16-byte aligned")
-    if any(not 1 <= d <= 2**32 for d in dims):
-        raise LaunchError(f"tensor dimensions must be between 1 and 2^32, got {dims[::-1]}")
+    if any(not 1 <= d <= MAX_DIM for d in dims):
+        raise LaunchError(f"tensor dimensions must be between 1 and 2^31, got {dims[::-1]}")
     if any(not 1 <= b <= 256 for b in box):
         raise LaunchError(f"box dimensions must be between 1 and 256, got {box[::-1]}")
     if any(not 1 <= s <= 8 for s in steps):

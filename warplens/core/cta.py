@@ -39,6 +39,7 @@ class Barrier:
     arrived: list = field(default_factory=list)  # warps that arrived in this round
     waiters: list = field(default_factory=list)  # (warp, instr) blocked in bar.sync
     count: int | None = None  # explicit thread count, if any arrival gave one
+    knowledge: set[int] = field(default_factory=set)  # copies known at arrival, not later
 
     def satisfied(self, warps) -> bool:
         if self.count is not None:
@@ -74,6 +75,7 @@ class Cta:
                 f"barrier {barrier_id} thread count {count} differs from the current "
                 f"phase's thread count {bar.count}")
         bar.arrived.append(warp)
+        bar.knowledge |= warp.seen
         if count is not None:
             bar.count = count
         if wait:
@@ -85,15 +87,15 @@ class Cta:
         released = False
         for bar in self.barriers.values():
             if bar.arrived and bar.satisfied(self.warps):
-                # Warps that met at a barrier share what they know about finished TMA copies.
-                known = set().union(*(w.seen for w in bar.arrived))
-                for warp in bar.arrived:
-                    warp.seen |= known
+                # Arrivals release prior knowledge; only waiting warps acquire
+                # it. A bar.arrive caller may have run ahead since its arrival.
                 for warp, _ in bar.waiters:
+                    warp.seen |= bar.knowledge
                     warp.blocked = None
                 released = released or bool(bar.waiters)
                 self.smem.epoch += 1
                 bar.arrived, bar.waiters, bar.count = [], [], None
+                bar.knowledge = set()
         return released
 
     # -- mbarriers ------------------------------------------------------------
@@ -169,6 +171,8 @@ class Cta:
                               f"nothing waited on {how}",
                               operation.warp, operation.ins, [operation.lane])
             self._complete(entry)
+        for bar in self.mbarriers.values():
+            bar.finish()
         if self.tmem is not None:
             for column, (ncols, (warp, ins, lane)) in self.tmem.allocations.items():
                 self.findings.add("tmem-leak", f"{ncols} tensor-memory columns allocated here were "

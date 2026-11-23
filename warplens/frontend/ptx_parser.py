@@ -99,12 +99,13 @@ class _Parser:
         self.lines = text.splitlines()
         self.toks = _tokenize(text, name)
         self.i = 0
-        # Nested { } blocks (inline assembly) have their own registers and labels.
+        # Nested { } blocks (inline assembly) have their own variables and labels.
         # Scope 0 is the function body; names declared in scope k > 0 are stored
         # as "name@k" so they cannot clash with the enclosing ones.
         self.scopes = [0]
         self.next_scope = 1
         self.branches: list[tuple[Instr, list[int], _Tok]] = []
+        self.shared: dict[str, SharedVar] = {}
 
     def scoped(self, name: str, scope: int) -> str:
         return name if scope == 0 else f"{name}@{scope}"
@@ -206,6 +207,7 @@ class _Parser:
                 self.skip_directive(t)
         self.expect("{")
         self.scopes, self.next_scope, self.branches = [0], 1, []
+        self.shared = {}
         self.body(fn)
         for ins, scopes, tok in self.branches:
             target = ins.operands[0] if len(ins.operands) == 1 else None
@@ -334,7 +336,10 @@ class _Parser:
             elif t.value == ".reg":
                 self.reg_decl(fn)
             elif t.value == ".shared":
-                fn.shared.append(self.shared_var(extern=False))
+                var = self.shared_var(extern=False)
+                var.name = self.scoped(var.name, self.scopes[-1])
+                self.shared[var.name] = var
+                fn.shared.append(var)
             elif t.value == ".local":
                 fn.locals.append(self.shared_var(extern=False))
             elif t.value == ".param":  # storage for the arguments of a call
@@ -475,9 +480,14 @@ class _Parser:
             return Vec(tuple(elems))
         if t.kind != "word":
             raise self.syntax(t, f"expected an operand, found {t.value!r}")
-        key = self.find(t.value, fn.regs)
-        if key is not None:
-            return Reg(key)
+        # Registers and shared variables can shadow each other. Resolve both
+        # in lexical order, so an outer register cannot hide an inner variable.
+        for scope in reversed(self.scopes):
+            key = self.scoped(t.value, scope)
+            if key in fn.regs:
+                return Reg(key)
+            if key in self.shared:
+                return Sym(key)
         if t.value.startswith("%"):
             base, _, comp = t.value[1:].partition(".")
             if base in SPECIAL_REGISTERS:

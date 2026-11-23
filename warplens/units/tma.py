@@ -18,7 +18,7 @@ import numpy as np
 
 from ..core.cta import Wait
 from ..errors import ExecutionError, MemoryFault
-from ..frontend.ir import TensorRef
+from ..frontend.ir import Imm, TensorRef
 from ..host import tensor_map as tm
 from .alu import _address, op, unsupported
 
@@ -33,8 +33,13 @@ def _scalar(w, ins, operand, lane: int, ty: str = "u32") -> int:
 
 def _smem_bytes(w, ins, start: int, nbytes: int, bits: int, verb: str) -> np.ndarray:
     """Shared-memory byte indices of a (possibly swizzled) buffer."""
-    idx = tm.swizzle_offsets(np.uint64(start) + np.arange(nbytes, dtype=np.uint64), bits)
     size = w.cta.smem.size
+    # Reject impossible transfers before allocating an index for every byte.
+    # Swizzling is a permutation, so a transfer larger than SMEM cannot fit.
+    if nbytes > size or (nbytes and start >= size):
+        raise ExecutionError(f"TMA {verb} of {nbytes} byte(s) at shared offset {start} runs past "
+                             f"the CTA's {size} bytes of shared memory")
+    idx = tm.swizzle_offsets(np.uint64(start) + np.arange(nbytes, dtype=np.uint64), bits)
     if len(idx) and int(idx.max()) >= size:
         raise ExecutionError(f"TMA {verb} of {nbytes} byte(s) at shared offset {start} runs past "
                              f"the CTA's {size} bytes of shared memory")
@@ -52,6 +57,9 @@ def _tensor_map(w, ins, operand: TensorRef, lane: int, nd: int):
     if info.rank != nd:
         raise ExecutionError(f"{nd}d TMA instruction used with a {info.rank}-dimensional tensor map")
     coords = [int(w.read(c, "s32")[lane]) for c in operand.coords]
+    if coords[0] * info.elem_size % 16:
+        raise ExecutionError("TMA innermost coordinate must give a 16-byte aligned bounding box "
+                             f"(coordinate {coords[0]}, element size {info.elem_size})")
     return info, coords
 
 
@@ -70,6 +78,15 @@ def _check_alignment(w, ins, info, start: int, lane: int) -> None:
 def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar) -> None:
     """Issue an asynchronous write of `data` to shared bytes `idx`, reporting to `bar`."""
     cta = w.cta
+    _require_seen(w, ins, [lane], cta.smem.async_writer[idx], "TMA load overwrites")
+    for op_id in np.unique(cta.smem.async_reader[idx]):
+        if op_id > 0 and int(op_id) not in w.seen:
+            previous = cta.async_ops[int(op_id)]
+            cta.findings.add(
+                "tma-store-source-overwritten",
+                f"TMA load overwrites shared memory that the TMA store at line "
+                f"{previous.ins.line} reads, without waiting for it "
+                "(cp.async.bulk.wait_group.read)", w, ins, [lane])
     operation = cta.new_async("load", w, ins, lane)
     cta.smem.begin_async_write(idx, operation.id)
     bar.in_flight += 1
@@ -87,6 +104,10 @@ def _store(w, ins, lane: int, idx: np.ndarray, write_global) -> None:
     """Issue an asynchronous read of shared bytes `idx`; `write_global(bytes)` delivers them."""
     cta = w.cta
     smem = cta.smem
+    if smem.has_uninitialized_bytes(idx):
+        cta.findings.add(
+            "smem-uninitialized-read", "TMA store reads shared memory that this CTA never wrote",
+            w, ins, [lane])
     if smem.unfenced[idx].any():
         cta.findings.add(
             "tma-store-missing-fence",
@@ -134,23 +155,33 @@ def _cp(w, ins, mask):
     cta, ops = w.cta, ins.operands
 
     if rest == ["commit_group"]:
-        if w.open_stores:
-            w.groups.append(w.open_stores)
-            w.open_stores = []
+        if ops:
+            raise unsupported(ins, "commit_group takes no operands")
+        for lane in lanes:
+            group = [o for o in w.open_stores if o.lane == lane]
+            # An empty commit still occupies a position among the newest groups.
+            w.groups.setdefault(lane, []).append(group)
+        w.open_stores = [o for o in w.open_stores if not mask[o.lane]]
         return
     if rest in (["wait_group"], ["wait_group", "read"]):
         if len(ops) != 1:
             raise unsupported(ins, "expected a group count")
-        allowed = _scalar(w, ins, ops[0], lanes[0])
-        pending = [g for g in w.groups if not all(o.done for o in g)]
-        if len(pending) > allowed:
+        count = ops[0]
+        if not isinstance(count, Imm) or count.kind != "int" or count.value < 0:
+            raise ExecutionError("cp.async.bulk.wait_group needs a nonnegative integer constant")
+        allowed = count.value
+        older = {lane: w.groups.get(lane, [])[:max(0, len(w.groups.get(lane, [])) - allowed)]
+                 for lane in lanes}
+        pending = sum(not all(o.done for o in group)
+                      for groups in older.values() for group in groups)
+        if pending:
             w.blocked = Wait("bulk group", ins, retry=True,
-                             detail=lambda: f"{len(pending)} TMA store group(s) still in flight")
+                             detail=lambda: f"{pending} TMA store group(s) still in flight")
             return
-        for group in w.groups:
-            if all(o.done for o in group):
+        for lane, groups in older.items():
+            for group in groups:
                 w.seen.update(o.id for o in group)
-        w.groups = pending
+            w.groups[lane] = w.groups.get(lane, [])[len(groups):]
         return
     if rest and rest[0] == "prefetch":
         return  # a cache hint; no functional effect
@@ -168,6 +199,8 @@ def _cp(w, ins, mask):
     to_global = dst == "global" and src.startswith("shared")
     if not (to_shared or to_global):
         raise unsupported(ins)
+    if nd and "tile" in flags:
+        flags.remove("tile")  # explicitly naming the default tensor copy mode
     extra = set(flags) - (_LOAD_FLAGS if to_shared else _STORE_FLAGS)
     if extra:
         raise unsupported(ins, f"modifier .{sorted(extra)[0]}")

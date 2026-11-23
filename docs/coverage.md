@@ -16,7 +16,7 @@ that names the instruction and its PTX line.
 | performance directives before the body (`.maxntid`, ...), `.pragma` | ignored |
 | `.shared` variables, in a function or at module level, and `.extern .shared name[]` / `name[0]` | yes; alignments and sizes accept PTX integer literals |
 | paired destinations (`%r1\|%p1`) | yes |
-| nested `{ }` blocks with their own registers and labels (inline assembly) | yes |
+| nested `{ }` blocks with their own registers, shared variables and labels (inline assembly) | yes |
 | register names without `%`, `_` as a discarded destination, `[tensor_map, {coords}]` operands | yes |
 | `.global` / `.const` variables with numeric initializers, `.local` variables (one copy per thread) | yes |
 | structs passed by value (`.param .align 8 .b8 name[24]`, read with `ld.param` at an offset) | yes; pass bytes, a NumPy record or a ctypes structure |
@@ -40,7 +40,7 @@ that names the instruction and its PTX line.
 | mbarrier | `mbarrier.init`, `.arrive` (with count), `.arrive.expect_tx`, `.expect_tx`, `.complete_tx`, `.test_wait`, `.try_wait` (both with `.parity`), `.inval` | no `arrive_drop`, `.noComplete`, `pending_count` |
 | TMA | `cp.async.bulk.tensor.{1..5}d` load (`shared <- global`, `.mbarrier::complete_tx::bytes`) and store (`global <- shared`, `.bulk_group`), tile mode; `cp.async.bulk` without a tensor map; `.commit_group`, `.wait_group[.read]`; `prefetch.tensormap` and `cp.async.bulk.prefetch` (no-ops) | no multicast, im2col, `cp.reduce`, `tensormap.replace`; `.L2::cache_hint` ignored |
 | tcgen05 | `tcgen05.alloc`, `.dealloc`, `.relinquish_alloc_permit` (`cta_group::1`); `.mma` `kind::f16` / `kind::tf32` with K-major shared-memory operands and float32 accumulators, M = 64 or 128; `.commit` to an mbarrier; `.ld` / `.st` shape `32x32b.xN`; `.wait::ld/st` and `.fence::*` (no-ops) | no `cta_group::2`, TMEM operand A, MN-major, other kinds, other shapes, `.pack`, `.cp`, `.shift`; see `m3.md` |
-| Fences | `fence.proxy.async`; `fence.mbarrier_init`, `fence.acq_rel`, `fence.sc`, `fence.proxy.*` accepted with no effect | |
+| Fences | `fence.proxy.async[.global/.shared::cta/.shared::cluster]`; `fence.mbarrier_init.release.cluster`, `fence.{acq_rel,sc}.{cta,cluster,gpu,sys}`, `fence.proxy.alias` | only async fences affecting shared memory change checker state; other proxy modes are unsupported |
 | Control | `bra`, `bra.uni`, `ret`, `exit` | no `brx.idx`, no `call` |
 
 ## Special registers

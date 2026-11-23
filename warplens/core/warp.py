@@ -21,7 +21,7 @@ class Warp:
         self.blocked = None  # a core.cta.Wait while the warp cannot run
         self.seen: set[int] = set()  # TMA copies this warp has synchronized with
         self.open_stores: list = []  # TMA stores issued but not yet in a bulk group
-        self.groups: list[list] = []  # committed bulk groups not yet waited for
+        self.groups: dict[int, list[list]] = {}  # lane -> committed bulk groups not yet waited for
         self.uncommitted: list = []  # tcgen05.mma operations not yet covered by a tcgen05.commit
         self.warp_id = warp_id
         self.tid = tid  # (x, y, z) arrays, one entry per lane

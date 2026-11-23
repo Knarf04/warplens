@@ -19,6 +19,29 @@ def test_device_arrays_round_trip(sim):
     assert sim.from_numpy(a[:, ::2]).numpy().tolist() == a[:, ::2].tolist()  # non-contiguous input
 
 
+@pytest.mark.parametrize("foreign_slot", [0, 1, 2])
+def test_foreign_device_arguments_are_rejected_before_execution(sim, foreign_slot):
+    local = [sim.from_numpy(np.array([v], dtype=np.float32)) for v in (10, 2, -99)]
+    other = warplens.Device()
+    foreign = other.from_numpy(np.array([100], dtype=np.float32))
+    # Independent devices reuse addresses, so accepting this pointer would alias
+    # local[0], whether the argument is used as an input or an output.
+    assert foreign.addr == local[0].addr
+    args = [*local, 1]
+    args[foreign_slot] = foreign
+    with pytest.raises(warplens.LaunchError, match=f"argument {foreign_slot} .*different device"):
+        sim.launch(VECADD, "vecadd", grid=1, block=1, args=iter(args))
+    assert [a.numpy().item() for a in local] == [10, 2, -99]
+    assert foreign.numpy().item() == 100
+
+
+def test_same_device_arguments_accept_an_iterator(sim):
+    a, b = (sim.from_numpy(np.array([v], dtype=np.float32)) for v in (10, 2))
+    out = sim.empty(1, "f32")
+    sim.launch(VECADD, "vecadd", grid=1, block=1, args=iter([a, b, out, 1]))
+    assert out.numpy().tolist() == [12]
+
+
 def test_3d_grid_and_block_special_registers(sim):
     # Every thread writes one record of its coordinates at a unique global index.
     mod = kernel("""

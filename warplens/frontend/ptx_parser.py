@@ -20,8 +20,8 @@ _TOKEN = re.compile(
     (?P<ws>[ \t\r\n]+)
   | (?P<comment>//[^\n]*|/\*.*?\*/)
   | (?P<string>"[^"\n]*")
-  | (?P<num>-?(?:0[fF][0-9a-fA-F]{8}|0[dD][0-9a-fA-F]{16}|0[xX][0-9a-fA-F]+U?|0[bB][01]+U?
-        |\d+\.\d+(?:[eE][-+]?\d+)?|\d+U?))
+  | (?P<num>[-+]?(?:0[fF][0-9a-fA-F]{8}|0[dD][0-9a-fA-F]{16}|0[xX][0-9a-fA-F]+U?|0[bB][01]+U?
+        |(?:\d+\.\d*|\.\d+)(?:[eE][-+]?\d+)?|\d+[eE][-+]?\d+|\d+U?))
   | (?P<word>[A-Za-z_$%.][A-Za-z0-9_$.]*(?:::[A-Za-z0-9_$.]+)*)
   | (?P<punct>[{}()\[\],;:=+<>@!|])
     """,
@@ -67,7 +67,7 @@ def _tokenize(text: str, name: str) -> list[_Tok]:
 def _number(tok: _Tok) -> Imm:
     s = tok.value
     neg = s.startswith("-")
-    body = s[1:] if neg else s
+    body = s[1:] if s.startswith(("-", "+")) else s
     prefix = body[:2].lower()
     if prefix == "0f":
         bits = int(body[2:], 16)
@@ -75,7 +75,7 @@ def _number(tok: _Tok) -> Imm:
     if prefix == "0d":
         bits = int(body[2:], 16)
         return Imm("f64", bits ^ (1 << 63) if neg else bits)
-    if "." in body:
+    if prefix not in ("0x", "0b") and ("." in body or "e" in body.lower()):
         (bits,) = struct.unpack("<Q", struct.pack("<d", float(s)))
         return Imm("f64", bits)
     body = body.rstrip("U")
@@ -168,11 +168,21 @@ class _Parser:
         # Performance-tuning directives (.maxntid, .reqntid, ...) sit before the body.
         while self.peek().value != "{":
             t = self.next()
+            if t.value == ";":
+                raise self.unsupported(entry_tok, "entry declarations without a body are not supported yet")
             if t.kind == "eof":
                 raise self.syntax(t, f"function `{fn.name}` has no body")
+            if t.value in _IGNORED_BODY_DIRECTIVES:
+                self.skip_directive(t)
         self.expect("{")
         self.body(fn)
         return fn
+
+    def skip_directive(self, directive: _Tok) -> None:
+        while (end := self.next()).value != ";":
+            if end.kind == "eof" or end.value in ("{", "}"):
+                raise self.syntax(directive,
+                                  f"directive `{directive.value}` is missing its terminating ';'")
 
     def param(self) -> Param:
         self.expect(".param")
@@ -210,8 +220,7 @@ class _Parser:
             elif t.value == ".reg":
                 self.reg_decl(fn)
             elif t.value in _IGNORED_BODY_DIRECTIVES:
-                while self.next().value != ";":
-                    pass
+                self.skip_directive(t)
             elif t.kind == "word" and t.value.startswith("."):
                 raise self.unsupported(t, f"unsupported directive `{t.value}`")
             else:

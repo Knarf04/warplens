@@ -1,3 +1,7 @@
+import struct
+import subprocess
+import sys
+
 import pytest
 
 import warplens
@@ -57,3 +61,55 @@ def test_unsupported_constructs_are_hard_errors():
         warplens.parse_ptx(HEADER + ".global .align 4 .u32 x;")
     with pytest.raises(warplens.UnsupportedError, match="nested"):
         kernel("{ ret; }")
+
+
+@pytest.mark.parametrize("literal", [
+    "1e-3", "1E+3", ".5", "1.", "1.e2", ".5e-2", "0e0", "1.25",
+    "-1e-3", "-.5", "-1.", "-.5e+2", "-1.E-2", "-0.", "+1e-3", "+.5", "+1.",
+])
+def test_decimal_float_literals(literal):
+    mod = kernel(f".reg .f64 %f; mov.f64 %f, {literal}; ret;")
+    imm = mod.functions["k"].instrs[0].operands[1]
+    bits = int.from_bytes(struct.pack("<d", float(literal)), "little")
+    assert imm == Imm("f64", bits)
+
+
+@pytest.mark.parametrize("literal, expected", [
+    ("0xdeadbeef", 0xDEADBEEF), ("0xDEADBEEFU", 0xDEADBEEF),
+    ("+0x1e", 30), ("-0x1e", -30), ("0b101U", 5), ("077", 63),
+    ("42U", 42),
+])
+def test_integer_literals_keep_integer_interpretation(literal, expected):
+    mod = kernel(f".reg .b64 %r; mov.b64 %r, {literal}; ret;")
+    assert mod.functions["k"].instrs[0].operands[1] == Imm("int", expected)
+
+
+@pytest.mark.parametrize("following", ["", "\n.visible .entry actual() { ret; }"])
+def test_entry_prototypes_are_rejected_before_the_next_function(following):
+    text = HEADER + ".extern .entry external();" + following
+    with pytest.raises(warplens.UnsupportedError,
+                       match=r"test.ptx:4: entry declarations without a body"):
+        warplens.parse_ptx(text, name="test.ptx")
+
+
+def test_pragma_is_ignored_without_consuming_the_next_instruction():
+    fn = kernel('.pragma "nounroll"; ret;').functions["k"]
+    assert [ins.name for ins in fn.instrs] == ["ret"]
+
+
+def test_header_pragma_is_not_mistaken_for_an_entry_declaration():
+    text = HEADER + '.visible .entry k() .maxntid 32, 1, 1 .pragma "nounroll"; { ret; }'
+    fn = warplens.parse_ptx(text).functions["k"]
+    assert [ins.name for ins in fn.instrs] == ["ret"]
+
+
+@pytest.mark.parametrize("ending", ["", "\n}"])
+def test_unterminated_pragma_reports_an_error_without_hanging(ending):
+    text = HEADER + '.entry k() {\n.pragma "nounroll"' + ending
+    # A subprocess bounds this regression: the old parser spins forever at EOF.
+    result = subprocess.run(
+        [sys.executable, "-c", "import sys, warplens; warplens.parse_ptx(sys.argv[1], name='test.ptx')", text],
+        capture_output=True, text=True, timeout=5,
+    )
+    assert result.returncode != 0
+    assert "PtxSyntaxError: test.ptx:5: directive `.pragma` is missing its terminating ';'" in result.stderr

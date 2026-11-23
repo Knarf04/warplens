@@ -80,9 +80,13 @@ through their bit patterns. **It does not execute the block-scaled
 Bit widths and NaN conventions are taken from `cutlass/exmy_base.h`. Every
 format has at most 256 codes, so decoding is tested for every code against the
 definition evaluated with exact arithmetic, and encoding is tested on every
-midpoint between neighbouring values (ties go to the even code). Encoding
-saturates at the largest finite value, like PTX's `.satfinite`. None of this
-has been compared with a GPU's conversion instructions.
+midpoint between neighbouring values. Element-format ties go to the even
+significand; UE8M0 ties go to the next power of two, following the
+[CUDA E8M0 conversion rule](https://docs.nvidia.com/cuda/cuda-math-api/cuda_math_api/group__CUDA__MATH__FP8__MISC.html).
+Encoding saturates at the largest finite value, like PTX's `.satfinite`.
+Negative inputs to unsigned formats and NaN inputs to E2M1 are rejected by
+this host API; it does not reproduce every CUDA conversion special case.
+None of this has been compared with a GPU's conversion instructions.
 
 | Block format | Elements | Scale | Per block |
 | --- | --- | --- | --- |
@@ -91,8 +95,11 @@ has been compared with a GPU's conversion instructions.
 | NVFP4 | `E2M1` | `UE4M3`, 8 steps per octave, plus one float32 scale per tensor | 16 |
 
 How a scale is chosen is a recipe, not part of the format. `quantize` uses the
-OCP Microscaling recipe for MX (put the block's peak in the element format's
-top binade) and peak / 6 for NVFP4; you can pass your own scales. Two effects
+[OCP Microscaling recipe](https://www.opencompute.org/documents/ocp-microscaling-formats-mx-v1-0-spec-final-pdf)
+for MX (put the block's peak in the element format's top binade) and peak / 6
+for NVFP4; you can pass your own scales. NVFP4's automatically chosen tensor
+scale is clamped to the positive finite float32 range before rounding; explicit
+tensor scales must remain positive and finite after float32 conversion. Two effects
 are visible with `explain_block` and `compare_formats`:
 
 - Under the MX recipe the peak can saturate. E2M1's top binade is [4, 8) but

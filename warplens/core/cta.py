@@ -183,6 +183,8 @@ class Cta:
             self.findings.add(kind, f"the kernel returned while this {what} was still in flight; "
                               f"nothing waited on {how}",
                               operation.warp, operation.ins, [operation.lane])
+            if self.timeline is not None:
+                self.timeline.now = entry[0]
             self._complete(entry)
         for bar in self.mbarriers.values():
             bar.finish()

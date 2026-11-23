@@ -64,13 +64,13 @@ def test_encoding_round_trips_every_finite_code(fmt):
 
 
 @pytest.mark.parametrize("fmt", FORMATS, ids=lambda f: f.name)
-def test_every_midpoint_rounds_to_the_even_code_and_neighbours_round_to_nearest(fmt):
+def test_every_midpoint_uses_the_format_tie_rule_and_neighbours_round_to_nearest(fmt):
     half = fmt.codes // 2 if fmt.signed else fmt.codes
     codes = np.flatnonzero(np.isfinite(fmt.table[:half]))
     for lower, upper in zip(codes[:-1], codes[1:]):
         a, b = Fraction(float(fmt.table[lower])), Fraction(float(fmt.table[upper]))
         middle = (a + b) / 2
-        even = lower if lower % 2 == 0 else upper
+        even = upper if fmt is UE8M0 else (lower if lower % 2 == 0 else upper)
         assert fmt.encode(float(middle)) == even
         assert fmt.encode(float(middle - (b - a) / 8)) == lower
         assert fmt.encode(float(middle + (b - a) / 8)) == upper
@@ -90,8 +90,8 @@ def test_saturation_infinity_and_nan():
         E4M3.encode([1e9], saturate=False)
     with pytest.raises(ValueError, match="UE8M0 is unsigned"):
         UE8M0.encode([-1.0])
-    # Powers of two only. 3 is midway between 2 and 4, and 0.75 between 0.5 and 1: ties go to the even code.
-    assert UE8M0.encode([1.0, 3.0, 0.75, 2.9, 3.1]).tolist() == [127, 128, 126, 128, 129]
+    # UE8M0 nearest rounds exact power-of-two midpoints upward, regardless of exponent-code parity.
+    assert UE8M0.encode([1.0, 3.0, 0.75, 2.9, 3.1]).tolist() == [127, 129, 127, 128, 129]
 
 
 # -- block scaling ----------------------------------------------------------------------------
@@ -205,3 +205,57 @@ def test_explain_block_shows_scale_codes_and_errors():
     assert len(text.splitlines()) == 5 + 16 + 1
     mx = explain_block(x, MXFP4)
     assert "block scale: code 126 = 01111110 = 0.5" in mx and "uses 78% of the element range" in mx
+
+
+@pytest.mark.parametrize("fmt", [MXFP8_E4M3, MXFP8_E5M2, MXFP4], ids=lambda f: f.name)
+def test_mx_scale_exponent_is_exact_below_a_power_of_two(fmt):
+    # log2(nextafter(8, 0)) rounds to 3.0, but the peak's binade is still [4, 8).
+    peak = np.nextafter(8.0, 0.0)
+    codes, scales, tensor_scale = quantize(np.full(fmt.block, peak), fmt)
+    top_exponent = {"E4M3": 8, "E5M2": 15, "E2M1": 2}[fmt.element.name]
+    assert scales.tolist() == [127 + 2 - top_exponent]
+    assert dequantize(codes, scales, fmt, tensor_scale)[0] == fmt.element.largest * 2.0 ** (2 - top_exponent)
+
+
+def test_nvfp4_small_tensor_keeps_a_nonzero_float32_global_scale():
+    x = np.full(16, np.float32(1e-43), dtype=np.float64)
+    with np.errstate(all="raise"):
+        codes, scales, tensor_scale = quantize(x, NVFP4)
+        back = dequantize(codes, scales, NVFP4, tensor_scale)
+    assert tensor_scale == float(np.finfo(np.float32).smallest_subnormal)
+    np.testing.assert_allclose(back, x, rtol=0.1, atol=0)
+
+
+@pytest.mark.parametrize("tensor_scale", [0.0, -1.0, np.nan, np.inf, 1e-100, 1e100])
+def test_invalid_tensor_scales_cannot_silently_zero_or_nan_the_output(tensor_scale):
+    with pytest.raises(ValueError, match="positive finite float32"):
+        quantize(np.ones(16), NVFP4, tensor_scale=tensor_scale)
+    with pytest.raises(ValueError, match="positive finite float32"):
+        quantize(np.ones(16), NVFP4, scales=[56], tensor_scale=tensor_scale)
+    with pytest.raises(ValueError, match="positive finite float32"):
+        dequantize(np.ones(16, dtype=np.uint8), [56], NVFP4, tensor_scale)
+
+
+@pytest.mark.parametrize("codes", [[1.9], [np.nan], [np.inf]])
+def test_decode_requires_integer_bit_codes(codes):
+    with pytest.raises(ValueError, match="integer"):
+        E2M1.decode(codes)
+
+
+@pytest.mark.parametrize("scales", [np.array([-129]), np.array([383]), np.array([127.9])])
+def test_quantize_validates_codes_before_narrowing_the_scale_storage(scales):
+    with pytest.raises(ValueError, match="codes"):
+        quantize(np.ones(32), MXFP4, scales=scales)
+
+
+@pytest.mark.parametrize("scales", [127, [[127]], [[127, 128]]])
+def test_dequantize_requires_exactly_one_scale_per_block(scales):
+    with pytest.raises(ValueError, match="32 element codes per scale"):
+        dequantize(np.zeros(32, dtype=np.uint8), scales, MXFP4)
+
+
+def test_zero_nvfp4_block_can_be_explained_without_dividing_by_zero():
+    with np.errstate(all="raise"):
+        text = explain_block(np.zeros(16), NVFP4)
+    assert "RMS error of the block: 0" in text
+    assert "nan" not in text

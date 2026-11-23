@@ -10,13 +10,13 @@ name: B300
 sm_count:
   value: 148
   unit: SMs
-  source: "B200 value, not measured on B300. arXiv:2512.02189, section III-A"
+  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, section III-A"
   url: https://arxiv.org/abs/2512.02189
 clock_ghz:
   value: 1.5
   unit: GHz
   source: assumption
-  note: The core clock is not public. It only sets the cost of issuing an instruction.
+  note: Assumed core clock; converts instruction, SMEM, TMEM and MMA latency costs and the TMA rate from clocks to nanoseconds.
 hbm_capacity_gb:
   value: 288
   unit: GB
@@ -25,7 +25,7 @@ hbm_capacity_gb:
 hbm_bandwidth_tb_s:
   value: 4.141
   unit: TB/s
-  source: "B200 value, not measured on B300. arXiv:2512.02189, Table XIII (measured STREAM Triad; the stated peak is 8 TB/s)"
+  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, Table XIII (measured STREAM Triad; the stated peak is 8 TB/s)"
   url: https://arxiv.org/abs/2512.02189
 l2_bandwidth_per_sm_gb_s:
   value: 400
@@ -60,16 +60,16 @@ tmem_access_clk:
 tensor_core_tflops_f16:
   value: 1929.6
   unit: TFLOPS
-  source: "B200 value, not measured on B300. arXiv:2512.02189, Table VII (measured, whole GPU, FP16)"
+  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, Table VII (measured, whole GPU, FP16)"
   url: https://arxiv.org/abs/2512.02189
 tensor_core_tflops_tf32:
   value: 964.5
   unit: TFLOPS
-  source: "B200 value, not measured on B300. arXiv:2512.02189, Table VII (measured, whole GPU, TF32)"
+  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, Table VII (measured, whole GPU, TF32)"
   url: https://arxiv.org/abs/2512.02189
 mma_latency_clk:
   value: 11.3
   unit: clk
-  source: "B200 value, not measured on B300. arXiv:2512.02189, Table V (tcgen05.mma m128n128k16, dependency-chain latency)"
+  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, Table V (tcgen05.mma m128n128k16, dependency-chain latency)"
   url: https://arxiv.org/abs/2512.02189
-  note: Added once per MMA as pipeline latency. The paper's cycle counts and its throughput table do not agree with each other for any single clock frequency.
+  note: Added once per MMA as pipeline latency. Applying this B200 FP16 m128n128k16 measurement to B300, other shapes and TF32 is a model assumption.

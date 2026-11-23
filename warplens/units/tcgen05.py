@@ -29,8 +29,10 @@ What is implemented, and where each rule comes from (CUTLASS/CuTe sources):
   is lane m. For M = 64, row m is lane 32 * (m // 16) + m % 16: the low 16 lanes
   of each warp's 32.
 * `tcgen05.ld.32x32b.xN [addr]`: the thread on lane l of its warp reads TMEM lane
-  lane(addr) + l, columns column(addr) .. + N - 1. A warp may only touch the 32
-  lanes 32 * (warpid % 4) .. + 31.
+  lane(addr) + l, columns column(addr) .. + N - 1. The 16x64b, 16x128b and
+  16x256b shapes cover 16 lanes and give each thread 1, 2 or 4 registers per
+  unit; `transfer_cells` has the mapping (cute/atom/copy_traits_sm100.hpp).
+  A warp may only touch the 32 lanes 32 * (warpid % 4) .. + 31.
 
 None of this has been run against hardware. Accumulation is float32; the order
 of additions inside one MMA is not meant to match the hardware bit for bit.
@@ -189,34 +191,61 @@ def _mma(w, ins, lane: int) -> None:
     cta.schedule(operation, land)
 
 
+_REGISTERS_PER_UNIT = {"32x32b": 1, "16x64b": 1, "16x128b": 2, "16x256b": 4}
+
+
+def transfer_cells(shape: str, count: int) -> tuple[np.ndarray, np.ndarray]:
+    """Which TMEM cell each register of each thread maps to in `tcgen05.ld/st.<shape>.x<count>`.
+
+    Returns (lane offset, column offset), each of shape (32 threads, registers),
+    relative to the instruction's TMEM address. `32x32b` spans the warp's 32
+    lanes, one lane per thread. The `16x...` shapes span 16 lanes and give each
+    thread several cells of them. Derived from the Copy_Traits of
+    SM100_TMEM_LOAD_* in cute/atom/copy_traits_sm100.hpp.
+    """
+    if shape not in _REGISTERS_PER_UNIT:
+        raise ValueError(shape)
+    t = np.arange(32)[:, None]
+    q = np.arange(_REGISTERS_PER_UNIT[shape] * count)[None, :]
+    if shape == "32x32b":
+        return t + 0 * q, q + 0 * t
+    if shape == "16x64b":
+        return 8 * (t & 1) + (t >> 2) + 0 * q, ((t >> 1) & 1) + 2 * q
+    if shape == "16x128b":
+        return (t >> 2) + 8 * (q & 1), (t & 3) + 4 * (q >> 1)
+    return (t >> 2) + 8 * ((q >> 1) & 1), 2 * (t & 3) + (q & 1) + 8 * (q >> 2)
+
+
 def _transfer(w, ins, mask, store: bool) -> None:
     cta = w.cta
-    shape = [m for m in ins.mods if "x" in m and m[0].isdigit()]
+    shape = next((m for m in ins.mods if m in _REGISTERS_PER_UNIT), None)
     count = next((int(m[1:]) for m in ins.mods if m[0] == "x" and m[1:].isdigit()), None)
-    if shape != ["32x32b"] or count is None or any(m.startswith(("pack", "unpack")) for m in ins.mods):
-        raise unsupported(ins, "only the 32x32b shape without packing is implemented")
+    if shape is None or not count or any(m.startswith(("pack", "unpack")) for m in ins.mods):
+        raise unsupported(ins, "implemented shapes are 32x32b, 16x64b, 16x128b and 16x256b, "
+                               "without packing")
     regs, mem = (ins.operands[1], ins.operands[0]) if store else ins.operands[:2]
-    if not isinstance(regs, Vec) or len(regs.elems) != count or not isinstance(mem, Mem):
-        raise unsupported(ins, f"expected {count} register(s) and a [tmem address]")
+    lane_offset, column_offset = transfer_cells(shape, count)
+    if not isinstance(regs, Vec) or len(regs.elems) != lane_offset.shape[1] or not isinstance(mem, Mem):
+        raise unsupported(ins, f"expected {lane_offset.shape[1]} register(s) and a [tmem address]")
     lanes = np.flatnonzero(mask)
     if not len(lanes):
         return
     tmem = _tmem(cta)
     address = _address(w, ins, mem)[lanes]
-    rows = (address >> np.uint64(16)).astype(np.int64) + lanes
-    cols = (address & np.uint64(0xFFFF)).astype(np.int64)
-    if rows.max() >= LANES or cols.max() + count > COLUMNS:
-        raise ExecutionError(f"{ins.name} reaches lane {int(rows.max())}, column "
-                             f"{int(cols.max()) + count - 1}, outside tensor memory")
+    all_rows = (address >> np.uint64(16)).astype(np.int64)[:, None] + lane_offset[lanes]
+    all_cols = (address & np.uint64(0xFFFF)).astype(np.int64)[:, None] + column_offset[lanes]
+    if all_rows.max() >= LANES or all_cols.max() >= COLUMNS:
+        raise ExecutionError(f"{ins.name} reaches lane {int(all_rows.max())}, column "
+                             f"{int(all_cols.max())}, outside tensor memory")
     quadrant = 32 * (w.warp_id % 4)
-    outside = (rows < quadrant) | (rows >= quadrant + 32)
-    if outside.any():
+    stray = (all_rows < quadrant) | (all_rows >= quadrant + 32)
+    if stray.any():
         cta.findings.add("tmem-lane-rule",
                          f"warp {w.warp_id} may only access tensor-memory lanes {quadrant}-"
-                         f"{quadrant + 31}, but this reaches lane {int(rows[outside][0])}",
-                         w, ins, lanes[outside])
+                         f"{quadrant + 31}, but this reaches lane {int(all_rows[stray].min())}",
+                         w, ins, lanes[stray.any(axis=1)])
     for i, reg in enumerate(regs.elems):
-        c = cols + i
+        rows, c = all_rows[:, i], all_cols[:, i]
         if not tmem.allocated[c].all():
             cta.findings.add("tmem-unallocated", f"{ins.name} touches a column that is not allocated",
                              w, ins, lanes[~tmem.allocated[c]])

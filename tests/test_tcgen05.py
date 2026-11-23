@@ -169,10 +169,127 @@ def test_allocation_size_must_be_a_power_of_two_of_at_least_32(sim):
 def test_unsupported_tcgen05_forms_are_errors(sim):
     for line, why in [
         ("tcgen05.alloc.cta_group::2.sync.aligned.shared::cta.b32 [%a], 32;", "cta_group::2"),
-        ("tcgen05.ld.sync.aligned.16x64b.x1.b32 {%a}, [%a];", "only the 32x32b shape"),
-        ("tcgen05.ld.sync.aligned.32x32b.x1.pack::16b.b32 {%a}, [%a];", "only the 32x32b shape"),
+        ("tcgen05.ld.sync.aligned.16x32bx2.x1.b32 {%a}, [%a], 1;", "implemented shapes are"),
+        ("tcgen05.ld.sync.aligned.32x32b.x1.pack::16b.b32 {%a}, [%a];", "without packing"),
+        ("tcgen05.ld.sync.aligned.16x128b.x1.b32 {%a}, [%a];", r"expected 2 register\(s\)"),
         ("tcgen05.cp.4x256b.1x64b [%a], %d;", "tcgen05.cp"),
     ]:
         mod = kernel(f".reg .b32 %a; .reg .b64 %d;\n.shared .align 4 .u32 cell;\nmov.b32 %a, cell;\n{line}\nret;")
         with pytest.raises(warplens.UnsupportedError, match=why):
             sim.launch(mod, "k", grid=1, block=32)
+
+
+# -- load and store shapes ------------------------------------------------------------------
+
+# Copy_Traits of SM100_TMEM_LOAD_<name> in cute/atom/copy_traits_sm100.hpp, copied as data:
+# ((value bits per lane, lanes), DstLayout shape, DstLayout stride). The DstLayout maps
+# (thread, register bit) to a value index; ValID then splits that index into (bit, lane).
+CUTE_TRAITS = {
+    ("32x32b", 1): ((32, 32), (32, 32), (32, 1)),
+    ("32x32b", 4): ((128, 32), (32, 128), (128, 1)),
+    ("16x64b", 1): ((64, 16), ((2, 2, 8), 32), ((512, 32, 64), 1)),
+    ("16x64b", 2): ((128, 16), ((2, 2, 8), (32, 2)), ((1024, 32, 128), (1, 64))),
+    ("16x64b", 4): ((256, 16), ((2, 2, 8), (32, 4)), ((2048, 32, 256), (1, 64))),
+    ("16x128b", 1): ((128, 16), ((4, 8), (32, 2)), ((32, 128), (1, 1024))),
+    ("16x128b", 2): ((256, 16), ((4, 8), (32, 2, 2)), ((32, 256), (1, 2048, 128))),
+    ("16x128b", 4): ((512, 16), ((4, 8), (32, 2, 4)), ((32, 512), (1, 4096, 128))),
+    ("16x256b", 2): ((512, 16), ((4, 8), (64, 2, 2)), ((64, 512), (1, 4096, 256))),
+    ("16x256b", 4): ((1024, 16), ((4, 8), (64, 2, 4)), ((64, 1024), (1, 8192, 256))),
+}
+
+
+def cute_index(shape, stride, flat):
+    """Evaluate a CuTe layout mode at a flat (column-major) coordinate."""
+    if isinstance(shape, int):
+        return stride * flat
+    total = 0
+    for sub_shape, sub_stride in zip(shape, stride):
+        size = sub_shape if isinstance(sub_shape, int) else int(np.prod(np.array(sub_shape).ravel()))
+        total += cute_index(sub_shape, sub_stride, flat % size)
+        flat //= size
+    return total
+
+
+def cute_cells(traits):
+    """(lane, column) of every register of every thread, from the CuTe layouts alone."""
+    (bits, _), (thread_shape, value_shape), (thread_stride, value_stride) = traits
+    value_bits = value_shape if isinstance(value_shape, int) else int(np.prod(value_shape))
+    lanes, columns = [], []
+    for thread in range(32):
+        row_l, row_c = [], []
+        for register in range(value_bits // 32):
+            index = cute_index(thread_shape, thread_stride, thread) + \
+                cute_index(value_shape, value_stride, register * 32)
+            row_l.append(index // bits)
+            row_c.append(index % bits // 32)
+        lanes.append(row_l)
+        columns.append(row_c)
+    return np.array(lanes), np.array(columns)
+
+
+@pytest.mark.parametrize("shape, count", sorted(CUTE_TRAITS))
+def test_transfer_shapes_agree_with_cute_layouts(shape, count):
+    from warplens.units.tcgen05 import transfer_cells
+    lanes, columns = transfer_cells(shape, count)
+    expect_lanes, expect_columns = cute_cells(CUTE_TRAITS[shape, count])
+    np.testing.assert_array_equal(lanes, expect_lanes)
+    np.testing.assert_array_equal(columns, expect_columns)
+    # Every cell of the covered block is reached exactly once.
+    cells = set(zip(lanes.ravel().tolist(), columns.ravel().tolist()))
+    assert len(cells) == lanes.size
+    assert cells == {(l, c) for l in range(lanes.max() + 1) for c in range(columns.max() + 1)}
+
+
+def shape_kernel(shape, count, half):
+    """Each warp stores lane * 1000 + column over its 32 lanes with 32x32b, then reads its
+    lower or upper 16 lanes back with `shape`, and writes the registers to `out`."""
+    registers = {"16x64b": 1, "16x128b": 2, "16x256b": 4}[shape] * count
+    width = {"16x64b": 2, "16x128b": 4, "16x256b": 8}[shape] * count
+    fill = "\n".join(f"""
+        add.u32 %v, %lane, {c};
+        add.u32 %x, %taddr, {c};
+        tcgen05.st.sync.aligned.32x32b.x1.b32 [%x], {{%v}};""" for c in range(width))
+    names = ", ".join(f"%g{i}" for i in range(registers))
+    stores = "\n".join(f"st.global.u32 [%o+{4 * i}], %g{i};" for i in range(registers))
+    return kernel(f"""
+        .reg .b64 %o, %off; .reg .b32 %t, %w, %l, %lane, %tp, %base, %taddr, %v, %x, %g<{registers}>;
+        .reg .pred %q;
+        .shared .align 4 .u32 tptr;
+        mov.u32 %t, %tid.x; mov.u32 %w, %warpid; mov.u32 %l, %laneid;
+        setp.eq.u32 %q, %w, 0;
+        mov.b32 %tp, tptr;
+        @%q tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%tp], 32;
+        bar.sync 0;
+        ld.shared.u32 %base, [%tp];
+        shl.b32 %x, %w, 21;
+        add.u32 %taddr, %base, %x;
+        mad.lo.u32 %lane, %w, 32, %l;
+        mul.lo.u32 %lane, %lane, 1000;
+        {fill}
+        tcgen05.wait::st.sync.aligned;
+        add.u32 %x, %taddr, {half * 16 << 16};
+        tcgen05.ld.sync.aligned.{shape}.x{count}.b32 {{{names}}}, [%x];
+        tcgen05.wait::ld.sync.aligned;
+        ld.param.u64 %o, [out];
+        mul.wide.u32 %off, %t, {4 * registers};
+        add.u64 %o, %o, %off;
+        {stores}
+        bar.sync 0;
+        @%q tcgen05.dealloc.cta_group::1.sync.aligned.b32 %base, 32;
+        ret;
+    """, ".param .u64 out"), registers
+
+
+@pytest.mark.parametrize("shape, count", [("16x64b", 1), ("16x64b", 4), ("16x128b", 1),
+                                          ("16x128b", 2), ("16x256b", 1), ("16x256b", 4)])
+@pytest.mark.parametrize("half", [0, 1])
+def test_store_then_load_with_each_shape(sim, shape, count, half):
+    from warplens.units.tcgen05 import transfer_cells
+    mod, registers = shape_kernel(shape, count, half)
+    out = sim.empty((128, registers), "u32")
+    stats = sim.launch(mod, "k", grid=1, block=128, args=[out])
+    lanes, columns = transfer_cells(shape, count)
+    warp = np.arange(128)[:, None] // 32
+    expect = (32 * warp + 16 * half + np.tile(lanes, (4, 1))) * 1000 + np.tile(columns, (4, 1))
+    np.testing.assert_array_equal(out.numpy(), expect)
+    assert not stats.findings

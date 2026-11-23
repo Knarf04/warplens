@@ -5,7 +5,7 @@ Understand an NVIDIA Blackwell GPU by watching it run. No GPU required.
 warplens takes real GPU kernel code compiled to PTX for datacenter Blackwell
 (`sm_100a`) and executes it on the CPU, with no GPU anywhere in the loop.
 
-> **Status: early.** Milestones M0 to M2 are done and M3 is mostly done: CUDA
+> **Status: early.** Milestones M0 to M3 are done: CUDA
 > kernels using global and shared memory, barriers, warp shuffles, TMA,
 > mbarriers and the Blackwell tensor core (tcgen05) run and match NumPy,
 > including CUTLASS's first two Blackwell tutorials, unmodified. There is a
@@ -23,6 +23,7 @@ python examples/01_smem_transpose/run.py  # bank conflicts of three shared-memor
 python examples/02_tma_copy/run.py     # TMA + mbarrier, then five deliberate bugs and their reports
 examples/03_cutlass_mma/build.sh       # fetch CUTLASS and compile two Blackwell tutorials (needs nvcc)
 python examples/03_cutlass_mma/run.py  # run those tcgen05 GEMMs on the CPU
+python -m warplens.viz.tmem 64 32      # where a tcgen05.mma result lands in tensor memory
 pytest
 ```
 

@@ -2,7 +2,8 @@
 
     warplens run [options] program [arguments...]
 
-runs a compiled CUDA program with its GPU work executed by the simulator.
+runs a program with its GPU work executed by the simulator. `program` is either a
+compiled CUDA executable, or a Python script that uses Triton (a `.py` file).
 """
 
 from __future__ import annotations
@@ -72,6 +73,45 @@ def short(name: str, width: int = 64) -> str:
     return name if len(name) <= width else name[:width - 3] + "..."
 
 
+def summary(launches, model: str) -> None:
+    out = sys.stderr
+    findings = sum(len(s.findings) for _, s in launches)
+    print(f"warplens: {len(launches)} kernel launch(es) simulated on {model}, "
+          f"{findings} finding(s)", file=out)
+    for name, stats in launches:
+        line = f"  {short(name)}: {stats.ctas} CTA(s), {stats.instructions} warp-instructions"
+        if stats.timing is not None:
+            line += f", {stats.timing.time_ns:,.0f} ns simulated ({stats.timing.bottleneck}-bound)"
+        print(line, file=out)
+        for finding in stats.findings:
+            print("    " + str(finding).replace("\n", "\n    "), file=out)
+
+
+def run_script(args) -> int:
+    """A Python script: make Triton target the simulator, then run the script in this process.
+    The script creates its tensors with `triton.runtime.driver.active.tensor(...)`."""
+    import runpy
+    try:
+        from . import triton_driver
+    except ImportError as exc:
+        sys.exit(f"warplens: {exc}")
+    driver = triton_driver.install(args.model, **({"timing": True} if args.timing else {}))
+    sys.argv = [args.program, *args.arguments]
+    code = 0
+    try:
+        runpy.run_path(args.program, run_name="__main__")
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+    finally:
+        triton_driver.uninstall()
+    if not args.quiet:
+        if driver.launches:
+            summary(driver.launches, args.model)
+        else:
+            print("warplens: the script launched no Triton kernels", file=sys.stderr)
+    return code
+
+
 def run(args) -> int:
     from .host.shim_server import ShimServer
 
@@ -79,6 +119,9 @@ def run(args) -> int:
     if not Path(program).exists():
         sys.exit(f"warplens: no such program: {args.program}")
     program = str(Path(program).absolute())
+    if program.endswith(".py"):
+        args.program = program
+        return run_script(args)
     lib = shim_libraries()
     server = ShimServer(args.model, timing=args.timing)
     ours, theirs = socket.socketpair()
@@ -118,16 +161,7 @@ def run(args) -> int:
             if server.needs_ptx or not server.modules:
                 print(BUILD_HINT, file=out)
         else:
-            findings = sum(len(s.findings) for _, s in server.launches)
-            print(f"warplens: {len(server.launches)} kernel launch(es) simulated on {args.model}, "
-                  f"{findings} finding(s)", file=out)
-            for name, stats in server.launches:
-                line = f"  {short(name)}: {stats.ctas} CTA(s), {stats.instructions} warp-instructions"
-                if stats.timing is not None:
-                    line += f", {stats.timing.time_ns:,.0f} ns simulated ({stats.timing.bottleneck}-bound)"
-                print(line, file=out)
-                for finding in stats.findings:
-                    print("    " + str(finding).replace("\n", "\n    "), file=out)
+            summary(server.launches, args.model)
     return code if code >= 0 else 128 - code
 
 
@@ -135,7 +169,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="warplens", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
-    runner = commands.add_parser("run", help="run a compiled CUDA program in the simulator",
+    runner = commands.add_parser("run", help="run a compiled CUDA program or a Triton script in the simulator",
                                  epilog=BUILD_HINT, formatter_class=argparse.RawDescriptionHelpFormatter)
     runner.add_argument("--model", default="B200", choices=["B200", "B300"], help="GPU to simulate")
     runner.add_argument("--timing", action="store_true",

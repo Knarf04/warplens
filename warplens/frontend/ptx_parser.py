@@ -53,7 +53,20 @@ class _Tok:
         return f"{self.value!r}"
 
 
+_DEBUG_LINE = re.compile(r"^[ \t]*\.(?:loc|file)\b[^\n]*$", re.M)
+_DEBUG_SECTION = re.compile(r"^[ \t]*\.section\b[^{\n]*\n?[ \t]*\{.*?\}", re.M | re.S)
+
+
+def _strip_debug_info(text: str) -> str:
+    """Blank out DWARF debug directives (`.loc`, `.file`, `.section .debug_* { ... }`),
+    which compilers such as Triton emit, keeping every line where it was."""
+    def blank(match):
+        return "\n" * match.group().count("\n")
+    return _DEBUG_SECTION.sub(blank, _DEBUG_LINE.sub("", text))
+
+
 def _tokenize(text: str, name: str) -> list[_Tok]:
+    text = _strip_debug_info(text)
     toks: list[_Tok] = []
     pos, line = 0, 1
     while pos < len(text):

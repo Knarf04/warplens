@@ -25,7 +25,7 @@ from ..core.cta import Wait
 from ..errors import ExecutionError
 from ..frontend.ir import Sym
 from .alu import _address, op, unsupported
-from .smem import GENERIC_WINDOW, MAX_SMEM_BYTES
+from .smem import CLUSTER_WINDOW, GENERIC_WINDOW, local_shared_offset, resolve_shared
 
 _NOISE = frozenset({"shared", "shared::cta", "shared::cluster", "b64",
                     "release", "relaxed", "acquire", "cta", "cluster"})
@@ -40,27 +40,26 @@ def _mbarrier(w, ins, mask):
     if not len(lanes):
         return
     cta, ops = w.cta, ins.operands
+    local = any(m in ins.mods for m in ("shared", "shared::cta"))
 
     def offsets(operand):
         addr = _address(w, ins, operand)
         if not any(m in ins.mods for m in ("shared", "shared::cta", "shared::cluster")):
             window = np.uint64(GENERIC_WINDOW)
-            shared = (addr >= window) & (addr < window + np.uint64(MAX_SMEM_BYTES))
+            shared = (addr >= window) & (addr < window + np.uint64(CLUSTER_WINDOW))
             if not shared[mask].all():
                 raise ExecutionError("generic mbarrier address does not point to shared memory")
             addr = addr - window
-        return addr
+        return local_shared_offset(addr) if local else addr
 
     def bars(operand):
         addr = offsets(operand)
-        if "shared::cluster" not in ins.mods:
+        if local:
             return [(int(l), cta.mbarrier(int(addr[l]), w, ins, [int(l)])) for l in lanes]
         # A cluster-wide address (from mapa) may name another CTA's mbarrier.
-        from .smem import CLUSTER_STRIDE
         found = []
         for l in lanes:
-            rank_plus_1, offset = divmod(int(addr[l]), CLUSTER_STRIDE)
-            target = cta if rank_plus_1 == 0 else cta.peer(rank_plus_1 - 1)
+            target, offset = resolve_shared(cta, int(addr[l]))
             if target is not cta and kind[:1] != ("arrive",):
                 raise ExecutionError(f"mbarrier.{'.'.join(kind)} on another CTA's mbarrier; only "
                                      "arrive may be remote")
@@ -73,7 +72,10 @@ def _mbarrier(w, ins, mask):
     if kind == ("init",) and len(ops) == 2:
         addr, n = offsets(ops[0]), count(ops[1])
         for l in lanes:
-            cta.mbarrier_init(int(addr[l]), int(n[l]), w, ins)
+            target, offset = (cta, int(addr[l])) if local else resolve_shared(cta, int(addr[l]))
+            if target is not cta:
+                raise ExecutionError("mbarrier.init must address this CTA's shared memory")
+            cta.mbarrier_init(offset, int(n[l]), w, ins)
     elif kind in (("arrive",), ("arrive", "expect_tx")) and 2 <= len(ops) <= 3:
         expect = kind[-1] == "expect_tx"
         if expect and len(ops) != 3:
@@ -123,10 +125,8 @@ def _mbarrier(w, ins, mask):
             return
         w.write(ops[0], result, mask)
     elif kind == ("inval",) and len(ops) == 1:
-        addr = offsets(ops[0])
-        for l in lanes:
-            cta.mbarrier(int(addr[l]), w, ins, [int(l)])
-            del cta.mbarriers[int(addr[l])]
+        for _, bar in bars(ops[0]):
+            del bar.cta.mbarriers[bar.offset]
     else:
         raise unsupported(ins)
 

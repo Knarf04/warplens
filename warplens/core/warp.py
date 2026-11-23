@@ -24,6 +24,8 @@ class Warp:
         self.global_accesses = 0  # ordinary global loads of that instruction
         self.seen: set[int] = set()  # TMA copies this warp has synchronized with
         self.open_stores: list = []  # TMA stores issued but not yet in a bulk group
+        self.cp_open: list = []  # cp.async copies issued since the last cp.async.commit_group
+        self.cp_groups: list[list] = []  # committed cp.async groups not yet waited for
         self.groups: dict[int, list[list]] = {}  # lane -> committed bulk groups not yet waited for
         self.tcgen_issued: list = []  # all issued MMAs; each commit snapshots its thread's history
         self.tcgen_observed: set[int] = set()  # relaxed waits awaiting an after_thread_sync fence
@@ -71,7 +73,10 @@ class Warp:
 
     def _symbol(self, sym: Sym) -> int:
         prog = self.program
-        for table in (prog.symbols, prog.local_symbols, prog.global_symbols, prog.param_offsets):
+        if sym.name in prog.symbols:
+            from ..units.smem import CLUSTER_STRIDE
+            return self.cta.rank * CLUSTER_STRIDE + prog.symbols[sym.name]
+        for table in (prog.local_symbols, prog.global_symbols, prog.param_offsets):
             if sym.name in table:
                 return table[sym.name]
         raise ExecutionError(f"`{sym.name}` is not a variable this kernel can address")
@@ -91,7 +96,10 @@ class Warp:
             return self.local[lane, offset:offset + count].tobytes()
         addrs = np.uint64(offset) + np.arange(count, dtype=np.uint64)
         if space == "shared":
-            return self.cta.smem.data[self.cta.smem.index(addrs, 1, "read")].tobytes()
+            from ..units.smem import resolve_shared
+            target, offset = resolve_shared(self.cta, offset)
+            addrs = np.uint64(offset) + np.arange(count, dtype=np.uint64)
+            return target.smem.data[target.smem.index(addrs, 1, "read")].tobytes()
         return self.mem.read(addrs, np.dtype(np.uint8)).tobytes()
 
     def read_cstring(self, address: int, lane: int, limit: int = 1 << 16) -> str:

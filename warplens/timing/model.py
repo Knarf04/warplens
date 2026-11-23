@@ -155,7 +155,7 @@ class Timeline:
         issued = operation.warp.time
         work = operation.work or {}
         thread = (operation.warp.warp_id, operation.lane)
-        if operation.kind in ("load", "store"):
+        if operation.kind in ("load", "store", "copy"):  # "copy": cp.async, charged like TMA
             nbytes = work.get("bytes", 0)
             global_bytes = work.get("global_bytes", nbytes)
             lines = work.get("lines")

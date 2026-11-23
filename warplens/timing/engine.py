@@ -22,6 +22,7 @@ class TimedEngine(Engine):
         for w in warps:
             w.time = 0.0
         while True:
+            group.retire_ctas()
             source = group.next_async()  # each CTA's queue is sorted by completion time
             if all(w.done for w in warps):
                 # Retiring the cluster must still report operations left in flight.

@@ -50,6 +50,10 @@ def locate(m: int, n: int, m_dim: int, n_dim: int, pair: bool = False, lane_offs
         return 0, int(accumulator_rows(m_dim, lane_offset).tolist().index(m)), n
     if m_dim not in (128, 256):
         raise ValueError("M must be 128 or 256 for cta_group::2")
+    if not 16 <= n_dim <= 256 or n_dim % 16:
+        raise ValueError("N must be a multiple of 16 from 16 to 256 for cta_group::2")
+    if lane_offset != 0:
+        raise ValueError("the lane offset must be 0 for cta_group::2")
     half = m_dim // 2
     cta, row = divmod(m, half)
     if m_dim == 256:
@@ -156,6 +160,10 @@ def main(argv=None) -> int:
             print(transfer_text(args.transfer[0], int(args.transfer[1])))
             return 0
         if args.pair:
+            if args.lane_offset:
+                raise ValueError("the lane offset must be 0 for cta_group::2")
+            if args.svg:
+                raise ValueError("SVG output is not implemented for cta_group::2")
             print(pair_text(args.m, args.n))
             return 0
         print(accumulator_text(args.m, args.n, args.lane_offset))

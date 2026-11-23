@@ -22,10 +22,24 @@ MAX_SMEM_BYTES = 228 * 1024
 # Shadow "writer" value for bytes last written by TMA rather than by a warp.
 ASYNC_PROXY = -2
 
-# Cluster-wide shared addresses (`shared::cluster`): an address below CLUSTER_STRIDE is the
-# CTA's own shared memory; `mapa` produces (rank + 1) * CLUSTER_STRIDE + offset for the
-# shared memory of the CTA with that rank in the cluster.
-CLUSTER_STRIDE = 1 << 20
+# Shared pointers carry the CTA rank above the byte offset. In particular,
+# bit 24 selects the peer within a pair, as used by CUTLASS SM100 TMA code.
+# Other address bits are simulator-defined, not a hardware encoding claim.
+CLUSTER_STRIDE = 1 << 24
+CLUSTER_WINDOW = 16 * CLUSTER_STRIDE
+
+
+def local_shared_offset(address):
+    """Remove valid cluster routing bits for an explicitly CTA-local access."""
+    if np.isscalar(address):
+        return int(address) % CLUSTER_STRIDE if 0 <= address < CLUSTER_WINDOW else int(address)
+    return np.where(address < CLUSTER_WINDOW, address % np.uint64(CLUSTER_STRIDE), address)
+
+
+def resolve_shared(cta, address: int):
+    """Resolve a shared::cluster pointer to its target CTA and byte offset."""
+    rank, offset = divmod(int(address), CLUSTER_STRIDE)
+    return (cta if rank == cta.rank else cta.peer(rank)), offset
 
 # Where shared memory appears in the generic address space (`cvta.shared`).
 GENERIC_WINDOW = 0x1_0000_0000

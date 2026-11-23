@@ -12,7 +12,8 @@ import numpy as np
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
 from ..frontend.ir import Instr, Mem, NP_TYPES, Pair, Sym, UINT_BY_SIZE, Vec
 from .floating import fused_multiply_add
-from .smem import CLUSTER_STRIDE, GENERIC_WINDOW, MAX_SMEM_BYTES
+from .smem import (CLUSTER_STRIDE, CLUSTER_WINDOW, GENERIC_WINDOW, MAX_SMEM_BYTES,
+                   local_shared_offset)
 
 HANDLERS: dict = {}
 
@@ -101,6 +102,116 @@ def _mov(w, ins, mask):
     w.write(d, w.read(a, ty), mask)
 
 
+@op("prmt")
+def _prmt(w, ins, mask):
+    """prmt.b32 d, a, b, c: build d from four bytes chosen out of the eight of {b, a}.
+
+    Byte i of d is selected by the i-th 4-bit field of c: its low three bits pick a source
+    byte (0-3 from a, 4-7 from b). If the field's top bit is set, the result byte is instead
+    the selected byte's sign bit copied to all eight bits. Checked on real hardware.
+    """
+    if ins.mods != ("b32",):
+        raise unsupported(ins, "only the default prmt.b32 mode is implemented")
+    d, a, b, c = _operands(ins, 4)
+    source = (w.read(a, "b32").astype(np.uint64)) | (w.read(b, "b32").astype(np.uint64) << np.uint64(32))
+    control = w.read(c, "u32")
+    out = np.zeros(len(mask), dtype=np.uint32)
+    for i in range(4):
+        field = (control >> np.uint32(4 * i)) & np.uint32(0xF)
+        byte = ((source >> ((field & np.uint32(7)).astype(np.uint64) * np.uint64(8))) & np.uint64(0xFF)).astype(np.uint32)
+        byte = np.where(field & np.uint32(8), np.where(byte & np.uint32(0x80), 0xFF, 0), byte).astype(np.uint32)
+        out |= byte << np.uint32(8 * i)
+    w.write(d, out, mask)
+
+
+@op("bfe")
+def _bfe(w, ins, mask):
+    """bfe d, a, pos, len: the `len`-bit field of `a` starting at bit `pos`.
+
+    Checked on real hardware: only the low 8 bits of `pos` and `len` count; bits read past
+    the top of `a` are zero for the unsigned form, and copies of the field's sign bit for
+    the signed form, where the sign bit is the field's top bit or the top bit of `a` if the
+    field extends beyond it; a zero-length field is 0.
+    """
+    ty, _ = _type(ins, kinds="iu")
+    d, a, pos, length = _operands(ins, 4)
+    x = w.read(a, ty)
+    width = x.dtype.itemsize * 8
+    if width not in (32, 64):
+        raise unsupported(ins, "bfe needs a 32- or 64-bit type")
+    unsigned = x.view(UINT_BY_SIZE[x.dtype.itemsize]).astype(object)
+    p = (w.read(pos, "u32") & 0xFF).astype(object)
+    n = (w.read(length, "u32") & 0xFF).astype(object)
+    out = np.zeros(len(mask), dtype=object)
+    full = (1 << width) - 1
+    for i in np.flatnonzero(mask):
+        value, start, count = int(unsigned[i]), int(p[i]), int(n[i])
+        if count == 0:
+            continue
+        field = (value >> start) & ((1 << count) - 1) if start < width else 0
+        if x.dtype.kind == "i":
+            sign_at = min(start + count - 1, width - 1)
+            if (value >> sign_at) & 1:
+                have = max(min(start + count, width) - start, 0)  # bits actually read from a
+                field |= full & ~((1 << have) - 1)
+        out[i] = field & full
+    w.write(d, out.astype(UINT_BY_SIZE[x.dtype.itemsize]).view(x.dtype), mask)
+
+
+@op("ldmatrix")
+def _ldmatrix(w, ins, mask):
+    """ldmatrix.sync.aligned.m8n8.xN[.trans].shared.b16 {r0, ...}, [addr]
+
+    Loads N 8x8 matrices of 16-bit elements from shared memory for the whole warp. Lane
+    8j + i supplies the address of row i of matrix j (8 elements, 16 bytes). Every lane
+    receives two elements of each matrix in one 32-bit register, the first in the low half:
+    lane t gets columns 2(t%4) and 2(t%4)+1 of row t//4, or with .trans rows 2(t%4) and
+    2(t%4)+1 of column t//4. Checked on real hardware.
+    """
+    mods = list(ins.mods)
+    trans = "trans" in mods
+    if trans:
+        mods.remove("trans")
+    count = next((int(m[1:]) for m in mods if m in ("x1", "x2", "x4")), None)
+    if count is None or mods != ["sync", "aligned", "m8n8", f"x{count}", "shared", "b16"]:
+        raise unsupported(ins, "expected ldmatrix.sync.aligned.m8n8.x{1,2,4}[.trans].shared.b16")
+    regs, mem = _operands(ins, 2)
+    regs = _elements(ins, regs, count) if count > 1 else \
+        (list(regs.elems) if isinstance(regs, Vec) else [regs])
+    if len(regs) != count:
+        raise unsupported(ins, f"expected {count} register(s)")
+    if not mask.any():
+        return
+    if not mask.all():
+        raise ExecutionError("ldmatrix needs all 32 lanes of the warp to execute it together")
+    addrs = _address(w, ins, mem)
+    cta = w.cta
+    t = np.arange(32)
+    for j, reg in enumerate(regs):
+        rows = addrs[8 * j:8 * j + 8]  # the lanes that supply this matrix's row addresses
+        offsets = (rows[:, None] + np.arange(8, dtype=np.uint64) * np.uint64(2)).reshape(-1)
+        try:
+            values, unwritten, racy = cta.smem.read(offsets, np.dtype(np.uint16), w.warp_id)
+        except MemoryFault as e:
+            e.lanes = sorted({8 * j + int(k) // 8 for k in e.which})
+            raise
+        if cta.smem.async_active:
+            _async_check(w, ins, np.isin(t, 8 * j + np.arange(8)), addrs, 16, "read of", writing=False)
+        if len(unwritten):
+            cta.findings.add("smem-uninitialized-read", "read of shared memory that this CTA never wrote",
+                             w, ins, sorted({8 * j + int(k) // 8 for k in unwritten}))
+        if len(racy):
+            cta.findings.add("smem-race", "read of shared memory that another warp wrote with no "
+                             "barrier in between", w, ins, sorted({8 * j + int(k) // 8 for k in racy}))
+        matrix = values.reshape(8, 8).astype(np.uint32)
+        if trans:
+            low, high = matrix[2 * (t % 4), t // 4], matrix[2 * (t % 4) + 1, t // 4]
+        else:
+            low, high = matrix[t // 4, 2 * (t % 4)], matrix[t // 4, 2 * (t % 4) + 1]
+        w.write(reg, low | (high << np.uint32(16)), mask)
+        w.smem_waves += 8  # timing: a rough cost, eight row reads per matrix
+
+
 @op("mapa")
 def _mapa(w, ins, mask):
     """mapa.shared::cluster d, a, rank: the cluster-wide address of shared address `a`
@@ -110,12 +221,12 @@ def _mapa(w, ins, mask):
     d, a, rank = _operands(ins, 3)
     offset = w.read_address(a)
     ranks = w.read(rank, "u32").astype(np.uint64)
-    if (offset[mask] >= CLUSTER_STRIDE).any():
-        raise ExecutionError("mapa needs an address in this CTA's own shared memory")
+    if (offset[mask] // np.uint64(CLUSTER_STRIDE) >= len(w.cta.cluster.ctas)).any():
+        raise ExecutionError("mapa source does not point to shared memory in this cluster")
     if (ranks[mask] >= len(w.cta.cluster.ctas)).any():
         raise ExecutionError(f"mapa to CTA rank {int(ranks[mask].max())}, but the cluster has "
                              f"{len(w.cta.cluster.ctas)} CTA(s)")
-    value = (ranks + np.uint64(1)) * np.uint64(CLUSTER_STRIDE) + offset
+    value = ranks * np.uint64(CLUSTER_STRIDE) + offset % np.uint64(CLUSTER_STRIDE)
     w.write(d, value.astype(NP_TYPES[ins.mods[1]]), mask)
 
 
@@ -123,7 +234,8 @@ def _mapa(w, ins, mask):
 def _cvta(w, ins, mask):
     # Address-space conversion. Global addresses are already generic addresses;
     # shared addresses are offsets that sit in a fixed window of the generic space.
-    ty, extra = _type(ins, allowed={"to", "global", "const", "shared", "local", "param"}, kinds="u")
+    ty, extra = _type(ins, allowed={"to", "global", "const", "shared", "shared::cta",
+                                  "shared::cluster", "local", "param"}, kinds="u")
     spaces = [e for e in extra if e != "to"]
     if len(spaces) != 1 or (ty != "u64" and spaces[0] not in ("global", "const")):
         raise unsupported(ins)
@@ -131,7 +243,7 @@ def _cvta(w, ins, mask):
     value = w.read(a, ty)
     if spaces[0] not in ("global", "const"):
         window = np.uint64({"shared": GENERIC_WINDOW, "local": LOCAL_WINDOW,
-                            "param": PARAM_WINDOW}[spaces[0]])
+                            "param": PARAM_WINDOW}[spaces[0].split("::")[0]])
         value = value - window if "to" in extra else value + window
     w.write(d, value, mask)
 
@@ -401,7 +513,7 @@ def route(address: int) -> tuple[str, int]:
     """Which memory a generic address refers to, and the address within it."""
     if PARAM_WINDOW <= address < PARAM_WINDOW + _LOCAL_WINDOW_BYTES:
         return "param", address - PARAM_WINDOW
-    if GENERIC_WINDOW <= address < GENERIC_WINDOW + MAX_SMEM_BYTES:
+    if GENERIC_WINDOW <= address < GENERIC_WINDOW + CLUSTER_WINDOW:
         return "shared", address - GENERIC_WINDOW
     if LOCAL_WINDOW <= address < LOCAL_WINDOW + _LOCAL_WINDOW_BYTES:
         return "local", address - LOCAL_WINDOW
@@ -430,9 +542,9 @@ def _cluster_groups(w, addrs: np.ndarray, mask: np.ndarray):
     yields (CTA, lanes, offsets within that CTA's shared memory)."""
     stride = np.uint64(CLUSTER_STRIDE)
     which = addrs // stride
-    for rank_plus_1 in np.unique(which[mask]):
-        lanes = mask & (which == rank_plus_1)
-        target = w.cta if rank_plus_1 == 0 else w.cta.peer(int(rank_plus_1) - 1)
+    for rank in np.unique(which[mask]):
+        lanes = mask & (which == rank)
+        target = w.cta.peer(int(rank))
         yield target, lanes, addrs % stride
 
 
@@ -447,15 +559,16 @@ def _split_generic(space: str, addrs: np.ndarray, mask: np.ndarray):
     if space in ("global", "const"):
         return mask, None, None, None, None
     if space == "shared":
-        return None, mask, addrs, None, None
+        return None, mask, local_shared_offset(addrs), None, None
     if space == "local":
         return None, None, None, mask, addrs
     window = np.uint64(GENERIC_WINDOW)
-    in_smem = (addrs >= window) & (addrs < window + np.uint64(MAX_SMEM_BYTES))
+    in_smem = (addrs >= window) & (addrs < window + np.uint64(CLUSTER_WINDOW))
     local = np.uint64(LOCAL_WINDOW)
     in_local = (addrs >= local) & (addrs < local + np.uint64(_LOCAL_WINDOW_BYTES))
     to_smem, to_local = mask & in_smem, mask & in_local
-    return (mask & ~in_smem & ~in_local, (to_smem if to_smem.any() else None), addrs - window,
+    return (mask & ~in_smem & ~in_local, (to_smem if to_smem.any() else None),
+            local_shared_offset(addrs - window),
             (to_local if to_local.any() else None), addrs - local)
 
 
@@ -473,6 +586,12 @@ def _local_index(w, ins, lanes: np.ndarray, offsets: np.ndarray, size: int, verb
 
 def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
     value = np.zeros(len(mask), dtype=dt)
+    if space == "generic":
+        shared = mask & (addrs >= GENERIC_WINDOW) & (addrs < GENERIC_WINDOW + CLUSTER_WINDOW)
+        if shared.any():
+            value[shared] = _load(w, ins, "shared::cluster", addrs - np.uint64(GENERIC_WINDOW),
+                                  dt, shared)[shared]
+            mask = mask & ~shared
     if space == "shared::cluster":  # distributed shared memory: maybe another CTA's
         for target, lanes, offsets in _cluster_groups(w, addrs, mask):
             if target is w.cta:
@@ -581,6 +700,11 @@ def _async_check(w, ins, s, offsets, size: int, what: str, writing: bool) -> Non
 
 
 def _store(w, ins, space, addrs, value, mask) -> None:
+    if space == "generic":
+        shared = mask & (addrs >= GENERIC_WINDOW) & (addrs < GENERIC_WINDOW + CLUSTER_WINDOW)
+        if shared.any():
+            _store(w, ins, "shared::cluster", addrs - np.uint64(GENERIC_WINDOW), value, shared)
+            mask = mask & ~shared
     if space == "shared::cluster":
         for target, lanes, offsets in _cluster_groups(w, addrs, mask):
             if target is w.cta:
@@ -629,6 +753,10 @@ def _record_memory_banks(w, ins, space, addrs, mask, size: int) -> None:
     """Account for one complete scalar or vector instruction, not each element."""
     if space == "shared::cluster":
         return  # bank accounting across CTAs is not modeled
+    if space == "generic":
+        shared = (addrs >= GENERIC_WINDOW) & (addrs < GENERIC_WINDOW + CLUSTER_WINDOW)
+        rank = (addrs - np.uint64(GENERIC_WINDOW)) // np.uint64(CLUSTER_STRIDE)
+        mask = mask & ~(shared & (rank != w.cta.rank))
     in_global, shared, offsets, _, _ = _split_generic(space, addrs, mask)
     if shared is not None and shared.any():
         w.smem_waves += w.cta.smem_report.record(ins, w.program.fn.name, offsets[shared], size,
@@ -644,7 +772,9 @@ def _fault_lanes(e: MemoryFault, mask: np.ndarray) -> None:
 def _elements(ins, operand, width: int):
     if width == 1:
         if isinstance(operand, Vec):
-            raise unsupported(ins, "a {vector} operand needs .v2 or .v4")
+            if len(operand.elems) != 1:  # `{ %r1 }` is a scalar written with braces (Triton does)
+                raise unsupported(ins, "a {vector} operand needs .v2 or .v4")
+            return [operand.elems[0]]
         return [operand]
     if not isinstance(operand, Vec) or len(operand.elems) != width:
         raise unsupported(ins, f"expected a vector of {width} operands")

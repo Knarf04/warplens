@@ -73,3 +73,66 @@ def test_printf_struct_param_and_local_array_match_real_gpu(sim):
     got = ["out: " + " ".join(map(str, out.numpy()))] + stats.output.splitlines()
     assert sorted(got) == (AMPERE / "printf_golden.txt").read_text().splitlines()
     assert not stats.findings
+
+
+def test_ldmatrix_and_bfe_match_real_gpu(sim):
+    """ldmatrix_golden.txt is bin/ldmatrix_golden on an RTX 3080 Ti: all six ldmatrix forms
+    with a permuted row address per lane, and bfe.u32/bfe.s32 over 726 edge cases."""
+    lines = [l.split() for l in (AMPERE / "ldmatrix_golden.txt").read_text().splitlines()]
+    expect = np.array([[int(x, 16) for x in l[3:]] for l in lines if l[0] == "L"], dtype=np.uint32)
+    out = sim.empty((6, 32, 4), "u32")
+    stats = sim.launch(AMPERE / "ldmatrix_probe.ptx", "ldmatrix_probe", grid=1, block=32, args=[out])
+    np.testing.assert_array_equal(out.numpy().reshape(-1, 4), expect)
+    assert not stats.findings
+
+    cases = np.array([[int(x, 16) for x in l[1:]] for l in lines if l[0] == "B"], dtype=np.uint32)
+    n = len(cases)
+    assert n == 726
+    result = sim.empty(2 * n, "u32")
+    sim.launch(AMPERE / "ldmatrix_probe.ptx", "bfe_probe", grid=-(-n // 256), block=256,
+               args=[sim.from_numpy(cases[:, 0].copy()), sim.from_numpy(cases[:, 1].copy()),
+                     sim.from_numpy(cases[:, 2].copy()), result, n])
+    got = result.numpy()
+    wrong = [(hex(a), int(p), int(l), hex(u), hex(gu), hex(s), hex(gs))
+             for (a, p, l, u, s), gu, gs in zip(cases, got[:n], got[n:]) if (u, s) != (gu, gs)]
+    assert not wrong, f"{len(wrong)} of {n} differ, e.g. (a, pos, len, unsigned, got, signed, got): {wrong[:4]}"
+
+
+def test_cp_async_with_a_source_size_matches_real_gpu(sim):
+    """cpasync_golden.txt is bin/cpasync_golden on an RTX 3080 Ti: each lane copies 16 bytes
+    but reads only its source size; the GPU zero-fills the rest."""
+    rows = [l.split() for l in (AMPERE / "cpasync_golden.txt").read_text().splitlines()]
+    sizes = np.array([int(r[0]) for r in rows], dtype=np.uint32)
+    expect = np.array([[int(x, 16) for x in r[1:]] for r in rows], dtype=np.uint8)
+    data = ((np.arange(512) * 7 + 1) % 256).astype(np.uint8)
+    out = sim.empty((32, 16), "u8")
+    stats = sim.launch(AMPERE / "cpasync_probe.ptx", "cpasync_probe", grid=1, block=32,
+                       args=[sim.from_numpy(data), sim.from_numpy(sizes), out])
+    np.testing.assert_array_equal(out.numpy(), expect)
+    assert not stats.findings
+    assert (expect[3, 3:] == 0).all() and (expect[3, :3] == data[48:51]).all()  # 3 read, 13 zeroed
+
+
+def test_prmt_matches_real_gpu(sim):
+    """prmt_golden.txt is bin/prmt_golden on an RTX 3080 Ti: 304 (a, b, control) triples."""
+    from conftest import kernel
+    rows = np.array([[int(x, 16) for x in l.split()] for l in (AMPERE / "prmt_golden.txt").read_text().splitlines()],
+                    dtype=np.uint32)
+    n = len(rows)
+    mod = kernel("""
+        .reg .b64 %pa, %pb, %pc, %po, %off; .reg .b32 %i, %a, %b, %c, %d, %x, %y;
+        ld.param.u64 %pa, [a]; ld.param.u64 %pb, [b]; ld.param.u64 %pc, [c]; ld.param.u64 %po, [o];
+        mov.u32 %x, %ctaid.x; mov.u32 %y, %tid.x;
+        mad.lo.u32 %i, %x, 256, %y;
+        mul.wide.u32 %off, %i, 4;
+        add.u64 %pa, %pa, %off; add.u64 %pb, %pb, %off; add.u64 %pc, %pc, %off; add.u64 %po, %po, %off;
+        ld.global.u32 %a, [%pa]; ld.global.u32 %b, [%pb]; ld.global.u32 %c, [%pc];
+        prmt.b32 %d, %a, %b, %c;
+        st.global.u32 [%po], %d;
+        ret;
+    """, ".param .u64 a, .param .u64 b, .param .u64 c, .param .u64 o")
+    pad = -n % 256
+    columns = [np.concatenate([rows[:, k], np.zeros(pad, np.uint32)]) for k in range(3)]
+    out = sim.empty(n + pad, "u32")
+    sim.launch(mod, "k", grid=(n + pad) // 256, block=256, args=[*(sim.from_numpy(c) for c in columns), out])
+    np.testing.assert_array_equal(out.numpy()[:n], rows[:, 3])

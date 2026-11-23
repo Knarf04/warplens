@@ -63,6 +63,7 @@ class Cta:
         self.timeline = None  # timing.model.Timeline when the launch is timed
         self.cluster = None  # core.cluster.Cluster this CTA belongs to
         self.rank = 0  # position in the cluster
+        self.retired = False  # its warps exited; peers may still be running
         self.smem = SharedMemory(smem_bytes)
         self.smem_report = smem_report
         self.findings = findings
@@ -161,7 +162,7 @@ class Cta:
         _, operation, complete = entry
         complete()
         operation.done = True
-        if operation.kind == "store":
+        if operation.kind in ("store", "copy"):
             self._wake("bulk group")
 
     def tick_async(self) -> None:
@@ -180,19 +181,33 @@ class Cta:
         self._complete(self.async_queue.pop(0))
         return True
 
-    def finish(self) -> None:
-        """All warps returned. Copies still in flight are reported, then completed."""
-        while self.async_queue:
-            entry = self.async_queue.pop(0)
-            operation = entry[1]
+    def retire(self, *, after: float | None = None) -> None:
+        """Diagnose operations outstanding at CTA exit without completing them early.
+
+        In timed mode a queued completion at or before the last instruction's
+        finish time has already completed by retirement, even if not dispatched.
+        """
+        if self.retired:
+            return
+        self.retired = True
+        for when, operation, _ in self.async_queue:
+            if after is not None and when <= after:
+                continue
             kind, what, how = {
                 "store": ("tma-store-not-waited", "TMA store", "cp.async.bulk.wait_group"),
                 "load": ("tma-load-not-waited", "TMA load", "its mbarrier"),
+                "copy": ("cp-async-not-waited", "cp.async copy", "cp.async.wait_group"),
             }.get(operation.kind, ("tcgen05-not-waited", f"tcgen05.{operation.kind}",
                                    "a tcgen05.commit and its mbarrier"))
-            self.findings.add(kind, f"the kernel returned while this {what} was still in flight; "
+            self.findings.add(kind, f"CTA {self.id} returned while this {what} was still in flight; "
                               f"nothing waited on {how}",
                               operation.warp, operation.ins, [operation.lane])
+
+    def finish(self) -> None:
+        """Finalize a retired CTA after outstanding operations have been diagnosed."""
+        self.retire()
+        while self.async_queue:
+            entry = self.async_queue.pop(0)
             if self.timeline is not None:
                 self.timeline.now = entry[0]
             self._complete(entry)

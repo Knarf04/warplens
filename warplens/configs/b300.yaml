@@ -1,0 +1,75 @@
+# NVIDIA B300 (Blackwell Ultra), parameters of warplens's approximate timing model.
+#
+# NOTHING here has been measured on a B300. Entries are the B200 values unless marked.
+# Every entry has a `source`. "assumption" means the number is NOT public and was
+# chosen to be plausible; results that depend on it are illustrations, not predictions.
+# The paper cited as arXiv:2512.02189 is Jarmusch and Chandrasekaran,
+# "Microbenchmarking NVIDIA's Blackwell Architecture" (v3).
+name: B300
+
+sm_count:
+  value: 148
+  unit: SMs
+  source: "B200 value, not measured on B300. arXiv:2512.02189, section III-A"
+  url: https://arxiv.org/abs/2512.02189
+clock_ghz:
+  value: 1.5
+  unit: GHz
+  source: assumption
+  note: The core clock is not public. It only sets the cost of issuing an instruction.
+hbm_capacity_gb:
+  value: 288
+  unit: GB
+  source: assumption
+  note: Publicly announced capacity for Blackwell Ultra; not checked against a primary source here.
+hbm_bandwidth_tb_s:
+  value: 4.141
+  unit: TB/s
+  source: "B200 value, not measured on B300. arXiv:2512.02189, Table XIII (measured STREAM Triad; the stated peak is 8 TB/s)"
+  url: https://arxiv.org/abs/2512.02189
+l2_bandwidth_per_sm_gb_s:
+  value: 400
+  unit: GB/s
+  source: assumption
+  note: Rate at which one SM can pull data that is already in the L2 cache.
+tma_latency_ns:
+  value: 100
+  unit: ns
+  source: assumption
+  note: Fixed delay from issuing a TMA copy to its completion, on top of the transfer itself.
+tma_bytes_per_clk:
+  value: 128
+  unit: bytes/clk
+  source: assumption
+  note: Throughput of one SM's TMA engine; set equal to one shared-memory wavefront per clock.
+smem_wavefront_clk:
+  value: 1
+  unit: clk
+  source: assumption
+  note: Cost of one shared-memory wavefront (see docs/m1.md for what a wavefront is).
+global_access_latency_clk:
+  value: 30
+  unit: clk
+  source: assumption
+  note: Time a warp waits for an ordinary global load. Stores are not waited for.
+tmem_access_clk:
+  value: 4
+  unit: clk
+  source: assumption
+  note: Cost of one tcgen05.ld or tcgen05.st instruction.
+tensor_core_tflops_f16:
+  value: 1929.6
+  unit: TFLOPS
+  source: "B200 value, not measured on B300. arXiv:2512.02189, Table VII (measured, whole GPU, FP16)"
+  url: https://arxiv.org/abs/2512.02189
+tensor_core_tflops_tf32:
+  value: 964.5
+  unit: TFLOPS
+  source: "B200 value, not measured on B300. arXiv:2512.02189, Table VII (measured, whole GPU, TF32)"
+  url: https://arxiv.org/abs/2512.02189
+mma_latency_clk:
+  value: 11.3
+  unit: clk
+  source: "B200 value, not measured on B300. arXiv:2512.02189, Table V (tcgen05.mma m128n128k16, dependency-chain latency)"
+  url: https://arxiv.org/abs/2512.02189
+  note: Added once per MMA as pipeline latency. The paper's cycle counts and its throughput table do not agree with each other for any single clock frequency.

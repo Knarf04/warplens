@@ -76,7 +76,7 @@ def _check_alignment(w, ins, info, start: int, lane: int) -> None:
 
 
 def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
-          swizzle: int | None = None) -> None:
+          swizzle: int | None = None, source=None) -> None:
     """Issue an asynchronous write of `data` to shared bytes `idx`, reporting to `bar`."""
     cta = w.cta
     _require_seen(w, ins, [lane], cta.smem.async_writer[idx], "TMA load overwrites")
@@ -97,6 +97,8 @@ def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
                 "(cp.async.bulk.wait_group.read)", w, ins, [lane])
     operation = cta.new_async("load", w, ins, lane)
     operation.swizzle = swizzle
+    operation.work = {"bytes": len(idx),
+                      "lines": None if source is None else np.unique(source >> np.uint64(7))}
     cta.smem.begin_async_write(idx, operation.id)
     bar.in_flight += 1
 
@@ -124,6 +126,7 @@ def _store(w, ins, lane: int, idx: np.ndarray, write_global) -> None:
             "in between; TMA may read stale data", w, ins, [lane])
     _require_seen(w, ins, [lane], smem.async_writer[idx], "TMA store reads")
     operation = cta.new_async("store", w, ins, lane)
+    operation.work = {"bytes": len(idx)}
     smem.async_reader[idx] = operation.id
     smem.async_active = True
     w.open_stores.append(operation)
@@ -233,7 +236,8 @@ def _cp(w, ins, mask):
             if info.nan_fill:
                 values[:] = np.array(np.nan, dtype=f"f{info.elem_size}").view(dt)
             values[inside] = w.mem.read(addrs[inside], dt)
-            _load(w, ins, lane, start, idx, values.view(np.uint8), bar, swizzle=info.swizzle)
+            _load(w, ins, lane, start, idx, values.view(np.uint8), bar, swizzle=info.swizzle,
+                  source=addrs[inside])
         elif to_shared:  # [smem], [global], size, [mbarrier]
             if len(ops) != 4 + hint:
                 raise unsupported(ins, "expected [dst], [src], size, [mbarrier]")

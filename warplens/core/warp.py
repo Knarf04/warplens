@@ -19,6 +19,9 @@ class Warp:
         self.program = program
         self.cta = cta  # the Cta this warp belongs to
         self.blocked = None  # a core.cta.Wait while the warp cannot run
+        self.time = 0.0  # ns; only advanced in timed runs
+        self.smem_waves = 0  # shared-memory wavefronts of the instruction being executed
+        self.global_accesses = 0  # ordinary global loads of that instruction
         self.seen: set[int] = set()  # TMA copies this warp has synchronized with
         self.open_stores: list = []  # TMA stores issued but not yet in a bulk group
         self.groups: dict[int, list[list]] = {}  # lane -> committed bulk groups not yet waited for

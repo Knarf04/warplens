@@ -111,11 +111,17 @@ class Device:
         return self._modules[path]
 
     def launch(self, ptx, entry: str, *, grid, block, args=(), smem: int = 0, trace=None,
-               max_steps: int | None = None, async_delay: int = 4) -> LaunchStats:
+               max_steps: int | None = None, async_delay: int = 4, timing=False,
+               active_sms: int | None = None) -> LaunchStats:
         """Run kernel `entry` from `ptx` (a path or a parsed Module) to completion.
 
         `smem` is the dynamic shared memory per CTA in bytes, as passed to a
-        real launch; it sizes `extern __shared__` arrays. `async_delay` is how
+        real launch; it sizes `extern __shared__` arrays.
+
+        With `timing=True` the launch also runs an approximate timing model of
+        this device (`stats.timing`); pass a `timing.config.GpuConfig` to use
+        other parameters. `active_sms` is how many SMs are assumed to share the
+        memory bandwidth (default: all of them). Without timing, `async_delay` is how
         many scheduling rounds a TMA copy takes to complete after it is issued.
 
         `trace`, if given, is called as trace(warp, pc, instr, active_mask)
@@ -135,4 +141,12 @@ class Device:
             self._programs[key] = Program(module, module.functions[entry], self._globals[id(module)])
         return run_kernel(self._programs[key], self.memory, grid=grid, block=block,
                           args=args, smem=smem, trace=trace, max_steps=max_steps,
-                          async_delay=async_delay)
+                          async_delay=async_delay, timing=self._timing(timing, active_sms))
+
+    def _timing(self, timing, active_sms):
+        if timing is None or timing is False:
+            return None
+        from ..timing.config import GpuConfig
+        from ..timing.model import Timing
+        config = timing if isinstance(timing, GpuConfig) else GpuConfig.load(self.model)
+        return Timing(config, active_sms)

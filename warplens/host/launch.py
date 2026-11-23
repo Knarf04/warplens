@@ -33,6 +33,7 @@ class LaunchStats:
     smem: SmemReport = field(default_factory=SmemReport, repr=False)  # bank conflicts
     findings: list[Finding] = field(default_factory=list, repr=False)
     output: str = field(default="", repr=False)  # what the kernel printed with printf
+    timing: object = field(default=None, repr=False)  # timing.model.TimingReport of a timed launch
 
     def report(self) -> str:
         """Bank-conflict table and findings as text."""
@@ -106,7 +107,7 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, bytes]:
 
 
 def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace=None,
-               max_steps: int | None = None, async_delay: int = 4) -> LaunchStats:
+               max_steps: int | None = None, async_delay: int = 4, timing=None) -> LaunchStats:
     if (not isinstance(async_delay, (int, np.integer))
             or isinstance(async_delay, (bool, np.bool_)) or async_delay < 0):
         raise LaunchError(f"async_delay must be a non-negative integer, got {async_delay!r}")
@@ -142,7 +143,11 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                         threads=gx * gy * gz * threads, smem_bytes=smem_bytes)
     findings = Findings()
     output: list[str] = []
-    engine = Engine(max_steps)
+    if timing is None:
+        engine = Engine(max_steps)
+    else:
+        from ..timing.engine import TimedEngine
+        engine = TimedEngine(max_steps)
     with np.errstate(all="ignore"):
         for cz in range(gz):
             for cy in range(gy):
@@ -150,6 +155,8 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                     ids = {"ctaid.x": const(cx), "ctaid.y": const(cy), "ctaid.z": const(cz)}
                     cta = Cta((cx, cy, cz), smem_bytes, stats.smem, findings, async_delay)
                     cta.output = output
+                    if timing is not None:
+                        cta.timeline = timing.timeline(cta.id)
                     warps = cta.warps
                     for wi in range(nwarps):
                         t = tuple(c[wi] for c in tid)
@@ -165,5 +172,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                         stats.divergent_branches += w.divergences
                         stats.max_simt_depth = max(stats.max_simt_depth, w.stack.max_depth)
     stats.findings = findings.items
+    if timing is not None:
+        stats.timing = timing.report()
     stats.output = "".join(output)
     return stats

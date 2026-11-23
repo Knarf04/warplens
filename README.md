@@ -5,13 +5,15 @@ Understand an NVIDIA Blackwell GPU by watching it run. No GPU required.
 warplens takes real GPU kernel code compiled to PTX for datacenter Blackwell
 (`sm_100a`) and executes it on the CPU, with no GPU anywhere in the loop.
 
-> **Status: early.** Milestones M0 to M3 are done: CUDA
+> **Status: early.** Milestones M0 to M4 are done: CUDA
 > kernels using global and shared memory, barriers, warp shuffles, TMA,
 > mbarriers and the Blackwell tensor core (tcgen05) run and match NumPy,
 > including CUTLASS's first two Blackwell tutorials, unmodified. There is a
 > shared-memory bank-conflict report and checkers for races and for misuse of
 > the TMA, mbarrier and TMEM protocols. Nothing Blackwell-specific has been
-> compared with real hardware. See [PLAN.md](PLAN.md) for the roadmap.
+> compared with real hardware. An approximate, uncalibrated timing model shows
+> what limits a kernel under stated parameters. See [PLAN.md](PLAN.md) for the
+> roadmap.
 
 ## Try it
 
@@ -24,6 +26,7 @@ python examples/02_tma_copy/run.py     # TMA + mbarrier, then five deliberate bu
 examples/03_cutlass_mma/build.sh       # fetch CUTLASS and compile two Blackwell tutorials (needs nvcc)
 python examples/03_cutlass_mma/run.py  # run those tcgen05 GEMMs on the CPU
 python -m warplens.viz.tmem 64 32      # where a tcgen05.mma result lands in tensor memory
+python examples/04_pipelined_gemm/run.py out/  # pipelined GEMM: what limits it at 1, 2, 4 stages
 pytest
 ```
 
@@ -37,7 +40,7 @@ sim.launch("examples/00_vecadd/vecadd.ptx", "vecadd", grid=4, block=256, args=[A
 assert np.array_equal(C.numpy(), a + b)
 ```
 
-Running needs only Python 3.11+ and NumPy. Compiling your own CUDA C++ to PTX
+Running needs only Python 3.11+, NumPy and PyYAML. Compiling your own CUDA C++ to PTX
 needs `nvcc` from CUDA 12.8 or newer; [env/](env/README.md) sets up an isolated
 conda env with it.
 
@@ -48,6 +51,7 @@ conda env with it.
 - [docs/m1.md](docs/m1.md): shared memory, bank model, barriers, findings
 - [docs/m2.md](docs/m2.md): TMA, tensor maps, mbarriers, protocol checkers
 - [docs/m3.md](docs/m3.md): tcgen05, tensor memory, running a CUTLASS tutorial
+- [docs/m4.md](docs/m4.md): the timing model, its sources and assumptions, traces and reports
 - [docs/coverage.md](docs/coverage.md): which PTX is supported
 - [validation/README.md](validation/README.md): cross-checks against a real GPU
 

@@ -65,9 +65,10 @@ class InstrBanks:
 class SmemReport:
     instructions: dict[tuple[str, int], InstrBanks] = field(default_factory=dict)  # by kernel and PC
 
-    def record(self, ins, kernel: str, offsets: np.ndarray, size: int, *, pc: int) -> None:
+    def record(self, ins, kernel: str, offsets: np.ndarray, size: int, *, pc: int) -> int:
+        """Returns the wavefronts this access took."""
         if not len(offsets):
-            return
+            return 0
         # PTX permits several instructions on one source line. Their costs
         # must remain separate, including distinct load/store counters.
         key = (kernel, pc)
@@ -81,6 +82,7 @@ class SmemReport:
         entry.bank_words += per_bank
         if waves * entry.worst_ideal > entry.worst * ideal:
             entry.worst, entry.worst_ideal = waves, ideal
+        return waves
 
     @property
     def wavefronts(self) -> int:

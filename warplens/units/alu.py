@@ -557,10 +557,12 @@ def _store(w, ins, space, addrs, value, mask) -> None:
 
 def _record_memory_banks(w, ins, space, addrs, mask, size: int) -> None:
     """Account for one complete scalar or vector instruction, not each element."""
-    _, shared, offsets, _, _ = _split_generic(space, addrs, mask)
+    in_global, shared, offsets, _, _ = _split_generic(space, addrs, mask)
     if shared is not None and shared.any():
-        w.cta.smem_report.record(ins, w.program.fn.name, offsets[shared], size,
-                                 pc=w.stack.top.pc)
+        w.smem_waves += w.cta.smem_report.record(ins, w.program.fn.name, offsets[shared], size,
+                                                 pc=w.stack.top.pc)
+    if in_global is not None and in_global.any() and ins.opcode == "ld":
+        w.global_accesses += 1  # for the timing model: a load makes the warp wait, a store does not
 
 
 def _fault_lanes(e: MemoryFault, mask: np.ndarray) -> None:

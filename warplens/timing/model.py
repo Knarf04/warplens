@@ -1,0 +1,296 @@
+"""An approximate timing model.
+
+Time is in nanoseconds. Each CTA is modeled as running alone on one SM, with
+these resources, each a server that handles one piece of work at a time:
+
+    issue slots   4 per SM; warp w uses slot w % 4; one instruction per clock
+    SMEM          one shared-memory wavefront per `smem_wavefront_clk`
+    TMA engine    `tma_bytes_per_clk`, plus a fixed `tma_latency_ns` per copy
+    HBM           this SM's share of the device bandwidth, for bytes not yet in L2
+    L2            `l2_bandwidth_per_sm_gb_s`, for bytes some CTA already fetched
+    Tensor Core   this SM's share of the device FLOP rate for the MMA's type
+
+A warp's instruction starts when the warp and its issue slot are free. A TMA
+copy or an MMA is asynchronous: it queues on its servers and completes later,
+and warps waiting on its mbarrier resume at that time.
+
+This explains where time goes; it does not predict it. The microarchitecture
+is not public, several parameters are assumptions (the config files say which),
+and nothing here has been calibrated against hardware.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+import numpy as np
+
+from .config import GpuConfig
+
+SATURATED = 0.85  # a resource busy at least this fraction of the time is called the bottleneck
+LINE = 128  # bytes; granularity of the "already in L2" bookkeeping
+
+
+@dataclass(slots=True)
+class Slice:
+    track: str
+    name: str
+    start: float
+    end: float
+    cta: tuple = (0, 0, 0)
+    args: dict = field(default_factory=dict)
+
+
+class Server:
+    __slots__ = ("name", "free", "busy", "work", "first", "last")
+
+    def __init__(self, name: str):
+        self.name = name
+        self.free = 0.0  # time the server next becomes available
+        self.busy = 0.0  # total time spent working
+        self.work = 0.0  # total amount of work (bytes, FLOPs, instructions, wavefronts)
+        self.first = None  # start of the first job
+        self.last = 0.0  # end of the last job
+
+    def reserve(self, ready: float, duration: float, amount: float) -> tuple[float, float]:
+        start = max(ready, self.free)
+        end = start + duration
+        self.free = end
+        self.busy += duration
+        self.work += amount
+        if self.first is None:
+            self.first = start
+        self.last = end
+        return start, end
+
+
+# Which config entries each resource's numbers are derived from.
+RESOURCE_SOURCES = {
+    "issue slots": ("clock_ghz",),
+    "SMEM": ("smem_wavefront_clk", "clock_ghz"),
+    "TMA engine": ("tma_bytes_per_clk", "tma_latency_ns", "clock_ghz"),
+    "HBM": ("hbm_bandwidth_tb_s", "sm_count"),
+    "L2": ("l2_bandwidth_per_sm_gb_s",),
+    "Tensor Core": ("tensor_core_tflops_f16", "tensor_core_tflops_tf32", "sm_count",
+                    "mma_latency_clk", "clock_ghz"),
+}
+
+
+class Timeline:
+    """The timing state of one CTA on its SM."""
+
+    def __init__(self, timing: "Timing", cta_id):
+        self.timing = timing
+        self.cta_id = cta_id
+        cfg = timing.config
+        self.clk = 1.0 / cfg["clock_ghz"]  # ns per clock
+        self.now = 0.0
+        self.end = 0.0
+        self.slots = [Server("issue slots") for _ in range(4)]
+        self.smem = Server("SMEM")
+        self.tma = Server("TMA engine")
+        self.hbm = Server("HBM")
+        self.l2 = Server("L2")
+        self.tensor_core = Server("Tensor Core")
+        self.tma_rate = cfg["tma_bytes_per_clk"] / self.clk  # bytes per ns
+        self.hbm_rate = cfg["hbm_bandwidth_tb_s"] * 1e3 / timing.active_sms  # TB/s -> bytes/ns, shared
+        self.l2_rate = cfg["l2_bandwidth_per_sm_gb_s"]  # GB/s == bytes/ns
+        self.flop_rate = {kind: cfg[f"tensor_core_tflops_{kind}"] * 1e3 / cfg["sm_count"]
+                          for kind in ("f16", "tf32")}  # FLOP per ns for this SM
+        self.flops = 0.0
+        self.bytes_loaded = 0.0
+        self.async_first = None  # window in which asynchronous work was in flight
+        self.async_last = 0.0
+        self.mma_done: dict[int, float] = {}  # warp id -> completion time of its latest MMA
+        self.wait_start: dict[int, tuple[float, object]] = {}
+        self.run_start: dict[int, float] = {}
+
+    # -- warps ---------------------------------------------------------------------
+    def charge(self, warp, ins) -> None:
+        """Advance `warp.time` past the instruction it just executed."""
+        cfg = self.timing.config
+        slot = self.slots[warp.warp_id % 4]
+        _, t = slot.reserve(warp.time, self.clk, 1)
+        if warp.smem_waves:
+            _, t = self.smem.reserve(t, warp.smem_waves * cfg["smem_wavefront_clk"] * self.clk,
+                                     warp.smem_waves)
+            warp.smem_waves = 0
+        if warp.global_accesses:
+            t += cfg["global_access_latency_clk"] * self.clk
+            warp.global_accesses = 0
+        if ins.opcode == "tcgen05" and ins.mods[:1] in (("ld",), ("st",)):
+            t += cfg["tmem_access_clk"] * self.clk
+        warp.time = t
+        self.end = max(self.end, t)
+
+    def slice(self, track: str, name: str, start: float, end: float, **args) -> None:
+        self.timing.slices.append(Slice(track, name, start, end, self.cta_id, args))
+
+    def blocked(self, warp, when: float) -> None:
+        self.slice(f"warp {warp.warp_id}", "run", self.run_start.get(warp.warp_id, 0.0), when)
+        self.wait_start[warp.warp_id] = (when, warp.blocked)
+
+    def resumed(self, warp, when: float) -> None:
+        start, wait = self.wait_start.pop(warp.warp_id, (when, None))
+        warp.time = max(warp.time, when)
+        if wait is not None:
+            text = " ".join(wait.ins.text.split())
+            self.slice(f"warp {warp.warp_id}", f"wait: {wait.kind}", start, warp.time,
+                       line=wait.ins.line, instruction=text)
+        self.run_start[warp.warp_id] = warp.time
+
+    def finished(self, warp) -> None:
+        self.slice(f"warp {warp.warp_id}", "run", self.run_start.get(warp.warp_id, 0.0), warp.time)
+
+    # -- asynchronous operations -----------------------------------------------------
+    def schedule(self, operation) -> float:
+        """Completion time of a TMA copy, MMA or commit issued now by its warp."""
+        cfg = self.timing.config
+        issued = operation.warp.time
+        work = operation.work or {}
+        if operation.kind in ("load", "store"):
+            nbytes = work.get("bytes", 0)
+            lines = work.get("lines")
+            fresh = nbytes
+            if operation.kind == "load" and lines is not None and len(lines):
+                seen = self.timing.l2_lines
+                new = [int(x) for x in lines if int(x) not in seen]
+                seen.update(new)
+                fresh = nbytes * len(new) / len(lines)
+            start, end = self.tma.reserve(issued, nbytes / self.tma_rate, nbytes)
+            if fresh:
+                _, hbm_end = self.hbm.reserve(issued, fresh / self.hbm_rate, fresh)
+                end = max(end, hbm_end)
+            if nbytes - fresh:
+                _, l2_end = self.l2.reserve(issued, (nbytes - fresh) / self.l2_rate, nbytes - fresh)
+                end = max(end, l2_end)
+            done = end + cfg["tma_latency_ns"]
+            self.bytes_loaded += nbytes
+            self.slice("TMA engine", f"TMA {operation.kind}", start, done, bytes=nbytes,
+                       from_hbm=int(fresh), line=operation.ins.line)
+        elif operation.kind == "mma":
+            flops = work.get("flops", 0.0)
+            rate = self.flop_rate[work.get("kind", "f16")]
+            start, end = self.tensor_core.reserve(issued, flops / rate, flops)
+            done = end + cfg["mma_latency_clk"] * self.clk
+            self.flops += flops
+            self.mma_done[operation.warp.warp_id] = done
+            self.slice("Tensor Core", f"MMA {work.get('shape', '')}", start, done,
+                       flops=flops, line=operation.ins.line)
+        else:  # tcgen05.commit: arrives once the warp's earlier MMAs are complete
+            done = max(issued, self.mma_done.get(operation.warp.warp_id, issued))
+        if self.async_first is None:
+            self.async_first = issued
+        self.async_last = max(self.async_last, done)
+        self.end = max(self.end, done)
+        return done
+
+    # -- summary -------------------------------------------------------------------
+    def utilization(self) -> dict[str, float]:
+        total = max(self.end, 1e-12)
+        window = max(self.async_last - (self.async_first or 0.0), 1e-12)
+        return {
+            "issue slots": sum(s.busy for s in self.slots) / (4 * total),
+            "SMEM": self.smem.busy / total,
+            "TMA engine": self.tma.busy / window,
+            "HBM": self.hbm.busy / window,
+            "L2": self.l2.busy / window,
+            "Tensor Core": self.tensor_core.busy / window,
+        }
+
+
+class Timing:
+    """Timing of one launch: a Timeline per CTA plus what they share."""
+
+    def __init__(self, config: GpuConfig, active_sms: int | None = None):
+        self.config = config
+        # How many SMs draw on HBM at once. Each CTA is simulated alone, so this
+        # decides its share of the bandwidth. Default: the whole device is busy.
+        self.active_sms = int(active_sms or config["sm_count"])
+        self.l2_lines: set[int] = set()  # global-memory lines some CTA has already fetched
+        self.timelines: list[Timeline] = []
+        self.slices: list[Slice] = []
+        self.instants: list[tuple[str, float, tuple]] = []
+
+    def timeline(self, cta_id) -> Timeline:
+        self.timelines.append(Timeline(self, cta_id))
+        return self.timelines[-1]
+
+    def report(self) -> "TimingReport":
+        return TimingReport(self)
+
+
+class TimingReport:
+    def __init__(self, timing: Timing):
+        self.config = timing.config
+        self.active_sms = timing.active_sms
+        self.slices = timing.slices
+        self.instants = timing.instants
+        lines = timing.timelines
+        self.ctas = len(lines)
+        self.time_ns = max((t.end for t in lines), default=0.0)
+        self.clocks = self.time_ns * self.config["clock_ghz"]
+        names = list(RESOURCE_SOURCES)
+        per_cta = [t.utilization() for t in lines]
+        self.utilization = {n: float(np.mean([u[n] for u in per_cta])) if per_cta else 0.0
+                            for n in names}
+        self.flops = sum(t.flops for t in lines)
+        self.bytes_loaded = sum(t.bytes_loaded for t in lines)
+        self.pipeline_ns = float(np.mean([t.async_last - (t.async_first or 0.0) for t in lines])) \
+            if lines else 0.0
+
+    @property
+    def bottleneck(self) -> str:
+        """The busiest resource if it is saturated, otherwise "latency"."""
+        name, value = max(self.utilization.items(), key=lambda kv: kv[1])
+        return name if value >= SATURATED else "latency"
+
+    @property
+    def verdict(self) -> str:
+        name, value = max(self.utilization.items(), key=lambda kv: kv[1])
+        if value >= SATURATED:
+            return f"{name}-bound: the {name} is busy {value:.0%} of the time"
+        return (f"latency-bound: no resource is saturated (the busiest, {name}, is at {value:.0%}); "
+                "time goes to waiting for round trips")
+
+    def roofline(self) -> dict[str, float]:
+        """Achieved rate against this SM's compute and memory ceilings, per CTA."""
+        seconds = max(self.pipeline_ns, 1e-12) * 1e-9
+        per_cta_flops = self.flops / max(self.ctas, 1)
+        per_cta_bytes = self.bytes_loaded / max(self.ctas, 1)
+        intensity = per_cta_flops / per_cta_bytes if per_cta_bytes else float("inf")
+        peak = self.config["tensor_core_tflops_f16"] * 1e12 / self.config["sm_count"]
+        memory = self.config["hbm_bandwidth_tb_s"] * 1e12 / self.active_sms
+        return {"achieved_flops_per_s": per_cta_flops / seconds,
+                "compute_ceiling_flops_per_s": peak,
+                "memory_ceiling_flops_per_s": intensity * memory,
+                "flops_per_byte": intensity}
+
+    def summary(self) -> str:
+        cfg = self.config
+        lines = [f"Approximate timing on {cfg.name} (model, not a measurement)",
+                 f"  {self.ctas} CTA(s), each alone on one SM; {self.active_sms} SMs assumed to share HBM",
+                 f"  kernel time {self.time_ns:,.0f} ns ({self.clocks:,.0f} clocks at "
+                 f"{cfg['clock_ghz']:g} GHz, an assumed clock)",
+                 f"  verdict: {self.verdict}",
+                 "  resource       busy   derived from"]
+        for name, value in self.utilization.items():
+            keys = ", ".join(k + ("*" if cfg.params[k].is_assumption else "")
+                             for k in RESOURCE_SOURCES[name])
+            lines.append(f"  {name:<13} {value:>5.0%}   {keys}")
+        r = self.roofline()
+        if self.flops:
+            lines.append(f"  roofline: {r['achieved_flops_per_s'] / 1e12:.2f} TFLOP/s per SM achieved; "
+                         f"compute ceiling {r['compute_ceiling_flops_per_s'] / 1e12:.2f}, memory "
+                         f"ceiling {r['memory_ceiling_flops_per_s'] / 1e12:.2f} at "
+                         f"{r['flops_per_byte']:.1f} FLOP/byte")
+        lines.append("  * assumed value, not public; see the config file for every source")
+        return "\n".join(lines)
+
+    def write_trace(self, path) -> None:
+        from ..viz.trace_perfetto import write_trace
+        write_trace(self, path)
+
+    def write_html(self, path, title: str = "warplens timing report") -> None:
+        from ..viz.html_report import write_html
+        write_html(self, path, title)

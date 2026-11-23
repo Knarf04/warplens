@@ -9,13 +9,16 @@ description = "Understand a Blackwell GPU by watching it run, on your CPU."
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26"]
+dependencies = ["numpy>=1.26", "pyyaml>=6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
 [tool.setuptools.packages.find]
 include = ["warplens*"]
+
+[tool.setuptools.package-data]
+"warplens.configs" = ["*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -10,6 +10,7 @@ channels:
 dependencies:
   - python=3.12
   - numpy
+  - pyyaml
   - pytest
   # CUDA toolchain (compile-only). cuda-version pins every cuda-* package.
   - cuda-version=13.5

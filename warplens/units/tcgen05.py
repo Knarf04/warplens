@@ -233,6 +233,9 @@ def _mma(w, ins, lane: int) -> None:
 
     smem = cta.smem
     operation = cta.new_async("mma", w, ins, lane)
+    k_dim = idx_a.shape[1]
+    operation.work = {"flops": 2.0 * m_dim * n_dim * k_dim, "kind": kind,
+                      "shape": f"{m_dim}x{n_dim}x{k_dim}"}
     smem.async_reader[idx_a] = operation.id
     smem.async_reader[idx_b] = operation.id
     smem.async_active = True

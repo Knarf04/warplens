@@ -22,12 +22,13 @@ class Wait:
 
 class AsyncOp:
     """One TMA copy in flight (or finished)."""
-    __slots__ = ("id", "kind", "warp", "ins", "lane", "done", "swizzle")
+    __slots__ = ("id", "kind", "warp", "ins", "lane", "done", "swizzle", "work")
 
     def __init__(self, op_id: int, kind: str, warp, ins, lane: int):
         self.id, self.kind, self.warp, self.ins, self.lane = op_id, kind, warp, ins, lane
         self.done = False
         self.swizzle = None  # swizzle bits of a TMA tensor load (None: not known)
+        self.work = None  # what the timing model needs: bytes moved, FLOPs, ...
 
 
 @dataclass(slots=True)
@@ -59,6 +60,7 @@ class Cta:
         self.mbarriers: dict[int, object] = {}  # shared offset -> Mbarrier
         self.output: list[str] = []  # text printed by the kernel
         self.tmem = None  # units.tcgen05.Tmem, created on first use
+        self.timeline = None  # timing.model.Timeline when the launch is timed
         self.smem = SharedMemory(smem_bytes)
         self.smem_report = smem_report
         self.findings = findings
@@ -119,6 +121,8 @@ class Cta:
     def phase_completed(self) -> None:
         """An mbarrier phase completed: wake its waiters; it also orders shared-memory accesses."""
         self.smem.epoch += 1
+        if self.timeline is not None:
+            self.timeline.timing.instants.append(("mbarrier phase completes", self.timeline.now, self.id))
         self._wake("mbarrier")
 
     def _wake(self, kind: str) -> None:
@@ -133,7 +137,15 @@ class Cta:
         return operation
 
     def schedule(self, operation: AsyncOp, complete) -> None:
-        self.async_queue.append([self.async_delay, operation, complete])
+        if self.timeline is None:
+            self.async_queue.append([self.async_delay, operation, complete])
+            return
+        # Timed run: the queue holds completion times and stays sorted by them.
+        when = self.timeline.schedule(operation)
+        at = len(self.async_queue)
+        while at and self.async_queue[at - 1][0] > when:
+            at -= 1
+        self.async_queue.insert(at, [when, operation, complete])
 
     def _complete(self, entry) -> None:
         _, operation, complete = entry

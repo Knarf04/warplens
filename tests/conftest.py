@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +8,18 @@ import warplens
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 HEADER = ".version 9.5\n.target sm_100a\n.address_size 64\n"
+
+
+def cuda_include(header: str = "cuda.h") -> Path | None:
+    """The CUDA toolkit include directory that has `header`, or None. Looks next to the nvcc on
+    PATH first (a conda env keeps its headers under targets/), then in /usr/local/cuda."""
+    candidates = []
+    nvcc = shutil.which("nvcc")
+    if nvcc:
+        toolkit = Path(nvcc).resolve().parent.parent
+        candidates += [toolkit / "targets/x86_64-linux/include", toolkit / "include"]
+    candidates.append(Path("/usr/local/cuda/include"))
+    return next((p for p in candidates if (p / header).exists()), None)
 
 
 def kernel(body: str, params: str = "", name: str = "k") -> warplens.frontend.ir.Module:

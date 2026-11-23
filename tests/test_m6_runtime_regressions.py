@@ -9,6 +9,8 @@ from pathlib import Path
 
 import pytest
 
+from conftest import cuda_include
+
 from warplens.errors import WarplensError
 from warplens.host.shim_server import FREE, MALLOC, ShimServer
 
@@ -167,12 +169,7 @@ int main(int argc, char **argv) {
 @pytest.fixture(scope="module")
 def runtime_client(tmp_path_factory):
     compiler = shutil.which(os.environ.get("CC", "cc"))
-    nvcc = shutil.which("nvcc")
-    candidates = [Path("/usr/local/cuda/include")]
-    if nvcc:
-        toolkit = Path(nvcc).resolve().parent.parent
-        candidates += [toolkit / "include", toolkit / "targets/x86_64-linux/include"]
-    include = next((p for p in candidates if (p / "cuda_runtime_api.h").exists()), None)
+    include = cuda_include("cuda_runtime_api.h")
     if compiler is None or include is None:
         pytest.skip("native runtime regressions need a C compiler and CUDA toolkit headers")
     build = tmp_path_factory.mktemp("runtime-shim")

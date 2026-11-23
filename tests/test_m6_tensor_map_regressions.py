@@ -13,7 +13,7 @@ import warplens
 from warplens.host import tensor_map as tm
 from warplens.host.shim_server import ShimServer, TENSOR_MAP
 
-from conftest import kernel
+from conftest import cuda_include, kernel
 
 
 def driver_map(**changes):
@@ -97,9 +97,9 @@ def test_tensor_map_request_preserves_pitch_and_upper_dimension_bound():
 def driver_shim(tmp_path_factory):
     """Test the real C entry point with a bounded protocol stub, without a GPU/server."""
     root = Path(__file__).resolve().parents[1]
-    include = Path("/usr/local/cuda/include")
+    include = cuda_include("cuda.h")
     cc = shutil.which("cc")
-    if not cc or not (include / "cuda.h").exists():
+    if not cc or include is None:
         pytest.skip("C compiler and CUDA headers required")
     tmp = tmp_path_factory.mktemp("driver_shim")
     stub = tmp / "stub.c"

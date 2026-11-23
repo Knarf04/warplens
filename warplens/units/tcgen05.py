@@ -29,7 +29,10 @@ What is implemented, and where each rule comes from (CUTLASS/CuTe sources):
   is lane m. For M = 64, row m is lane 32 * (m // 16) + m % 16: the low 16 lanes
   of each warp's 32.
 * `tcgen05.ld.32x32b.xN [addr]`: the thread on lane l of its warp reads TMEM lane
-  lane(addr) + l, columns column(addr) .. + N - 1. The 16x64b, 16x128b and
+  32 * (warpid % 4) + (lane(addr) % 32) + l, columns column(addr) .. + N - 1.
+  NVIDIA CUTLASS's tcgen05_ld primitive documents the local 5-bit row index;
+  high row bits do not select another warp's window. Transfers spanning the
+  local 32-row boundary are not modeled. The 16x64b, 16x128b and
   16x256b shapes cover 16 lanes and give each thread 1, 2 or 4 registers per
   unit; `transfer_cells` has the mapping (cute/atom/copy_traits_sm100.hpp).
   A warp may only touch the 32 lanes 32 * (warpid % 4) .. + 31.
@@ -405,26 +408,22 @@ def _transfer(w, ins, mask, store: bool) -> None:
     if (address != address[0]).any():
         raise ExecutionError(f"{ins.name} requires the same tensor-memory address in every lane "
                              "of the warp")
-    # Which lanes a warp reaches is fixed by its position in the warpgroup: warp w gets lanes
-    # 32 * (w % 4) .. + 31. The lane part of the address only selects within that window.
-    # This reconciles two code generators that both run on real hardware: CuTe passes the
-    # window's own base lane (32 * w), while TIRx passes the same address, lane 0, in every warp.
+    if (address > np.uint64(0xFFFFFFFF)).any():
+        raise ExecutionError(f"{ins.name} requires a 32-bit tensor-memory address")
+    # NVIDIA CUTLASS's tcgen05_ld primitive documents row(addr) % 32 as the
+    # local row index. All encoded row-window aliases therefore reach the
+    # same physical window, fixed by the warp's position in its warpgroup.
     quadrant = 32 * (w.warp_id % 4)
-    address_lane = (address >> np.uint64(16)).astype(np.int64)
-    within = address_lane % 32
-    all_rows = quadrant + within[:, None] + lane_offset[lanes]
+    within = ((address >> np.uint64(16)) & np.uint64(31)).astype(np.int64)
+    local_rows = within[:, None] + lane_offset[lanes]
+    if (local_rows >= 32).any():
+        # The documented base-row alias does not establish how an entire
+        # transfer crossing this boundary behaves; do not invent wraparound.
+        raise unsupported(ins, "a transfer spanning the local 32-row tensor-memory window")
+    all_rows = quadrant + local_rows
     all_cols = (address & np.uint64(0xFFFF)).astype(np.int64)[:, None] + column_offset[lanes]
     if all_cols.max() >= COLUMNS:
         raise ExecutionError(f"{ins.name} reaches column {int(all_cols.max())}, outside tensor memory")
-    named = address_lane - within  # the 32-lane window the address itself names
-    stray = (all_rows >= quadrant + 32) | ((named != 0) & (named != quadrant))[:, None]
-    if stray.any():
-        reached = int(named[0] + within[0] + lane_offset[lanes].max())
-        cta.findings.add("tmem-lane-rule",
-                         f"warp {w.warp_id} may only access tensor-memory lanes {quadrant}-"
-                         f"{quadrant + 31}, but its address reaches lane {reached}; the access "
-                         "stays inside the warp's own window", w, ins, lanes[stray.any(axis=1)])
-        all_rows = quadrant + (all_rows - quadrant) % 32
     for i, reg in enumerate(regs.elems):
         rows, c = all_rows[:, i], all_cols[:, i]
         if not tmem.allocated[c].all():

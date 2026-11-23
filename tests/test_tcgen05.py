@@ -186,12 +186,10 @@ def test_reading_accumulators_without_waiting_for_the_commit_is_caught(sim):
     assert first.text.startswith("tcgen05.ld") and "tcgen05.mma at line" in first.message
 
 
-def test_lane_rule(sim):
-    # Three warps, each naming the lanes of the next one.
+def test_row_window_aliases_keep_each_warps_own_accumulators(sim):
+    # High row bits alias the same local row in each warp's physical window.
     got, expect, stats = run(sim, m=128, n=8, shift=32 << 16, ncols=32, block=96)
-    f = next(f for f in stats.findings if f.kind == "tmem-lane-rule")
-    assert "warp 0 may only access tensor-memory lanes 0-31, but its address reaches lane 63" in f.message
-    assert "stays inside the warp's own window" in f.message
+    assert not stats.findings
     np.testing.assert_allclose(got[:96], expect[:96], rtol=1e-5, atol=1e-5)  # each warp read its own rows
 
 

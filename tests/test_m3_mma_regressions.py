@@ -121,4 +121,3 @@ def test_mma_reads_of_never_written_shared_operands_are_reported(sim):
 def test_mma_requires_synchronization_with_tma_operand_producer(sim, delay):
     _, stats, _ = _run(sim, wait_source=False, async_delay=delay)
     assert "tma-load-unsynchronized" in {f.kind for f in stats.findings}
-

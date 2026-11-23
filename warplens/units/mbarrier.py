@@ -96,6 +96,13 @@ def _mbarrier(w, ins, mask):
             if done:
                 if "relaxed" not in ins.mods:
                     w.seen |= bar.completed_knowledge
+                else:
+                    # A successful relaxed wait can order tcgen05 operations
+                    # when followed by fence::after_thread_sync. It does not
+                    # acquire TMA/generic-memory visibility on its own.
+                    w.tcgen_observed.update(
+                        op_id for op_id in bar.completed_knowledge
+                        if op_id in cta.async_ops and cta.async_ops[op_id].kind == "mma")
             else:
                 waiting.append(bar)
         if blocking and waiting:
@@ -170,9 +177,9 @@ class Mbarrier:
         self.tx += n
         self._check()
 
-    def arrive(self, n: int, warp, ins, lanes) -> None:
+    def arrive(self, n: int, warp, ins, lanes, *, knowledge=None) -> None:
         if "relaxed" not in ins.mods:
-            self.knowledge |= warp.seen
+            self.knowledge |= warp.seen if knowledge is None else knowledge
         if n > self.pending:
             self.cta.findings.add(
                 "mbarrier-over-arrival",

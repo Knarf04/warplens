@@ -54,7 +54,7 @@ class Program:
             self.param_offsets[p.name] = offset
             offset += p.size
         self._param_bytes = offset
-        self._blob: tuple[int, bytes] | None = None
+        self._blob: tuple[dict[str, bytes], bytes] | None = None
 
         # Shared-memory layout: sized variables in declaration order, then the
         # dynamically sized `.extern .shared name[]` region requested at launch.
@@ -76,11 +76,13 @@ class Program:
 
     def param_blob(self, params: dict[str, bytes]) -> bytes:
         """All parameters of one launch laid out in parameter space."""
-        if self._blob is None or self._blob[0] != id(params):
+        # Keep the dictionary alive while its blob is cached: a bare id can
+        # be reused by a later launch after the previous warps are collected.
+        if self._blob is None or self._blob[0] is not params:
             blob = bytearray(self._param_bytes)
             for name, offset in self.param_offsets.items():
                 blob[offset:offset + len(params[name])] = params[name]
-            self._blob = (id(params), bytes(blob))
+            self._blob = (params, bytes(blob))
         return self._blob[1]
 
     def smem_bytes(self, dynamic: int) -> int:

@@ -18,8 +18,8 @@ What is implemented, and where each rule comes from (CUTLASS/CuTe sources):
 * Instruction descriptor (cute/arch/mma_sm100_desc.hpp, InstrDescriptor):
   c_format bits 4-5, a_format 7-9, b_format 10-12, a/b negate 13/14,
   a/b major 15/16, N/8 in bits 17-22, M/16 in bits 24-28.
-* Shared-memory descriptor (SmemDescriptor): start/16 in bits 0-13, leading
-  byte offset/16 in 16-29, stride byte offset/16 in 32-45, layout type in 61-63
+* Shared-memory descriptor (SmemDescriptor): start/16 in bits 0-14, leading
+  byte offset/16 in 16-30, stride byte offset/16 in 32-45, layout type in 61-63
   (0 none, 6/4/2 = 32B/64B/128B swizzle). With T = 16 / element size, element
   (r, k) of a K-major operand is at
       start + (r % 8) * row_bytes + (r // 8) * SBO + (k % T) * size + (k // T) * step
@@ -42,16 +42,17 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..core.cta import Wait
 from ..errors import ExecutionError
-from ..frontend.ir import Mem, Vec
+from ..frontend.ir import Mem, Reg, Vec
 from ..host.tensor_map import swizzle_offsets
 from .alu import _address, op, unsupported
+from .smem import GENERIC_WINDOW, MAX_SMEM_BYTES
 
 LANES, COLUMNS = 128, 512
 _LAYOUTS = {0: (0, 16), 6: (1, 32), 4: (2, 64), 2: (3, 128)}  # layout type -> (swizzle bits, row bytes)
 _ELEMENT = {"f16": {0: np.dtype(np.float16)}, "tf32": {2: np.dtype(np.float32)}}
-_NO_OPS = {"wait::ld", "wait::st", "fence::before_thread_sync", "fence::after_thread_sync",
-           "relinquish_alloc_permit"}
+_FENCES = {"fence::before_thread_sync", "fence::after_thread_sync"}
 
 
 class Tmem:
@@ -61,25 +62,34 @@ class Tmem:
         self.pending = np.zeros((LANES, COLUMNS), dtype=np.int32)  # MMA that last targeted the cell
         self.allocated = np.zeros(COLUMNS, dtype=np.bool_)
         self.allocations: dict[int, tuple[int, object]] = {}  # first column -> (columns, alloc instr)
+        self.alloc_permit = True
+        self.last_alloc_size = COLUMNS
 
-    def alloc(self, ncols: int) -> int:
+    def alloc(self, ncols: int) -> int | None:
+        if not self.alloc_permit:
+            raise ExecutionError("tcgen05.alloc after this CTA relinquished its allocation permit")
         if ncols < 32 or ncols > COLUMNS or ncols & (ncols - 1):
             raise ExecutionError(f"tcgen05.alloc of {ncols} columns; the count must be a power of "
                                  f"two from 32 to {COLUMNS}")
+        if ncols > self.last_alloc_size:
+            raise ExecutionError(f"tcgen05.alloc of {ncols} columns increases the previous allocation "
+                                 f"size of {self.last_alloc_size} columns")
         for start in range(0, COLUMNS - ncols + 1, ncols):
             if not self.allocated[start:start + ncols].any():
                 self.allocated[start:start + ncols] = True
+                self.last_alloc_size = ncols
                 return start
-        raise ExecutionError(f"tcgen05.alloc of {ncols} columns: tensor memory is full")
+        return None  # the issuing warp retries after another warp frees memory
 
     def dealloc(self, address: int, ncols: int) -> None:
-        start = address & 0xFFFF
+        start = address
         if start not in self.allocations or self.allocations[start][0] != ncols:
             raise ExecutionError(f"tcgen05.dealloc of {ncols} columns at column {start} does not "
                                  "match an allocation")
         del self.allocations[start]
         self.allocated[start:start + ncols] = False
         self.written[:, start:start + ncols] = False
+        self.pending[:, start:start + ncols] = 0
 
 
 def _tmem(cta) -> Tmem:
@@ -94,14 +104,21 @@ def _split(address: int) -> tuple[int, int]:
 
 def _operand_bytes(w, ins, desc: int, rows: int, dtype: np.dtype, which: str) -> np.ndarray:
     """Shared-memory byte indices, shape (rows, K, element size), of a K-major operand."""
+    # PTX tcgen05 shared-memory descriptor: fixed 001 at bits 46..48,
+    # reserved bits 15/31/54..60, and relative (not absolute) LBO mode.
+    if (desc >> 46) & 7 != 1 or desc & ((1 << 15) | (1 << 31) | (0x7F << 54)):
+        raise ExecutionError(f"invalid shared-memory descriptor {desc:#x} for operand {which}: "
+                             "fixed or reserved bits are not set as required")
+    if (desc >> 52) & 3:
+        raise unsupported(ins, "shared-memory descriptor with absolute LBO or decompression mode")
     layout = desc >> 61
     if layout not in _LAYOUTS:
         raise unsupported(ins, f"shared-memory descriptor layout type {layout} for operand {which}")
     if (desc >> 49) & 7:
         raise unsupported(ins, "shared-memory descriptor with a non-zero base offset")
     bits, row_bytes = _LAYOUTS[layout]
-    start = (desc & 0x3FFF) << 4
-    lbo = ((desc >> 16) & 0x3FFF) << 4
+    start = (desc & 0x7FFF) << 4
+    lbo = ((desc >> 16) & 0x7FFF) << 4
     sbo = ((desc >> 32) & 0x3FFF) << 4
     size = dtype.itemsize
     per_chunk = 16 // size
@@ -128,8 +145,11 @@ def _mma(w, ins, lane: int) -> None:
     kind = next((m.split("::")[1] for m in ins.mods if m.startswith("kind::")), None)
     if kind not in _ELEMENT:
         raise unsupported(ins, f"only kind::f16 and kind::tf32 are implemented")
-    if len(ops) < 4 or not isinstance(ops[0], Mem):
-        raise unsupported(ins, "expected [d], a, b, idesc[, {mask}][, enable]")
+    extra = set(ins.mods) - {"mma", "cta_group::1", f"kind::{kind}"}
+    if extra:
+        raise unsupported(ins, f"MMA modifier .{sorted(extra)[0]}")
+    if len(ops) < 5 or not isinstance(ops[0], Mem):
+        raise unsupported(ins, "expected [d], a, b, idesc[, {mask}], enable[, scale-input-d]")
     if isinstance(ops[1], Mem):
         raise unsupported(ins, "operand A in tensor memory")
     d_lane, d_col = _split(int(_address(w, ins, ops[0])[lane]))
@@ -140,10 +160,24 @@ def _mma(w, ins, lane: int) -> None:
     disabled = np.zeros(LANES, dtype=np.bool_)
     if rest and isinstance(rest[0], Vec):
         words = [int(w.read(e, "u32")[lane]) for e in rest.pop(0).elems]
+        if len(words) != 4:
+            raise ExecutionError("tcgen05.mma.cta_group::1 needs four disable-output-lane words")
         for i, word in enumerate(words):
             disabled[32 * i:32 * i + 32] = (word >> np.arange(32)) & 1
-    accumulate = bool(w.read(rest[0], "pred")[lane]) if rest else False
+    if len(rest) not in (1, 2):
+        raise unsupported(ins, "expected enable-input-d and optional scale-input-d")
+    accumulate = bool(w.read(rest[0], "pred")[lane])
+    scale = 0
+    if len(rest) == 2:
+        from ..frontend.ir import Imm
+        operand = rest[1]
+        if not isinstance(operand, Imm) or operand.kind != "int" or not 0 <= operand.value <= 15:
+            raise ExecutionError("tcgen05.mma scale-input-d must be an integer constant from 0 to 15")
+        scale = operand.value
 
+    if idesc & ((1 << 6) | (1 << 23) | (7 << 29)):
+        raise ExecutionError("tcgen05.mma instruction descriptor has reserved bits, an unsupported "
+                             "K dimension or .ws shift controls")
     if idesc & 0b1100 or (idesc >> 15) & 3:
         raise unsupported(ins, "sparse, saturating or MN-major MMA")
     if (idesc >> 4) & 3 != 1:
@@ -171,20 +205,33 @@ def _mma(w, ins, lane: int) -> None:
     keep = ~disabled[lanes]
     cells = (lanes[keep][:, None], d_col + np.arange(n_dim)[None, :])
 
-    operation = cta.new_async("mma", w, ins, lane)
     smem = cta.smem
+    from .tma import _require_seen
+    for which, idx in (("A", idx_a), ("B", idx_b)):
+        if smem.has_uninitialized_bytes(idx):
+            cta.findings.add("smem-uninitialized-read",
+                             f"tcgen05.mma operand {which} reads shared memory that this CTA never wrote",
+                             w, ins, [lane])
+        _require_seen(w, ins, [lane], smem.async_writer[idx], f"tcgen05.mma operand {which} reads")
+    operation = cta.new_async("mma", w, ins, lane)
     smem.async_reader[idx_a] = operation.id
     smem.async_reader[idx_b] = operation.id
     smem.async_active = True
     tmem.pending[cells] = operation.id
-    w.uncommitted.append(operation)
+    w.tcgen_issued.append(operation)
 
     def land():
         a = smem.data[idx_a].view(formats[a_fmt])[..., 0].astype(np.float32)
         b = smem.data[idx_b].view(formats[b_fmt])[..., 0].astype(np.float32)
         result = (a @ b.T * np.float32(sign))[keep]
         if accumulate:
-            result = result + tmem.data[cells].view(np.float32)
+            # Check on completion: an earlier pipelined MMA in the same thread
+            # may initialize these cells after this instruction is issued.
+            if not tmem.written[cells].all():
+                cta.findings.add("tmem-uninitialized-read",
+                                 "tcgen05.mma accumulates tensor memory that was never written",
+                                 w, ins, [lane])
+            result = result + tmem.data[cells].view(np.float32) * np.float32(2.0 ** -scale)
         tmem.data[cells] = result.astype(np.float32).view(np.uint32)
         tmem.written[cells] = True
 
@@ -192,6 +239,29 @@ def _mma(w, ins, lane: int) -> None:
 
 
 _REGISTERS_PER_UNIT = {"32x32b": 1, "16x64b": 1, "16x128b": 2, "16x256b": 4}
+
+
+def _transfer_size(shape: str, count: int) -> int:
+    if shape not in _REGISTERS_PER_UNIT:
+        raise ValueError(f"unsupported tensor-memory transfer shape {shape}")
+    registers = _REGISTERS_PER_UNIT[shape] * count
+    if count < 1 or count & (count - 1) or registers > 128:
+        maximum = 128 // _REGISTERS_PER_UNIT[shape]
+        raise ValueError(f"{shape} repeat count must be a power of two from 1 to {maximum}")
+    return registers
+
+
+def _collective(ins, mask) -> None:
+    if not mask.all():
+        raise ExecutionError(f"{ins.name} requires all 32 lanes of the warp to execute together; "
+                             f"only {int(mask.sum())} participate")
+
+
+def _uniform(w, ins, operand, mask, what: str) -> int:
+    values = w.read(operand, "u32")[mask]
+    if (values != values[0]).any():
+        raise ExecutionError(f"{ins.name} requires the same {what} in every lane of the warp")
+    return int(values[0])
 
 
 def transfer_cells(shape: str, count: int) -> tuple[np.ndarray, np.ndarray]:
@@ -203,10 +273,9 @@ def transfer_cells(shape: str, count: int) -> tuple[np.ndarray, np.ndarray]:
     thread several cells of them. Derived from the Copy_Traits of
     SM100_TMEM_LOAD_* in cute/atom/copy_traits_sm100.hpp.
     """
-    if shape not in _REGISTERS_PER_UNIT:
-        raise ValueError(shape)
+    registers = _transfer_size(shape, count)
     t = np.arange(32)[:, None]
-    q = np.arange(_REGISTERS_PER_UNIT[shape] * count)[None, :]
+    q = np.arange(registers)[None, :]
     if shape == "32x32b":
         return t + 0 * q, q + 0 * t
     if shape == "16x64b":
@@ -216,6 +285,19 @@ def transfer_cells(shape: str, count: int) -> tuple[np.ndarray, np.ndarray]:
     return (t >> 2) + 8 * ((q >> 1) & 1), 2 * (t & 3) + (q & 1) + 8 * (q >> 2)
 
 
+def _check_tmem_overwrite(w, ins, ids, lanes, *, dealloc=False) -> None:
+    """A store/free must not erase the outstanding producer's dependency."""
+    for op_id in np.unique(ids):
+        if not op_id or int(op_id) in w.seen:
+            continue
+        operation = w.cta.async_ops[int(op_id)]
+        state = "is still in flight" if not operation.done else "has not been synchronized with"
+        action = "deallocation of" if dealloc else "write to"
+        kind = "tmem-dealloc-before-commit" if dealloc else "tmem-write-before-commit"
+        w.cta.findings.add(kind, f"{action} tensor memory targeted by the tcgen05.mma at line "
+                           f"{operation.ins.line}; that MMA {state}", w, ins, lanes)
+
+
 def _transfer(w, ins, mask, store: bool) -> None:
     cta = w.cta
     shape = next((m for m in ins.mods if m in _REGISTERS_PER_UNIT), None)
@@ -223,15 +305,27 @@ def _transfer(w, ins, mask, store: bool) -> None:
     if shape is None or not count or any(m.startswith(("pack", "unpack")) for m in ins.mods):
         raise unsupported(ins, "implemented shapes are 32x32b, 16x64b, 16x128b and 16x256b, "
                                "without packing")
+    if tuple(ins.mods) != ("st" if store else "ld", "sync", "aligned", shape, f"x{count}", "b32") \
+            or len(ins.operands) != 2:
+        raise unsupported(ins, "expected an unmodified .sync.aligned transfer with two operands")
+    try:
+        _transfer_size(shape, count)
+    except ValueError as exc:
+        raise unsupported(ins, str(exc)) from exc
     regs, mem = (ins.operands[1], ins.operands[0]) if store else ins.operands[:2]
     lane_offset, column_offset = transfer_cells(shape, count)
-    if not isinstance(regs, Vec) or len(regs.elems) != lane_offset.shape[1] or not isinstance(mem, Mem):
+    if not isinstance(regs, Vec) or len(regs.elems) != lane_offset.shape[1] \
+            or not all(isinstance(reg, Reg) for reg in regs.elems) or not isinstance(mem, Mem):
         raise unsupported(ins, f"expected {lane_offset.shape[1]} register(s) and a [tmem address]")
     lanes = np.flatnonzero(mask)
     if not len(lanes):
         return
+    _collective(ins, mask)
     tmem = _tmem(cta)
     address = _address(w, ins, mem)[lanes]
+    if (address != address[0]).any():
+        raise ExecutionError(f"{ins.name} requires the same tensor-memory address in every lane "
+                             "of the warp")
     all_rows = (address >> np.uint64(16)).astype(np.int64)[:, None] + lane_offset[lanes]
     all_cols = (address & np.uint64(0xFFFF)).astype(np.int64)[:, None] + column_offset[lanes]
     if all_rows.max() >= LANES or all_cols.max() >= COLUMNS:
@@ -250,6 +344,7 @@ def _transfer(w, ins, mask, store: bool) -> None:
             cta.findings.add("tmem-unallocated", f"{ins.name} touches a column that is not allocated",
                              w, ins, lanes[~tmem.allocated[c]])
         if store:
+            _check_tmem_overwrite(w, ins, tmem.pending[rows, c], lanes)
             tmem.data[rows, c] = w.read(reg, "b32")[lanes]
             tmem.written[rows, c] = True
             tmem.pending[rows, c] = 0
@@ -274,44 +369,101 @@ def _transfer(w, ins, mask, store: bool) -> None:
 @op("tcgen05")
 def _tcgen05(w, ins, mask):
     kind = ins.mods[0] if ins.mods else ""
-    if kind in _NO_OPS:
+    if kind in _FENCES:
+        if tuple(ins.mods) != (kind,) or ins.operands:
+            raise unsupported(ins)
+        if kind == "fence::after_thread_sync" and mask.any():
+            w.seen |= w.tcgen_observed
+            w.tcgen_observed.clear()
         return
     if not mask.any():
         return
     cta = w.cta
     lane = int(np.flatnonzero(mask)[0])
-    if kind in ("alloc", "dealloc", "mma", "commit") and "cta_group::1" not in ins.mods:
+    if kind in ("alloc", "dealloc", "mma", "commit", "relinquish_alloc_permit") \
+            and "cta_group::1" not in ins.mods:
         raise unsupported(ins, "cta_group::2 needs clusters, which are not implemented yet")
-    if kind == "alloc":
-        if len(ins.operands) != 2:
+    if kind in ("wait::ld", "wait::st", "relinquish_alloc_permit"):
+        expected = ((kind, "cta_group::1", "sync", "aligned") if kind == "relinquish_alloc_permit"
+                    else (kind, "sync", "aligned"))
+        if tuple(ins.mods) != expected or ins.operands:
             raise unsupported(ins)
-        ncols = int(w.read(ins.operands[1], "u32")[lane])
+        _collective(ins, mask)
+        if kind == "relinquish_alloc_permit":
+            _tmem(cta).alloc_permit = False
+        return
+    if kind == "alloc":
+        if len(ins.operands) != 2 or tuple(ins.mods) not in (
+                ("alloc", "cta_group::1", "sync", "aligned", "shared::cta", "b32"),
+                ("alloc", "cta_group::1", "sync", "aligned", "b32")):
+            raise unsupported(ins)
+        _collective(ins, mask)
+        ncols = _uniform(w, ins, ins.operands[1], mask, "column count")
+        offsets = _address(w, ins, ins.operands[0])[mask]
+        if "shared::cta" not in ins.mods:
+            window = np.uint64(GENERIC_WINDOW)
+            if not ((offsets >= window) & (offsets < window + np.uint64(MAX_SMEM_BYTES))).all():
+                raise ExecutionError("generic tcgen05.alloc destination does not point to shared memory")
+            offsets = offsets - window
+        if (offsets % 4).any():
+            raise ExecutionError("tcgen05.alloc destination must be aligned to 4 bytes")
+        # Check every destination before reserving memory. The PTX contract requires
+        # uniform nCols, but does not impose uniformity on the shared destinations.
+        offsets = np.unique(offsets)
+        cta.smem.index(offsets, 4, "write")
         tmem = _tmem(cta)
         column = tmem.alloc(ncols)
+        if column is None:
+            w.blocked = Wait("tensor-memory allocation", ins, retry=True,
+                             detail=lambda: f"waiting for {ncols} tensor-memory columns to become available")
+            return
         tmem.allocations[column] = (ncols, (w, ins, lane))
-        offset = _address(w, ins, ins.operands[0])[lane:lane + 1]
-        cta.smem.write(offset, np.array([column], dtype=np.uint32), w.warp_id)
+        cta.smem.write(offsets, np.full(len(offsets), column, dtype=np.uint32), w.warp_id)
     elif kind == "dealloc":
-        if len(ins.operands) != 2:
+        if len(ins.operands) != 2 or tuple(ins.mods) != (
+                "dealloc", "cta_group::1", "sync", "aligned", "b32"):
             raise unsupported(ins)
-        _tmem(cta).dealloc(int(w.read(ins.operands[0], "u32")[lane]),
-                           int(w.read(ins.operands[1], "u32")[lane]))
+        _collective(ins, mask)
+        ncols = _uniform(w, ins, ins.operands[1], mask, "column count")
+        addresses = w.read(ins.operands[0], "u32")[mask]
+        if (addresses != addresses[0]).any():
+            raise unsupported(ins, "deallocation with different tensor-memory addresses across lanes")
+        tmem = _tmem(cta)
+        start = int(addresses[0])
+        if start in tmem.allocations and tmem.allocations[start][0] == ncols:
+            _check_tmem_overwrite(w, ins, tmem.pending[:, start:start + ncols],
+                                  np.flatnonzero(mask), dealloc=True)
+        tmem.dealloc(start, ncols)
+        cta._wake("tensor-memory allocation")
     elif kind == "mma":
         for l in np.flatnonzero(mask):
             _mma(w, ins, int(l))
     elif kind == "commit":
-        if "mbarrier::arrive::one" not in ins.mods or any("multicast" in m for m in ins.mods) \
-                or len(ins.operands) != 1:
+        allowed = {"commit", "cta_group::1", "mbarrier::arrive::one", "shared::cluster", "b64"}
+        if not {"mbarrier::arrive::one", "b64"} <= set(ins.mods) \
+                or set(ins.mods) - allowed or len(ins.operands) != 1:
             raise unsupported(ins)
+        addresses = _address(w, ins, ins.operands[0])
+        if "shared::cluster" not in ins.mods:
+            shared = (addresses >= GENERIC_WINDOW) & (addresses < GENERIC_WINDOW + MAX_SMEM_BYTES)
+            if not shared[mask].all():
+                raise ExecutionError("generic tcgen05.commit address does not point to shared memory")
+            addresses = addresses - np.uint64(GENERIC_WINDOW)
         for l in np.flatnonzero(mask):
             l = int(l)
-            bar = cta.mbarrier(int(_address(w, ins, ins.operands[0])[l]), w, ins, [l])
-            covered, w.uncommitted = w.uncommitted, []
+            bar = cta.mbarrier(int(addresses[l]), w, ins, [l])
+            # A commit covers every earlier MMA from this thread, including
+            # operations already tracked by another barrier. Other lanes in
+            # the warp cannot commit on the issuing thread's behalf.
+            covered = tuple(o for o in w.tcgen_issued if o.lane == l)
             operation = cta.new_async("commit", w, ins, l)
+            released = frozenset(w.seen)
 
-            def land(bar=bar, covered=covered, l=l):
+            def land(bar=bar, covered=covered, l=l, released=released):
                 bar.knowledge.update(o.id for o in covered)
-                bar.arrive(1, w, ins, [l])
+                # Do not acquire knowledge the issuing warp learns later,
+                # while this asynchronous arrival is waiting to complete.
+                bar.arrive(1, w, ins, [l], knowledge=released)
 
             cta.schedule(operation, land)
     elif kind == "ld":

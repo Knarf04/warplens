@@ -22,15 +22,19 @@ from .alu import op, unsupported
 _SPEC = re.compile(r"%([-+ #0]*)(\d+|\*)?(?:\.(\d+|\*))?(hh|h|ll|l|j|z|t|L)?([diouxXeEfFgGaAcspn%])")
 
 
-def format_printf(fmt: str, read, read_cstring) -> str:
-    """Format like C printf. `read(offset, size)` returns argument bytes."""
-    out, pos, offset = [], 0, 0
+def format_printf(fmt: str, read, read_cstring) -> tuple[str, int]:
+    """Return text and the number of parsed arguments (CUDA printf's result).
+
+    `read(offset, size)` returns argument bytes.
+    """
+    out, pos, offset, argc = [], 0, 0, 0
 
     def take(size: int, code: str):
-        nonlocal offset
+        nonlocal offset, argc
         offset = -(-offset // size) * size
         (value,) = struct.unpack("<" + code, read(offset, size))
         offset += size
+        argc += 1
         return value
 
     for m in _SPEC.finditer(fmt):
@@ -62,7 +66,7 @@ def format_printf(fmt: str, read, read_cstring) -> str:
         else:
             raise ExecutionError(f"printf conversion %{conv} is not supported")
     out.append(fmt[pos:])
-    return "".join(out)
+    return "".join(out), argc
 
 
 @op("call")
@@ -85,11 +89,14 @@ def _call(w, ins, mask):
     for lane in np.flatnonzero(mask):
         lane = int(lane)
         base = int(arg_ptr[lane])
-        text = format_printf(w.read_cstring(int(fmt_ptr[lane]), lane),
-                             lambda off, size: w.read_bytes(base + off, size, lane),
-                             lambda address: w.read_cstring(address, lane))
+        if not fmt_ptr[lane]:
+            written[lane] = 0xFFFF_FFFF  # CUDA printf returns -1 for a null format.
+            continue
+        text, argc = format_printf(w.read_cstring(int(fmt_ptr[lane]), lane),
+                                   lambda off, size: w.read_bytes(base + off, size, lane),
+                                   lambda address: w.read_cstring(address, lane))
         w.cta.output.append(text)
-        written[lane] = len(text)
+        written[lane] = argc
     if ret.elems:
         slot = w.call_params.setdefault(ret.elems[0].name, np.zeros(len(mask), dtype=np.uint64))
         np.copyto(slot, written, where=mask)

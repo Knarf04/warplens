@@ -22,7 +22,8 @@ class Warp:
         self.seen: set[int] = set()  # TMA copies this warp has synchronized with
         self.open_stores: list = []  # TMA stores issued but not yet in a bulk group
         self.groups: dict[int, list[list]] = {}  # lane -> committed bulk groups not yet waited for
-        self.uncommitted: list = []  # tcgen05.mma operations not yet covered by a tcgen05.commit
+        self.tcgen_issued: list = []  # all issued MMAs; each commit snapshots its thread's history
+        self.tcgen_observed: set[int] = set()  # relaxed waits awaiting an after_thread_sync fence
         self.warp_id = warp_id
         self.tid = tid  # (x, y, z) arrays, one entry per lane
         self.specials = specials

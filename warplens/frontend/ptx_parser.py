@@ -106,6 +106,7 @@ class _Parser:
         self.next_scope = 1
         self.branches: list[tuple[Instr, list[int], _Tok]] = []
         self.shared: dict[str, SharedVar] = {}
+        self.locals: dict[str, SharedVar] = {}
 
     def scoped(self, name: str, scope: int) -> str:
         return name if scope == 0 else f"{name}@{scope}"
@@ -208,6 +209,7 @@ class _Parser:
         self.expect("{")
         self.scopes, self.next_scope, self.branches = [0], 1, []
         self.shared = {}
+        self.locals = {}
         self.body(fn)
         for ins, scopes, tok in self.branches:
             target = ins.operands[0] if len(ins.operands) == 1 else None
@@ -343,7 +345,10 @@ class _Parser:
                 self.shared[var.name] = var
                 fn.shared.append(var)
             elif t.value == ".local":
-                fn.locals.append(self.shared_var(extern=False))
+                var = self.shared_var(extern=False)
+                var.name = self.scoped(var.name, self.scopes[-1])
+                self.locals[var.name] = var
+                fn.locals.append(var)
             elif t.value == ".param":  # storage for the arguments of a call
                 ty_tok = self.expect_kind("word", "a parameter type")
                 ty = ty_tok.value.lstrip(".")
@@ -482,13 +487,13 @@ class _Parser:
             return Vec(tuple(elems))
         if t.kind != "word":
             raise self.syntax(t, f"expected an operand, found {t.value!r}")
-        # Registers and shared variables can shadow each other. Resolve both
+        # Registers and memory variables can shadow each other. Resolve them
         # in lexical order, so an outer register cannot hide an inner variable.
         for scope in reversed(self.scopes):
             key = self.scoped(t.value, scope)
             if key in fn.regs:
                 return Reg(key)
-            if key in self.shared:
+            if key in self.shared or key in self.locals:
                 return Sym(key)
         if t.value.startswith("%"):
             base, _, comp = t.value[1:].partition(".")

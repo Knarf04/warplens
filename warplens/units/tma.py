@@ -82,6 +82,13 @@ def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar)
     for op_id in np.unique(cta.smem.async_reader[idx]):
         if op_id > 0 and int(op_id) not in w.seen:
             previous = cta.async_ops[int(op_id)]
+            if previous.kind == "mma":
+                cta.findings.add(
+                    "mma-operand-overwritten",
+                    f"TMA load overwrites shared memory that the tcgen05.mma at line "
+                    f"{previous.ins.line} reads, without waiting on its tcgen05.commit mbarrier",
+                    w, ins, [lane])
+                continue
             cta.findings.add(
                 "tma-store-source-overwritten",
                 f"TMA load overwrites shared memory that the TMA store at line "

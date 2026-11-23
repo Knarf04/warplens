@@ -160,7 +160,7 @@ def _bfe(w, ins, mask):
 
 @op("ldmatrix")
 def _ldmatrix(w, ins, mask):
-    """ldmatrix.sync.aligned.m8n8.xN[.trans].shared.b16 {r0, ...}, [addr]
+    """ldmatrix.sync.aligned.m8n8.xN[.trans][.shared[::cta]].b16 {r0, ...}, [addr]
 
     Loads N 8x8 matrices of 16-bit elements from shared memory for the whole warp. Lane
     8j + i supplies the address of row i of matrix j (8 elements, 16 bytes). Every lane
@@ -173,8 +173,11 @@ def _ldmatrix(w, ins, mask):
     if trans:
         mods.remove("trans")
     count = next((int(m[1:]) for m in mods if m in ("x1", "x2", "x4")), None)
-    if count is None or mods != ["sync", "aligned", "m8n8", f"x{count}", "shared", "b16"]:
-        raise unsupported(ins, "expected ldmatrix.sync.aligned.m8n8.x{1,2,4}[.trans].shared.b16")
+    space = mods[-2] if len(mods) >= 2 and mods[-2] in ("shared", "shared::cta") else "generic"
+    if space != "generic":
+        mods.pop(-2)
+    if count is None or mods != ["sync", "aligned", "m8n8", f"x{count}", "b16"]:
+        raise unsupported(ins, "expected ldmatrix.sync.aligned.m8n8.x{1,2,4}[.trans][.shared[::cta]].b16")
     regs, mem = _operands(ins, 2)
     regs = _elements(ins, regs, count) if count > 1 else \
         (list(regs.elems) if isinstance(regs, Vec) else [regs])
@@ -186,6 +189,18 @@ def _ldmatrix(w, ins, mask):
         raise ExecutionError("ldmatrix needs all 32 lanes of the warp to execute it together")
     addrs = _address(w, ins, mem)
     cta = w.cta
+    # Only lanes 0..8N-1 supply addresses. A generic pointer must name shared
+    # memory; explicit .shared and .shared::cta use this CTA's local offsets.
+    if space == "generic":
+        supplied = addrs[:8 * count]
+        if ((supplied < GENERIC_WINDOW) | (supplied >= GENERIC_WINDOW + CLUSTER_WINDOW)).any():
+            raise ExecutionError("ldmatrix generic addresses must point into shared memory")
+        addrs = addrs - np.uint64(GENERIC_WINDOW)
+        if (addrs[:8 * count] // np.uint64(CLUSTER_STRIDE) != cta.rank).any():
+            raise unsupported(ins, "ldmatrix through a generic pointer to another CTA")
+    addrs = local_shared_offset(addrs)
+    if (addrs[:8 * count] % np.uint64(16)).any():
+        raise ExecutionError("ldmatrix row addresses must be 16-byte aligned")
     t = np.arange(32)
     for j, reg in enumerate(regs):
         rows = addrs[8 * j:8 * j + 8]  # the lanes that supply this matrix's row addresses
@@ -209,7 +224,11 @@ def _ldmatrix(w, ins, mask):
         else:
             low, high = matrix[t // 4, 2 * (t % 4)], matrix[t // 4, 2 * (t % 4) + 1]
         w.write(reg, low | (high << np.uint32(16)), mask)
-        w.smem_waves += 8  # timing: a rough cost, eight row reads per matrix
+    # Each matrix is a separate 128-byte transfer. Keep its bank conflicts
+    # separate, while recording only one warp instruction for x2/x4 as well.
+    w.smem_waves += cta.smem_report.record_groups(
+        ins, w.program.fn.name, [addrs[8 * j:8 * j + 8] for j in range(count)], 16,
+        pc=w.stack.top.pc)
 
 
 @op("mapa")

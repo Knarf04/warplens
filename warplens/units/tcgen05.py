@@ -229,6 +229,11 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
     a_fmt, b_fmt = (idesc >> 7) & 7, (idesc >> 10) & 7
     if a_fmt not in formats or b_fmt not in formats:
         raise unsupported(ins, f"operand format {a_fmt}/{b_fmt} for kind::{kind}")
+    if kind == "tf32" and (a_mn_major or b_mn_major):
+        # PTX 9.7.18.10.1: TF32 transpose needs the distinct 128B swizzle
+        # with 32-byte atomicity, not any of the 16-byte layouts decoded here.
+        raise unsupported(ins, "MN-major TF32 requires 128B swizzling with 32-byte "
+                          "atomicity, which is not implemented")
     m_dim, n_dim = ((idesc >> 24) & 31) << 4, ((idesc >> 17) & 63) << 3
     if m_dim not in ((128, 256) if pair else (64, 128)) or not 8 <= n_dim <= 256 \
             or (pair and n_dim % 16):

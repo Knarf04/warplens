@@ -24,8 +24,8 @@ class Warp:
         self.global_accesses = 0  # ordinary global loads of that instruction
         self.seen: set[int] = set()  # TMA copies this warp has synchronized with
         self.open_stores: list = []  # TMA stores issued but not yet in a bulk group
-        self.cp_open: list = []  # cp.async copies issued since the last cp.async.commit_group
-        self.cp_groups: list[list] = []  # committed cp.async groups not yet waited for
+        self.cp_open: dict[int, list] = {}  # lane -> uncommitted cp.async copies
+        self.cp_groups: dict[int, list[list]] = {}  # lane -> committed cp.async groups
         self.groups: dict[int, list[list]] = {}  # lane -> committed bulk groups not yet waited for
         self.tcgen_issued: list = []  # all issued MMAs; each commit snapshots its thread's history
         self.tcgen_observed: set[int] = set()  # relaxed waits awaiting an after_thread_sync fence

@@ -96,13 +96,21 @@ def run_script(args) -> int:
     except ImportError as exc:
         sys.exit(f"warplens: {exc}")
     driver = triton_driver.install(args.model, **({"timing": True} if args.timing else {}))
+    previous_argv, previous_path = sys.argv, sys.path[:]
     sys.argv = [args.program, *args.arguments]
+    # run_path does not add a plain script's directory to the import path as
+    # `python script.py` does. Preserve the surrounding interpreter afterwards.
+    sys.path.insert(0, str(Path(args.program).absolute().parent))
     code = 0
     try:
         runpy.run_path(args.program, run_name="__main__")
     except SystemExit as exc:
         code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+        if exc.code is not None and not isinstance(exc.code, int):
+            print(exc.code, file=sys.stderr)
     finally:
+        sys.argv = previous_argv
+        sys.path[:] = previous_path
         triton_driver.uninstall()
     if not args.quiet:
         if driver.launches:

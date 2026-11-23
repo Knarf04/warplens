@@ -827,6 +827,10 @@ def _ld(w, ins, mask):
         return
     addrs = _address(w, ins, src)
     for k, dest in enumerate(dests):
+        # A vector sink suppresses the memory read itself (PTX ld / ld.global.nc),
+        # so do not fault on or otherwise observe that element's address.
+        if type(dest) is Sym and dest.name == "_":
+            continue
         w.write(dest, _load(w, ins, space, addrs + np.uint64(k * dt.itemsize), dt, mask), mask)
     _record_memory_banks(w, ins, space, addrs, mask, width * dt.itemsize)
 

@@ -18,7 +18,10 @@ class Warp:
                  specials: dict[str, np.ndarray], params: dict, mem, trace=None):
         self.program = program
         self.cta = cta  # the Cta this warp belongs to
-        self.blocked = None  # (barrier number, instr) while waiting in bar.sync
+        self.blocked = None  # a core.cta.Wait while the warp cannot run
+        self.seen: set[int] = set()  # TMA copies this warp has synchronized with
+        self.open_stores: list = []  # TMA stores issued but not yet in a bulk group
+        self.groups: list[list] = []  # committed bulk groups not yet waited for
         self.warp_id = warp_id
         self.tid = tid  # (x, y, z) arrays, one entry per lane
         self.specials = specials
@@ -170,7 +173,8 @@ class Warp:
                 if isinstance(e, ExecutionError) and e.where is None:
                     e.where = self._where(ins, active, e)
                 raise
-            top.pc = pc + 1
+            if self.blocked is None or not self.blocked.retry:
+                top.pc = pc + 1
         stack.settle()
 
     def _where(self, ins, active: np.ndarray, err: ExecutionError) -> str:

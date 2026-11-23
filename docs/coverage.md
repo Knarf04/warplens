@@ -16,8 +16,10 @@ that names the instruction and its PTX line.
 | performance directives before the body (`.maxntid`, ...), `.pragma` | ignored |
 | `.shared` variables, in a function or at module level, and `.extern .shared name[]` | yes |
 | paired destinations (`%r1\|%p1`) | yes |
+| nested `{ }` blocks with their own registers and labels (inline assembly) | yes |
+| register names without `%`, `_` as a discarded destination, `[tensor_map, {coords}]` operands | yes |
 | `.func` and `call`, `.global` / `.const` / `.local` variables | no |
-| nested `{ }` blocks (inline asm scopes), array parameters | no |
+| array parameters | no |
 
 ## Instructions
 
@@ -32,6 +34,9 @@ that names the instruction and its PTX line.
 | Memory | `ld.param`, `ld`/`st` with `.global`, `.shared` or no space (generic) | no vector `.v2/.v4`, no `.local` |
 | Barriers | `bar.sync a[, count]`, `bar.arrive a, count`; also spelled `barrier` and `.cta` | no `bar.red` |
 | Shuffle | `shfl.sync.{up,down,bfly,idx}.b32` with optional predicate destination | |
+| mbarrier | `mbarrier.init`, `.arrive` (with count), `.arrive.expect_tx`, `.expect_tx`, `.complete_tx`, `.test_wait`, `.try_wait` (both with `.parity`), `.inval` | no `arrive_drop`, `.noComplete`, `pending_count` |
+| TMA | `cp.async.bulk.tensor.{1..5}d` load (`shared <- global`, `.mbarrier::complete_tx::bytes`) and store (`global <- shared`, `.bulk_group`), tile mode; `cp.async.bulk` without a tensor map; `.commit_group`, `.wait_group[.read]`; `prefetch.tensormap` and `cp.async.bulk.prefetch` (no-ops) | no multicast, im2col, `cp.reduce`, `tensormap.replace`; `.L2::cache_hint` ignored |
+| Fences | `fence.proxy.async`; `fence.mbarrier_init`, `fence.acq_rel`, `fence.sc`, `fence.proxy.*` accepted with no effect | |
 | Control | `bra`, `bra.uni`, `ret`, `exit` | no `brx.idx`, no `call` |
 
 ## Special registers

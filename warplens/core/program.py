@@ -5,7 +5,9 @@ from __future__ import annotations
 from ..errors import UnsupportedError
 from ..frontend.cfg import reconvergence_points
 from ..frontend.ir import Function, Module
-from ..units import barrier as _barrier  # noqa: F401  (registers its handlers)
+from ..units import barrier as _barrier  # noqa: F401  (these imports register handlers)
+from ..units import mbarrier as _mbarrier  # noqa: F401
+from ..units import tma as _tma  # noqa: F401
 from ..units.alu import CONTROL_FLOW, HANDLERS
 
 

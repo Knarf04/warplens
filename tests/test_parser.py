@@ -59,8 +59,6 @@ def test_unsupported_constructs_are_hard_errors():
         kernel(".local .align 4 .b8 buf[64];")
     with pytest.raises(warplens.UnsupportedError, match=r"module-level directive `\.global`"):
         warplens.parse_ptx(HEADER + ".global .align 4 .u32 x;")
-    with pytest.raises(warplens.UnsupportedError, match="nested"):
-        kernel("{ ret; }")
 
 
 @pytest.mark.parametrize("literal", [

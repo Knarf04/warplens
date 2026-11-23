@@ -376,6 +376,8 @@ def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
         except MemoryFault as e:
             _fault_lanes(e, s)
             raise
+        if cta.smem.async_active:
+            _async_check(w, ins, s, offsets, dt.itemsize, "read of", writing=False)
         cta.smem_report.record(ins, w.program.fn.name, offsets[s], dt.itemsize)
         if len(unwritten):
             cta.findings.add("smem-uninitialized-read",
@@ -388,6 +390,36 @@ def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
     return value
 
 
+def _async_check(w, ins, s, offsets, size: int, what: str, writing: bool) -> None:
+    """Report ordinary accesses to bytes that TMA is using and this warp has not
+    synchronized with: a load it never waited for, or a store still reading."""
+    cta = w.cta
+    smem = cta.smem
+    idx = smem.index(offsets[s], size, "access")
+    lanes = np.flatnonzero(s)
+
+    def unseen(shadow):
+        ids = shadow[idx]
+        return [(int(i), lanes[(ids == i).any(axis=1)]) for i in np.unique(ids[ids > 0])
+                if int(i) not in w.seen]
+
+    for op_id, hit in unseen(smem.async_writer):
+        operation = cta.async_ops[op_id]
+        state = "is still in flight" if not operation.done else \
+            "has completed, but this warp never waited on its mbarrier"
+        cta.findings.add("tma-load-unsynchronized",
+                         f"{what} shared memory that the TMA load at line {operation.ins.line} "
+                         f"writes; that load {state}", w, ins, hit)
+    if writing:
+        for op_id, hit in unseen(smem.async_reader):
+            operation = cta.async_ops[op_id]
+            state = "is still reading it" if not operation.done else \
+                "has completed, but this warp never waited for it (cp.async.bulk.wait_group.read)"
+            cta.findings.add("tma-store-source-overwritten",
+                             f"write to shared memory that the TMA store at line "
+                             f"{operation.ins.line} reads; that store {state}", w, ins, hit)
+
+
 def _store(w, ins, space, addrs, value, mask) -> None:
     g, s, offsets = _split_generic(space, addrs, mask)
     try:
@@ -398,6 +430,10 @@ def _store(w, ins, space, addrs, value, mask) -> None:
         raise
     if s is not None and s.any():
         try:
+            if w.cta.smem.async_active:
+                idx = w.cta.smem.index(offsets[s], value.dtype.itemsize, "write")
+                _async_check(w, ins, s, offsets, value.dtype.itemsize, "write to", writing=True)
+                w.cta.smem.async_writer[idx] = 0  # overwritten by an ordinary store
             racy = w.cta.smem.write(offsets[s], value[s], w.warp_id)
         except MemoryFault as e:
             _fault_lanes(e, s)

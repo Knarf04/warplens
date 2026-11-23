@@ -19,6 +19,9 @@ from ..errors import MemoryFault
 # Largest shared memory one CTA may have on sm_100a (PTX ISA 9.5, section 5.1.7).
 MAX_SMEM_BYTES = 228 * 1024
 
+# Shadow "writer" value for bytes last written by TMA rather than by a warp.
+ASYNC_PROXY = -2
+
 # Where shared memory appears in the generic address space (`cvta.shared`).
 GENERIC_WINDOW = 0x1_0000_0000
 
@@ -32,6 +35,11 @@ class SharedMemory:
         self._write_epoch = np.zeros(size, dtype=np.int32)
         self._reader = np.full(size, -1, dtype=np.int32)
         self._read_epoch = np.zeros(size, dtype=np.int32)
+        # TMA (async proxy) shadow state; ids refer to Cta.async_ops.
+        self.async_active = False  # stays False for kernels that never use TMA
+        self.async_writer = np.zeros(size, dtype=np.int32)  # TMA load that last targeted the byte
+        self.async_reader = np.zeros(size, dtype=np.int32)  # TMA store that last read the byte
+        self.unfenced = np.zeros(size, dtype=np.bool_)  # ordinary write not yet fenced for TMA
 
     def _index(self, offsets: np.ndarray, size: int, verb: str) -> np.ndarray:
         ok = offsets <= np.uint64(self.size - size) if self.size >= size else np.zeros(len(offsets), bool)
@@ -48,7 +56,7 @@ class SharedMemory:
         idx = self._index(offsets, dtype.itemsize, "read")
         values = self.data[idx].view(dtype).ravel()
         writer = self._writer[idx]
-        unwritten = np.flatnonzero((writer < 0).any(axis=1))
+        unwritten = np.flatnonzero((writer == -1).any(axis=1))
         racy = (writer >= 0) & (writer != warp) & (self._write_epoch[idx] == self.epoch)
         self._reader[idx] = warp
         self._read_epoch[idx] = self.epoch
@@ -64,4 +72,25 @@ class SharedMemory:
         self.data[idx] = np.ascontiguousarray(values).view(np.uint8).reshape(len(offsets), size)
         self._writer[idx] = warp
         self._write_epoch[idx] = self.epoch
+        self.unfenced[idx] = True
         return np.flatnonzero(racy.any(axis=1))
+
+    # -- async proxy (TMA) ---------------------------------------------------
+    def index(self, offsets: np.ndarray, size: int, verb: str) -> np.ndarray:
+        return self._index(offsets, size, verb)
+
+    def begin_async_write(self, idx: np.ndarray, op_id: int) -> None:
+        self.async_writer[idx] = op_id
+        self.async_active = True
+
+    def finish_async_write(self, idx: np.ndarray, data: np.ndarray) -> None:
+        self.data[idx] = data
+        self._writer[idx] = ASYNC_PROXY
+        self.unfenced[idx] = False
+
+    def fence_async(self, warp: int) -> None:
+        """fence.proxy.async by `warp`: its own earlier writes, and writes that a
+        completed barrier already ordered before it, become visible to TMA."""
+        if self.unfenced.any():
+            ordered = (self._writer == warp) | (self._write_epoch < self.epoch)
+            self.unfenced &= ~ordered

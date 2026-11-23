@@ -10,6 +10,7 @@ from ..core.program import Program
 from ..errors import LaunchError
 from ..frontend.ir import Module, NP_TYPES
 from ..frontend.ptx_parser import parse_ptx_file
+from . import tensor_map as _tensor_map
 from ..units.memory import GlobalMemory
 from .launch import LaunchStats, run_kernel
 
@@ -41,6 +42,17 @@ class DeviceArray:
         return f"DeviceArray({self.shape}, {self.dtype}, addr={self.addr:#x})"
 
 
+class TensorMap(DeviceArray):
+    """A tensor map in device memory. Pass it to a kernel like a pointer."""
+
+    def __init__(self, device: "Device", addr: int, info):
+        super().__init__(device, addr, (_tensor_map.SIZE,), np.dtype(np.uint8))
+        self.info = info
+
+    def __repr__(self) -> str:
+        return f"TensorMap({self.info}, addr={self.addr:#x})"
+
+
 class Device:
     def __init__(self, model: str = "B200"):
         if model not in MODELS:
@@ -68,6 +80,24 @@ class Device:
         self.memory.buffer(out.addr)[:] = array.reshape(-1).view(np.uint8)
         return out
 
+    def tensor_map_tiled(self, array: DeviceArray, box, *, swizzle=None, element_strides=None,
+                         oob_fill: str = "zero") -> TensorMap:
+        """Describe `array` to TMA, like cuTensorMapEncodeTiled.
+
+        `box` is the tile a TMA instruction moves, one entry per array axis in
+        the array's own (NumPy) axis order. `swizzle` is None, "32B", "64B" or
+        "128B". Inside a kernel, TMA coordinates are in the opposite order:
+        coordinate 0 indexes the last array axis.
+        """
+        if array.device is not self:
+            raise LaunchError("the array belongs to a different device")
+        info = _tensor_map.make_tiled(address=array.addr, shape=array.shape, dtype=array.dtype,
+                                      box=box, swizzle=swizzle, element_strides=element_strides,
+                                      oob_fill=oob_fill)
+        addr = self.memory.alloc(_tensor_map.SIZE, align=64)
+        self.memory.buffer(addr)[:] = np.frombuffer(_tensor_map.encode(info), dtype=np.uint8)
+        return TensorMap(self, addr, info)
+
     # -- kernels -------------------------------------------------------------
     def load_ptx(self, path) -> Module:
         path = Path(path).resolve()
@@ -76,11 +106,12 @@ class Device:
         return self._modules[path]
 
     def launch(self, ptx, entry: str, *, grid, block, args=(), smem: int = 0, trace=None,
-               max_steps: int | None = None) -> LaunchStats:
+               max_steps: int | None = None, async_delay: int = 4) -> LaunchStats:
         """Run kernel `entry` from `ptx` (a path or a parsed Module) to completion.
 
         `smem` is the dynamic shared memory per CTA in bytes, as passed to a
-        real launch; it sizes `extern __shared__` arrays.
+        real launch; it sizes `extern __shared__` arrays. `async_delay` is how
+        many scheduling rounds a TMA copy takes to complete after it is issued.
 
         `trace`, if given, is called as trace(warp, pc, instr, active_mask)
         before every instruction.
@@ -93,4 +124,5 @@ class Device:
         if key not in self._programs:
             self._programs[key] = Program(module, module.functions[entry])
         return run_kernel(self._programs[key], self.memory, grid=grid, block=block,
-                          args=args, smem=smem, trace=trace, max_steps=max_steps)
+                          args=args, smem=smem, trace=trace, max_steps=max_steps,
+                          async_delay=async_delay)

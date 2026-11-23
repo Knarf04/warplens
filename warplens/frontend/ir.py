@@ -70,7 +70,14 @@ class Pair:
     second: Reg
 
 
-Operand = Reg | Special | Imm | Sym | Mem | Vec | Pair
+@dataclass(frozen=True, slots=True)
+class TensorRef:
+    """A TMA tensor operand: `[tensor_map, {c0, c1, ...}]`."""
+    base: Reg | Sym | Imm
+    coords: tuple
+
+
+Operand = Reg | Special | Imm | Sym | Mem | Vec | Pair | TensorRef
 
 
 @dataclass(slots=True)

@@ -21,15 +21,17 @@ class Engine:
         while True:
             runnable = [w for w in warps if w.blocked is None and not w.done]
             if not runnable:
-                if cta.release_barriers():
-                    continue
                 if all(w.done for w in warps):
+                    cta.finish()
                     return
+                if cta.release_barriers() or cta.complete_next_async():
+                    continue
                 raise DeadlockError(
                     f"deadlock in CTA {cta.id}: every unfinished warp is blocked and "
                     f"nothing can release them\n{cta.describe_blocked()}")
             for w in runnable:
                 w.step()
+            cta.tick_async()
             cta.release_barriers()
             self.steps += len(runnable)
             if limit is not None and self.steps > limit:

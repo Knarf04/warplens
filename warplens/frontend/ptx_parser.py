@@ -14,7 +14,7 @@ from pathlib import Path
 
 from ..errors import PtxSyntaxError, UnsupportedError
 from .ir import (Function, Imm, Instr, Mem, Module, NP_TYPES, Pair, Param, Reg, SharedVar,
-                 Special, Sym, Vec)
+                 Special, Sym, TensorRef, Vec)
 
 _TOKEN = re.compile(
     r"""
@@ -97,6 +97,23 @@ class _Parser:
         self.lines = text.splitlines()
         self.toks = _tokenize(text, name)
         self.i = 0
+        # Nested { } blocks (inline assembly) have their own registers and labels.
+        # Scope 0 is the function body; names declared in scope k > 0 are stored
+        # as "name@k" so they cannot clash with the enclosing ones.
+        self.scopes = [0]
+        self.next_scope = 1
+        self.branches: list[tuple[Instr, list[int], _Tok]] = []
+
+    def scoped(self, name: str, scope: int) -> str:
+        return name if scope == 0 else f"{name}@{scope}"
+
+    def find(self, name: str, table) -> str | None:
+        """The stored name of `name` in the innermost scope that declares it."""
+        for scope in reversed(self.scopes):
+            key = self.scoped(name, scope)
+            if key in table:
+                return key
+        return None
 
     # -- token helpers -----------------------------------------------------
     def peek(self) -> _Tok:
@@ -182,7 +199,17 @@ class _Parser:
             if t.value in _IGNORED_BODY_DIRECTIVES:
                 self.skip_directive(t)
         self.expect("{")
+        self.scopes, self.next_scope, self.branches = [0], 1, []
         self.body(fn)
+        for ins, scopes, tok in self.branches:
+            target = ins.operands[0] if len(ins.operands) == 1 else None
+            saved, self.scopes = self.scopes, scopes
+            key = self.find(target.name, fn.labels) if isinstance(target, Sym) else None
+            self.scopes = saved
+            if key is None:
+                raise PtxSyntaxError(
+                    f"{self.name}:{ins.line}: branch to an undefined label\n    {ins.text}")
+            ins.operands = (Sym(key),)
         return fn
 
     def skip_directive(self, directive: _Tok) -> None:
@@ -218,12 +245,17 @@ class _Parser:
             if t.value == "}":
                 break
             if t.value == "{":
-                raise self.unsupported(t, "nested { } blocks are not supported yet")
+                self.scopes.append(self.next_scope)
+                self.next_scope += 1
+                self.body(fn)
+                self.scopes.pop()
+                continue
             if t.kind == "word" and self.peek().value == ":":
                 self.next()
-                if t.value in fn.labels:
+                key = self.scoped(t.value, self.scopes[-1])
+                if key in fn.labels:
                     raise self.syntax(t, f"label `{t.value}` defined twice")
-                fn.labels[t.value] = len(fn.instrs)
+                fn.labels[key] = len(fn.instrs)
             elif t.value == ".reg":
                 self.reg_decl(fn)
             elif t.value == ".shared":
@@ -234,13 +266,10 @@ class _Parser:
                 raise self.unsupported(t, f"unsupported directive `{t.value}`")
             else:
                 self.i -= 1
-                fn.instrs.append(self.instruction(fn))
-        for ins in fn.instrs:
-            if ins.opcode == "bra":
-                target = ins.operands[0] if ins.operands else None
-                if not isinstance(target, Sym) or target.name not in fn.labels:
-                    raise PtxSyntaxError(
-                        f"{self.name}:{ins.line}: branch to an undefined label\n    {ins.text}")
+                ins = self.instruction(fn)
+                fn.instrs.append(ins)
+                if ins.opcode == "bra":
+                    self.branches.append((ins, list(self.scopes), t))
 
     def shared_var(self, extern: bool) -> SharedVar:
         """`.shared [.align N] .type name[count]...;` (the `.shared` is already consumed)."""
@@ -275,15 +304,14 @@ class _Parser:
             raise self.unsupported(ty_tok, f"unsupported register type `{ty_tok.value}`")
         while True:
             name = self.expect_kind("word", "a register name")
-            if not name.value.startswith("%"):
-                raise self.syntax(name, f"register names start with '%', found {name.value!r}")
+            scope = self.scopes[-1]
             if self.accept("<"):
                 count = int(self.expect_kind("num", "a register count").value)
                 self.expect(">")
                 for k in range(count):
-                    fn.regs[f"{name.value}{k}"] = ty
+                    fn.regs[self.scoped(f"{name.value}{k}", scope)] = ty
             else:
-                fn.regs[name.value] = ty
+                fn.regs[self.scoped(name.value, scope)] = ty
             if self.accept(";"):
                 return
             self.expect(",")
@@ -294,9 +322,10 @@ class _Parser:
         if self.accept("@"):
             negated = self.accept("!")
             p = self.expect_kind("word", "a predicate register")
-            if fn.regs.get(p.value) != "pred":
+            key = self.find(p.value, fn.regs)
+            if key is None or fn.regs[key] != "pred":
                 raise self.syntax(p, f"`{p.value}` is not a declared .pred register")
-            pred = Reg(p.value)
+            pred = Reg(key)
         op = self.expect_kind("word", "an instruction")
         opcode, *mods = op.value.split(".")
         operands = []
@@ -323,6 +352,12 @@ class _Parser:
             base = self.operand(fn)
             if not isinstance(base, (Reg, Sym, Imm)):
                 raise self.syntax(t, "invalid address expression")
+            if self.accept(","):  # [tensor_map, {c0, c1, ...}]
+                coords = self.operand(fn)
+                if not isinstance(coords, Vec):
+                    raise self.syntax(t, "expected {coordinates} after the tensor map")
+                self.expect("]")
+                return TensorRef(base, coords.elems)
             offset = 0
             if self.accept("+"):
                 offset = _number(self.expect_kind("num", "an offset")).value
@@ -340,9 +375,10 @@ class _Parser:
             return Vec(tuple(elems))
         if t.kind != "word":
             raise self.syntax(t, f"expected an operand, found {t.value!r}")
+        key = self.find(t.value, fn.regs)
+        if key is not None:
+            return Reg(key)
         if t.value.startswith("%"):
-            if t.value in fn.regs:
-                return Reg(t.value)
             base, _, comp = t.value[1:].partition(".")
             if base in SPECIAL_REGISTERS:
                 if SPECIAL_REGISTERS[base] and comp not in ("x", "y", "z"):

@@ -10,7 +10,7 @@ from .errors import (
     WarplensError,
 )
 from .frontend.ptx_parser import parse_ptx, parse_ptx_file
-from .host.device import Device, DeviceArray
+from .host.device import Device, DeviceArray, TensorMap
 from .host.launch import LaunchStats
 
 __version__ = "0.0.1"
@@ -24,6 +24,7 @@ __all__ = [
     "LaunchStats",
     "MemoryFault",
     "PtxSyntaxError",
+    "TensorMap",
     "UnsupportedError",
     "WarplensError",
     "parse_ptx",

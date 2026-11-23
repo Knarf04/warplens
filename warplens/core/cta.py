@@ -10,6 +10,24 @@ NUM_BARRIERS = 16
 WARP_SIZE = 32
 
 
+class Wait:
+    """Why a warp is blocked. With `retry`, the warp re-executes the blocking
+    instruction when woken instead of continuing after it."""
+    __slots__ = ("kind", "ins", "retry", "detail")
+
+    def __init__(self, kind: str, ins, retry: bool = False, detail=None):
+        self.kind, self.ins, self.retry, self.detail = kind, ins, retry, detail
+
+
+class AsyncOp:
+    """One TMA copy in flight (or finished)."""
+    __slots__ = ("id", "kind", "warp", "ins", "lane", "done")
+
+    def __init__(self, op_id: int, kind: str, warp, ins, lane: int):
+        self.id, self.kind, self.warp, self.ins, self.lane = op_id, kind, warp, ins, lane
+        self.done = False
+
+
 @dataclass(slots=True)
 class Barrier:
     """A named barrier (`bar.sync` / `bar.arrive`).
@@ -29,8 +47,13 @@ class Barrier:
 
 
 class Cta:
-    def __init__(self, cta_id: tuple[int, int, int], smem_bytes: int, smem_report, findings):
+    def __init__(self, cta_id: tuple[int, int, int], smem_bytes: int, smem_report, findings,
+                 async_delay: int = 4):
         self.id = cta_id
+        self.async_delay = async_delay
+        self.async_ops: dict[int, AsyncOp] = {}
+        self.async_queue: list[list] = []  # [rounds left, AsyncOp, completion callback]
+        self.mbarriers: dict[int, object] = {}  # shared offset -> Mbarrier
         self.smem = SharedMemory(smem_bytes)
         self.smem_report = smem_report
         self.findings = findings
@@ -44,13 +67,17 @@ class Cta:
             bar.count = count
         if wait:
             bar.waiters.append((warp, ins))
-            warp.blocked = (barrier_id, ins)
+            warp.blocked = Wait("barrier", ins)
 
     def release_barriers(self) -> bool:
         """Complete every barrier whose arrivals are all in. True if any warp was released."""
         released = False
         for bar in self.barriers.values():
             if bar.arrived and bar.satisfied(self.warps):
+                # Warps that met at a barrier share what they know about finished TMA copies.
+                known = set().union(*(w.seen for w in bar.arrived))
+                for warp in bar.arrived:
+                    warp.seen |= known
                 for warp, _ in bar.waiters:
                     warp.blocked = None
                 released = released or bool(bar.waiters)
@@ -58,8 +85,91 @@ class Cta:
                 bar.arrived, bar.waiters, bar.count = [], [], None
         return released
 
+    # -- mbarriers ------------------------------------------------------------
+    def mbarrier_init(self, offset: int, count: int, warp, ins) -> None:
+        from ..units.mbarrier import mbarrier_init
+        mbarrier_init(self, offset, count, warp, ins)
+
+    def mbarrier(self, offset: int, warp, ins, lanes):
+        bar = self.mbarriers.get(offset)
+        if bar is None:
+            from ..errors import ExecutionError
+            raise ExecutionError(f"mbarrier at shared offset {offset} is used before mbarrier.init")
+        if bar.init_warp != warp.warp_id and bar.init_epoch == self.smem.epoch:
+            self.findings.add(
+                "mbarrier-init-race",
+                f"mbarrier at shared offset {offset} was initialized by warp {bar.init_warp} and "
+                "is used by another warp with no barrier in between", warp, ins, lanes)
+        return bar
+
+    def phase_completed(self) -> None:
+        """An mbarrier phase completed: wake its waiters; it also orders shared-memory accesses."""
+        self.smem.epoch += 1
+        self._wake("mbarrier")
+
+    def _wake(self, kind: str) -> None:
+        for w in self.warps:
+            if w.blocked is not None and w.blocked.kind == kind:
+                w.blocked = None
+
+    # -- asynchronous operations (TMA) ----------------------------------------
+    def new_async(self, kind: str, warp, ins, lane: int) -> AsyncOp:
+        operation = AsyncOp(len(self.async_ops) + 1, kind, warp, ins, lane)
+        self.async_ops[operation.id] = operation
+        return operation
+
+    def schedule(self, operation: AsyncOp, complete) -> None:
+        self.async_queue.append([self.async_delay, operation, complete])
+
+    def _complete(self, entry) -> None:
+        _, operation, complete = entry
+        complete()
+        operation.done = True
+        if operation.kind == "store":
+            self._wake("bulk group")
+
+    def tick_async(self) -> None:
+        """One scheduling round has passed."""
+        if not self.async_queue:
+            return
+        for entry in self.async_queue:
+            entry[0] -= 1
+        while self.async_queue and self.async_queue[0][0] <= 0:
+            self._complete(self.async_queue.pop(0))
+
+    def complete_next_async(self) -> bool:
+        """Nothing else can run: let the oldest copy in flight finish now."""
+        if not self.async_queue:
+            return False
+        self._complete(self.async_queue.pop(0))
+        return True
+
+    def finish(self) -> None:
+        """All warps returned. Copies still in flight are reported, then completed."""
+        while self.async_queue:
+            entry = self.async_queue.pop(0)
+            operation = entry[1]
+            kind, how = ("tma-store-not-waited", "cp.async.bulk.wait_group") \
+                if operation.kind == "store" else ("tma-load-not-waited", "its mbarrier")
+            self.findings.add(kind, f"the kernel returned while this TMA {operation.kind} was "
+                              f"still in flight; nothing waited on {how}",
+                              operation.warp, operation.ins, [operation.lane])
+            self._complete(entry)
+
     def describe_blocked(self) -> str:
+        from ..check.report import _ranges
         lines = []
+        groups: dict[tuple, list[int]] = {}  # warps waiting at the same place for the same thing
+        for w in self.warps:
+            if w.blocked is not None and w.blocked.kind != "barrier":
+                detail = w.blocked.detail() if w.blocked.detail is not None else ""
+                where = f"line {w.blocked.ins.line}: {' '.join(w.blocked.ins.text.split())}"
+                groups.setdefault((where, detail), []).append(w.warp_id)
+        for (where, detail), ids in groups.items():
+            who = f"warp {ids[0]} waits" if len(ids) == 1 else f"warps {_ranges(ids)} wait"
+            lines.append(f"  {who} at {where}")
+            if detail:
+                lines.append(f"    {detail}")
         for barrier_id, bar in sorted(self.barriers.items()):
             if not bar.waiters:
                 continue

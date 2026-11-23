@@ -2,7 +2,7 @@
 
 **Understand a Blackwell GPU by watching it run, on your CPU.**
 
-> Status: M0 and M1 done (2026-11-23), M1's `ncu` cross-check matches on bank conflicts but not on the total wavefront count (validation/README.md). See docs/m0.md, docs/m1.md.
+> Status: M0 to M2 done (2026-11-23). M1's `ncu` cross-check matches on bank conflicts but not on the total wavefront count (validation/README.md). M2 is not validated on hardware (docs/m2.md).
 > GitHub description: *Understand a Blackwell GPU by watching it run, on your CPU.*
 > Topics: `cuda` `gpu` `blackwell` `simulator` `ptx` `cutlass` `triton` `tensor-cores` `gpu-programming`
 

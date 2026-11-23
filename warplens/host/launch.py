@@ -83,7 +83,7 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, tuple[int, int]]:
 
 
 def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace=None,
-               max_steps: int | None = None) -> LaunchStats:
+               max_steps: int | None = None, async_delay: int = 4) -> LaunchStats:
     gx, gy, gz = dim3(grid, "grid")
     bx, by, bz = dim3(block, "block")
     threads = bx * by * bz
@@ -120,7 +120,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
             for cy in range(gy):
                 for cx in range(gx):
                     ids = {"ctaid.x": const(cx), "ctaid.y": const(cy), "ctaid.z": const(cz)}
-                    cta = Cta((cx, cy, cz), smem_bytes, stats.smem, findings)
+                    cta = Cta((cx, cy, cz), smem_bytes, stats.smem, findings, async_delay)
                     warps = cta.warps
                     for wi in range(nwarps):
                         t = tuple(c[wi] for c in tid)

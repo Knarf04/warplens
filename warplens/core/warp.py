@@ -158,6 +158,8 @@ class Warp:
 
     def write(self, dest, value: np.ndarray, mask: np.ndarray) -> None:
         """Store `value` into register `dest` on the lanes in `mask`."""
+        if type(dest) is Sym and dest.name == "_":
+            return  # a discarded destination
         if type(dest) is not Reg:
             raise ExecutionError(f"destination {dest!r} is not a register")
         raw = self.regs[dest.name]

@@ -525,7 +525,11 @@ def _space(ins: Instr):
     spaces = {"global", "shared", "param", "local", "shared::cta", "shared::cluster"}
     if ins.opcode == "ld":
         spaces.add("const")
-    ty, extra = _type(ins, allowed=spaces | {"v2", "v4"})
+    ty, extra = _type(ins, allowed=spaces | {"v2", "v4", "nc"})
+    if "nc" in extra:  # ld.global.nc: a read-only cache hint, with no functional effect
+        if ins.opcode != "ld" or "global" not in extra:
+            raise unsupported(ins, "modifier .nc")
+        extra.remove("nc")
     width = 1
     for v, n in (("v2", 2), ("v4", 4)):
         if v in extra:

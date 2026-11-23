@@ -187,10 +187,45 @@ def test_reading_accumulators_without_waiting_for_the_commit_is_caught(sim):
 
 
 def test_lane_rule(sim):
-    # Three warps, each addressing the lanes of the next one.
-    _, _, stats = run(sim, m=128, n=8, shift=32 << 16, ncols=32, block=96)
+    # Three warps, each naming the lanes of the next one.
+    got, expect, stats = run(sim, m=128, n=8, shift=32 << 16, ncols=32, block=96)
     f = next(f for f in stats.findings if f.kind == "tmem-lane-rule")
-    assert "warp 0 may only access tensor-memory lanes 0-31, but this reaches lane 32" in f.message
+    assert "warp 0 may only access tensor-memory lanes 0-31, but its address reaches lane 63" in f.message
+    assert "stays inside the warp's own window" in f.message
+    np.testing.assert_allclose(got[:96], expect[:96], rtol=1e-5, atol=1e-5)  # each warp read its own rows
+
+
+def test_the_same_address_in_every_warp_reaches_each_warps_own_lanes(sim):
+    """A warp's lane window comes from its position in the warpgroup; the address selects within
+    it. TIRx passes one address (lane 0) in all four warps; CuTe passes each window's base lane.
+    Store the first way, load the second way: both must name the same cells."""
+    mod = kernel("""
+        .reg .b64 %o, %off; .reg .b32 %t, %w, %tp, %base, %own, %v, %x; .reg .pred %q;
+        .shared .align 4 .u32 tptr;
+        mov.u32 %t, %tid.x; mov.u32 %w, %warpid;
+        setp.eq.u32 %q, %w, 0;
+        mov.b32 %tp, tptr;
+        @%q tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%tp], 32;
+        bar.sync 0;
+        ld.shared.u32 %base, [%tp];
+        add.u32 %v, %t, 500;
+        tcgen05.st.sync.aligned.32x32b.x1.b32 [%base], {%v};
+        tcgen05.wait::st.sync.aligned;
+        shl.b32 %x, %w, 21;
+        add.u32 %own, %base, %x;
+        tcgen05.ld.sync.aligned.32x32b.x1.b32 {%v}, [%own];
+        tcgen05.wait::ld.sync.aligned;
+        ld.param.u64 %o, [out];
+        mul.wide.u32 %off, %t, 4;
+        add.u64 %o, %o, %off;
+        st.global.u32 [%o], %v;
+        bar.sync 0;
+        @%q tcgen05.dealloc.cta_group::1.sync.aligned.b32 %base, 32;
+        ret;
+    """, ".param .u64 out")
+    out = sim.empty(128, "u32")
+    stats = sim.launch(mod, "k", grid=1, block=128, args=[out])
+    assert out.numpy().tolist() == [500 + t for t in range(128)] and not stats.findings
 
 
 def test_leaked_allocation_is_reported(sim):

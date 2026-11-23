@@ -405,18 +405,26 @@ def _transfer(w, ins, mask, store: bool) -> None:
     if (address != address[0]).any():
         raise ExecutionError(f"{ins.name} requires the same tensor-memory address in every lane "
                              "of the warp")
-    all_rows = (address >> np.uint64(16)).astype(np.int64)[:, None] + lane_offset[lanes]
-    all_cols = (address & np.uint64(0xFFFF)).astype(np.int64)[:, None] + column_offset[lanes]
-    if all_rows.max() >= LANES or all_cols.max() >= COLUMNS:
-        raise ExecutionError(f"{ins.name} reaches lane {int(all_rows.max())}, column "
-                             f"{int(all_cols.max())}, outside tensor memory")
+    # Which lanes a warp reaches is fixed by its position in the warpgroup: warp w gets lanes
+    # 32 * (w % 4) .. + 31. The lane part of the address only selects within that window.
+    # This reconciles two code generators that both run on real hardware: CuTe passes the
+    # window's own base lane (32 * w), while TIRx passes the same address, lane 0, in every warp.
     quadrant = 32 * (w.warp_id % 4)
-    stray = (all_rows < quadrant) | (all_rows >= quadrant + 32)
+    address_lane = (address >> np.uint64(16)).astype(np.int64)
+    within = address_lane % 32
+    all_rows = quadrant + within[:, None] + lane_offset[lanes]
+    all_cols = (address & np.uint64(0xFFFF)).astype(np.int64)[:, None] + column_offset[lanes]
+    if all_cols.max() >= COLUMNS:
+        raise ExecutionError(f"{ins.name} reaches column {int(all_cols.max())}, outside tensor memory")
+    named = address_lane - within  # the 32-lane window the address itself names
+    stray = (all_rows >= quadrant + 32) | ((named != 0) & (named != quadrant))[:, None]
     if stray.any():
+        reached = int(named[0] + within[0] + lane_offset[lanes].max())
         cta.findings.add("tmem-lane-rule",
                          f"warp {w.warp_id} may only access tensor-memory lanes {quadrant}-"
-                         f"{quadrant + 31}, but this reaches lane {int(all_rows[stray].min())}",
-                         w, ins, lanes[stray.any(axis=1)])
+                         f"{quadrant + 31}, but its address reaches lane {reached}; the access "
+                         "stays inside the warp's own window", w, ins, lanes[stray.any(axis=1)])
+        all_rows = quadrant + (all_rows - quadrant) % 32
     for i, reg in enumerate(regs.elems):
         rows, c = all_rows[:, i], all_cols[:, i]
         if not tmem.allocated[c].all():

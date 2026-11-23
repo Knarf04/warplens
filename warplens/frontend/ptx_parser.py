@@ -459,7 +459,8 @@ class _Parser:
                 operand = self.operand(fn)
                 if self.accept("|"):
                     second = self.operand(fn)
-                    if not (isinstance(operand, Reg) and isinstance(second, Reg)):
+                    discard = Sym("_")  # `_|%p`: that half of the result is not wanted
+                    if not all(isinstance(x, Reg) or x == discard for x in (operand, second)):
                         raise self.syntax(first, "both sides of a paired destination must be registers")
                     operand = Pair(operand, second)
                 operands.append(operand)

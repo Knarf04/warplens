@@ -171,6 +171,10 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
     with np.errstate(all="ignore"):
         for qz, qy, qx in np.ndindex(gz // kz, gy // ky, gx // kx):  # one cluster at a time
             group = Cluster((qx, qy, qz), cluster)
+            # CTAs within a cluster overlap in time, so they must agree when
+            # fetched lines become readable in L2. Earlier clusters have
+            # finished and remain warm through Timing.l2_lines.
+            cluster_l2_ready: dict[int, float] = {}
             for rz, ry, rx in np.ndindex(kz, ky, kx):  # its CTAs in rank order
                 cx, cy, cz = qx * kx + rx, qy * ky + ry, qz * kz + rz
                 ids = {"ctaid.x": const(cx), "ctaid.y": const(cy), "ctaid.z": const(cz),
@@ -183,6 +187,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                 group.add(cta)
                 if timing is not None:
                     cta.timeline = timing.timeline(cta.id)
+                    cta.timeline.l2_ready = cluster_l2_ready
                 for wi in range(nwarps):
                     t = tuple(c[wi] for c in tid)
                     specials = {**shared, **cluster_specials, **ids, "warpid": const(wi),

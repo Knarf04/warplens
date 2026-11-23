@@ -28,6 +28,7 @@ class Engine:
         warps = group.warps
         limit = self.max_steps
         while True:
+            group.retire_ctas()
             runnable = [w for w in warps if w.blocked is None and not w.done]
             if not runnable:
                 if all(w.done for w in warps):

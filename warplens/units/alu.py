@@ -12,7 +12,8 @@ import numpy as np
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
 from ..frontend.ir import Instr, Mem, NP_TYPES, Pair, Sym, UINT_BY_SIZE, Vec
 from .floating import fused_multiply_add
-from .smem import CLUSTER_STRIDE, GENERIC_WINDOW, MAX_SMEM_BYTES
+from .smem import (CLUSTER_STRIDE, CLUSTER_WINDOW, GENERIC_WINDOW, MAX_SMEM_BYTES,
+                   local_shared_offset)
 
 HANDLERS: dict = {}
 
@@ -220,12 +221,12 @@ def _mapa(w, ins, mask):
     d, a, rank = _operands(ins, 3)
     offset = w.read_address(a)
     ranks = w.read(rank, "u32").astype(np.uint64)
-    if (offset[mask] >= CLUSTER_STRIDE).any():
-        raise ExecutionError("mapa needs an address in this CTA's own shared memory")
+    if (offset[mask] // np.uint64(CLUSTER_STRIDE) >= len(w.cta.cluster.ctas)).any():
+        raise ExecutionError("mapa source does not point to shared memory in this cluster")
     if (ranks[mask] >= len(w.cta.cluster.ctas)).any():
         raise ExecutionError(f"mapa to CTA rank {int(ranks[mask].max())}, but the cluster has "
                              f"{len(w.cta.cluster.ctas)} CTA(s)")
-    value = (ranks + np.uint64(1)) * np.uint64(CLUSTER_STRIDE) + offset
+    value = ranks * np.uint64(CLUSTER_STRIDE) + offset % np.uint64(CLUSTER_STRIDE)
     w.write(d, value.astype(NP_TYPES[ins.mods[1]]), mask)
 
 
@@ -233,7 +234,8 @@ def _mapa(w, ins, mask):
 def _cvta(w, ins, mask):
     # Address-space conversion. Global addresses are already generic addresses;
     # shared addresses are offsets that sit in a fixed window of the generic space.
-    ty, extra = _type(ins, allowed={"to", "global", "const", "shared", "local", "param"}, kinds="u")
+    ty, extra = _type(ins, allowed={"to", "global", "const", "shared", "shared::cta",
+                                  "shared::cluster", "local", "param"}, kinds="u")
     spaces = [e for e in extra if e != "to"]
     if len(spaces) != 1 or (ty != "u64" and spaces[0] not in ("global", "const")):
         raise unsupported(ins)
@@ -241,7 +243,7 @@ def _cvta(w, ins, mask):
     value = w.read(a, ty)
     if spaces[0] not in ("global", "const"):
         window = np.uint64({"shared": GENERIC_WINDOW, "local": LOCAL_WINDOW,
-                            "param": PARAM_WINDOW}[spaces[0]])
+                            "param": PARAM_WINDOW}[spaces[0].split("::")[0]])
         value = value - window if "to" in extra else value + window
     w.write(d, value, mask)
 
@@ -511,7 +513,7 @@ def route(address: int) -> tuple[str, int]:
     """Which memory a generic address refers to, and the address within it."""
     if PARAM_WINDOW <= address < PARAM_WINDOW + _LOCAL_WINDOW_BYTES:
         return "param", address - PARAM_WINDOW
-    if GENERIC_WINDOW <= address < GENERIC_WINDOW + MAX_SMEM_BYTES:
+    if GENERIC_WINDOW <= address < GENERIC_WINDOW + CLUSTER_WINDOW:
         return "shared", address - GENERIC_WINDOW
     if LOCAL_WINDOW <= address < LOCAL_WINDOW + _LOCAL_WINDOW_BYTES:
         return "local", address - LOCAL_WINDOW
@@ -540,9 +542,9 @@ def _cluster_groups(w, addrs: np.ndarray, mask: np.ndarray):
     yields (CTA, lanes, offsets within that CTA's shared memory)."""
     stride = np.uint64(CLUSTER_STRIDE)
     which = addrs // stride
-    for rank_plus_1 in np.unique(which[mask]):
-        lanes = mask & (which == rank_plus_1)
-        target = w.cta if rank_plus_1 == 0 else w.cta.peer(int(rank_plus_1) - 1)
+    for rank in np.unique(which[mask]):
+        lanes = mask & (which == rank)
+        target = w.cta.peer(int(rank))
         yield target, lanes, addrs % stride
 
 
@@ -557,15 +559,16 @@ def _split_generic(space: str, addrs: np.ndarray, mask: np.ndarray):
     if space in ("global", "const"):
         return mask, None, None, None, None
     if space == "shared":
-        return None, mask, addrs, None, None
+        return None, mask, local_shared_offset(addrs), None, None
     if space == "local":
         return None, None, None, mask, addrs
     window = np.uint64(GENERIC_WINDOW)
-    in_smem = (addrs >= window) & (addrs < window + np.uint64(MAX_SMEM_BYTES))
+    in_smem = (addrs >= window) & (addrs < window + np.uint64(CLUSTER_WINDOW))
     local = np.uint64(LOCAL_WINDOW)
     in_local = (addrs >= local) & (addrs < local + np.uint64(_LOCAL_WINDOW_BYTES))
     to_smem, to_local = mask & in_smem, mask & in_local
-    return (mask & ~in_smem & ~in_local, (to_smem if to_smem.any() else None), addrs - window,
+    return (mask & ~in_smem & ~in_local, (to_smem if to_smem.any() else None),
+            local_shared_offset(addrs - window),
             (to_local if to_local.any() else None), addrs - local)
 
 
@@ -583,6 +586,12 @@ def _local_index(w, ins, lanes: np.ndarray, offsets: np.ndarray, size: int, verb
 
 def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
     value = np.zeros(len(mask), dtype=dt)
+    if space == "generic":
+        shared = mask & (addrs >= GENERIC_WINDOW) & (addrs < GENERIC_WINDOW + CLUSTER_WINDOW)
+        if shared.any():
+            value[shared] = _load(w, ins, "shared::cluster", addrs - np.uint64(GENERIC_WINDOW),
+                                  dt, shared)[shared]
+            mask = mask & ~shared
     if space == "shared::cluster":  # distributed shared memory: maybe another CTA's
         for target, lanes, offsets in _cluster_groups(w, addrs, mask):
             if target is w.cta:
@@ -691,6 +700,11 @@ def _async_check(w, ins, s, offsets, size: int, what: str, writing: bool) -> Non
 
 
 def _store(w, ins, space, addrs, value, mask) -> None:
+    if space == "generic":
+        shared = mask & (addrs >= GENERIC_WINDOW) & (addrs < GENERIC_WINDOW + CLUSTER_WINDOW)
+        if shared.any():
+            _store(w, ins, "shared::cluster", addrs - np.uint64(GENERIC_WINDOW), value, shared)
+            mask = mask & ~shared
     if space == "shared::cluster":
         for target, lanes, offsets in _cluster_groups(w, addrs, mask):
             if target is w.cta:
@@ -739,6 +753,10 @@ def _record_memory_banks(w, ins, space, addrs, mask, size: int) -> None:
     """Account for one complete scalar or vector instruction, not each element."""
     if space == "shared::cluster":
         return  # bank accounting across CTAs is not modeled
+    if space == "generic":
+        shared = (addrs >= GENERIC_WINDOW) & (addrs < GENERIC_WINDOW + CLUSTER_WINDOW)
+        rank = (addrs - np.uint64(GENERIC_WINDOW)) // np.uint64(CLUSTER_STRIDE)
+        mask = mask & ~(shared & (rank != w.cta.rank))
     in_global, shared, offsets, _, _ = _split_generic(space, addrs, mask)
     if shared is not None and shared.any():
         w.smem_waves += w.cta.smem_report.record(ins, w.program.fn.name, offsets[shared], size,

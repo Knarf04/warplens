@@ -18,13 +18,25 @@ def _uniform(w, ins, operand, mask, what: str) -> int:
 
 def _cluster_barrier(w, ins, mask):
     """barrier.cluster.arrive / barrier.cluster.wait: a barrier over every thread of the cluster."""
-    mods = [m for m in ins.mods[1:] if m not in ("aligned", "release", "acquire", "relaxed")]
-    if mods not in (["arrive"], ["wait"]) or ins.operands:
+    mods = list(ins.mods[1:])
+    if mods and mods[-1] == "aligned":
+        mods.pop()
+    if tuple(mods) not in (("arrive",), ("arrive", "release"), ("arrive", "relaxed"),
+                           ("wait",), ("wait", "acquire")) or ins.operands:
         raise unsupported(ins)
     if not mask.any():
         return
-    if mods == ["arrive"]:
-        w.cta.cluster.barrier_arrive(w)
+    live = w.live_lanes()
+    if not np.array_equal(live, mask):
+        if "aligned" not in ins.mods:
+            raise unsupported(ins, "divergent cluster barrier rendezvous is not modeled")
+        w.cta.findings.add("barrier-in-divergent-code",
+                           f"{ins.name} reached by only {int(mask.sum())} of the warp's "
+                           f"{int(live.sum())} running lanes; .aligned requires uniform "
+                           "participation; here the whole warp is counted as arrived",
+                           w, ins, np.flatnonzero(mask))
+    if mods[0] == "arrive":
+        w.cta.cluster.barrier_arrive(w, ins, release="relaxed" not in mods)
     else:
         w.cta.cluster.barrier_wait(w, ins)
 

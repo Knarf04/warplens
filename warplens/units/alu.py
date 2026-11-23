@@ -77,6 +77,27 @@ def _mul_hi(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 def _mov(w, ins, mask):
     ty, _ = _type(ins, kinds="iufb")
     d, a = _operands(ins, 2)
+    if isinstance(a, Vec) or isinstance(d, Vec):
+        # Pack {lo, ..., hi} into one register, or unpack one register into several.
+        # The first element is the least significant (checked on real hardware).
+        elems = (a if isinstance(a, Vec) else d).elems
+        total = NP_TYPES[ty].itemsize
+        if isinstance(a, Vec) and isinstance(d, Vec) or total % max(len(elems), 1) \
+                or total // len(elems) not in UINT_BY_SIZE or NP_TYPES[ty].kind == "b":
+            raise unsupported(ins, "vector mov must pack or unpack equal power-of-two parts")
+        part = UINT_BY_SIZE[total // len(elems)]
+        whole = UINT_BY_SIZE[total]
+        bits = np.uint64(8 * part.itemsize)
+        if isinstance(a, Vec):
+            value = np.zeros(len(mask), dtype=np.uint64)
+            for i, e in enumerate(elems):
+                value |= w.read(e, f"b{8 * part.itemsize}").astype(np.uint64) << (bits * np.uint64(i))
+            w.write(d, value.astype(whole), mask)
+        else:
+            value = w.read(a, ty).view(whole).astype(np.uint64)
+            for i, e in enumerate(elems):
+                w.write(e, (value >> (bits * np.uint64(i))).astype(part), mask)
+        return
     w.write(d, w.read(a, ty), mask)
 
 
@@ -455,6 +476,13 @@ def _async_check(w, ins, s, offsets, size: int, what: str, writing: bool) -> Non
     if writing:
         for op_id, hit in unseen(smem.async_reader):
             operation = cta.async_ops[op_id]
+            if operation.kind == "mma":
+                state = "is still reading it" if not operation.done else \
+                    "has completed, but this warp never waited on the mbarrier of its tcgen05.commit"
+                cta.findings.add("mma-operand-overwritten",
+                                 f"write to shared memory that the tcgen05.mma at line "
+                                 f"{operation.ins.line} reads; that MMA {state}", w, ins, hit)
+                continue
             state = "is still reading it" if not operation.done else \
                 "has completed, but this warp never waited for it (cp.async.bulk.wait_group.read)"
             cta.findings.add("tma-store-source-overwritten",

@@ -240,11 +240,12 @@ class _Parser:
                 self.expect_kind("num", "an alignment")
         if t.kind != "word":
             raise self.syntax(t, f"expected a parameter name, found {t.value!r}")
-        size = NP_TYPES[ty].itemsize
+        size, by_value = NP_TYPES[ty].itemsize, False
         while self.accept("["):  # a struct passed by value: `.param .align 8 .b8 name[24]`
             size *= int(self.expect_kind("num", "an array size").value)
             self.expect("]")
-        return Param(name=t.value, type=ty, is_ptr=is_ptr, size=size)
+            by_value = True
+        return Param(name=t.value, type=ty, is_ptr=is_ptr, size=size, by_value=by_value)
 
     def extern_func(self, start: _Tok) -> str:
         """`.extern .func (ret) name (params);` Only the name is kept."""

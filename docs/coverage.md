@@ -27,7 +27,7 @@ that names the instruction and its PTX line.
 
 | Group | Instructions | Notes |
 | --- | --- | --- |
-| Moves | `mov` (including the address of a variable), `cvta[.to].{global,shared,local}` | |
+| Moves | `mov` (including the address of a variable, and packing or unpacking a `{vector}`), `cvta[.to].{global,shared,local}` | |
 | Integer | `add`, `sub`, `mul.{lo,hi,wide}`, `mad.{lo,hi,wide}`, `div`, `rem`, `min`, `max`, `neg`, `abs` | no `.sat`, no carry forms |
 | Float | `add`, `sub`, `mul`, `div`, `fma`, `mad`, `min`, `max`, `neg`, `abs`, `sqrt` | round-to-nearest only; `fma` and floating `mad` round once |
 | Bitwise | `and`, `or`, `xor`, `not`, `shl`, `shr` | also on `.pred` (not shifts) |
@@ -39,6 +39,7 @@ that names the instruction and its PTX line.
 | Shuffle | `shfl.sync.{up,down,bfly,idx}.b32` with optional predicate destination | no rendezvous across divergent paths; see `m1.md` |
 | mbarrier | `mbarrier.init`, `.arrive` (with count), `.arrive.expect_tx`, `.expect_tx`, `.complete_tx`, `.test_wait`, `.try_wait` (both with `.parity`), `.inval` | no `arrive_drop`, `.noComplete`, `pending_count` |
 | TMA | `cp.async.bulk.tensor.{1..5}d` load (`shared <- global`, `.mbarrier::complete_tx::bytes`) and store (`global <- shared`, `.bulk_group`), tile mode; `cp.async.bulk` without a tensor map; `.commit_group`, `.wait_group[.read]`; `prefetch.tensormap` and `cp.async.bulk.prefetch` (no-ops) | no multicast, im2col, `cp.reduce`, `tensormap.replace`; `.L2::cache_hint` ignored |
+| tcgen05 | `tcgen05.alloc`, `.dealloc`, `.relinquish_alloc_permit` (`cta_group::1`); `.mma` `kind::f16` / `kind::tf32` with K-major shared-memory operands and float32 accumulators, M = 64 or 128; `.commit` to an mbarrier; `.ld` / `.st` shape `32x32b.xN`; `.wait::ld/st` and `.fence::*` (no-ops) | no `cta_group::2`, TMEM operand A, MN-major, other kinds, other shapes, `.pack`, `.cp`, `.shift`; see `m3.md` |
 | Fences | `fence.proxy.async`; `fence.mbarrier_init`, `fence.acq_rel`, `fence.sc`, `fence.proxy.*` accepted with no effect | |
 | Control | `bra`, `bra.uni`, `ret`, `exit` | no `brx.idx`, no `call` |
 

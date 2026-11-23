@@ -56,6 +56,7 @@ class Cta:
         self.async_queue: list[list] = []  # [rounds left, AsyncOp, completion callback]
         self.mbarriers: dict[int, object] = {}  # shared offset -> Mbarrier
         self.output: list[str] = []  # text printed by the kernel
+        self.tmem = None  # units.tcgen05.Tmem, created on first use
         self.smem = SharedMemory(smem_bytes)
         self.smem_report = smem_report
         self.findings = findings
@@ -159,12 +160,19 @@ class Cta:
         while self.async_queue:
             entry = self.async_queue.pop(0)
             operation = entry[1]
-            kind, how = ("tma-store-not-waited", "cp.async.bulk.wait_group") \
-                if operation.kind == "store" else ("tma-load-not-waited", "its mbarrier")
-            self.findings.add(kind, f"the kernel returned while this TMA {operation.kind} was "
-                              f"still in flight; nothing waited on {how}",
+            kind, what, how = {
+                "store": ("tma-store-not-waited", "TMA store", "cp.async.bulk.wait_group"),
+                "load": ("tma-load-not-waited", "TMA load", "its mbarrier"),
+            }.get(operation.kind, ("tcgen05-not-waited", f"tcgen05.{operation.kind}",
+                                   "a tcgen05.commit and its mbarrier"))
+            self.findings.add(kind, f"the kernel returned while this {what} was still in flight; "
+                              f"nothing waited on {how}",
                               operation.warp, operation.ins, [operation.lane])
             self._complete(entry)
+        if self.tmem is not None:
+            for column, (ncols, (warp, ins, lane)) in self.tmem.allocations.items():
+                self.findings.add("tmem-leak", f"{ncols} tensor-memory columns allocated here were "
+                                  "never released with tcgen05.dealloc", warp, ins, [lane])
 
     def describe_blocked(self) -> str:
         from ..check.report import _ranges

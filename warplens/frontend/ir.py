@@ -110,7 +110,8 @@ class Param:
     name: str
     type: str
     is_ptr: bool = False
-    size: int = 0  # bytes; larger than the type for by-value structs (`.b8 name[24]`)
+    size: int = 0  # bytes
+    by_value: bool = False  # a struct passed by value (`.b8 name[24]`)
 
 
 @dataclass(slots=True)

@@ -2,7 +2,7 @@
 
 **Understand a Blackwell GPU by watching it run, on your CPU.**
 
-> Status: M0 to M2 done (2026-11-23). M1's `ncu` cross-check matches on bank conflicts but not on the total wavefront count (validation/README.md). M2 is not validated on hardware (docs/m2.md).
+> Status: M0 to M2 done, M3 partly done (2026-11-23): CUTLASS tutorial 01 runs correctly; tutorial 02 and the TMEM layout view are open (docs/m3.md). M1's `ncu` cross-check matches on bank conflicts but not on the total wavefront count (validation/README.md). M2 and M3 are not validated on Blackwell hardware.
 > GitHub description: *Understand a Blackwell GPU by watching it run, on your CPU.*
 > Topics: `cuda` `gpu` `blackwell` `simulator` `ptx` `cutlass` `triton` `tensor-cores` `gpu-programming`
 
@@ -202,9 +202,9 @@ Each milestone ends with a runnable example, tests, and a short write-up in `doc
 | **M0** skeleton | PTX parser (basic subset), warp SIMT executor, GMEM, Python launch API, CI | `vecadd` and a divergent-branch kernel, compiled by nvcc for sm_100a, run on CPU and match NumPy |
 | **M1** SMEM | shared memory, named barriers, `shfl`, bank/wavefront model, conflict report | the transpose kernel in linear/padded/swizzled layouts reports 32-way / 0 / 0 conflicts. **Validated against `ncu` on a real Ampere GPU** (same counters) |
 | **M2** TMA + mbarrier | tensor-map emulation, TMA load/store 1–5D tile mode, OOB fill, swizzle 32/64/128B, mbarrier full semantics, bulk groups, proxy fences, hazard + deadlock checkers | a TMA copy kernel round-trips GMEM→SMEM→GMEM for every swizzle mode. Deliberately broken variants (wrong expect_tx, missing fence, early reuse) are each caught |
-| **M3** tcgen05 + TMEM | alloc/dealloc, SMEM + instruction descriptors, `mma` kind::f16/tf32 `cta_group::1` (M=64 Layout F, M=128), `commit`, `ld/st` shapes, lane-rule checker | the CUTLASS Blackwell CuTe tutorials (`examples/cute/tutorial/blackwell/01_mma_sm100.cu`, `02_mma_tma_sm100.cu`, names to verify) produce correct GEMM output. The TMEM layout view matches the course's Layout F/B figures |
+| **M3** tcgen05 + TMEM | alloc/dealloc, SMEM + instruction descriptors, `mma` kind::f16/tf32 `cta_group::1` (M=64 Layout F, M=128), `commit`, `ld/st` shapes, lane-rule checker | the CUTLASS Blackwell CuTe tutorials (`examples/cute/tutorial/blackwell/01_mma_sm100.cu`, `02_mma_tma_sm100.cu`) produce correct GEMM output. The TMEM layout view matches the course's Layout F/B figures |
 | **M4** timing + reports | timing model, B200/B300 configs, Perfetto trace, utilization summary, HTML report | a warp-specialized pipelined GEMM shows the expected trend over 1/2/4 stages (bottleneck moves from latency to TMA/HBM to Tensor Core). Every number in the report links to its config source |
-| **M5** clusters | clusters, DSMEM, remote mbarrier, TMA multicast, `cta_group::2` (Layouts A/B), CLC | the CUTLASS tutorials with multicast and 2-SM MMA (`03_…multicast`, `04_…2sm`, to verify) are correct; Layout B worked example (C[10,11] → lane 74) is reproduced |
+| **M5** clusters | clusters, DSMEM, remote mbarrier, TMA multicast, `cta_group::2` (Layouts A/B), CLC | the CUTLASS tutorials with multicast and 2-SM MMA (`03_mma_tma_multicast_sm100.cu`, `04_mma_tma_2sm_sm100.cu`) are correct; Layout B worked example (C[10,11] → lane 74) is reproduced |
 | **M6** frontends | Triton driver, CuTe DSL spike, libcudart/libcuda shim | a Triton matmul and an unmodified CUTLASS example binary run under `warplens run` |
 | **v1.0** | docs, coverage table, tutorial notebook that follows the MLC course chapters | public release |
 

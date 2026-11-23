@@ -72,7 +72,7 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, bytes]:
     for k, (param, arg) in enumerate(zip(fn.params, args)):
         dt = NP_TYPES[param.type]
         what = f"argument {k} (`{param.name}`, .{param.type})"
-        if param.size != dt.itemsize:  # a struct passed by value
+        if param.by_value:  # a struct passed by value
             raw = _struct_bytes(arg)
             if raw is None:
                 raise LaunchError(f"argument {k} (`{param.name}`) is a {param.size}-byte struct passed "

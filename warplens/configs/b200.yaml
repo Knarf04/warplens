@@ -15,7 +15,7 @@ clock_ghz:
   value: 1.5
   unit: GHz
   source: assumption
-  note: The core clock is not public. It only sets the cost of issuing an instruction.
+  note: Assumed core clock; converts instruction, SMEM, TMEM and MMA latency costs and the TMA rate from clocks to nanoseconds.
 hbm_capacity_gb:
   value: 192
   unit: GB
@@ -71,4 +71,4 @@ mma_latency_clk:
   unit: clk
   source: "arXiv:2512.02189, Table V (tcgen05.mma m128n128k16, dependency-chain latency)"
   url: https://arxiv.org/abs/2512.02189
-  note: Added once per MMA as pipeline latency. The paper's cycle counts and its throughput table do not agree with each other for any single clock frequency.
+  note: Added once per MMA as pipeline latency. Applying this FP16 m128n128k16 measurement to other shapes and TF32 is a model assumption; it is not a measured latency for those instructions.

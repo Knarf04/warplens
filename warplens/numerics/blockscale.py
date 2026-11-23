@@ -58,34 +58,50 @@ def _blocks(x, fmt: BlockScaled) -> np.ndarray:
     return x.reshape(-1, fmt.block)
 
 
+def _tensor_scale(value: float) -> float:
+    with np.errstate(over="ignore", under="ignore"):
+        value = float(np.float32(value))
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError("tensor scale must be a positive finite float32 value")
+    return value
+
+
 def choose_scales(x, fmt: BlockScaled, tensor_scale: float | None = None):
     """(scale codes, tensor scale) by the recipe described in this module."""
     blocks = _blocks(x, fmt)
     peak = np.abs(blocks).max(axis=1)
     if fmt.scale is UE8M0:
-        top = int(np.floor(np.log2(fmt.element.largest)))  # exponent of the element format's top binade
-        with np.errstate(divide="ignore"):
-            exponent = np.where(peak > 0, np.floor(np.log2(np.where(peak > 0, peak, 1.0))) - top, 0.0)
+        # frexp extracts the binade exactly, including values just below powers
+        # of two where a rounded log2 can select an exponent one too large.
+        top = np.frexp(fmt.element.largest)[1] - 1
+        exponent = np.where(peak > 0, np.frexp(peak)[1] - 1 - top, 0)
         return np.clip(exponent + UE8M0.bias, 0, 254).astype(np.uint8), 1.0
     if tensor_scale is None:
-        largest = float(peak.max())
-        # Map the largest block scale onto the largest UE4M3 value.
+        largest = float(peak.max(initial=0.0))
+        # Map the largest block scale onto the largest UE4M3 value. Clamp the
+        # global scale to finite nonzero float32 so tiny tensors do not become
+        # all zero merely because their ideal global scale underflows.
         tensor_scale = largest / fmt.element.largest / fmt.scale.largest if largest > 0 else 1.0
-    tensor_scale = float(np.float32(tensor_scale))
+        limits = np.finfo(np.float32)
+        tensor_scale = np.clip(tensor_scale, float(limits.smallest_subnormal), float(limits.max))
+    tensor_scale = _tensor_scale(tensor_scale)
     return fmt.scale.encode(peak / fmt.element.largest / tensor_scale), tensor_scale
 
 
 def quantize(x, fmt: BlockScaled, scales=None, tensor_scale: float | None = None):
     """Returns (element codes, scale codes, tensor scale). `scales` overrides the recipe."""
     blocks = _blocks(x, fmt)
+    if tensor_scale is not None:
+        tensor_scale = _tensor_scale(tensor_scale)
     if scales is None:
         scales, tensor_scale = choose_scales(x, fmt, tensor_scale)
     else:
-        scales = np.asarray(scales, dtype=np.uint8)
-        tensor_scale = float(np.float32(1.0 if tensor_scale is None else tensor_scale))
+        scales = np.asarray(scales)
+        tensor_scale = 1.0 if tensor_scale is None else tensor_scale
         if scales.shape != (len(blocks),):
             raise ValueError(f"expected {len(blocks)} scale code(s), one per block")
     factor = fmt.scale.decode(scales) * tensor_scale
+    scales = scales.astype(np.uint8)  # validate integer codes before narrowing
     if np.isnan(factor).any():
         raise ValueError("a block scale is NaN")
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -94,10 +110,10 @@ def quantize(x, fmt: BlockScaled, scales=None, tensor_scale: float | None = None
 
 
 def dequantize(codes, scales, fmt: BlockScaled, tensor_scale: float = 1.0) -> np.ndarray:
-    codes = np.asarray(codes)
-    if codes.ndim != 1 or len(codes) % fmt.block or len(codes) // fmt.block != len(np.asarray(scales)):
+    codes, scales = np.asarray(codes), np.asarray(scales)
+    if codes.ndim != 1 or len(codes) % fmt.block or scales.shape != (len(codes) // fmt.block,):
         raise ValueError(f"{fmt.name} needs {fmt.block} element codes per scale code")
-    factor = fmt.scale.decode(scales) * float(np.float32(tensor_scale))
+    factor = fmt.scale.decode(scales) * _tensor_scale(tensor_scale)
     return (fmt.element.decode(codes).reshape(-1, fmt.block) * factor[:, None]).reshape(-1)
 
 
@@ -119,7 +135,8 @@ def explain_block(x, fmt: BlockScaled, block: int = 0, tensor_scale: float | Non
     lines.append("       value      /scale   code  bits         stored       error")
     for i in range(fmt.block):
         code = int(codes[lo + i])
-        lines.append(f"  {values[i]:>10.5f} {values[i] / (factor * tensor_scale):>10.4f}   {code:>4}  "
+        scaled = values[i] / (factor * tensor_scale) if factor else 0.0
+        lines.append(f"  {values[i]:>10.5f} {scaled:>10.4f}   {code:>4}  "
                      f"{fmt.element.bit_string(code):<10} {kept[i]:>10.5f}  {kept[i] - values[i]:>+10.5f}")
     rms = float(np.sqrt(np.mean((kept - values) ** 2)))
     lines.append(f"  RMS error of the block: {rms:.6g} ({rms / max(float(np.sqrt(np.mean(values ** 2))), 1e-300):.2%} of its RMS value)")

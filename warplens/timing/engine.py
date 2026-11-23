@@ -14,11 +14,19 @@ class TimedEngine(Engine):
         for w in warps:
             w.time = 0.0
         while True:
+            if all(w.done for w in warps):
+                # Retiring the CTA must still report operations left in flight.
+                # Only completions reached before the final instruction finishes
+                # can retire normally; finish() diagnoses and drains the rest.
+                retired = max(w.time for w in warps)
+                while queue and queue[0][0] <= retired:
+                    line.now = queue[0][0]
+                    cta._complete(queue.pop(0))
+                line.now = retired
+                cta.finish()
+                return
             runnable = [w for w in warps if w.blocked is None and not w.done]
             if not runnable and not queue:
-                if all(w.done for w in warps):
-                    cta.finish()
-                    return
                 if cta.release_barriers():
                     continue
                 for bar in cta.mbarriers.values():
@@ -27,13 +35,21 @@ class TimedEngine(Engine):
                     f"deadlock in CTA {cta.id}: every unfinished warp is blocked and "
                     f"nothing can release them\n{cta.describe_blocked()}", cta.findings.items)
             waiting = [w for w in warps if w.blocked is not None]
-            warp = min(runnable, key=lambda w: w.time) if runnable else None
-            if queue and (warp is None or queue[0][0] <= warp.time):
+            def issue_time(w):
+                return max(w.time, line.slots[w.warp_id % 4].free)
+
+            # Issue-slot contention delays the instruction itself, including
+            # its functional effects and any asynchronous work it launches.
+            # Prefer the longest-ready warp when two share the same issue time.
+            warp = min(runnable, key=lambda w: (issue_time(w), w.time)) if runnable else None
+            when = issue_time(warp) if warp is not None else None
+            if queue and (warp is None or queue[0][0] <= when):
                 line.now = queue[0][0]
                 cta._complete(queue.pop(0))
             else:
+                warp.time = when
                 ins = warp.program.instrs[warp.stack.top.pc]
-                line.now = warp.time
+                line.now = when
                 warp.step()
                 line.charge(warp, ins)
                 line.now = warp.time

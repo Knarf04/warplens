@@ -22,10 +22,12 @@ and nothing here has been calibrated against hardware.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from numbers import Integral
 
 import numpy as np
 
 from .config import GpuConfig
+from ..errors import LaunchError
 
 SATURATED = 0.85  # a resource busy at least this fraction of the time is called the bottleneck
 LINE = 128  # bytes; granularity of the "already in L2" bookkeeping
@@ -69,7 +71,7 @@ RESOURCE_SOURCES = {
     "issue slots": ("clock_ghz",),
     "SMEM": ("smem_wavefront_clk", "clock_ghz"),
     "TMA engine": ("tma_bytes_per_clk", "tma_latency_ns", "clock_ghz"),
-    "HBM": ("hbm_bandwidth_tb_s", "sm_count"),
+    "HBM": ("hbm_bandwidth_tb_s",),
     "L2": ("l2_bandwidth_per_sm_gb_s",),
     "Tensor Core": ("tensor_core_tflops_f16", "tensor_core_tflops_tf32", "sm_count",
                     "mma_latency_clk", "clock_ghz"),
@@ -98,10 +100,14 @@ class Timeline:
         self.flop_rate = {kind: cfg[f"tensor_core_tflops_{kind}"] * 1e3 / cfg["sm_count"]
                           for kind in ("f16", "tf32")}  # FLOP per ns for this SM
         self.flops = 0.0
+        self.flops_by_kind = {kind: 0.0 for kind in self.flop_rate}
         self.bytes_loaded = 0.0
+        # Lines fetched by earlier CTAs are warm at this CTA's time zero.
+        # Within a CTA, issuing a fetch does not make its data available yet.
+        self.l2_ready: dict[int, float] = {}
         self.async_first = None  # window in which asynchronous work was in flight
         self.async_last = 0.0
-        self.mma_done: dict[int, float] = {}  # warp id -> completion time of its latest MMA
+        self.mma_done: dict[tuple[int, int], float] = {}  # (warp, lane) -> latest MMA completion
         self.wait_start: dict[int, tuple[float, object]] = {}
         self.run_start: dict[int, float] = {}
 
@@ -148,37 +154,45 @@ class Timeline:
         cfg = self.timing.config
         issued = operation.warp.time
         work = operation.work or {}
+        thread = (operation.warp.warp_id, operation.lane)
         if operation.kind in ("load", "store"):
             nbytes = work.get("bytes", 0)
+            global_bytes = work.get("global_bytes", nbytes)
             lines = work.get("lines")
-            fresh = nbytes
+            fresh = global_bytes
+            new = []
             if operation.kind == "load" and lines is not None and len(lines):
                 seen = self.timing.l2_lines
-                new = [int(x) for x in lines if int(x) not in seen]
+                new = [int(x) for x in lines if int(x) not in seen or
+                       self.l2_ready.get(int(x), 0.0) > issued]
                 seen.update(new)
-                fresh = nbytes * len(new) / len(lines)
+                fresh = global_bytes * len(new) / len(lines)
             start, end = self.tma.reserve(issued, nbytes / self.tma_rate, nbytes)
             if fresh:
                 _, hbm_end = self.hbm.reserve(issued, fresh / self.hbm_rate, fresh)
                 end = max(end, hbm_end)
-            if nbytes - fresh:
-                _, l2_end = self.l2.reserve(issued, (nbytes - fresh) / self.l2_rate, nbytes - fresh)
+            if global_bytes - fresh:
+                _, l2_end = self.l2.reserve(issued, (global_bytes - fresh) / self.l2_rate,
+                                          global_bytes - fresh)
                 end = max(end, l2_end)
             done = end + cfg["tma_latency_ns"]
+            for address in new:
+                self.l2_ready[address] = min(self.l2_ready.get(address, done), done)
             self.bytes_loaded += nbytes
             self.slice("TMA engine", f"TMA {operation.kind}", start, done, bytes=nbytes,
-                       from_hbm=int(fresh), line=operation.ins.line)
+                       from_hbm=int(fresh), issued_ns=issued, line=operation.ins.line)
         elif operation.kind == "mma":
             flops = work.get("flops", 0.0)
             rate = self.flop_rate[work.get("kind", "f16")]
             start, end = self.tensor_core.reserve(issued, flops / rate, flops)
             done = end + cfg["mma_latency_clk"] * self.clk
             self.flops += flops
-            self.mma_done[operation.warp.warp_id] = done
+            self.flops_by_kind[work.get("kind", "f16")] += flops
+            self.mma_done[thread] = done
             self.slice("Tensor Core", f"MMA {work.get('shape', '')}", start, done,
                        flops=flops, line=operation.ins.line)
-        else:  # tcgen05.commit: arrives once the warp's earlier MMAs are complete
-            done = max(issued, self.mma_done.get(operation.warp.warp_id, issued))
+        else:  # tcgen05.commit tracks earlier MMAs issued by this thread only
+            done = max(issued, self.mma_done.get(thread, issued))
         if self.async_first is None:
             self.async_first = issued
         self.async_last = max(self.async_last, done)
@@ -206,7 +220,12 @@ class Timing:
         self.config = config
         # How many SMs draw on HBM at once. Each CTA is simulated alone, so this
         # decides its share of the bandwidth. Default: the whole device is busy.
-        self.active_sms = int(active_sms or config["sm_count"])
+        if active_sms is None:
+            active_sms = int(config["sm_count"])
+        if (isinstance(active_sms, (bool, np.bool_)) or not isinstance(active_sms, Integral)
+                or not 1 <= active_sms <= config["sm_count"]):
+            raise LaunchError(f"active_sms must be an integer from 1 to {int(config['sm_count'])}")
+        self.active_sms = int(active_sms)
         self.l2_lines: set[int] = set()  # global-memory lines some CTA has already fetched
         self.timelines: list[Timeline] = []
         self.slices: list[Slice] = []
@@ -235,6 +254,12 @@ class TimingReport:
         self.utilization = {n: float(np.mean([u[n] for u in per_cta])) if per_cta else 0.0
                             for n in names}
         self.flops = sum(t.flops for t in lines)
+        self.flops_by_kind = {kind: sum(t.flops_by_kind[kind] for t in lines)
+                              for kind in ("f16", "tf32")}
+        self.compute_source_keys = tuple(f"tensor_core_tflops_{kind}"
+                                         for kind, flops in self.flops_by_kind.items() if flops)
+        if not self.compute_source_keys:
+            self.compute_source_keys = ("tensor_core_tflops_f16",)
         self.bytes_loaded = sum(t.bytes_loaded for t in lines)
         self.pipeline_ns = float(np.mean([t.async_last - (t.async_first or 0.0) for t in lines])) \
             if lines else 0.0
@@ -259,7 +284,12 @@ class TimingReport:
         per_cta_flops = self.flops / max(self.ctas, 1)
         per_cta_bytes = self.bytes_loaded / max(self.ctas, 1)
         intensity = per_cta_flops / per_cta_bytes if per_cta_bytes else float("inf")
-        peak = self.config["tensor_core_tflops_f16"] * 1e12 / self.config["sm_count"]
+        # A mixed workload's ceiling weights time at each dtype's peak rate.
+        peak_seconds = sum(flops / (self.config[f"tensor_core_tflops_{kind}"] * 1e12 /
+                                     self.config["sm_count"])
+                           for kind, flops in self.flops_by_kind.items())
+        peak = self.flops / peak_seconds if peak_seconds else \
+            self.config["tensor_core_tflops_f16"] * 1e12 / self.config["sm_count"]
         memory = self.config["hbm_bandwidth_tb_s"] * 1e12 / self.active_sms
         return {"achieved_flops_per_s": per_cta_flops / seconds,
                 "compute_ceiling_flops_per_s": peak,
@@ -277,14 +307,16 @@ class TimingReport:
         for name, value in self.utilization.items():
             keys = ", ".join(k + ("*" if cfg.params[k].is_assumption else "")
                              for k in RESOURCE_SOURCES[name])
+            if name == "HBM":
+                keys += ", active_sms (launch parameter)"
             lines.append(f"  {name:<13} {value:>5.0%}   {keys}")
         r = self.roofline()
         if self.flops:
-            lines.append(f"  roofline: {r['achieved_flops_per_s'] / 1e12:.2f} TFLOP/s per SM achieved; "
+            lines.append(f"  roofline: {r['achieved_flops_per_s'] / 1e12:.2f} TFLOP/s pipeline rate per SM; "
                          f"compute ceiling {r['compute_ceiling_flops_per_s'] / 1e12:.2f}, memory "
                          f"ceiling {r['memory_ceiling_flops_per_s'] / 1e12:.2f} at "
                          f"{r['flops_per_byte']:.1f} FLOP/byte")
-        lines.append("  * assumed value, not public; see the config file for every source")
+        lines.append("  * assumed value in this model; see the config file for every source")
         return "\n".join(lines)
 
     def write_trace(self, path) -> None:

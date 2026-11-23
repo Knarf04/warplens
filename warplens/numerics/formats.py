@@ -72,12 +72,17 @@ class FloatFormat:
 
     def decode(self, codes) -> np.ndarray:
         codes = np.asarray(codes)
+        if codes.size and codes.dtype.kind not in "biu":
+            raise ValueError(f"{self.name} codes must be integers")
         if codes.size and (codes.min() < 0 or codes.max() >= self.codes):
             raise ValueError(f"{self.name} codes must be in 0..{self.codes - 1}")
         return self.table[codes.astype(np.intp)]
 
     def encode(self, values, saturate: bool = True) -> np.ndarray:
-        """Round to the nearest representable value, ties to the even code.
+        """Round to nearest, ties to the even significand (UE8M0 ties upward).
+
+        UE8M0 has no fraction bits: midpoint ties go to the next power of two,
+        as documented for CUDA's nearest E8M0 conversion, not by exponent parity.
 
         With `saturate`, values beyond the largest magnitude (and infinities)
         become the largest finite value, like PTX's `.satfinite`. Without it,
@@ -96,7 +101,8 @@ class FloatFormat:
         upper = np.clip(np.searchsorted(levels, magnitude, side="left"), 1, len(levels) - 1)
         lower = upper - 1
         below, above = magnitude - levels[lower], levels[upper] - magnitude
-        pick_upper = (above < below) | ((above == below) & (finite[upper] % 2 == 0))
+        tie_up = (self.fraction_bits == 0) | (finite[upper] % 2 == 0)
+        pick_upper = (above < below) | ((above == below) & tie_up)
         code = np.where(pick_upper, finite[upper], finite[lower])
         over = magnitude > levels[-1]
         if not saturate:

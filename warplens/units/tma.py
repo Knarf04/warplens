@@ -76,7 +76,7 @@ def _check_alignment(w, ins, info, start: int, lane: int) -> None:
 
 
 def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
-          swizzle: int | None = None, source=None) -> None:
+          swizzle: int | None = None, source=None, global_bytes: int | None = None) -> None:
     """Issue an asynchronous write of `data` to shared bytes `idx`, reporting to `bar`."""
     cta = w.cta
     _require_seen(w, ins, [lane], cta.smem.async_writer[idx], "TMA load overwrites")
@@ -98,6 +98,7 @@ def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
     operation = cta.new_async("load", w, ins, lane)
     operation.swizzle = swizzle
     operation.work = {"bytes": len(idx),
+                      "global_bytes": len(idx) if global_bytes is None else global_bytes,
                       "lines": None if source is None else np.unique(source >> np.uint64(7))}
     cta.smem.begin_async_write(idx, operation.id)
     bar.in_flight += 1
@@ -237,7 +238,7 @@ def _cp(w, ins, mask):
                 values[:] = np.array(np.nan, dtype=f"f{info.elem_size}").view(dt)
             values[inside] = w.mem.read(addrs[inside], dt)
             _load(w, ins, lane, start, idx, values.view(np.uint8), bar, swizzle=info.swizzle,
-                  source=addrs[inside])
+                  source=addrs[inside], global_bytes=int(inside.sum()) * info.elem_size)
         elif to_shared:  # [smem], [global], size, [mbarrier]
             if len(ops) != 4 + hint:
                 raise unsupported(ins, "expected [dst], [src], size, [mbarrier]")
@@ -246,8 +247,9 @@ def _cp(w, ins, mask):
             nbytes = _raw_size(w, ins, ops[2], lane, start, source)
             bar = cta.mbarrier(int(_address(w, ins, ops[3])[lane]), w, ins, [lane])
             idx = _smem_bytes(w, ins, start, nbytes, 0, "load")
-            data = w.mem.read(np.uint64(source) + np.arange(nbytes, dtype=np.uint64), _UINT[1])
-            _load(w, ins, lane, start, idx, data, bar)
+            addrs = np.uint64(source) + np.arange(nbytes, dtype=np.uint64)
+            data = w.mem.read(addrs, _UINT[1])
+            _load(w, ins, lane, start, idx, data, bar, source=addrs)
         elif nd:  # [tensor_map, {coords}], [smem]
             if len(ops) != 2 + hint:
                 raise unsupported(ins, "expected [tensor_map, {coords}], [src]")

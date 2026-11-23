@@ -161,7 +161,7 @@ class Cta:
         _, operation, complete = entry
         complete()
         operation.done = True
-        if operation.kind == "store":
+        if operation.kind in ("store", "copy"):
             self._wake("bulk group")
 
     def tick_async(self) -> None:
@@ -188,6 +188,7 @@ class Cta:
             kind, what, how = {
                 "store": ("tma-store-not-waited", "TMA store", "cp.async.bulk.wait_group"),
                 "load": ("tma-load-not-waited", "TMA load", "its mbarrier"),
+                "copy": ("cp-async-not-waited", "cp.async copy", "cp.async.wait_group"),
             }.get(operation.kind, ("tcgen05-not-waited", f"tcgen05.{operation.kind}",
                                    "a tcgen05.commit and its mbarrier"))
             self.findings.add(kind, f"the kernel returned while this {what} was still in flight; "

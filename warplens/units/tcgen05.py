@@ -102,8 +102,17 @@ def _split(address: int) -> tuple[int, int]:
     return address >> 16, address & 0xFFFF
 
 
-def _operand_bytes(w, ins, desc: int, rows: int, dtype: np.dtype, which: str) -> np.ndarray:
-    """Shared-memory byte indices, shape (rows, K, element size), of a K-major operand."""
+def _operand_bytes(w, ins, desc: int, rows: int, dtype: np.dtype, which: str,
+                   mn_major: bool = False) -> np.ndarray:
+    """Shared-memory byte indices, shape (rows, K, element size), of an MMA operand.
+
+    `rows` runs along the operand's M or N dimension. K-major: elements along K are
+    contiguous. MN-major: elements along M/N are contiguous (make_umma_desc<Major::MN>
+    in cute/arch/mma_sm100_desc.hpp): with T = 16 / element size and a swizzle atom of
+    A = 1, 2, 4 or 8 sixteen-byte chunks, element (r, k) is at
+        (r % T) * size + (r // T % A) * 16 + (r // (T * A)) * LBO + (k % 8) * 16 * A + (k // 8) * SBO
+    and for the unswizzled layout at (r % T) * size + (r // T) * SBO + (k % 8) * 16 + (k // 8) * LBO.
+    """
     # PTX tcgen05 shared-memory descriptor: fixed 001 at bits 46..48,
     # reserved bits 15/31/54..60, and relative (not absolute) LBO mode.
     if (desc >> 46) & 7 != 1 or desc & ((1 << 15) | (1 << 31) | (0x7F << 54)):
@@ -125,9 +134,18 @@ def _operand_bytes(w, ins, desc: int, rows: int, dtype: np.dtype, which: str) ->
     r = np.arange(rows, dtype=np.uint64)[:, None, None]
     k = np.arange(2 * per_chunk, dtype=np.uint64)[None, :, None]
     b = np.arange(size, dtype=np.uint64)[None, None, :]
-    step = 16 if bits else lbo
-    offsets = (np.uint64(start) + (r % 8) * row_bytes + (r // 8) * sbo
-               + (k % per_chunk) * size + (k // per_chunk) * step + b)
+    if mn_major:
+        atom = row_bytes // 16  # sixteen-byte chunks along M/N in one swizzle atom
+        if bits:
+            offsets = (np.uint64(start) + (r % per_chunk) * size + (r // per_chunk % atom) * 16
+                       + (r // (per_chunk * atom)) * lbo + (k % 8) * row_bytes + (k // 8) * sbo + b)
+        else:
+            offsets = (np.uint64(start) + (r % per_chunk) * size + (r // per_chunk) * sbo
+                       + (k % 8) * 16 + (k // 8) * lbo + b)
+    else:
+        step = 16 if bits else lbo
+        offsets = (np.uint64(start) + (r % 8) * row_bytes + (r // 8) * sbo
+                   + (k % per_chunk) * size + (k // per_chunk) * step + b)
     idx = swizzle_offsets(offsets, bits)
     if int(idx.max()) >= w.cta.smem.size:
         raise ExecutionError(f"tcgen05.mma operand {which} (descriptor {desc:#x}) extends past the "
@@ -202,8 +220,9 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
     if idesc & ((1 << 6) | (1 << 23) | (7 << 29)):
         raise ExecutionError("tcgen05.mma instruction descriptor has reserved bits, an unsupported "
                              "K dimension or .ws shift controls")
-    if idesc & 0b1100 or (idesc >> 15) & 3:
-        raise unsupported(ins, "sparse, saturating or MN-major MMA")
+    if idesc & 0b1100:
+        raise unsupported(ins, "sparse or saturating MMA")
+    a_mn_major, b_mn_major = bool((idesc >> 15) & 1), bool((idesc >> 16) & 1)
     if (idesc >> 4) & 3 != 1:
         raise unsupported(ins, "only float32 accumulators are implemented")
     formats = _ELEMENT[kind]
@@ -244,8 +263,8 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
     parts = []
     for i, member in enumerate(members):
         tmem = _tmem(member)
-        idx_a = _operand_bytes(w, ins, desc_a, rows_m, formats[a_fmt], "A")
-        idx_b = _operand_bytes(w, ins, desc_b, rows_n, formats[b_fmt], "B")
+        idx_a = _operand_bytes(w, ins, desc_a, rows_m, formats[a_fmt], "A", a_mn_major)
+        idx_b = _operand_bytes(w, ins, desc_b, rows_n, formats[b_fmt], "B", b_mn_major)
         for which, idx, desc in (("A", idx_a, desc_a), ("B", idx_b, desc_b)):
             _check_operand(w, ins, lane, which, idx, _LAYOUTS[desc >> 61][0], member)
         if not tmem.allocated[column_grid[0]].all():

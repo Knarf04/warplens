@@ -158,11 +158,82 @@ def _require_seen(w, ins, lanes, ids: np.ndarray, what: str) -> None:
                 f"that load {state}", w, ins, lanes)
 
 
+def _cp_async(w, ins, mask) -> None:
+    """The per-thread asynchronous copy that predates TMA (Ampere and later):
+
+        cp.async.{ca,cg}.shared.global [dst], [src], size[, src_size]
+        cp.async.commit_group
+        cp.async.wait_group N
+
+    Each executing thread copies `size` bytes (4, 8 or 16) from global to shared memory.
+    With `src_size`, only that many bytes are read and the rest are zero. Copies issued
+    since the last commit form a group; `wait_group N` waits until at most N of the warp's
+    groups are still pending, and only then may the data be read.
+    """
+    mods = ins.mods[1:]
+    cta, ops = w.cta, ins.operands
+    lanes = np.flatnonzero(mask)
+    if not len(lanes):
+        return
+    if mods == ("commit_group",) and not ops:
+        if w.cp_open:
+            w.cp_groups.append(w.cp_open)
+            w.cp_open = []
+        return
+    if mods == ("wait_group",) and len(ops) == 1:
+        allowed = _scalar(w, ins, ops[0], int(lanes[0]))
+        pending = [g for g in w.cp_groups if not all(o.done for o in g)]
+        if len(pending) > allowed:
+            w.blocked = Wait("bulk group", ins, retry=True,
+                             detail=lambda: f"{len(pending)} cp.async group(s) still in flight")
+            return
+        for group in w.cp_groups:
+            if all(o.done for o in group):
+                w.seen.update(o.id for o in group)
+        w.cp_groups = pending
+        return
+    if len(mods) != 3 or mods[0] not in ("ca", "cg") or mods[1:] != ("shared", "global") \
+            or len(ops) not in (3, 4):
+        raise unsupported(ins, "expected cp.async.{ca,cg}.shared.global [dst], [src], size[, src_size]")
+    size = _scalar(w, ins, ops[2], int(lanes[0]))
+    if size not in (4, 8, 16):
+        raise ExecutionError(f"cp.async copies 4, 8 or 16 bytes, not {size}")
+    wanted = w.read(ops[3], "u32")[lanes].astype(np.int64) if len(ops) == 4 else np.full(len(lanes), size)
+    if (wanted > size).any():
+        raise ExecutionError("cp.async source size is larger than the copy size")
+    span = np.arange(size, dtype=np.uint64)
+    source = _address(w, ins, ops[1])[lanes]
+    data = np.zeros((len(lanes), size), dtype=np.uint8)
+    reads = span[None, :] < wanted[:, None].astype(np.uint64)  # bytes actually read; the rest are zero
+    try:
+        data[reads] = w.mem.read((source[:, None] + span[None, :])[reads], _UINT[1])
+    except MemoryFault as e:
+        e.lanes = sorted({int(lanes[k]) for k in np.flatnonzero(reads.any(axis=1))})
+        raise
+    offsets = _address(w, ins, ops[0])[lanes]
+    try:
+        idx = cta.smem.index(offsets, size, "write")
+    except MemoryFault as e:
+        e.lanes = [int(lanes[k]) for k in e.which]
+        raise
+    operation = cta.new_async("copy", w, ins, int(lanes[0]))
+    operation.work = {"bytes": int(reads.sum()), "lines": None}
+    cta.smem.begin_async_write(idx.reshape(-1), operation.id)
+    w.cp_open.append(operation)
+
+    def land():
+        cta.smem.finish_async_write(idx.reshape(-1), data.reshape(-1))
+
+    cta.schedule(operation, land)
+
+
 @op("cp")
 def _cp(w, ins, mask):
     mods = ins.mods
+    if mods[:1] == ("async",) and mods[1:2] != ("bulk",):
+        return _cp_async(w, ins, mask)
     if mods[:2] != ("async", "bulk"):
-        raise unsupported(ins, "only cp.async.bulk (TMA) is implemented")
+        raise unsupported(ins)
     rest = list(mods[2:])
     lanes = [int(l) for l in np.flatnonzero(mask)]
     if not lanes:

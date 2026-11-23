@@ -45,7 +45,8 @@ class Program:
                 self.symbols[v.name] = offset
                 offset += v.size
         self.smem_static = offset
-        self.smem_dynamic_base = _align_up(offset, 16)
+        dynamic_align = max([16, *(v.align for v in variables if v.size is None)])
+        self.smem_dynamic_base = _align_up(offset, dynamic_align)
         for v in variables:
             if v.size is None:
                 self.symbols[v.name] = self.smem_dynamic_base

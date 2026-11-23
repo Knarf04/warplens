@@ -276,7 +276,11 @@ class _Parser:
         start = self.peek()
         align = None
         if self.accept(".align"):
-            align = int(self.expect_kind("num", "an alignment").value)
+            align_tok = self.expect_kind("num", "an alignment")
+            alignment = _number(align_tok)
+            align = alignment.value
+            if alignment.kind != "int" or align <= 0 or align & (align - 1):
+                raise self.syntax(align_tok, "shared-memory alignment must be a positive power of two")
         ty_tok = self.expect_kind("word", "a variable type")
         ty = ty_tok.value.lstrip(".")
         if ty not in NP_TYPES or ty == "pred":
@@ -287,7 +291,14 @@ class _Parser:
             if self.accept("]"):
                 unsized = True
             else:
-                count *= int(self.expect_kind("num", "an array size").value)
+                size_tok = self.expect_kind("num", "an array size")
+                dimension = _number(size_tok)
+                if dimension.kind != "int" or dimension.value < 0:
+                    raise self.syntax(size_tok, "shared-memory array size must be a non-negative integer")
+                if dimension.value == 0:
+                    unsized = True
+                else:
+                    count *= dimension.value
                 self.expect("]")
         if self.peek().value == "=":
             raise self.syntax(self.peek(), ".shared variables cannot have initializers")

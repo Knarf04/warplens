@@ -55,6 +55,7 @@ class Cta:
         self.async_ops: dict[int, AsyncOp] = {}
         self.async_queue: list[list] = []  # [rounds left, AsyncOp, completion callback]
         self.mbarriers: dict[int, object] = {}  # shared offset -> Mbarrier
+        self.output: list[str] = []  # text printed by the kernel
         self.smem = SharedMemory(smem_bytes)
         self.smem_report = smem_report
         self.findings = findings

@@ -110,6 +110,16 @@ class Param:
     name: str
     type: str
     is_ptr: bool = False
+    size: int = 0  # bytes; larger than the type for by-value structs (`.b8 name[24]`)
+
+
+@dataclass(slots=True)
+class GlobalVar:
+    """A `.global` or `.const` variable with its initial bytes."""
+    name: str
+    align: int
+    data: bytes
+    line: int = 0
 
 
 @dataclass(slots=True)
@@ -120,6 +130,8 @@ class Function:
     instrs: list[Instr] = field(default_factory=list)
     labels: dict[str, int] = field(default_factory=dict)  # name -> instruction index
     shared: list[SharedVar] = field(default_factory=list)
+    locals: list[SharedVar] = field(default_factory=list)  # `.local` variables, one copy per thread
+    call_params: dict[str, str] = field(default_factory=dict)  # `.param`s declared for a call
     line: int = 0
 
 
@@ -131,3 +143,5 @@ class Module:
     address_size: int = 64
     functions: dict[str, Function] = field(default_factory=dict)
     shared: list[SharedVar] = field(default_factory=list)
+    globals: list[GlobalVar] = field(default_factory=list)
+    extern_funcs: set[str] = field(default_factory=set)

@@ -18,20 +18,23 @@ that names the instruction and its PTX line.
 | paired destinations (`%r1\|%p1`) | yes |
 | nested `{ }` blocks with their own registers and labels (inline assembly) | yes |
 | register names without `%`, `_` as a discarded destination, `[tensor_map, {coords}]` operands | yes |
-| `.func` and `call`, `.global` / `.const` / `.local` variables | no |
-| array parameters | no |
+| `.global` / `.const` variables with numeric initializers, `.local` variables (one copy per thread) | yes |
+| structs passed by value (`.param .align 8 .b8 name[24]`, read with `ld.param` at an offset) | yes; pass bytes, a NumPy record or a ctypes structure |
+| `.extern .func` declarations and `call` | only `vprintf` (device `printf`); its text is returned in `stats.output` |
+| `.func` definitions, calls to other functions, `.tex` | no |
 
 ## Instructions
 
 | Group | Instructions | Notes |
 | --- | --- | --- |
-| Moves | `mov` (including the address of a `.shared` variable), `cvta[.to].{global,shared}` | |
+| Moves | `mov` (including the address of a variable), `cvta[.to].{global,shared,local}` | |
 | Integer | `add`, `sub`, `mul.{lo,hi,wide}`, `mad.{lo,hi,wide}`, `div`, `rem`, `min`, `max`, `neg`, `abs` | no `.sat`, no carry forms |
 | Float | `add`, `sub`, `mul`, `div`, `fma`, `mad`, `min`, `max`, `neg`, `abs`, `sqrt` | round-to-nearest only; `fma` and floating `mad` round once |
 | Bitwise | `and`, `or`, `xor`, `not`, `shl`, `shr` | also on `.pred` (not shifts) |
 | Compare | `setp` with `eq ne lt le gt ge lo ls hi hs`, unordered `equ neu ltu leu gtu geu`, `num`, `nan`; `selp` | no combined-predicate or paired-destination forms |
 | Convert | `cvt` int↔int, int↔float, float↔float, float→int with `.rni/.rzi/.rmi/.rpi` (saturating) | no `.sat` on int→int |
-| Memory | `ld.param`, `ld`/`st` with `.global`, `.shared` or no space (generic) | no vector `.v2/.v4`, no `.local` |
+| Memory | `ld.param`, `st.param` (call arguments), `ld`/`st` with `.global`, `.shared`, `.local` or no space (generic), scalar or `.v2`/`.v4` | |
+| Election | `elect.sync d\|p, membermask` | the lowest participating lane is elected |
 | Barriers | `bar.sync a[, count]`, `bar.arrive a, count`; also spelled `barrier` and `.cta`, including `barrier[.cta].{sync,arrive}.aligned` | no `bar.red`; sync count zero means the whole CTA |
 | Shuffle | `shfl.sync.{up,down,bfly,idx}.b32` with optional predicate destination | no rendezvous across divergent paths; see `m1.md` |
 | mbarrier | `mbarrier.init`, `.arrive` (with count), `.arrive.expect_tx`, `.expect_tx`, `.complete_tx`, `.test_wait`, `.try_wait` (both with `.parity`), `.inval` | no `arrive_drop`, `.noComplete`, `pending_count` |

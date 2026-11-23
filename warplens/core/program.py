@@ -6,6 +6,7 @@ from ..errors import UnsupportedError
 from ..frontend.cfg import reconvergence_points
 from ..frontend.ir import Function, Module
 from ..units import barrier as _barrier  # noqa: F401  (these imports register handlers)
+from ..units import call as _call  # noqa: F401
 from ..units import mbarrier as _mbarrier  # noqa: F401
 from ..units import tma as _tma  # noqa: F401
 from ..units.alu import CONTROL_FLOW, HANDLERS
@@ -16,7 +17,7 @@ def _align_up(x: int, align: int) -> int:
 
 
 class Program:
-    def __init__(self, module: Module, fn: Function):
+    def __init__(self, module: Module, fn: Function, global_symbols: dict[str, int] | None = None):
         self.module = module
         self.fn = fn
         self.instrs = fn.instrs
@@ -33,6 +34,16 @@ class Program:
         self.targets = [fn.labels[i.operands[0].name] if i.opcode == "bra" else -1
                         for i in fn.instrs]
         self.reconv = reconvergence_points(fn)
+
+        # Per-thread local memory: variables in declaration order.
+        self.local_symbols: dict[str, int] = {}
+        offset = 0
+        for v in fn.locals:
+            offset = _align_up(offset, v.align)
+            self.local_symbols[v.name] = offset
+            offset += v.size or 0
+        self.local_bytes = offset
+        self.global_symbols = global_symbols or {}
 
         # Shared-memory layout: sized variables in declaration order, then the
         # dynamically sized `.extern .shared name[]` region requested at launch.

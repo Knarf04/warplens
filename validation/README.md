@@ -11,6 +11,7 @@ toolkit for the GPU binaries and the `warplens` conda env for the PTX.
 | --- | --- | --- |
 | `shfl.sync` semantics | `bin/shfl_golden > shfl_golden.txt` records 720 cases (4 modes x 5 widths x 36 operands) from the GPU. `tests/test_hardware_golden.py` runs the same kernel's PTX in the simulator. | all 720 match |
 | Barrier with exited threads | `bin/barrier_exit_hw 0` and `1`: whole warps, then half of every warp, return before `__syncthreads()`. | both complete on the GPU with correct output; the simulator does the same (`tests/test_smem.py`) |
+| `printf`, by-value struct parameter, per-thread local array | `bin/printf_hw \| sort > printf_golden.txt`; `tests/test_hardware_golden.py` runs `printf_probe.ptx` in the simulator. | output identical, including `%f`, `%5.2f`, `%hd`, `%ld`, `%#x`, `%s`, `%c` |
 | Transpose output | `bin/transpose_hw` | correct on the GPU and in the simulator |
 | Shared-memory bank counters | `run_ncu.sh` profiles `bin/transpose_hw` with Nsight Compute and compares its counters with the simulator's bank model. Recorded in `transpose_ncu_3080ti_grid64.csv`; `tests/test_hardware_golden.py` checks the simulator against it. | conflict and instruction counters match exactly; the total wavefront counter does not (see below) |
 

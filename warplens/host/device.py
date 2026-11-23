@@ -61,6 +61,7 @@ class Device:
         self.memory = GlobalMemory()
         self._modules: dict[Path, Module] = {}
         self._programs: dict[tuple[int, str], Program] = {}
+        self._globals: dict[int, dict[str, int]] = {}  # module -> its .global variables' addresses
 
     # -- memory --------------------------------------------------------------
     def empty(self, shape, dtype="f32") -> DeviceArray:
@@ -122,7 +123,12 @@ class Device:
             raise LaunchError(f"no kernel named `{entry}` in {module.name} (found: {known})")
         key = (id(module), entry)
         if key not in self._programs:
-            self._programs[key] = Program(module, module.functions[entry])
+            if id(module) not in self._globals:  # place the module's .global data once
+                placed = self._globals[id(module)] = {}
+                for var in module.globals:
+                    placed[var.name] = self.memory.alloc(max(len(var.data), 1), align=max(var.align, 16))
+                    self.memory.buffer(placed[var.name])[:len(var.data)] = np.frombuffer(var.data, np.uint8)
+            self._programs[key] = Program(module, module.functions[entry], self._globals[id(module)])
         return run_kernel(self._programs[key], self.memory, grid=grid, block=block,
                           args=args, smem=smem, trace=trace, max_steps=max_steps,
                           async_delay=async_delay)

@@ -1,0 +1,4 @@
+out: 121 124 119 126 121 124 119 126
+thread 0 of 8: sum=21 scale=2.500000 half= 1.25 tag=-7 ptrdiff=-7000000000 hex=0xff ok A%
+thread 1 of 8: sum=24 scale=2.500000 half= 1.25 tag=-7 ptrdiff=-6000000000 hex=0x100 ok B%
+thread 2 of 8: sum=19 scale=2.500000 half= 1.25 tag=-7 ptrdiff=-5000000000 hex=0x101 ok C%

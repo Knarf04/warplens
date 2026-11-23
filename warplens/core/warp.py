@@ -25,7 +25,9 @@ class Warp:
         self.warp_id = warp_id
         self.tid = tid  # (x, y, z) arrays, one entry per lane
         self.specials = specials
-        self.params = params  # name -> (bits, size in bytes)
+        self.params = params  # name -> raw little-endian bytes
+        self.call_params: dict[str, np.ndarray] = {}  # arguments being set up for a call, per lane
+        self.local = np.zeros((WARP_SIZE, program.local_bytes), dtype=np.uint8)  # per-thread stack
         self.mem = mem
         self.trace = trace
         self.regs = {name: np.zeros(WARP_SIZE, dtype=storage_dtype(ty))
@@ -63,10 +65,33 @@ class Warp:
         raise ExecutionError(f"operand {operand!r} cannot be used as an address")
 
     def _symbol(self, sym: Sym) -> int:
-        try:
-            return self.program.symbols[sym.name]
-        except KeyError:
-            raise ExecutionError(f"`{sym.name}` is not a variable this kernel can address") from None
+        prog = self.program
+        for table in (prog.symbols, prog.local_symbols, prog.global_symbols):
+            if sym.name in table:
+                return table[sym.name]
+        raise ExecutionError(f"`{sym.name}` is not a variable this kernel can address")
+
+    def read_bytes(self, address: int, count: int, lane: int) -> bytes:
+        """`count` bytes at a generic address, as seen by one lane."""
+        from ..units.alu import route
+        space, offset = route(address)
+        if space == "local":
+            if offset + count > self.local.shape[1]:
+                raise ExecutionError(f"read past the end of local memory at offset {offset}")
+            return self.local[lane, offset:offset + count].tobytes()
+        addrs = np.uint64(offset) + np.arange(count, dtype=np.uint64)
+        if space == "shared":
+            return self.cta.smem.data[self.cta.smem.index(addrs, 1, "read")].tobytes()
+        return self.mem.read(addrs, np.dtype(np.uint8)).tobytes()
+
+    def read_cstring(self, address: int, lane: int, limit: int = 1 << 16) -> str:
+        out = bytearray()
+        while len(out) < limit:
+            chunk = self.read_bytes(address + len(out), 1, lane)
+            if chunk == b"\0":
+                break
+            out += chunk
+        return out.decode("utf-8", errors="replace")
 
     def read(self, operand, ty: str) -> np.ndarray:
         """The operand as 32 values of PTX type `ty`."""

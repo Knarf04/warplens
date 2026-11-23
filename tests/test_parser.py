@@ -55,10 +55,10 @@ def test_errors_name_the_line():
 
 
 def test_unsupported_constructs_are_hard_errors():
-    with pytest.raises(warplens.UnsupportedError, match=r"`\.local`"):
-        kernel(".local .align 4 .b8 buf[64];")
-    with pytest.raises(warplens.UnsupportedError, match=r"module-level directive `\.global`"):
-        warplens.parse_ptx(HEADER + ".global .align 4 .u32 x;")
+    with pytest.raises(warplens.UnsupportedError, match=r"`\.tex`"):
+        kernel(".tex .u64 sampler;")
+    with pytest.raises(warplens.UnsupportedError, match=r"module-level directive `\.func`"):
+        warplens.parse_ptx(HEADER + ".func helper () { ret; }")
 
 
 @pytest.mark.parametrize("literal", [

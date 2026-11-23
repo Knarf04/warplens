@@ -32,6 +32,7 @@ class LaunchStats:
     smem_bytes: int = 0  # shared memory per CTA
     smem: SmemReport = field(default_factory=SmemReport, repr=False)  # bank conflicts
     findings: list[Finding] = field(default_factory=list, repr=False)
+    output: str = field(default="", repr=False)  # what the kernel printed with printf
 
     def report(self) -> str:
         """Bank-conflict table and findings as text."""
@@ -48,8 +49,20 @@ def dim3(value, what: str) -> tuple[int, int, int]:
     return tuple(int(d) for d in dims) + (1,) * (3 - len(dims))
 
 
-def encode_args(fn: Function, args, *, mem) -> dict[str, tuple[int, int]]:
-    """Convert host arguments to raw parameter bits: name -> (bits, size in bytes)."""
+def _struct_bytes(arg) -> bytes | None:
+    """Raw bytes of a by-value struct argument, or None if `arg` is not one."""
+    import ctypes
+    if isinstance(arg, (bytes, bytearray, memoryview)):
+        return bytes(arg)
+    if isinstance(arg, (np.ndarray, np.void)):
+        return arg.tobytes()
+    if isinstance(arg, (ctypes.Structure, ctypes.Union, ctypes.Array)):
+        return bytes(arg)
+    return None
+
+
+def encode_args(fn: Function, args, *, mem) -> dict[str, bytes]:
+    """Convert host arguments to the raw little-endian bytes of each parameter."""
     from .device import DeviceArray
 
     args = list(args)
@@ -59,6 +72,16 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, tuple[int, int]]:
     for k, (param, arg) in enumerate(zip(fn.params, args)):
         dt = NP_TYPES[param.type]
         what = f"argument {k} (`{param.name}`, .{param.type})"
+        if param.size != dt.itemsize:  # a struct passed by value
+            raw = _struct_bytes(arg)
+            if raw is None:
+                raise LaunchError(f"argument {k} (`{param.name}`) is a {param.size}-byte struct passed "
+                                  f"by value; pass bytes, a NumPy record or a ctypes structure, "
+                                  f"not {type(arg).__name__}")
+            if len(raw) != param.size:
+                raise LaunchError(f"argument {k} (`{param.name}`) must be {param.size} bytes, got {len(raw)}")
+            out[param.name] = raw
+            continue
         if isinstance(arg, DeviceArray):
             if arg.device.memory is not mem:
                 raise LaunchError(f"{what} belongs to a different device")
@@ -78,7 +101,7 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, tuple[int, int]]:
             bits = int.from_bytes(struct.pack(fmt, float(arg)), "little")
         else:
             raise LaunchError(f"{what}: unsupported argument type {type(arg).__name__}")
-        out[param.name] = (bits, dt.itemsize)
+        out[param.name] = bits.to_bytes(dt.itemsize, "little")
     return out
 
 
@@ -114,6 +137,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
     stats = LaunchStats(ctas=gx * gy * gz, warps=gx * gy * gz * nwarps,
                         threads=gx * gy * gz * threads, smem_bytes=smem_bytes)
     findings = Findings()
+    output: list[str] = []
     engine = Engine(max_steps)
     with np.errstate(all="ignore"):
         for cz in range(gz):
@@ -121,6 +145,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                 for cx in range(gx):
                     ids = {"ctaid.x": const(cx), "ctaid.y": const(cy), "ctaid.z": const(cz)}
                     cta = Cta((cx, cy, cz), smem_bytes, stats.smem, findings, async_delay)
+                    cta.output = output
                     warps = cta.warps
                     for wi in range(nwarps):
                         t = tuple(c[wi] for c in tid)
@@ -136,4 +161,5 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                         stats.divergent_branches += w.divergences
                         stats.max_simt_depth = max(stats.max_simt_depth, w.stack.max_depth)
     stats.findings = findings.items
+    stats.output = "".join(output)
     return stats

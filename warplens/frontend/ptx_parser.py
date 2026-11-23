@@ -10,11 +10,13 @@ from __future__ import annotations
 
 import re
 import struct
+
+import numpy as np
 from pathlib import Path
 
 from ..errors import PtxSyntaxError, UnsupportedError
-from .ir import (Function, Imm, Instr, Mem, Module, NP_TYPES, Pair, Param, Reg, SharedVar,
-                 Special, Sym, TensorRef, Vec)
+from .ir import (Function, GlobalVar, Imm, Instr, Mem, Module, NP_TYPES, Pair, Param, Reg,
+                 SharedVar, Special, Sym, TensorRef, Vec)
 
 _TOKEN = re.compile(
     r"""
@@ -157,7 +159,7 @@ class _Parser:
         mod = Module(name=self.name)
         extern = False
         while (t := self.next()).kind != "eof":
-            if t.value not in _LINKAGE and t.value != ".shared":
+            if t.value not in _LINKAGE and t.value not in (".shared", ".func"):
                 extern = False
             if t.value == ".version":
                 mod.version = self.expect_kind("num", "a version number").value
@@ -172,6 +174,10 @@ class _Parser:
                 continue
             elif t.value == ".shared":
                 mod.shared.append(self.shared_var(extern))
+            elif t.value in (".global", ".const"):
+                mod.globals.append(self.global_var(t))
+            elif t.value == ".func" and extern:
+                mod.extern_funcs.add(self.extern_func(t))
             elif t.value == ".entry":
                 fn = self.function(t)
                 mod.functions[fn.name] = fn
@@ -220,6 +226,8 @@ class _Parser:
 
     def param(self) -> Param:
         self.expect(".param")
+        if self.accept(".align"):  # by-value structs: `.param .align 8 .b8 name[24]`
+            self.expect_kind("num", "an alignment")
         ty_tok = self.expect_kind("word", "a parameter type")
         ty = ty_tok.value.lstrip(".")
         if ty not in NP_TYPES or ty == "pred":
@@ -232,9 +240,75 @@ class _Parser:
                 self.expect_kind("num", "an alignment")
         if t.kind != "word":
             raise self.syntax(t, f"expected a parameter name, found {t.value!r}")
-        if self.peek().value == "[":
-            raise self.unsupported(self.peek(), "array parameters are not supported yet")
-        return Param(name=t.value, type=ty, is_ptr=is_ptr)
+        size = NP_TYPES[ty].itemsize
+        while self.accept("["):  # a struct passed by value: `.param .align 8 .b8 name[24]`
+            size *= int(self.expect_kind("num", "an array size").value)
+            self.expect("]")
+        return Param(name=t.value, type=ty, is_ptr=is_ptr, size=size)
+
+    def extern_func(self, start: _Tok) -> str:
+        """`.extern .func (ret) name (params);` Only the name is kept."""
+        name = None
+        depth = 0
+        while (t := self.next()).value != ";" or depth:
+            if t.kind == "eof" or t.value in ("{", "}"):
+                raise self.unsupported(start, "only external function declarations are supported")
+            if t.value == "(":
+                depth += 1
+            elif t.value == ")":
+                depth -= 1
+            elif depth == 0 and t.kind == "word" and name is None:
+                name = t.value
+        if name is None:
+            raise self.syntax(start, "function declaration without a name")
+        return name
+
+    def global_var(self, start: _Tok) -> GlobalVar:
+        """`.global [.align N] .type name[count] [= {v, ...}];`"""
+        align = None
+        if self.accept(".align"):
+            align = int(self.expect_kind("num", "an alignment").value)
+        ty_tok = self.expect_kind("word", "a variable type")
+        ty = ty_tok.value.lstrip(".")
+        if ty not in NP_TYPES or ty == "pred":
+            raise self.unsupported(ty_tok, f"unsupported variable type `{ty_tok.value}`")
+        dt = NP_TYPES[ty]
+        name = self.expect_kind("word", "a variable name")
+        count = 1
+        while self.accept("["):
+            count *= int(self.expect_kind("num", "an array size").value)
+            self.expect("]")
+        values = np.zeros(count, dtype=dt)
+        if self.accept("="):
+            braces = self.accept("{")
+            k = 0
+            while True:
+                tok = self.next()
+                if tok.kind != "num":
+                    raise self.unsupported(tok, "only numeric initializers are supported")
+                if k >= count:
+                    raise self.syntax(tok, f"too many initializers for `{name.value}`")
+                imm = _number(tok)
+                if imm.kind == "int":
+                    if dt.kind == "f":
+                        values[k] = imm.value
+                    else:
+                        values.view(f"u{dt.itemsize}")[k] = imm.value % (1 << (8 * dt.itemsize))
+                else:
+                    width = 4 if imm.kind == "f32" else 8
+                    as_float = np.array([imm.value], dtype=f"u{width}").view(f"f{width}")[0]
+                    if dt.kind == "f":
+                        values[k] = as_float
+                    elif dt.itemsize == width:
+                        values.view(f"u{width}")[k] = imm.value
+                    else:
+                        raise self.syntax(tok, "floating-point initializer for an integer of another size")
+                k += 1
+                if not braces or self.accept("}"):
+                    break
+                self.expect(",")
+        self.expect(";")
+        return GlobalVar(name.value, align or dt.itemsize, values.tobytes(), start.line)
 
     # -- function body -----------------------------------------------------
     def body(self, fn: Function) -> None:
@@ -260,6 +334,18 @@ class _Parser:
                 self.reg_decl(fn)
             elif t.value == ".shared":
                 fn.shared.append(self.shared_var(extern=False))
+            elif t.value == ".local":
+                fn.locals.append(self.shared_var(extern=False))
+            elif t.value == ".param":  # storage for the arguments of a call
+                ty_tok = self.expect_kind("word", "a parameter type")
+                ty = ty_tok.value.lstrip(".")
+                if ty not in NP_TYPES or ty == "pred":
+                    raise self.unsupported(ty_tok, f"unsupported parameter type `{ty_tok.value}`")
+                name = self.expect_kind("word", "a parameter name")
+                if self.peek().value == "[" or self.peek().value.startswith("."):
+                    raise self.unsupported(name, "only scalar call parameters are supported")
+                self.expect(";")
+                fn.call_params[self.scoped(name.value, self.scopes[-1])] = ty
             elif t.value in _IGNORED_BODY_DIRECTIVES:
                 self.skip_directive(t)
             elif t.kind == "word" and t.value.startswith("."):
@@ -376,13 +462,15 @@ class _Parser:
                 offset = _number(self.next()).value
             self.expect("]")
             return Mem(base, offset)
-        if t.value == "{":
+        if t.value in ("{", "("):  # {a, b} vector; (a, b) argument or return list of a call
+            close = "}" if t.value == "{" else ")"
             elems = []
-            while True:
-                elems.append(self.operand(fn))
-                if self.accept("}"):
-                    break
-                self.expect(",")
+            if not self.accept(close):
+                while True:
+                    elems.append(self.operand(fn))
+                    if self.accept(close):
+                        break
+                    self.expect(",")
             return Vec(tuple(elems))
         if t.kind != "word":
             raise self.syntax(t, f"expected an operand, found {t.value!r}")
@@ -396,7 +484,7 @@ class _Parser:
                     raise self.unsupported(t, f"`{t.value}` without a .x/.y/.z component is not supported yet")
                 return Special(t.value[1:])
             raise self.syntax(t, f"undeclared register `{t.value}`")
-        return Sym(t.value)
+        return Sym(self.find(t.value, fn.call_params) or t.value)
 
 
 def parse_ptx(text: str, name: str = "<ptx>") -> Module:

@@ -84,14 +84,14 @@ def _mov(w, ins, mask):
 def _cvta(w, ins, mask):
     # Address-space conversion. Global addresses are already generic addresses;
     # shared addresses are offsets that sit in a fixed window of the generic space.
-    ty, extra = _type(ins, allowed={"to", "global", "shared"}, kinds="u")
+    ty, extra = _type(ins, allowed={"to", "global", "shared", "local"}, kinds="u")
     spaces = [e for e in extra if e != "to"]
-    if len(spaces) != 1 or (ty != "u64" and spaces[0] == "shared"):
+    if len(spaces) != 1 or (ty != "u64" and spaces[0] != "global"):
         raise unsupported(ins)
     d, a = _operands(ins, 2)
     value = w.read(a, ty)
-    if spaces[0] == "shared":
-        window = np.uint64(GENERIC_WINDOW)
+    if spaces[0] != "global":
+        window = np.uint64(GENERIC_WINDOW if spaces[0] == "shared" else LOCAL_WINDOW)
         value = value - window if "to" in extra else value + window
     w.write(d, value, mask)
 
@@ -341,34 +341,75 @@ def _address(w, ins, mem) -> np.ndarray:
     return base + np.uint64(mem.offset % (1 << 64)) if mem.offset else base
 
 
+LOCAL_WINDOW = 0x1_4000_0000  # where per-thread local memory appears in the generic space
+_LOCAL_WINDOW_BYTES = 1 << 24
+
+
+def route(address: int) -> tuple[str, int]:
+    """Which memory a generic address refers to, and the address within it."""
+    if GENERIC_WINDOW <= address < GENERIC_WINDOW + MAX_SMEM_BYTES:
+        return "shared", address - GENERIC_WINDOW
+    if LOCAL_WINDOW <= address < LOCAL_WINDOW + _LOCAL_WINDOW_BYTES:
+        return "local", address - LOCAL_WINDOW
+    return "global", address
+
+
 def _space(ins: Instr):
-    ty, extra = _type(ins, allowed={"global", "shared", "param"})
+    """(type, address space, vector length) of a load or store."""
+    ty, extra = _type(ins, allowed={"global", "shared", "param", "local", "v2", "v4"})
+    width = 1
+    for v, n in (("v2", 2), ("v4", 4)):
+        if v in extra:
+            extra.remove(v)
+            width = n
     if len(extra) > 1:
         raise unsupported(ins)
-    return ty, (extra[0] if extra else "generic")
+    return ty, (extra[0] if extra else "generic"), width
 
 
 def _split_generic(space: str, addrs: np.ndarray, mask: np.ndarray):
-    """(lanes that address global memory, lanes that address shared memory, shared offsets)."""
+    """(lanes addressing global memory, lanes addressing shared memory, shared offsets,
+    lanes addressing local memory, local offsets)."""
     if space == "global":
-        return mask, None, None
+        return mask, None, None, None, None
     if space == "shared":
-        return None, mask, addrs
+        return None, mask, addrs, None, None
+    if space == "local":
+        return None, None, None, mask, addrs
     window = np.uint64(GENERIC_WINDOW)
     in_smem = (addrs >= window) & (addrs < window + np.uint64(MAX_SMEM_BYTES))
-    to_smem = mask & in_smem
-    return mask & ~in_smem, (to_smem if to_smem.any() else None), addrs - window
+    local = np.uint64(LOCAL_WINDOW)
+    in_local = (addrs >= local) & (addrs < local + np.uint64(_LOCAL_WINDOW_BYTES))
+    to_smem, to_local = mask & in_smem, mask & in_local
+    return (mask & ~in_smem & ~in_local, (to_smem if to_smem.any() else None), addrs - window,
+            (to_local if to_local.any() else None), addrs - local)
+
+
+def _local_index(w, ins, lanes: np.ndarray, offsets: np.ndarray, size: int, verb: str):
+    total = w.local.shape[1]
+    off = offsets[lanes]
+    bad = off > np.uint64(max(total - size, 0)) if total >= size else np.ones(len(off), bool)
+    if bad.any():
+        e = MemoryFault(f"{verb} of {size} byte(s) at local offset {int(off[bad][0])} is outside "
+                        f"the thread's {total} bytes of local memory", np.flatnonzero(bad), off[bad])
+        e.lanes = [int(x) for x in lanes[bad]]
+        raise e
+    return lanes[:, None], off.astype(np.intp)[:, None] + np.arange(size, dtype=np.intp)
 
 
 def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
     value = np.zeros(len(mask), dtype=dt)
-    g, s, offsets = _split_generic(space, addrs, mask)
+    g, s, offsets, loc, local_offsets = _split_generic(space, addrs, mask)
     try:
         if g is not None and g.any():
             value[g] = w.mem.read(addrs[g], dt)
     except MemoryFault as e:
         _fault_lanes(e, g)
         raise
+    if loc is not None and loc.any():
+        lanes = np.flatnonzero(loc)
+        value[loc] = w.local[_local_index(w, ins, lanes, local_offsets, dt.itemsize, "read")] \
+            .view(dt).ravel()
     if s is not None and s.any():
         cta = w.cta
         try:
@@ -422,13 +463,18 @@ def _async_check(w, ins, s, offsets, size: int, what: str, writing: bool) -> Non
 
 
 def _store(w, ins, space, addrs, value, mask) -> None:
-    g, s, offsets = _split_generic(space, addrs, mask)
+    g, s, offsets, loc, local_offsets = _split_generic(space, addrs, mask)
     try:
         if g is not None and g.any():
             w.mem.write(addrs[g], value[g])
     except MemoryFault as e:
         _fault_lanes(e, g)
         raise
+    if loc is not None and loc.any():
+        lanes = np.flatnonzero(loc)
+        size = value.dtype.itemsize
+        w.local[_local_index(w, ins, lanes, local_offsets, size, "write")] = \
+            np.ascontiguousarray(value[loc]).view(np.uint8).reshape(len(lanes), size)
     if s is not None and s.any():
         try:
             if w.cta.smem.async_active:
@@ -451,43 +497,86 @@ def _fault_lanes(e: MemoryFault, mask: np.ndarray) -> None:
     e.lanes = [int(x) for x in np.flatnonzero(mask)[e.which]]
 
 
+def _elements(ins, operand, width: int):
+    if width == 1:
+        if isinstance(operand, Vec):
+            raise unsupported(ins, "a {vector} operand needs .v2 or .v4")
+        return [operand]
+    if not isinstance(operand, Vec) or len(operand.elems) != width:
+        raise unsupported(ins, f"expected a vector of {width} operands")
+    return list(operand.elems)
+
+
 @op("ld")
 def _ld(w, ins, mask):
-    ty, space = _space(ins)
+    ty, space, width = _space(ins)
     d, src = _operands(ins, 2)
-    if isinstance(d, Vec):
-        raise unsupported(ins, "vector loads")
+    dests = _elements(ins, d, width)
     dt = NP_TYPES[ty]
     if space == "param":
-        if not (isinstance(src, Mem) and isinstance(src.base, Sym) and src.offset == 0):
-            raise unsupported(ins, "expected ld.param from [parameter_name]")
-        if src.base.name not in w.params:
-            raise ExecutionError(f"`{src.base.name}` is not a parameter of this kernel")
-        bits, size = w.params[src.base.name]
-        if size < dt.itemsize:
-            raise ExecutionError(f"ld.param.{ty} reads past the {size}-byte parameter `{src.base.name}`")
-        value = np.full(len(mask), bits & ((1 << (8 * dt.itemsize)) - 1),
-                        dtype=UINT_BY_SIZE[dt.itemsize]).view(dt)
-        w.write(d, value, mask)
+        if not (isinstance(src, Mem) and isinstance(src.base, Sym)):
+            raise unsupported(ins, "expected ld.param from [parameter_name+offset]")
+        name = src.base.name
+        if name in w.params:
+            raw = w.params[name]
+            if src.offset < 0 or src.offset + width * dt.itemsize > len(raw):
+                raise ExecutionError(f"ld.param.{ty} at offset {src.offset} reads past the "
+                                     f"{len(raw)}-byte parameter `{name}`")
+            values = np.frombuffer(raw, dtype=dt, count=width, offset=src.offset)
+            for dest, v in zip(dests, values):
+                w.write(dest, np.full(len(mask), v, dtype=dt), mask)
+        elif name in w.call_params and width == 1 and src.offset == 0:  # e.g. a call's return value
+            w.write(dests[0], w.call_params[name].astype(UINT_BY_SIZE[dt.itemsize]).view(dt), mask)
+        else:
+            raise ExecutionError(f"`{name}` is not a parameter this instruction can read")
         return
-    w.write(d, _load(w, ins, space, _address(w, ins, src), dt, mask), mask)
+    addrs = _address(w, ins, src)
+    for k, dest in enumerate(dests):
+        w.write(dest, _load(w, ins, space, addrs + np.uint64(k * dt.itemsize), dt, mask), mask)
 
 
 @op("st")
 def _st(w, ins, mask):
-    ty, space = _space(ins)
-    if space == "param":
-        raise unsupported(ins, "parameters are read-only")
+    ty, space, width = _space(ins)
     dst, a = _operands(ins, 2)
-    if isinstance(a, Vec):
-        raise unsupported(ins, "vector stores")
-    _store(w, ins, space, _address(w, ins, dst), w.read(a, ty), mask)
+    values = _elements(ins, a, width)
+    dt = NP_TYPES[ty]
+    if space == "param":  # an argument for an upcoming call
+        if not (isinstance(dst, Mem) and isinstance(dst.base, Sym) and dst.offset == 0
+                and dst.base.name in w.program.fn.call_params and width == 1):
+            raise unsupported(ins, "st.param is only supported for scalar call arguments")
+        slot = w.call_params.setdefault(dst.base.name, np.zeros(len(mask), dtype=np.uint64))
+        bits = w.read(values[0], ty).view(UINT_BY_SIZE[dt.itemsize]).astype(np.uint64)
+        np.copyto(slot, bits, where=mask)
+        return
+    addrs = _address(w, ins, dst)
+    for k, value in enumerate(values):
+        _store(w, ins, space, addrs + np.uint64(k * dt.itemsize), w.read(value, ty), mask)
 
 
-# -- warp shuffle ------------------------------------------------------------------
+@op("elect")
+def _elect(w, ins, mask):
+    """elect.sync d|p, membermask: choose one leader among the lanes of the mask.
+    Every lane gets the leader's lane id; the predicate is true only for the leader."""
+    if ins.mods != ("sync",):
+        raise unsupported(ins)
+    d, member = _operands(ins, 2)
+    members = ((w.read(member, "u32")[:, None] >> _LANES.astype(np.uint32)) & 1).astype(bool)
+    leader = np.zeros(len(mask), dtype=np.uint32)
+    for lane in np.flatnonzero(mask):
+        candidates = np.flatnonzero(members[lane] & mask)
+        leader[lane] = candidates[0] if len(candidates) else lane
+    if isinstance(d, Pair):
+        w.write(d.first, leader, mask)
+        w.write(d.second, leader == _LANES, mask)
+    else:
+        w.write(d, leader, mask)
+
 
 _LANES = np.arange(32, dtype=np.int64)
 
+
+# -- warp shuffle ------------------------------------------------------------------
 
 @op("shfl")
 def _shfl(w, ins, mask):

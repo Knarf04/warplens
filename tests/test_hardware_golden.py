@@ -56,3 +56,20 @@ def test_bank_conflict_counters_match_ncu(sim):
         assert counters[prefix + "_op_st"] == by_op["st"][1]
         # Known gap: hardware reports a constant 4160 more wavefronts than the model.
         assert counters["l1tex__data_pipe_lsu_wavefronts_mem_shared"] - stats.smem.wavefronts == 4160
+
+
+def test_printf_struct_param_and_local_array_match_real_gpu(sim):
+    """printf_golden.txt is the sorted output of bin/printf_hw on the GPU."""
+    import ctypes
+
+    class Config(ctypes.Structure):
+        _fields_ = [("offset", ctypes.c_int), ("scale", ctypes.c_float),
+                    ("table", ctypes.c_uint64), ("tag", ctypes.c_short)]
+
+    table = sim.from_numpy(np.array([3, 1, 4, 1], dtype=np.int32))
+    out = sim.empty(8, "s32")
+    stats = sim.launch(AMPERE / "printf_probe.ptx", "printf_probe", grid=1, block=8,
+                       args=[Config(100, 2.5, table.addr, -7), out])
+    got = ["out: " + " ".join(map(str, out.numpy()))] + stats.output.splitlines()
+    assert sorted(got) == (AMPERE / "printf_golden.txt").read_text().splitlines()
+    assert not stats.findings

@@ -1,0 +1,17 @@
+# warplens development environment.
+# Create or update with: env/setup.sh
+#
+# The CUDA packages here are only the *compiler* side (nvcc, headers). They are
+# used to turn CUDA C++ into PTX for sm_100a / sm_103a. No GPU or driver is
+# needed, and the system CUDA install in /usr/local/cuda is left untouched.
+name: warplens
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - numpy
+  - pytest
+  # CUDA toolchain (compile-only). cuda-version pins every cuda-* package.
+  - cuda-version=13.5
+  - cuda-nvcc
+  - cuda-cudart-dev

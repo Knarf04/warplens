@@ -15,7 +15,8 @@ def test_accumulator_rows():
 
 def test_text_view_of_the_64_row_layout():
     text = tmem.accumulator_text(64, 32)
-    assert "  0-15     0     result rows 0-15" in text
+    assert "Layout F" in text and "  0-15     0     result rows 0-15" in text
+    assert " 16-31     0     result rows 0-15" in tmem.accumulator_text(64, 32, lane_offset=16)
     assert " 16-31     0     not written" in text
     assert " 96-111    3     result rows 48-63" in text
     assert tmem.accumulator_text(128, 8).count("result rows") == 4

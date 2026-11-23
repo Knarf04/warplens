@@ -159,6 +159,41 @@ def make_tiled(*, address: int, shape, dtype: np.dtype, box, swizzle=None, eleme
                          dims, tuple(strides), box, (1, *steps[1:]))
 
 
+# CUtensorMapDataType -> (element size, is floating point)
+DRIVER_TYPES = {0: (1, False), 1: (2, False), 2: (4, False), 3: (4, False), 4: (8, False),
+                5: (8, False), 6: (2, True), 7: (4, True), 8: (8, True), 9: (2, True),
+                10: (4, True), 11: (4, True), 12: (4, True)}
+
+
+def from_driver(*, data_type: int, rank: int, address: int, dims, strides, box, steps,
+                swizzle: int, nan_fill: bool, interleave: int = 0) -> TensorMapInfo:
+    """Build a tensor map from the arguments of cuTensorMapEncodeTiled, which are already
+    in TMA order (dimension 0 innermost) with explicit byte strides."""
+    if data_type not in DRIVER_TYPES:
+        raise LaunchError(f"unknown tensor-map data type {data_type}")
+    if interleave:
+        raise LaunchError("interleaved tensor maps are not supported")
+    if not 1 <= rank <= MAX_RANK or swizzle not in SWIZZLE_MODES:
+        raise LaunchError(f"invalid tensor map: rank {rank}, swizzle {swizzle}")
+    elem, is_float = DRIVER_TYPES[data_type]
+    dims, box, steps = tuple(dims[:rank]), tuple(box[:rank]), tuple(steps[:rank])
+    strides = tuple(strides[:rank - 1])
+    if address % 16 or any(s % 16 or s >= 2**40 for s in strides):
+        raise LaunchError("tensor-map address and strides must be multiples of 16")
+    if any(not 1 <= d <= 2**32 for d in dims) or any(not 1 <= b <= 256 for b in box) \
+            or any(not 1 <= s <= 8 for s in steps):
+        raise LaunchError(f"tensor-map dimensions out of range: dims {dims}, box {box}, strides {steps}")
+    inner = box[0] * elem
+    span = SWIZZLE_MODES[swizzle][1]
+    if inner % 16 or (span is not None and inner > span):
+        raise LaunchError(f"the innermost box dimension is {inner} bytes; it must be a multiple of "
+                          "16 and fit the swizzle span")
+    if nan_fill and not is_float:
+        raise LaunchError("NaN out-of-bounds fill needs a floating-point tensor")
+    return TensorMapInfo(rank, elem, is_float, swizzle, bool(nan_fill), address, dims, strides, box,
+                         (1, *steps[1:]))
+
+
 def element_addresses(info: TensorMapInfo, coords) -> tuple[np.ndarray, np.ndarray]:
     """Global address of every element of the box at `coords`, flattened with
     dimension 0 fastest, and which of them lie inside the tensor."""

@@ -2,7 +2,13 @@
 # Fetch CUTLASS at a pinned commit and compile its first four Blackwell tutorials to PTX.
 # CUTLASS sources and the PTX generated from them are not checked in.
 #
-#   conda run -n warplens examples/03_cutlass_mma/build.sh
+#   conda run -n warplens examples/03_cutlass_mma/build.sh           # PTX only
+#   conda run -n warplens examples/03_cutlass_mma/build.sh --programs # also the host programs
+#
+# With --programs each tutorial is also built as an ordinary executable in bin/, for
+#   warplens run examples/03_cutlass_mma/bin/tutorial_01
+# The flags that matter: embed PTX instead of machine code, uncompressed, and link the
+# shared CUDA runtime so that `warplens run` can stand in for it.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 COMMIT=f8acf1a
@@ -17,4 +23,12 @@ for pair in 01_mma_sm100:tutorial_01 02_mma_tma_sm100:tutorial_02 \
     -I.cutlass/include -I.cutlass/tools/util/include -I.cutlass/examples/common -I"$T" \
     -ptx "$T/${pair%%:*}.cu" -o "${pair##*:}.ptx"
   echo "built ${pair##*:}.ptx from CUTLASS $COMMIT"
+  if [[ "${1:-}" == "--programs" ]]; then
+    mkdir -p bin
+    nvcc -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared \
+      -std=c++17 -O3 -DNDEBUG -w \
+      -I.cutlass/include -I.cutlass/tools/util/include -I.cutlass/examples/common -I"$T" \
+      "$T/${pair%%:*}.cu" -o "bin/${pair##*:}"
+    echo "built bin/${pair##*:}"
+  fi
 done

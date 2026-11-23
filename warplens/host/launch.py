@@ -85,6 +85,11 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, bytes]:
                 raise LaunchError(f"argument {k} (`{param.name}`) must be {param.size} bytes, got {len(raw)}")
             out[param.name] = raw
             continue
+        if isinstance(arg, (bytes, bytearray)):  # raw bytes, as a compiled host program passes them
+            if len(arg) != dt.itemsize:
+                raise LaunchError(f"{what} must be {dt.itemsize} bytes, got {len(arg)}")
+            out[param.name] = bytes(arg)
+            continue
         if isinstance(arg, DeviceArray):
             if arg.device.memory is not mem:
                 raise LaunchError(f"{what} belongs to a different device")

@@ -63,14 +63,17 @@ class InstrBanks:
 
 @dataclass(slots=True)
 class SmemReport:
-    instructions: dict[int, InstrBanks] = field(default_factory=dict)  # by PTX line
+    instructions: dict[tuple[str, int], InstrBanks] = field(default_factory=dict)  # by kernel and PC
 
-    def record(self, ins, kernel: str, offsets: np.ndarray, size: int) -> None:
+    def record(self, ins, kernel: str, offsets: np.ndarray, size: int, *, pc: int) -> None:
         if not len(offsets):
             return
-        entry = self.instructions.get(ins.line)
+        # PTX permits several instructions on one source line. Their costs
+        # must remain separate, including distinct load/store counters.
+        key = (kernel, pc)
+        entry = self.instructions.get(key)
         if entry is None:
-            entry = self.instructions[ins.line] = InstrBanks(ins.line, ins.text, kernel, ins.opcode)
+            entry = self.instructions[key] = InstrBanks(ins.line, ins.text, kernel, ins.opcode)
         waves, ideal, per_bank = analyze(offsets, size)
         entry.executions += 1
         entry.wavefronts += waves

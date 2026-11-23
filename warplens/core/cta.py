@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from ..errors import ExecutionError
 from ..units.smem import SharedMemory
 
 NUM_BARRIERS = 16
@@ -39,6 +40,14 @@ class Cta:
 
     def arrive(self, barrier_id: int, warp, ins, count: int | None, wait: bool) -> None:
         bar = self.barriers.setdefault(barrier_id, Barrier())
+        if any(w is warp for w in bar.arrived):
+            raise ExecutionError(
+                f"warp {warp.warp_id} arrived at barrier {barrier_id} more than once "
+                "before the barrier completed")
+        if count is not None and bar.count is not None and count != bar.count:
+            raise ExecutionError(
+                f"barrier {barrier_id} thread count {count} differs from the current "
+                f"phase's thread count {bar.count}")
         bar.arrived.append(warp)
         if count is not None:
             bar.count = count

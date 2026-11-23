@@ -376,7 +376,8 @@ def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
         except MemoryFault as e:
             _fault_lanes(e, s)
             raise
-        cta.smem_report.record(ins, w.program.fn.name, offsets[s], dt.itemsize)
+        cta.smem_report.record(ins, w.program.fn.name, offsets[s], dt.itemsize,
+                               pc=w.stack.top.pc)
         if len(unwritten):
             cta.findings.add("smem-uninitialized-read",
                              "read of shared memory that this CTA never wrote",
@@ -406,7 +407,8 @@ def _store(w, ins, space, addrs, value, mask) -> None:
             w.cta.findings.add("smem-race",
                                "write to shared memory that another warp read or wrote with no "
                                "barrier in between", w, ins, np.flatnonzero(s)[racy])
-        w.cta.smem_report.record(ins, w.program.fn.name, offsets[s], value.dtype.itemsize)
+        w.cta.smem_report.record(ins, w.program.fn.name, offsets[s], value.dtype.itemsize,
+                                 pc=w.stack.top.pc)
 
 
 def _fault_lanes(e: MemoryFault, mask: np.ndarray) -> None:
@@ -487,19 +489,28 @@ def _shfl(w, ins, mask):
         raise unsupported(ins, f"shuffle mode .{mode}")
     j = np.where(valid, j, _LANES)
 
-    members = ((w.read(member, "u32")[:, None] >> _LANES.astype(np.uint32)) & 1).astype(bool)
-    lanes = np.flatnonzero(mask)
-    # Every executing lane must name exactly the set of lanes executing with it.
-    if len(lanes) and not (members[lanes] == mask).all():
+    member_values = w.read(member, "u32")
+    members = ((member_values[:, None] >> _LANES.astype(np.uint32)) & 1).astype(bool)
+    # Each caller must name itself, and its non-exited members must participate
+    # with the same membermask. Exited/unlaunched lanes may remain in the mask;
+    # distinct groups can execute the same instruction together on sm_70+.
+    named = members[_LANES, _LANES]
+    same_group = mask[None, :] & (member_values[:, None] == member_values[None, :])
+    missing = (members & w.live_lanes()[None, :] & ~same_group).any(axis=1)
+    mismatch = mask & (~named | missing)
+    if mismatch.any():
         w.cta.findings.add(
             "shfl-membermask-mismatch",
-            "shfl.sync member mask does not match the lanes executing it "
-            f"({len(lanes)} lane(s) active)", w, ins, lanes)
-    stale = mask & ~mask[j]
+            "shfl.sync caller is absent from its member mask, or a non-exited member "
+            "is not executing with the same member mask", w, ins, np.flatnonzero(mismatch))
+    # Callers outside their own mask were already reported above. For valid
+    # callers the source must both execute the instruction and be a named member.
+    stale = mask & named & (~mask[j] | ~members[_LANES, j])
     if stale.any():
         w.cta.findings.add(
             "shfl-inactive-source",
-            "shfl.sync reads a lane that is not executing this instruction; its value is undefined",
+            "shfl.sync reads a lane that is not executing this instruction or is outside "
+            "the caller's member mask; its value is undefined",
             w, ins, np.flatnonzero(stale))
 
     if isinstance(d, Pair):

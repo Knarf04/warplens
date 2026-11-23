@@ -46,7 +46,9 @@ class Findings:
     _index: dict = field(default_factory=dict)
 
     def add(self, kind: str, message: str, warp, ins, lanes) -> None:
-        key = (kind, ins.line)
+        # Source lines need not uniquely identify instructions: PTX accepts
+        # multiple statements, even identical ones, on the same line.
+        key = (kind, warp.program.fn.name, warp.stack.top.pc)
         if key in self._index:
             self._index[key].count += 1
             return

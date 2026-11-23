@@ -105,13 +105,13 @@ def _mov(w, ins, mask):
 def _cvta(w, ins, mask):
     # Address-space conversion. Global addresses are already generic addresses;
     # shared addresses are offsets that sit in a fixed window of the generic space.
-    ty, extra = _type(ins, allowed={"to", "global", "shared", "local", "param"}, kinds="u")
+    ty, extra = _type(ins, allowed={"to", "global", "const", "shared", "local", "param"}, kinds="u")
     spaces = [e for e in extra if e != "to"]
-    if len(spaces) != 1 or (ty != "u64" and spaces[0] != "global"):
+    if len(spaces) != 1 or (ty != "u64" and spaces[0] not in ("global", "const")):
         raise unsupported(ins)
     d, a = _operands(ins, 2)
     value = w.read(a, ty)
-    if spaces[0] != "global":
+    if spaces[0] not in ("global", "const"):
         window = np.uint64({"shared": GENERIC_WINDOW, "local": LOCAL_WINDOW,
                             "param": PARAM_WINDOW}[spaces[0]])
         value = value - window if "to" in extra else value + window
@@ -383,7 +383,10 @@ def route(address: int) -> tuple[str, int]:
 
 def _space(ins: Instr):
     """(type, address space, vector length) of a load or store."""
-    ty, extra = _type(ins, allowed={"global", "shared", "param", "local", "v2", "v4"})
+    spaces = {"global", "shared", "param", "local"}
+    if ins.opcode == "ld":
+        spaces.add("const")
+    ty, extra = _type(ins, allowed=spaces | {"v2", "v4"})
     width = 1
     for v, n in (("v2", 2), ("v4", 4)):
         if v in extra:
@@ -397,7 +400,7 @@ def _space(ins: Instr):
 def _split_generic(space: str, addrs: np.ndarray, mask: np.ndarray):
     """(lanes addressing global memory, lanes addressing shared memory, shared offsets,
     lanes addressing local memory, local offsets)."""
-    if space == "global":
+    if space in ("global", "const"):
         return mask, None, None, None, None
     if space == "shared":
         return None, mask, addrs, None, None
@@ -426,6 +429,30 @@ def _local_index(w, ins, lanes: np.ndarray, offsets: np.ndarray, size: int, verb
 
 def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
     value = np.zeros(len(mask), dtype=dt)
+    # Kernel parameters are read-only and their generic window is contained
+    # in global space (PTX 5.1.6); ld.global can therefore also read them.
+    if space in ("generic", "global", "param"):
+        if space == "param":
+            param, offsets = mask, addrs
+        else:
+            window = np.uint64(PARAM_WINDOW)
+            param = mask & (addrs >= window) & (addrs < window + np.uint64(_LOCAL_WINDOW_BYTES))
+            offsets = addrs - window
+        if param.any():
+            lanes = np.flatnonzero(param)
+            raw = np.frombuffer(w.program.param_blob(w.params), dtype=np.uint8)
+            off = offsets[param]
+            bad = off > np.uint64(max(len(raw) - dt.itemsize, 0)) if len(raw) >= dt.itemsize \
+                else np.ones(len(off), bool)
+            if bad.any():
+                e = MemoryFault(f"read of {dt.itemsize} byte(s) at parameter offset "
+                                f"{int(off[bad][0])} is outside the kernel's {len(raw)} parameter bytes",
+                                np.flatnonzero(bad), off[bad])
+                e.lanes = [int(x) for x in lanes[bad]]
+                raise e
+            idx = off.astype(np.intp)[:, None] + np.arange(dt.itemsize)
+            value[param] = raw[idx].view(dt).ravel()
+            mask = mask & ~param
     g, s, offsets, loc, local_offsets = _split_generic(space, addrs, mask)
     try:
         if g is not None and g.any():
@@ -446,8 +473,6 @@ def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
             raise
         if cta.smem.async_active:
             _async_check(w, ins, s, offsets, dt.itemsize, "read of", writing=False)
-        cta.smem_report.record(ins, w.program.fn.name, offsets[s], dt.itemsize,
-                               pc=w.stack.top.pc)
         if len(unwritten):
             cta.findings.add("smem-uninitialized-read",
                              "read of shared memory that this CTA never wrote",
@@ -497,6 +522,11 @@ def _async_check(w, ins, s, offsets, size: int, what: str, writing: bool) -> Non
 
 
 def _store(w, ins, space, addrs, value, mask) -> None:
+    if space in ("generic", "global"):
+        window = np.uint64(PARAM_WINDOW)
+        param = mask & (addrs >= window) & (addrs < window + np.uint64(_LOCAL_WINDOW_BYTES))
+        if param.any():
+            raise ExecutionError("kernel parameter memory is read-only")
     g, s, offsets, loc, local_offsets = _split_generic(space, addrs, mask)
     try:
         if g is not None and g.any():
@@ -523,7 +553,13 @@ def _store(w, ins, space, addrs, value, mask) -> None:
             w.cta.findings.add("smem-race",
                                "write to shared memory that another warp read or wrote with no "
                                "barrier in between", w, ins, np.flatnonzero(s)[racy])
-        w.cta.smem_report.record(ins, w.program.fn.name, offsets[s], value.dtype.itemsize,
+
+
+def _record_memory_banks(w, ins, space, addrs, mask, size: int) -> None:
+    """Account for one complete scalar or vector instruction, not each element."""
+    _, shared, offsets, _, _ = _split_generic(space, addrs, mask)
+    if shared is not None and shared.any():
+        w.cta.smem_report.record(ins, w.program.fn.name, offsets[shared], size,
                                  pc=w.stack.top.pc)
 
 
@@ -547,9 +583,7 @@ def _ld(w, ins, mask):
     d, src = _operands(ins, 2)
     dests = _elements(ins, d, width)
     dt = NP_TYPES[ty]
-    if space == "param":
-        if not (isinstance(src, Mem) and isinstance(src.base, Sym)):
-            raise unsupported(ins, "expected ld.param from [parameter_name+offset]")
+    if space == "param" and isinstance(src, Mem) and isinstance(src.base, Sym):
         name = src.base.name
         if name in w.params:
             raw = w.params[name]
@@ -567,6 +601,7 @@ def _ld(w, ins, mask):
     addrs = _address(w, ins, src)
     for k, dest in enumerate(dests):
         w.write(dest, _load(w, ins, space, addrs + np.uint64(k * dt.itemsize), dt, mask), mask)
+    _record_memory_banks(w, ins, space, addrs, mask, width * dt.itemsize)
 
 
 @op("st")
@@ -586,6 +621,7 @@ def _st(w, ins, mask):
     addrs = _address(w, ins, dst)
     for k, value in enumerate(values):
         _store(w, ins, space, addrs + np.uint64(k * dt.itemsize), w.read(value, ty), mask)
+    _record_memory_banks(w, ins, space, addrs, mask, width * dt.itemsize)
 
 
 @op("elect")

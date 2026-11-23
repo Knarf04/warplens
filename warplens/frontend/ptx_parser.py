@@ -54,15 +54,24 @@ class _Tok:
 
 
 _DEBUG_LINE = re.compile(r"^[ \t]*\.(?:loc|file)\b[^\n]*$", re.M)
-_DEBUG_SECTION = re.compile(r"^[ \t]*\.section\b[^{\n]*\n?[ \t]*\{.*?\}", re.M | re.S)
+_DEBUG_SECTION = re.compile(r"^[ \t]*\.section[ \t]+[A-Za-z_$%.][A-Za-z0-9_$.]*\s*\{[^}]*\}", re.M)
+_DEBUG_QUOTES_COMMENTS = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"', re.S)
 
 
 def _strip_debug_info(text: str) -> str:
     """Blank out DWARF debug directives (`.loc`, `.file`, `.section .debug_* { ... }`),
     which compilers such as Triton emit, keeping every line where it was."""
-    def blank(match):
-        return "\n" * match.group().count("\n")
-    return _DEBUG_SECTION.sub(blank, _DEBUG_LINE.sub("", text))
+    def blank(text):
+        return "".join("\n" if c == "\n" else " " for c in text)
+    # Locate directives/braces without interpreting text inside comments or
+    # quoted filenames. Keep offsets so erasing directives preserves source lines.
+    visible = _DEBUG_QUOTES_COMMENTS.sub(lambda m: blank(m.group()), text)
+    spans = [m.span() for pattern in (_DEBUG_LINE, _DEBUG_SECTION)
+             for m in pattern.finditer(visible)]
+    chars = list(text)
+    for start, end in spans:
+        chars[start:end] = blank(text[start:end])
+    return "".join(chars)
 
 
 def _tokenize(text: str, name: str) -> list[_Tok]:

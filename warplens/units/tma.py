@@ -20,7 +20,7 @@ from ..core.cta import Wait
 from ..errors import ExecutionError, MemoryFault
 from ..frontend.ir import Imm, TensorRef
 from ..host import tensor_map as tm
-from .alu import _address, op, unsupported
+from .alu import _address, _async_check, op, unsupported
 from .smem import local_shared_offset, resolve_shared
 
 _LOAD_FLAGS = frozenset({"mbarrier::complete_tx::bytes", "L2::cache_hint", "multicast::cluster"})
@@ -195,8 +195,8 @@ def _cp_async(w, ins, mask) -> None:
 
     Each executing thread copies `size` bytes (4, 8 or 16) from global to shared memory.
     With `src_size`, only that many bytes are read and the rest are zero. Copies issued
-    since the last commit form a group; `wait_group N` waits until at most N of the warp's
-    groups are still pending, and only then may the data be read.
+    since the last commit form a per-thread group; `wait_group N` leaves only the newest N
+    groups pending, and only then may the data be read.
     """
     mods = ins.mods[1:]
     cta, ops = w.cta, ins.operands
@@ -204,28 +204,36 @@ def _cp_async(w, ins, mask) -> None:
     if not len(lanes):
         return
     if mods == ("commit_group",) and not ops:
-        if w.cp_open:
-            w.cp_groups.append(w.cp_open)
-            w.cp_open = []
+        for lane in lanes:
+            # Even an empty commit occupies a position in this thread's history.
+            w.cp_groups.setdefault(int(lane), []).append(w.cp_open.pop(int(lane), []))
         return
     if mods == ("wait_group",) and len(ops) == 1:
-        # Every group except the N most recently committed must be complete. Which groups
-        # those are is fixed by commit order, not by which copies happen to finish first.
-        newest = _scalar(w, ins, ops[0], int(lanes[0]))
-        older = w.cp_groups[:len(w.cp_groups) - newest] if newest else w.cp_groups
-        pending = [g for g in older if not all(o.done for o in g)]
+        count = ops[0]
+        if not isinstance(count, Imm) or count.kind != "int" or count.value < 0:
+            raise ExecutionError("cp.async.wait_group needs a nonnegative integer constant")
+        # Select by commit order, independently for every executing thread.
+        older = {int(lane): w.cp_groups.get(int(lane), [])[
+                    :max(0, len(w.cp_groups.get(int(lane), [])) - count.value)] for lane in lanes}
+        pending = sum(not all(o.done for o in group)
+                      for groups in older.values() for group in groups)
         if pending:
             w.blocked = Wait("bulk group", ins, retry=True,
-                             detail=lambda: f"{len(pending)} cp.async group(s) still in flight")
+                             detail=lambda: f"{pending} cp.async group(s) still in flight")
             return
-        for group in older:
-            w.seen.update(o.id for o in group)
-        w.cp_groups = w.cp_groups[len(older):]
+        for lane, groups in older.items():
+            for group in groups:
+                w.seen.update(o.id for o in group)
+            w.cp_groups[lane] = w.cp_groups.get(lane, [])[len(groups):]
         return
     if len(mods) != 3 or mods[0] not in ("ca", "cg") or mods[1:] != ("shared", "global") \
             or len(ops) not in (3, 4):
         raise unsupported(ins, "expected cp.async.{ca,cg}.shared.global [dst], [src], size[, src_size]")
-    size = _scalar(w, ins, ops[2], int(lanes[0]))
+    if not isinstance(ops[2], Imm) or ops[2].kind != "int":
+        raise ExecutionError("cp.async copy size must be an integer constant")
+    size = ops[2].value
+    if mods[0] == "cg" and size != 16:
+        raise ExecutionError("cp.async.cg copies 16 bytes")
     if size not in (4, 8, 16):
         raise ExecutionError(f"cp.async copies 4, 8 or 16 bytes, not {size}")
     wanted = w.read(ops[3], "u32")[lanes].astype(np.int64) if len(ops) == 4 else np.full(len(lanes), size)
@@ -233,28 +241,47 @@ def _cp_async(w, ins, mask) -> None:
         raise ExecutionError("cp.async source size is larger than the copy size")
     span = np.arange(size, dtype=np.uint64)
     source = _address(w, ins, ops[1])[lanes]
+    offsets = local_shared_offset(_address(w, ins, ops[0]))
+    if (source % size).any() or (offsets[lanes] % size).any():
+        raise ExecutionError(f"cp.async needs {size}-byte aligned source and destination addresses")
     data = np.zeros((len(lanes), size), dtype=np.uint8)
     reads = span[None, :] < wanted[:, None].astype(np.uint64)  # bytes actually read; the rest are zero
     try:
         data[reads] = w.mem.read((source[:, None] + span[None, :])[reads], _UINT[1])
     except MemoryFault as e:
-        e.lanes = sorted({int(lanes[k]) for k in np.flatnonzero(reads.any(axis=1))})
+        readers = np.broadcast_to(lanes[:, None], reads.shape)[reads]
+        e.lanes = sorted({int(readers[k]) for k in e.which})
         raise
-    offsets = _address(w, ins, ops[0])[lanes]
     try:
-        idx = cta.smem.index(offsets, size, "write")
+        idx = cta.smem.index(offsets[lanes], size, "write")
     except MemoryFault as e:
         e.lanes = [int(lanes[k]) for k in e.which]
         raise
-    operation = cta.new_async("copy", w, ins, int(lanes[0]))
-    operation.work = {"bytes": int(reads.sum()), "lines": None}
-    cta.smem.begin_async_write(idx.reshape(-1), operation.id)
-    w.cp_open.append(operation)
+    unique, counts = np.unique(idx, return_counts=True)
+    overlaps = unique[counts > 1]
+    if len(overlaps):
+        hit = lanes[np.isin(idx, overlaps).any(axis=1)]
+        cta.findings.add("cp-async-overlapping-writes",
+                         "threads issue cp.async writes to overlapping shared-memory destinations",
+                         w, ins, hit)
+    if cta.smem.async_active:
+        _async_check(w, ins, mask, offsets, size, "cp.async overwrites", writing=True)
+    # Keep separate operation IDs and group membership for each thread. Knowledge
+    # elsewhere in the checker is still warp-scoped, as it is for TMA waits.
+    operations = [cta.new_async("copy", w, ins, int(lane)) for lane in lanes]
+    for lane, indices, operation in zip(lanes, idx, operations):
+        cta.smem.begin_async_write(indices, operation.id)
+        w.cp_open.setdefault(int(lane), []).append(operation)
+    # Coalesce scheduling/timing into one event for this issued warp instruction,
+    # avoiding an artificial per-lane multiplication of the transfer's startup cost.
+    operations[0].work = {"bytes": int(data.size), "global_bytes": int(reads.sum()), "lines": None}
 
     def land():
-        cta.smem.finish_async_write(idx.reshape(-1), data.reshape(-1))
+        cta.smem.finish_async_write(idx.reshape(-1), data.reshape(-1), writer_warp=w.warp_id)
+        for operation in operations:
+            operation.done = True
 
-    cta.schedule(operation, land)
+    cta.schedule(operations[0], land)
 
 
 @op("cp")

@@ -20,7 +20,7 @@
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static int channel = -2;
-static cudaError_t last_error = cudaSuccess;
+static __thread cudaError_t last_error = cudaSuccess;
 
 struct function { const void *host; uint32_t id, count, size[MAX_PARAMS]; };
 static struct function functions[MAX_FUNCTIONS];
@@ -29,6 +29,7 @@ static int function_count;
 struct allocation { uint64_t base, size; };
 static struct allocation allocations[MAX_ALLOCATIONS];
 static int allocation_count;
+static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static __thread struct { dim3 grid, block; size_t smem; cudaStream_t stream; } pending[8];
 static __thread int pending_depth;
@@ -76,7 +77,15 @@ int warplens_call(uint32_t op, const struct wl_part *parts, int count,
   pthread_mutex_lock(&lock);
   connect_once();
   uint32_t header[2] = {op, 0};
-  for (int i = 0; i < count; ++i) header[1] += (uint32_t)parts[i].size;
+  for (int i = 0; i < count; ++i) {
+    if (parts[i].size > UINT32_MAX - header[1]) {
+      fprintf(stderr, "warplens: request exceeds the shim protocol's 32-bit payload limit\n");
+      if (length) *length = 0;
+      pthread_mutex_unlock(&lock);
+      return cudaErrorInvalidValue;
+    }
+    header[1] += (uint32_t)parts[i].size;
+  }
   write_all(header, sizeof header);
   for (int i = 0; i < count; ++i) write_all(parts[i].data, parts[i].size);
 
@@ -89,7 +98,6 @@ int warplens_call(uint32_t op, const struct wl_part *parts, int count,
   body[size] = 0;
   if (status != 0) {
     fprintf(stderr, "warplens: %s\n", body);
-    last_error = (cudaError_t)status;
   } else if (reply) {
     memcpy(reply, body, size < capacity ? size : capacity);
   }
@@ -99,7 +107,10 @@ int warplens_call(uint32_t op, const struct wl_part *parts, int count,
   return status;
 }
 
-static cudaError_t result(int status) { return status ? (cudaError_t)status : cudaSuccess; }
+static cudaError_t result(int status) {
+  if (status) last_error = (cudaError_t)status;
+  return (cudaError_t)status;
+}
 
 /* -- modules and kernels: called by code the compiler generates ------------------------- */
 
@@ -165,7 +176,7 @@ unsigned __cudaPushCallConfiguration(dim3 gridDim, dim3 blockDim, size_t sharedM
 cudaError_t __cudaPopCallConfiguration(dim3 *gridDim, dim3 *blockDim, size_t *sharedMem,
                                        void *stream) {
   TRACE("__cudaPopCallConfiguration depth %d", pending_depth);
-  if (!pending_depth) return cudaErrorInvalidConfiguration;
+  if (!pending_depth) return result(cudaErrorInvalidConfiguration);
   --pending_depth;
   *gridDim = pending[pending_depth].grid; *blockDim = pending[pending_depth].block;
   *sharedMem = pending[pending_depth].smem; *(cudaStream_t *)stream = pending[pending_depth].stream;
@@ -229,9 +240,15 @@ cudaError_t cudaLaunchKernelExC(const cudaLaunchConfig_t *config, const void *fu
 
 static int is_device(const void *p) {
   uint64_t a = (uint64_t)p;
+  int found = 0;
+  pthread_mutex_lock(&allocation_lock);
   for (int i = 0; i < allocation_count; ++i)
-    if (a >= allocations[i].base && a < allocations[i].base + allocations[i].size) return 1;
-  return 0;
+    if (a >= allocations[i].base && a < allocations[i].base + allocations[i].size) {
+      found = 1;
+      break;
+    }
+  pthread_mutex_unlock(&allocation_lock);
+  return found;
 }
 
 cudaError_t cudaMalloc(void **devPtr, size_t size) {
@@ -239,9 +256,11 @@ cudaError_t cudaMalloc(void **devPtr, size_t size) {
   struct wl_part part = {&request, sizeof request};
   int status = warplens_call(WL_MALLOC, &part, 1, &address, sizeof address, NULL);
   if (!status) {
+    pthread_mutex_lock(&allocation_lock);
     if (allocation_count == MAX_ALLOCATIONS) die("too many allocations");
     allocations[allocation_count].base = address;
     allocations[allocation_count++].size = size ? size : 1;
+    pthread_mutex_unlock(&allocation_lock);
     *devPtr = (void *)address;
   }
   return result(status);
@@ -251,29 +270,40 @@ cudaError_t cudaFree(void *devPtr) {
   if (!devPtr) return cudaSuccess;
   uint64_t address = (uint64_t)devPtr;
   struct wl_part part = {&address, sizeof address};
-  for (int i = 0; i < allocation_count; ++i)
-    if (allocations[i].base == address) { allocations[i] = allocations[--allocation_count]; break; }
-  return result(warplens_call(WL_FREE, &part, 1, NULL, 0, NULL));
+  int status = warplens_call(WL_FREE, &part, 1, NULL, 0, NULL);
+  if (!status) {
+    pthread_mutex_lock(&allocation_lock);
+    for (int i = 0; i < allocation_count; ++i)
+      if (allocations[i].base == address) { allocations[i] = allocations[--allocation_count]; break; }
+    pthread_mutex_unlock(&allocation_lock);
+  }
+  return result(status);
 }
 
 cudaError_t cudaMemcpy(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind) {
-  int to_device = is_device(dst), from_device = is_device(src);
-  (void)kind;
-  if (to_device && from_device) {
+  /* Only cudaMemcpyDefault infers the direction. Explicit device pointers must
+   * reach the server even when stale or out of bounds, never host memmove. */
+  if (kind == cudaMemcpyDefault) {
+    int to_device = is_device(dst), from_device = is_device(src);
+    kind = to_device ? (from_device ? cudaMemcpyDeviceToDevice : cudaMemcpyHostToDevice)
+                     : (from_device ? cudaMemcpyDeviceToHost : cudaMemcpyHostToHost);
+  }
+  if (kind == cudaMemcpyDeviceToDevice) {
     uint64_t head[3] = {(uint64_t)dst, (uint64_t)src, count};
     struct wl_part part = {head, sizeof head};
     return result(warplens_call(WL_COPY, &part, 1, NULL, 0, NULL));
   }
-  if (to_device) {
+  if (kind == cudaMemcpyHostToDevice) {
     uint64_t address = (uint64_t)dst;
     struct wl_part parts[2] = {{&address, sizeof address}, {src, count}};
     return result(warplens_call(WL_WRITE, parts, 2, NULL, 0, NULL));
   }
-  if (from_device) {
+  if (kind == cudaMemcpyDeviceToHost) {
     uint64_t head[2] = {(uint64_t)src, count};
     struct wl_part part = {head, sizeof head};
     return result(warplens_call(WL_READ, &part, 1, dst, count, NULL));
   }
+  if (kind != cudaMemcpyHostToHost) return result(cudaErrorInvalidMemcpyDirection);
   memmove(dst, src, count);
   return cudaSuccess;
 }
@@ -323,15 +353,18 @@ const char *cudaGetErrorString(cudaError_t error) {
 
 cudaError_t cudaGetDeviceCount(int *count) { *count = 1; return cudaSuccess; }
 cudaError_t cudaGetDevice(int *device) { TRACE("cudaGetDevice"); *device = 0; return cudaSuccess; }
-cudaError_t cudaSetDevice(int device) { return device == 0 ? cudaSuccess : cudaErrorInvalidDevice; }
+cudaError_t cudaSetDevice(int device) { return result(device == 0 ? cudaSuccess : cudaErrorInvalidDevice); }
 
 cudaError_t cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
   TRACE("cudaGetDeviceProperties(%d)", device);
-  if (device != 0) return cudaErrorInvalidDevice;
+  if (device != 0) return result(cudaErrorInvalidDevice);
   memset(prop, 0, sizeof *prop);
   const char *model = getenv("WARPLENS_MODEL");
   snprintf(prop->name, sizeof prop->name, "warplens simulated %s", model ? model : "B200");
-  prop->totalGlobalMem = (size_t)192 << 30;
+  /* NVIDIA's CUDA GPU list gives B200 CC 10.0 and B300 CC 10.3.
+   * https://developer.nvidia.com/cuda/gpus */
+  int b300 = model && strcmp(model, "B300") == 0;
+  prop->totalGlobalMem = (size_t)(b300 ? 288 : 192) << 30;
   prop->sharedMemPerBlock = 48 * 1024;
   prop->sharedMemPerBlockOptin = 227 * 1024;
   prop->sharedMemPerMultiprocessor = 228 * 1024;
@@ -342,7 +375,7 @@ cudaError_t cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
   prop->maxThreadsPerMultiProcessor = 2048;
   prop->maxThreadsDim[0] = 1024; prop->maxThreadsDim[1] = 1024; prop->maxThreadsDim[2] = 64;
   prop->maxGridSize[0] = 2147483647; prop->maxGridSize[1] = 65535; prop->maxGridSize[2] = 65535;
-  prop->major = 10; prop->minor = 0;
+  prop->major = 10; prop->minor = b300 ? 3 : 0;
   prop->multiProcessorCount = 148;
   prop->maxBlocksPerMultiProcessor = 32;
   return cudaSuccess;

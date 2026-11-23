@@ -9,8 +9,11 @@ compiled CUDA executable, or a Python script that uses Triton (a `.py` file).
 from __future__ import annotations
 
 import argparse
+import fcntl
+import hashlib
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -25,13 +28,44 @@ The program must carry PTX and use the shared CUDA runtime. Build it like this:
 
 def shim_libraries() -> Path:
     """The directory holding the shim libraries, building them on first use."""
-    lib = SHIM_DIR / "lib"
-    if not any(lib.glob("libcudart.so.*")):
-        print("warplens: building the shim libraries (first run)", file=sys.stderr)
-        done = subprocess.run([str(SHIM_DIR / "build.sh")], capture_output=True, text=True)
-        if done.returncode:
-            sys.exit(f"warplens: could not build the shim libraries:\n{done.stdout}{done.stderr}\n"
-                     f"Run {SHIM_DIR / 'build.sh'} <CUDA include directory> by hand.")
+    def complete(lib):
+        return (lib / "libcuda.so.1").is_file() and any(p.is_file() for p in lib.glob("libcudart.so.*"))
+
+    # A manual build remains usable without a compiler or installed CUDA headers.
+    if complete(SHIM_DIR / "lib"):
+        return SHIM_DIR / "lib"
+    digest = hashlib.sha256()
+    for source in sorted(SHIM_DIR.iterdir()):
+        if source.suffix in {".c", ".h"} or source.name == "build.sh":
+            digest.update(source.name.encode() + b"\0" + source.read_bytes())
+    # The toolkit changes the runtime SONAME and exported ABI, even when our
+    # sources have not changed. Never reuse another toolkit's cached build.
+    if nvcc := shutil.which("nvcc"):
+        root = Path(nvcc).resolve().parent.parent
+        digest.update(str(root).encode())
+        for include in (root / "targets/x86_64-linux/include", root / "include"):
+            if (include / "cuda_runtime_api.h").is_file():
+                for name in ("cuda_runtime_api.h", "cuda.h"):
+                    header = include / name
+                    if header.is_file():
+                        digest.update(header.read_bytes())
+                break
+    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    lib = (cache / "warplens" / "shim" / digest.hexdigest()).absolute()
+    try:
+        lib.parent.mkdir(parents=True, exist_ok=True)
+        # Concurrent first runs share the build, rather than loading half of it.
+        with lib.with_suffix(".lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if not complete(lib):
+                print("warplens: building the shim libraries (first run)", file=sys.stderr)
+                done = subprocess.run([str(SHIM_DIR / "build.sh"), "", str(lib)],
+                                      capture_output=True, text=True)
+                if done.returncode or not complete(lib):
+                    sys.exit(f"warplens: could not build the shim libraries:\n{done.stdout}{done.stderr}\n"
+                             f"Run {SHIM_DIR / 'build.sh'} <CUDA include directory> by hand.")
+    except OSError as error:
+        sys.exit(f"warplens: could not build the shim libraries: {error}")
     return lib
 
 
@@ -62,13 +96,21 @@ def run_script(args) -> int:
     except ImportError as exc:
         sys.exit(f"warplens: {exc}")
     driver = triton_driver.install(args.model, **({"timing": True} if args.timing else {}))
+    previous_argv, previous_path = sys.argv, sys.path[:]
     sys.argv = [args.program, *args.arguments]
+    # run_path does not add a plain script's directory to the import path as
+    # `python script.py` does. Preserve the surrounding interpreter afterwards.
+    sys.path.insert(0, str(Path(args.program).absolute().parent))
     code = 0
     try:
         runpy.run_path(args.program, run_name="__main__")
     except SystemExit as exc:
         code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+        if exc.code is not None and not isinstance(exc.code, int):
+            print(exc.code, file=sys.stderr)
     finally:
+        sys.argv = previous_argv
+        sys.path[:] = previous_path
         triton_driver.uninstall()
     if not args.quiet:
         if driver.launches:
@@ -84,23 +126,41 @@ def run(args) -> int:
     program = shutil.which(args.program) or args.program
     if not Path(program).exists():
         sys.exit(f"warplens: no such program: {args.program}")
+    program = str(Path(program).absolute())
     if program.endswith(".py"):
+        args.program = program
         return run_script(args)
     lib = shim_libraries()
+    server = ShimServer(args.model, timing=args.timing)
     ours, theirs = socket.socketpair()
     env = dict(os.environ, WARPLENS_SHIM_FD=str(theirs.fileno()), WARPLENS_MODEL=args.model)
     env["LD_LIBRARY_PATH"] = f"{lib}:{env.get('LD_LIBRARY_PATH', '')}".rstrip(":")
     # Preload as well: a program built with an RPATH would otherwise find the real runtime first.
     shims = [str(p) for p in sorted(lib.glob("libcudart.so.*")) + [lib / "libcuda.so.1"]]
     env["LD_PRELOAD"] = " ".join(shims + env.get("LD_PRELOAD", "").split())
-    child = subprocess.Popen([program, *args.arguments], env=env, pass_fds=[theirs.fileno()])
-    theirs.close()
-    server = ShimServer(args.model, timing=args.timing)
+    child = None
     try:
+        try:
+            child = subprocess.Popen([program, *args.arguments], env=env, pass_fds=[theirs.fileno()])
+        except OSError as error:
+            sys.exit(f"warplens: cannot execute {args.program}: {error.strerror}")
+        theirs.close()
         server.serve(ours)
-    finally:
         ours.close()
-    code = child.wait()
+        code = child.wait()
+    finally:
+        theirs.close()
+        ours.close()
+        # A server exception or interruption must not orphan the CUDA program,
+        # which may otherwise remain blocked waiting for its next RPC response.
+        if child is not None:
+            if child.poll() is None:
+                child.terminate()
+                try:
+                    child.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+            child.wait()
 
     if not args.quiet:
         out = sys.stderr
@@ -110,7 +170,7 @@ def run(args) -> int:
                 print(BUILD_HINT, file=out)
         else:
             summary(server.launches, args.model)
-    return code
+    return code if code >= 0 else 128 - code
 
 
 def main(argv=None) -> int:
@@ -127,7 +187,16 @@ def main(argv=None) -> int:
     runner.add_argument("arguments", nargs=argparse.REMAINDER)
     runner.set_defaults(handler=run)
     args = parser.parse_args(argv)
-    return args.handler(args)
+    def terminate(signum, _frame):
+        raise SystemExit(128 + signum)
+
+    previous = signal.signal(signal.SIGTERM, terminate)
+    try:
+        return args.handler(args)
+    except KeyboardInterrupt:
+        return 130
+    finally:
+        signal.signal(signal.SIGTERM, previous)
 
 
 if __name__ == "__main__":

@@ -38,7 +38,7 @@ def test_matmul_uses_the_blackwell_tensor_core_and_matches_numpy(gpu, dims):
     got, reference, stats = example.matmul(gpu, *dims)
     np.testing.assert_allclose(got, reference, rtol=1e-4, atol=1e-4)
     assert not stats.findings
-    kernel = next(iter(example.matmul_kernel.device_caches[0][0].values()))
+    kernel = next(iter(example.matmul_kernel.device_caches[gpu.get_current_device()][0].values()))
     ptx = kernel.asm["ptx"]
     assert ".target sm_100a" in ptx and "tcgen05.mma" in ptx  # compiled for Blackwell, no GPU involved
     assert kernel.metadata.tmem_size > 0
@@ -82,11 +82,35 @@ def test_matmul_is_also_right_under_the_timing_model():
 
 
 def test_warplens_run_executes_a_triton_script():
+    import os
     import subprocess
     import sys
     done = subprocess.run([sys.executable, "-m", "warplens.cli", "run", str(EXAMPLE)],
-                          capture_output=True, text=True, timeout=600)
+                          capture_output=True, text=True, timeout=600,
+                          env={**os.environ, "CUDA_VISIBLE_DEVICES": ""})
     assert done.returncode == 0, done.stderr[-1500:]
     assert "vector add: max abs error vs NumPy 0" in done.stdout and "matmul: max abs error" in done.stdout
     assert "2 kernel launch(es) simulated on B200, 0 finding(s)" in done.stderr
     assert "matmul_kernel: 4 CTA(s)" in done.stderr
+
+
+def test_standalone_example_never_initializes_a_hardware_driver():
+    import os
+    import subprocess
+    import sys
+    # Make accidental access fail even on GPU-equipped development machines.
+    code = """\
+import importlib, runpy, sys
+driver_module = importlib.import_module('triton.runtime.driver')
+def no_hardware():
+    raise AssertionError('warplens tried to initialize a hardware driver')
+driver_module._create_driver = no_hardware
+runpy.run_path(sys.argv[1], run_name='__main__')
+assert driver_module.driver._active is None
+"""
+    done = subprocess.run([sys.executable, "-c", code, str(EXAMPLE)],
+                          capture_output=True, text=True, timeout=600,
+                          env={**os.environ, "CUDA_VISIBLE_DEVICES": ""})
+    assert done.returncode == 0, done.stderr[-1500:]
+    assert "vector add: max abs error vs NumPy 0" in done.stdout
+    assert "matmul: max abs error" in done.stdout

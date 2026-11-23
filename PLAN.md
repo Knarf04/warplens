@@ -272,7 +272,6 @@ Weak:
   it; expect more of that kind.
 - The timing model is uncalibrated and several parameters are assumptions.
 - `main` is still the initial commit; work is on stacked branches.
-- The tests for CUTLASS, Triton and compiled programs are skipped in CI.
 - TIRx and CuTe DSL kernels compile to PTX that runs, but their launch has to be
   repeated by hand.
 
@@ -281,7 +280,9 @@ Weak:
 **A. Stabilize the code**
 
 1. Merge the branch stack into `main`.
-2. Make CI run the full suite, including the tests that are skipped today.
+2. Done: CI's `full` job builds the CUTLASS tutorials and the shim libraries,
+   installs Triton and the CuTe DSL, and runs the whole suite with
+   `WARPLENS_NO_SKIPS=1`, under which a skipped test fails the run.
 3. Finish the launch path for TIRx and CuTe DSL, so one script runs unchanged
    in the simulator and on the GPU. Preferred route: extend the `libcuda` shim
    to the driver calls both runtimes make. First measure which calls those are,

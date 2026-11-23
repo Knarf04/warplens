@@ -63,7 +63,24 @@ class Vec:
     elems: tuple
 
 
-Operand = Reg | Special | Imm | Sym | Mem | Vec
+@dataclass(frozen=True, slots=True)
+class Pair:
+    """A paired destination such as `%r8|%p1` (value | predicate)."""
+    first: Reg
+    second: Reg
+
+
+Operand = Reg | Special | Imm | Sym | Mem | Vec | Pair
+
+
+@dataclass(slots=True)
+class SharedVar:
+    """A `.shared` variable. `size` is None for `.extern .shared name[]`, whose
+    size is the dynamic shared memory requested at launch."""
+    name: str
+    align: int
+    size: int | None
+    line: int = 0
 
 
 @dataclass(slots=True)
@@ -95,6 +112,7 @@ class Function:
     regs: dict[str, str] = field(default_factory=dict)  # name -> PTX type
     instrs: list[Instr] = field(default_factory=list)
     labels: dict[str, int] = field(default_factory=dict)  # name -> instruction index
+    shared: list[SharedVar] = field(default_factory=list)
     line: int = 0
 
 
@@ -105,3 +123,4 @@ class Module:
     target: str = ""
     address_size: int = 64
     functions: dict[str, Function] = field(default_factory=dict)
+    shared: list[SharedVar] = field(default_factory=list)

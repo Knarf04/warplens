@@ -10,8 +10,9 @@ from __future__ import annotations
 import numpy as np
 
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
-from ..frontend.ir import Instr, Mem, NP_TYPES, Sym, UINT_BY_SIZE, Vec
+from ..frontend.ir import Instr, Mem, NP_TYPES, Pair, Sym, UINT_BY_SIZE, Vec
 from .floating import fused_multiply_add
+from .smem import GENERIC_WINDOW, MAX_SMEM_BYTES
 
 HANDLERS: dict = {}
 
@@ -81,12 +82,18 @@ def _mov(w, ins, mask):
 
 @op("cvta")
 def _cvta(w, ins, mask):
-    # Address-space conversion. Global addresses are already generic addresses.
-    ty, extra = _type(ins, allowed={"to", "global"}, kinds="u")
-    if "global" not in extra:
-        raise unsupported(ins, "only the global address space exists so far")
+    # Address-space conversion. Global addresses are already generic addresses;
+    # shared addresses are offsets that sit in a fixed window of the generic space.
+    ty, extra = _type(ins, allowed={"to", "global", "shared"}, kinds="u")
+    spaces = [e for e in extra if e != "to"]
+    if len(spaces) != 1 or (ty != "u64" and spaces[0] == "shared"):
+        raise unsupported(ins)
     d, a = _operands(ins, 2)
-    w.write(d, w.read(a, ty), mask)
+    value = w.read(a, ty)
+    if spaces[0] == "shared":
+        window = np.uint64(GENERIC_WINDOW)
+        value = value - window if "to" in extra else value + window
+    w.write(d, value, mask)
 
 
 # -- integer and floating-point arithmetic ---------------------------------------
@@ -330,17 +337,76 @@ def _cvt(w, ins, mask):
 def _address(w, ins, mem) -> np.ndarray:
     if not isinstance(mem, Mem):
         raise unsupported(ins, "expected a [address] operand")
-    if isinstance(mem.base, Sym):
-        raise unsupported(ins, f"address of symbol `{mem.base.name}`")
-    base = w.read(mem.base, "u64")
+    base = w.read_address(mem.base)
     return base + np.uint64(mem.offset % (1 << 64)) if mem.offset else base
 
 
 def _space(ins: Instr):
-    ty, extra = _type(ins, allowed={"global", "param"})
+    ty, extra = _type(ins, allowed={"global", "shared", "param"})
     if len(extra) > 1:
         raise unsupported(ins)
-    return ty, (extra[0] if extra else "global")
+    return ty, (extra[0] if extra else "generic")
+
+
+def _split_generic(space: str, addrs: np.ndarray, mask: np.ndarray):
+    """(lanes that address global memory, lanes that address shared memory, shared offsets)."""
+    if space == "global":
+        return mask, None, None
+    if space == "shared":
+        return None, mask, addrs
+    window = np.uint64(GENERIC_WINDOW)
+    in_smem = (addrs >= window) & (addrs < window + np.uint64(MAX_SMEM_BYTES))
+    to_smem = mask & in_smem
+    return mask & ~in_smem, (to_smem if to_smem.any() else None), addrs - window
+
+
+def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
+    value = np.zeros(len(mask), dtype=dt)
+    g, s, offsets = _split_generic(space, addrs, mask)
+    try:
+        if g is not None and g.any():
+            value[g] = w.mem.read(addrs[g], dt)
+    except MemoryFault as e:
+        _fault_lanes(e, g)
+        raise
+    if s is not None and s.any():
+        cta = w.cta
+        try:
+            value[s], unwritten, racy = cta.smem.read(offsets[s], dt, w.warp_id)
+        except MemoryFault as e:
+            _fault_lanes(e, s)
+            raise
+        cta.smem_report.record(ins, w.program.fn.name, offsets[s], dt.itemsize)
+        if len(unwritten):
+            cta.findings.add("smem-uninitialized-read",
+                             "read of shared memory that this CTA never wrote",
+                             w, ins, np.flatnonzero(s)[unwritten])
+        if len(racy):
+            cta.findings.add("smem-race",
+                             "read of shared memory that another warp wrote with no barrier "
+                             "in between", w, ins, np.flatnonzero(s)[racy])
+    return value
+
+
+def _store(w, ins, space, addrs, value, mask) -> None:
+    g, s, offsets = _split_generic(space, addrs, mask)
+    try:
+        if g is not None and g.any():
+            w.mem.write(addrs[g], value[g])
+    except MemoryFault as e:
+        _fault_lanes(e, g)
+        raise
+    if s is not None and s.any():
+        try:
+            racy = w.cta.smem.write(offsets[s], value[s], w.warp_id)
+        except MemoryFault as e:
+            _fault_lanes(e, s)
+            raise
+        if len(racy):
+            w.cta.findings.add("smem-race",
+                               "write to shared memory that another warp read or wrote with no "
+                               "barrier in between", w, ins, np.flatnonzero(s)[racy])
+        w.cta.smem_report.record(ins, w.program.fn.name, offsets[s], value.dtype.itemsize)
 
 
 def _fault_lanes(e: MemoryFault, mask: np.ndarray) -> None:
@@ -366,32 +432,81 @@ def _ld(w, ins, mask):
                         dtype=UINT_BY_SIZE[dt.itemsize]).view(dt)
         w.write(d, value, mask)
         return
-    addrs = _address(w, ins, src)
-    try:
-        loaded = w.mem.read(addrs[mask], dt)
-    except MemoryFault as e:
-        _fault_lanes(e, mask)
-        raise
-    value = np.zeros(len(mask), dtype=dt)
-    value[mask] = loaded
-    w.write(d, value, mask)
+    w.write(d, _load(w, ins, space, _address(w, ins, src), dt, mask), mask)
 
 
 @op("st")
 def _st(w, ins, mask):
     ty, space = _space(ins)
-    if space != "global":
-        raise unsupported(ins, "stores go to global memory only so far")
+    if space == "param":
+        raise unsupported(ins, "parameters are read-only")
     dst, a = _operands(ins, 2)
     if isinstance(a, Vec):
         raise unsupported(ins, "vector stores")
-    addrs = _address(w, ins, dst)
-    value = w.read(a, ty)
-    try:
-        w.mem.write(addrs[mask], value[mask])
-    except MemoryFault as e:
-        _fault_lanes(e, mask)
-        raise
+    _store(w, ins, space, _address(w, ins, dst), w.read(a, ty), mask)
+
+
+# -- warp shuffle ------------------------------------------------------------------
+
+_LANES = np.arange(32, dtype=np.int64)
+
+
+@op("shfl")
+def _shfl(w, ins, mask):
+    """shfl.sync.{up,down,bfly,idx}.b32 d[|p], a, b, c, membermask
+
+    Each lane reads register `a` of another lane `j` of the same warp. `c`
+    packs a clamp value (bits 0-4) and a segment mask (bits 8-12) that confine
+    `j` to the lane's segment; if `j` falls outside, the lane keeps its own value
+    and the optional predicate `p` is false.
+    """
+    if len(ins.mods) != 3 or ins.mods[0] != "sync" or ins.mods[2] != "b32":
+        raise unsupported(ins, "expected shfl.sync.mode.b32")
+    mode = ins.mods[1]
+    d, a, b, c, member = _operands(ins, 5)
+    value = w.read(a, "b32")
+    bval = (w.read(b, "u32") & 31).astype(np.int64)
+    cbits = w.read(c, "u32")
+    cval = (cbits & 31).astype(np.int64)
+    seg = ((cbits >> 8) & 31).astype(np.int64)
+    max_lane = (_LANES & seg) | (cval & ~seg & 31)
+    min_lane = _LANES & seg
+    if mode == "up":
+        j = _LANES - bval
+        valid = j >= max_lane
+    elif mode == "down":
+        j = _LANES + bval
+        valid = j <= max_lane
+    elif mode == "bfly":
+        j = _LANES ^ bval
+        valid = j <= max_lane
+    elif mode == "idx":
+        j = min_lane | (bval & ~seg & 31)
+        valid = j <= max_lane
+    else:
+        raise unsupported(ins, f"shuffle mode .{mode}")
+    j = np.where(valid, j, _LANES)
+
+    members = ((w.read(member, "u32")[:, None] >> _LANES.astype(np.uint32)) & 1).astype(bool)
+    lanes = np.flatnonzero(mask)
+    # Every executing lane must name exactly the set of lanes executing with it.
+    if len(lanes) and not (members[lanes] == mask).all():
+        w.cta.findings.add(
+            "shfl-membermask-mismatch",
+            "shfl.sync member mask does not match the lanes executing it "
+            f"({len(lanes)} lane(s) active)", w, ins, lanes)
+    stale = mask & ~mask[j]
+    if stale.any():
+        w.cta.findings.add(
+            "shfl-inactive-source",
+            "shfl.sync reads a lane that is not executing this instruction; its value is undefined",
+            w, ins, np.flatnonzero(stale))
+
+    if isinstance(d, Pair):
+        w.write(d.first, value[j], mask)
+        w.write(d.second, valid, mask)
+    else:
+        w.write(d, value[j], mask)
 
 
 # Control flow is executed by the warp itself; listed here so that the

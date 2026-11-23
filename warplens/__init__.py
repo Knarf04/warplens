@@ -1,6 +1,7 @@
 """warplens: run Blackwell GPU kernels (PTX) on the CPU and watch what they do."""
 
 from .errors import (
+    DeadlockError,
     ExecutionError,
     LaunchError,
     MemoryFault,
@@ -15,6 +16,7 @@ from .host.launch import LaunchStats
 __version__ = "0.0.1"
 
 __all__ = [
+    "DeadlockError",
     "Device",
     "DeviceArray",
     "ExecutionError",

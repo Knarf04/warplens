@@ -13,7 +13,8 @@ import struct
 from pathlib import Path
 
 from ..errors import PtxSyntaxError, UnsupportedError
-from .ir import Function, Imm, Instr, Mem, Module, NP_TYPES, Param, Reg, Special, Sym, Vec
+from .ir import (Function, Imm, Instr, Mem, Module, NP_TYPES, Pair, Param, Reg, SharedVar,
+                 Special, Sym, Vec)
 
 _TOKEN = re.compile(
     r"""
@@ -137,7 +138,10 @@ class _Parser:
     # -- module ------------------------------------------------------------
     def module(self) -> Module:
         mod = Module(name=self.name)
+        extern = False
         while (t := self.next()).kind != "eof":
+            if t.value not in _LINKAGE and t.value != ".shared":
+                extern = False
             if t.value == ".version":
                 mod.version = self.expect_kind("num", "a version number").value
             elif t.value == ".target":
@@ -147,7 +151,10 @@ class _Parser:
             elif t.value == ".address_size":
                 mod.address_size = int(self.expect_kind("num", "an address size").value)
             elif t.value in _LINKAGE:
+                extern = extern or t.value == ".extern"
                 continue
+            elif t.value == ".shared":
+                mod.shared.append(self.shared_var(extern))
             elif t.value == ".entry":
                 fn = self.function(t)
                 mod.functions[fn.name] = fn
@@ -219,6 +226,8 @@ class _Parser:
                 fn.labels[t.value] = len(fn.instrs)
             elif t.value == ".reg":
                 self.reg_decl(fn)
+            elif t.value == ".shared":
+                fn.shared.append(self.shared_var(extern=False))
             elif t.value in _IGNORED_BODY_DIRECTIVES:
                 self.skip_directive(t)
             elif t.kind == "word" and t.value.startswith("."):
@@ -232,6 +241,32 @@ class _Parser:
                 if not isinstance(target, Sym) or target.name not in fn.labels:
                     raise PtxSyntaxError(
                         f"{self.name}:{ins.line}: branch to an undefined label\n    {ins.text}")
+
+    def shared_var(self, extern: bool) -> SharedVar:
+        """`.shared [.align N] .type name[count]...;` (the `.shared` is already consumed)."""
+        start = self.peek()
+        align = None
+        if self.accept(".align"):
+            align = int(self.expect_kind("num", "an alignment").value)
+        ty_tok = self.expect_kind("word", "a variable type")
+        ty = ty_tok.value.lstrip(".")
+        if ty not in NP_TYPES or ty == "pred":
+            raise self.unsupported(ty_tok, f"unsupported variable type `{ty_tok.value}`")
+        name = self.expect_kind("word", "a variable name")
+        count, unsized = 1, False
+        while self.accept("["):
+            if self.accept("]"):
+                unsized = True
+            else:
+                count *= int(self.expect_kind("num", "an array size").value)
+                self.expect("]")
+        if self.peek().value == "=":
+            raise self.syntax(self.peek(), ".shared variables cannot have initializers")
+        self.expect(";")
+        if unsized and not extern:
+            raise self.syntax(name, f"`{name.value}` needs an array size (only .extern arrays may omit it)")
+        item = NP_TYPES[ty].itemsize
+        return SharedVar(name.value, align or item, None if unsized else count * item, start.line)
 
     def reg_decl(self, fn: Function) -> None:
         ty_tok = self.expect_kind("word", "a register type")
@@ -267,11 +302,15 @@ class _Parser:
         operands = []
         if not self.accept(";"):
             while True:
-                operands.append(self.operand(fn))
+                operand = self.operand(fn)
+                if self.accept("|"):
+                    second = self.operand(fn)
+                    if not (isinstance(operand, Reg) and isinstance(second, Reg)):
+                        raise self.syntax(first, "both sides of a paired destination must be registers")
+                    operand = Pair(operand, second)
+                operands.append(operand)
                 if self.accept(";"):
                     break
-                if self.peek().value == "|":
-                    raise self.unsupported(self.peek(), "paired destinations (a|b) are not supported yet")
                 self.expect(",")
         return Instr(opcode, tuple(mods), tuple(operands), pred, negated,
                      first.line, self.source(first.line))

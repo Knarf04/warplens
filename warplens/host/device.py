@@ -75,9 +75,12 @@ class Device:
             self._modules[path] = parse_ptx_file(path)
         return self._modules[path]
 
-    def launch(self, ptx, entry: str, *, grid, block, args=(), trace=None,
+    def launch(self, ptx, entry: str, *, grid, block, args=(), smem: int = 0, trace=None,
                max_steps: int | None = None) -> LaunchStats:
         """Run kernel `entry` from `ptx` (a path or a parsed Module) to completion.
+
+        `smem` is the dynamic shared memory per CTA in bytes, as passed to a
+        real launch; it sizes `extern __shared__` arrays.
 
         `trace`, if given, is called as trace(warp, pc, instr, active_mask)
         before every instruction.
@@ -90,4 +93,4 @@ class Device:
         if key not in self._programs:
             self._programs[key] = Program(module, module.functions[entry])
         return run_kernel(self._programs[key], self.memory, grid=grid, block=block,
-                          args=args, trace=trace, max_steps=max_steps)
+                          args=args, smem=smem, trace=trace, max_steps=max_steps)

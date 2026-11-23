@@ -1,13 +1,13 @@
-"""Schedules warps. For now: round-robin, one instruction per warp per turn.
+"""Schedules the warps of one CTA: round-robin, one instruction per warp per turn.
 
 Stepping warps one instruction at a time (rather than running each to
-completion) is what later lets asynchronous units and blocking waits
+completion) is what lets blocking waits, and later asynchronous units,
 interleave with them.
 """
 
 from __future__ import annotations
 
-from ..errors import ExecutionError
+from ..errors import DeadlockError, ExecutionError
 
 
 class Engine:
@@ -15,15 +15,24 @@ class Engine:
         self.max_steps = max_steps
         self.steps = 0
 
-    def run(self, warps) -> None:
-        active = [w for w in warps if not w.done]
+    def run(self, cta) -> None:
+        warps = cta.warps
         limit = self.max_steps
-        while active:
-            for w in active:
+        while True:
+            runnable = [w for w in warps if w.blocked is None and not w.done]
+            if not runnable:
+                if cta.release_barriers():
+                    continue
+                if all(w.done for w in warps):
+                    return
+                raise DeadlockError(
+                    f"deadlock in CTA {cta.id}: every unfinished warp is blocked and "
+                    f"nothing can release them\n{cta.describe_blocked()}")
+            for w in runnable:
                 w.step()
-            self.steps += len(active)
+            cta.release_barriers()
+            self.steps += len(runnable)
             if limit is not None and self.steps > limit:
                 raise ExecutionError(
                     f"kernel did not finish within max_steps={limit} warp instructions "
                     "(infinite loop?)")
-            active = [w for w in active if not w.done]

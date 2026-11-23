@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Build the hardware-validation programs for the local GPU, and the PTX the
+# simulator runs for the same kernels.
+#
+#   HW_NVCC   nvcc with a full toolkit, for the GPU binaries (default: /usr/local/cuda/bin/nvcc)
+#   HW_ARCH   architecture of the local GPU (default: sm_86, Ampere)
+#   PTX_NVCC  nvcc that can target sm_100a (default: the one in the `warplens` conda env)
+set -euo pipefail
+cd "$(dirname "${BASH_SOURCE[0]}")"
+HW_NVCC="${HW_NVCC:-/usr/local/cuda/bin/nvcc}"
+HW_ARCH="${HW_ARCH:-sm_86}"
+PTX_NVCC="${PTX_NVCC:-conda run -n warplens nvcc}"
+
+mkdir -p bin
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/shfl_golden shfl_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/transpose_hw transpose_hw.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/barrier_exit_hw barrier_exit_hw.cu
+$PTX_NVCC -arch=sm_100a -ptx shfl_probe.cu -o shfl_probe.ptx
+$PTX_NVCC -arch=sm_100a -ptx barrier_exit_hw.cu -o barrier_exit.ptx
+echo "built bin/{shfl_golden,transpose_hw,barrier_exit_hw}, shfl_probe.ptx, barrier_exit.ptx"

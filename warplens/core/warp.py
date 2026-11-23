@@ -5,7 +5,8 @@ from __future__ import annotations
 import numpy as np
 
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
-from ..frontend.ir import Imm, Reg, Special, UINT_BY_SIZE, INT_BY_SIZE, NP_TYPES, storage_dtype
+from ..frontend.ir import (Imm, Reg, Special, Sym, UINT_BY_SIZE, INT_BY_SIZE, NP_TYPES,
+                            storage_dtype)
 from .program import Program
 from .simt_stack import SimtStack
 
@@ -16,7 +17,8 @@ class Warp:
     def __init__(self, program: Program, *, cta, warp_id: int, tid, mask: np.ndarray,
                  specials: dict[str, np.ndarray], params: dict, mem, trace=None):
         self.program = program
-        self.cta = cta  # (x, y, z) of the CTA this warp belongs to
+        self.cta = cta  # the Cta this warp belongs to
+        self.blocked = None  # (barrier number, instr) while waiting in bar.sync
         self.warp_id = warp_id
         self.tid = tid  # (x, y, z) arrays, one entry per lane
         self.specials = specials
@@ -34,7 +36,35 @@ class Warp:
     def done(self) -> bool:
         return self.stack.done
 
+    def live_lanes(self) -> np.ndarray:
+        """Lanes that have not returned, wherever they are in the SIMT stack."""
+        live = np.zeros(WARP_SIZE, dtype=np.bool_)
+        for e in self.stack.entries:
+            live |= e.mask
+        return live
+
     # -- operand access ------------------------------------------------------
+    def read_address(self, operand) -> np.ndarray:
+        """An address operand as 32 unsigned 64-bit values. Shared-memory
+        addresses are often kept in 32-bit registers."""
+        kind = type(operand)
+        if kind is Reg:
+            raw = self.regs[operand.name]
+            if raw.dtype.kind == "b":
+                raise ExecutionError(f"predicate register {operand.name} used as an address")
+            return raw.astype(np.uint64)
+        if kind is Imm and operand.kind == "int":
+            return np.full(WARP_SIZE, operand.value % (1 << 64), dtype=np.uint64)
+        if kind is Sym:
+            return np.full(WARP_SIZE, self._symbol(operand), dtype=np.uint64)
+        raise ExecutionError(f"operand {operand!r} cannot be used as an address")
+
+    def _symbol(self, sym: Sym) -> int:
+        try:
+            return self.program.symbols[sym.name]
+        except KeyError:
+            raise ExecutionError(f"`{sym.name}` is not a variable this kernel can address") from None
+
     def read(self, operand, ty: str) -> np.ndarray:
         """The operand as 32 values of PTX type `ty`."""
         dt = NP_TYPES[ty]
@@ -57,6 +87,10 @@ class Warp:
             if dt.kind not in "iu" or dt.itemsize < 4:
                 raise ExecutionError(f"%{operand.name} cannot be read as .{ty}")
             return value.astype(UINT_BY_SIZE[dt.itemsize]).view(dt)
+        if kind is Sym:  # the address of a variable, as in `mov.b32 %r1, tile`
+            if dt.kind not in "iu" or dt.itemsize < 4:
+                raise ExecutionError(f"address of `{operand.name}` cannot be read as .{ty}")
+            return np.full(WARP_SIZE, self._symbol(operand), dtype=UINT_BY_SIZE[dt.itemsize]).view(dt)
         raise ExecutionError(f"operand {operand!r} cannot be used as a .{ty} value")
 
     @staticmethod
@@ -143,7 +177,7 @@ class Warp:
         lanes = err.lanes if isinstance(err, MemoryFault) and err.lanes else \
             [int(x) for x in np.flatnonzero(active)]
         lines = [f"  at {self.program.module.name}:{ins.line}: {ins.text}",
-                 f"  in kernel `{self.program.fn.name}`, CTA {self.cta}, warp {self.warp_id}"]
+                 f"  in kernel `{self.program.fn.name}`, CTA {self.cta.id}, warp {self.warp_id}"]
         if lanes:
             first = lanes[0]
             thread = tuple(int(t[first]) for t in self.tid)

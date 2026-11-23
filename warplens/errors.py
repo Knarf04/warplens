@@ -31,6 +31,10 @@ class ExecutionError(WarplensError):
         return self.message if self.where is None else f"{self.message}\n{self.where}"
 
 
+class DeadlockError(ExecutionError):
+    """Every unfinished warp is blocked and nothing can release them."""
+
+
 class MemoryFault(ExecutionError):
     """A load or store touched bytes outside every allocation.
 

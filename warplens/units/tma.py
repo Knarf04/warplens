@@ -21,6 +21,7 @@ from ..errors import ExecutionError, MemoryFault
 from ..frontend.ir import Imm, TensorRef
 from ..host import tensor_map as tm
 from .alu import _address, op, unsupported
+from .smem import local_shared_offset, resolve_shared
 
 _LOAD_FLAGS = frozenset({"mbarrier::complete_tx::bytes", "L2::cache_hint", "multicast::cluster"})
 _STORE_FLAGS = frozenset({"bulk_group", "L2::cache_hint"})
@@ -31,9 +32,9 @@ def _scalar(w, ins, operand, lane: int, ty: str = "u32") -> int:
     return int(w.read(operand, ty)[lane])
 
 
-def _smem_bytes(w, ins, start: int, nbytes: int, bits: int, verb: str) -> np.ndarray:
+def _smem_bytes(w, ins, start: int, nbytes: int, bits: int, verb: str, target=None) -> np.ndarray:
     """Shared-memory byte indices of a (possibly swizzled) buffer."""
-    size = w.cta.smem.size
+    size = (target or w.cta).smem.size
     # Reject impossible transfers before allocating an index for every byte.
     # Swizzling is a permutation, so a transfer larger than SMEM cannot fit.
     if nbytes > size or (nbytes and start >= size):
@@ -44,6 +45,33 @@ def _smem_bytes(w, ins, start: int, nbytes: int, bits: int, verb: str) -> np.nda
         raise ExecutionError(f"TMA {verb} of {nbytes} byte(s) at shared offset {start} runs past "
                              f"the CTA's {size} bytes of shared memory")
     return idx.astype(np.intp)
+
+
+def _load_targets(w, ins, lane, dst_address, bar_address, space, group, multicast_mask):
+    """Resolve destination bytes separately from the completion barrier.
+
+    For a multicast group-2 copy, the barrier pointer selects the parity of
+    the receiving member of each destination pair, not necessarily the even one.
+    """
+    cta = w.cta
+    if space == "shared::cluster":
+        destination, start = resolve_shared(cta, dst_address)
+        barrier_cta, bar_offset = resolve_shared(cta, bar_address)
+    else:
+        destination = barrier_cta = cta
+        start, bar_offset = local_shared_offset(dst_address), local_shared_offset(bar_address)
+    if group == "cta_group::1" and destination is not barrier_cta:
+        raise ExecutionError("TMA .cta_group::1 needs destination and mbarrier in the same CTA")
+    if group == "cta_group::2" and destination.rank // 2 != barrier_cta.rank // 2:
+        raise ExecutionError("TMA .cta_group::2 needs the mbarrier in the destination CTA or its peer")
+    if multicast_mask is None:
+        recipients = [(destination, barrier_cta)]
+    else:
+        targets = [cta.peer(rank) for rank in range(16) if multicast_mask >> rank & 1]
+        recipients = [(target, target.peer((target.rank & ~1) | (barrier_cta.rank & 1))
+                       if group == "cta_group::2" else target) for target in targets]
+    return start, [(target, reports_to.mbarrier(bar_offset, w, ins, [lane]))
+                   for target, reports_to in recipients]
 
 
 def _tensor_map(w, ins, operand: TensorRef, lane: int, nd: int):
@@ -215,10 +243,12 @@ def _cp(w, ins, mask):
     if len(rest) < 2:
         raise unsupported(ins)
     dst, src, *flags = rest
-    to_shared = dst.startswith("shared") and src == "global"
-    to_global = dst == "global" and src.startswith("shared")
+    to_shared = dst in ("shared::cta", "shared::cluster") and src == "global"
+    to_global = dst == "global" and src == "shared::cta"
     if not (to_shared or to_global):
         raise unsupported(ins)
+    if cta_group is not None and not (to_shared and nd):
+        raise unsupported(ins, ".cta_group is only valid on tensor loads")
     if nd and "tile" in flags:
         flags.remove("tile")  # explicitly naming the default tensor copy mode
     extra = set(flags) - (_LOAD_FLAGS if to_shared else _STORE_FLAGS)
@@ -227,6 +257,8 @@ def _cp(w, ins, mask):
     needed = "mbarrier::complete_tx::bytes" if to_shared else "bulk_group"
     if needed not in flags:
         raise unsupported(ins, f"expected .{needed}")
+    if "multicast::cluster" in flags and dst != "shared::cluster":
+        raise unsupported(ins, ".multicast::cluster requires .shared::cluster destination")
     hint = 1 if "L2::cache_hint" in flags else 0
 
     for lane in lanes:
@@ -234,47 +266,47 @@ def _cp(w, ins, mask):
             multicast = "multicast::cluster" in flags
             if len(ops) != 3 + hint + multicast:
                 raise unsupported(ins, "expected [dst], [tensor_map, {coords}], [mbarrier][, mask]")
-            start = int(_address(w, ins, ops[0])[lane])
+            dst_address = int(_address(w, ins, ops[0])[lane])
             info, coords = _tensor_map(w, ins, ops[1], lane, nd)
-            bar_offset = int(_address(w, ins, ops[2])[lane])
+            bar_address = int(_address(w, ins, ops[2])[lane])
             # With multicast, the same box lands at the same offset in every CTA of the
             # cluster whose rank is set in the mask, and reports to each one's mbarrier.
-            targets = [cta]
-            if multicast:
-                ranks = int(w.read_address(ops[3])[lane]) & 0xFFFF  # a 16-bit operand
-                targets = [cta.peer(r) for r in range(16) if ranks >> r & 1]
+            ranks = _scalar(w, ins, ops[3], lane, "u16") if multicast else None
+            start, targets = _load_targets(w, ins, lane, dst_address, bar_address, dst,
+                                          cta_group or "cta_group::1", ranks)
             _check_alignment(w, ins, info, start, lane)
-            idx = _smem_bytes(w, ins, start, info.box_bytes, info.swizzle, "load")
+            indices = [_smem_bytes(w, ins, start, info.box_bytes, info.swizzle, "load", target)
+                       for target, _ in targets]
             addrs, inside = tm.element_addresses(info, coords)
             dt = _UINT[info.elem_size]
             values = np.zeros(len(addrs), dtype=dt)
             if info.nan_fill:
                 values[:] = np.array(np.nan, dtype=f"f{info.elem_size}").view(dt)
             values[inside] = w.mem.read(addrs[inside], dt)
-            for target in targets:
-                # A .cta_group::2 load reports to the mbarrier of the even-ranked CTA of the
-                # receiving pair, which is the one that waits and issues the MMA.
-                reports_to = target.peer(target.rank & ~1) if cta_group == "cta_group::2" else target
-                _load(w, ins, lane, start, idx, values.view(np.uint8),
-                      reports_to.mbarrier(bar_offset, w, ins, [lane]), swizzle=info.swizzle,
+            for (target, bar), idx in zip(targets, indices):
+                _load(w, ins, lane, start, idx, values.view(np.uint8), bar, swizzle=info.swizzle,
                       source=addrs[inside], global_bytes=int(inside.sum()) * info.elem_size,
                       target=target)
         elif to_shared:  # [smem], [global], size, [mbarrier]
-            if len(ops) != 4 + hint:
-                raise unsupported(ins, "expected [dst], [src], size, [mbarrier]")
-            start = int(_address(w, ins, ops[0])[lane])
+            multicast = "multicast::cluster" in flags
+            if len(ops) != 4 + hint + multicast:
+                raise unsupported(ins, "expected [dst], [src], size, [mbarrier][, mask]")
+            dst_address = int(_address(w, ins, ops[0])[lane])
             source = int(_address(w, ins, ops[1])[lane])
+            bar_address = int(_address(w, ins, ops[3])[lane])
+            ranks = _scalar(w, ins, ops[4], lane, "u16") if multicast else None
+            start, targets = _load_targets(w, ins, lane, dst_address, bar_address, dst, None, ranks)
             nbytes = _raw_size(w, ins, ops[2], lane, start, source)
-            bar = cta.mbarrier(int(_address(w, ins, ops[3])[lane]), w, ins, [lane])
-            idx = _smem_bytes(w, ins, start, nbytes, 0, "load")
+            indices = [_smem_bytes(w, ins, start, nbytes, 0, "load", target) for target, _ in targets]
             addrs = np.uint64(source) + np.arange(nbytes, dtype=np.uint64)
             data = w.mem.read(addrs, _UINT[1])
-            _load(w, ins, lane, start, idx, data, bar, source=addrs)
+            for (target, bar), idx in zip(targets, indices):
+                _load(w, ins, lane, start, idx, data, bar, source=addrs, target=target)
         elif nd:  # [tensor_map, {coords}], [smem]
             if len(ops) != 2 + hint:
                 raise unsupported(ins, "expected [tensor_map, {coords}], [src]")
             info, coords = _tensor_map(w, ins, ops[0], lane, nd)
-            start = int(_address(w, ins, ops[1])[lane])
+            start = local_shared_offset(int(_address(w, ins, ops[1])[lane]))
             _check_alignment(w, ins, info, start, lane)
             idx = _smem_bytes(w, ins, start, info.box_bytes, info.swizzle, "store")
             addrs, inside = tm.element_addresses(info, coords)
@@ -288,7 +320,7 @@ def _cp(w, ins, mask):
             if len(ops) != 3 + hint:
                 raise unsupported(ins, "expected [dst], [src], size")
             target = int(_address(w, ins, ops[0])[lane])
-            start = int(_address(w, ins, ops[1])[lane])
+            start = local_shared_offset(int(_address(w, ins, ops[1])[lane]))
             nbytes = _raw_size(w, ins, ops[2], lane, start, target)
             idx = _smem_bytes(w, ins, start, nbytes, 0, "store")
 

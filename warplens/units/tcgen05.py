@@ -47,7 +47,7 @@ from ..errors import ExecutionError
 from ..frontend.ir import Mem, Reg, Vec
 from ..host.tensor_map import swizzle_offsets
 from .alu import _address, op, unsupported
-from .smem import GENERIC_WINDOW, MAX_SMEM_BYTES
+from .smem import CLUSTER_WINDOW, GENERIC_WINDOW, local_shared_offset, resolve_shared
 
 LANES, COLUMNS = 128, 512
 _LAYOUTS = {0: (0, 16), 6: (1, 32), 4: (2, 64), 2: (3, 128)}  # layout type -> (swizzle bits, row bytes)
@@ -217,16 +217,18 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
                              "or 128, cta_group::2 needs M of 128 or 256, and N is 8 to 256")
     sign = (-1.0 if (idesc >> 13) & 1 else 1.0) * (-1.0 if (idesc >> 14) & 1 else 1.0)
 
-    # One CTA, or the pair (this CTA and the next rank) of a cta_group::2 MMA. In a pair each
+    # One CTA, or the even/odd pair of a cta_group::2 MMA. Either CTA may issue it. Each
     # CTA holds half of A's rows and half of B's rows in its own shared memory, at the same
     # descriptor addresses, and receives its half of the result in its own tensor memory.
     members = [cta]
     if pair:
-        if cta.rank % 2 or cta.rank + 1 >= len(cta.cluster.ctas):
-            raise ExecutionError("a cta_group::2 MMA must be issued by the even-ranked CTA of a "
+        even_rank = cta.rank & ~1
+        if even_rank + 1 >= len(cta.cluster.ctas):
+            raise ExecutionError("a cta_group::2 MMA requires both CTAs of a "
                                  f"pair; this is rank {cta.rank} in a cluster of "
                                  f"{len(cta.cluster.ctas)}")
-        members.append(cta.peer(cta.rank + 1))
+        # Matrix placement follows rank parity, not which CTA issued the MMA.
+        members = [cta.peer(even_rank), cta.peer(even_rank + 1)]
     rows_m, rows_n = m_dim // len(members), n_dim // len(members)
     n = np.arange(n_dim)[None, :]
     m = np.arange(rows_m)[:, None]
@@ -472,9 +474,10 @@ def _tcgen05(w, ins, mask):
         offsets = _address(w, ins, ins.operands[0])[mask]
         if "shared::cta" not in ins.mods:
             window = np.uint64(GENERIC_WINDOW)
-            if not ((offsets >= window) & (offsets < window + np.uint64(MAX_SMEM_BYTES))).all():
+            if not ((offsets >= window) & (offsets < window + np.uint64(CLUSTER_WINDOW))).all():
                 raise ExecutionError("generic tcgen05.alloc destination does not point to shared memory")
             offsets = offsets - window
+        offsets = local_shared_offset(offsets)
         if (offsets % 4).any():
             raise ExecutionError("tcgen05.alloc destination must be aligned to 4 bytes")
         # Check every destination before reserving memory. The PTX contract requires
@@ -517,7 +520,7 @@ def _tcgen05(w, ins, mask):
             raise unsupported(ins)
         addresses = _address(w, ins, ins.operands[0])
         if "shared::cluster" not in ins.mods:
-            shared = (addresses >= GENERIC_WINDOW) & (addresses < GENERIC_WINDOW + MAX_SMEM_BYTES)
+            shared = (addresses >= GENERIC_WINDOW) & (addresses < GENERIC_WINDOW + CLUSTER_WINDOW)
             if not shared[mask].all():
                 raise ExecutionError("generic tcgen05.commit address does not point to shared memory")
             addresses = addresses - np.uint64(GENERIC_WINDOW)
@@ -525,11 +528,12 @@ def _tcgen05(w, ins, mask):
             l = int(l)
             # With multicast the arrival goes to the mbarrier at this offset in every CTA
             # of the cluster whose rank is set in the mask.
-            targets = [cta]
+            target, offset = resolve_shared(cta, int(addresses[l]))
+            targets = [target]
             if multicast:
                 ranks = int(w.read_address(ins.operands[1])[l]) & 0xFFFF  # a 16-bit operand
                 targets = [cta.peer(r) for r in range(16) if ranks >> r & 1]
-            bars = [t.mbarrier(int(addresses[l]), w, ins, [l]) for t in targets]
+            bars = [t.mbarrier(offset, w, ins, [l]) for t in targets]
             # A commit covers every earlier MMA from this thread, including
             # operations already tracked by another barrier. Other lanes in
             # the warp cannot commit on the issuing thread's behalf.

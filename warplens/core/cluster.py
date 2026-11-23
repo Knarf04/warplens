@@ -8,6 +8,7 @@ different CTAs interleave.
 from __future__ import annotations
 
 from .cta import Wait
+from ..errors import ExecutionError
 
 
 class Cluster:
@@ -19,6 +20,7 @@ class Cluster:
         self.warps: list = []
         self.arrived: list = []  # warps that arrived at the cluster barrier in this round
         self.waiting: list = []
+        self.knowledge: set[int] = set()  # only knowledge released at arrival
         self.owed: dict[int, set] = {}  # knowledge for warps whose round completed before they waited
 
     def add(self, cta) -> None:
@@ -39,18 +41,25 @@ class Cluster:
         return {(c.rank, offset): bar for c in self.ctas for offset, bar in c.mbarriers.items()}
 
     # -- the cluster barrier: barrier.cluster.arrive / barrier.cluster.wait ---------------
-    def barrier_arrive(self, warp) -> None:
-        if not any(w is warp for w in self.arrived):
-            self.arrived.append(warp)
+    def barrier_arrive(self, warp, ins=None, *, release: bool = True) -> None:
+        if any(w is warp for w in self.arrived):
+            raise ExecutionError("arrived at the cluster barrier twice before its phase completed")
+        # A completed older phase need not be waited on, but its knowledge
+        # cannot satisfy the wait corresponding to this new arrival.
+        self.owed.pop(id(warp), None)
+        self.arrived.append(warp)
+        if release:
+            self.knowledge |= warp.seen
 
     def barrier_wait(self, warp, ins) -> None:
-        """Block until every running warp of the cluster has arrived in this round.
-        A warp that did not arrive, or whose round already completed, does not wait."""
-        if any(w is warp for w in self.arrived):
-            self.waiting.append(warp)
-            warp.blocked = Wait("cluster barrier", ins)
-        else:
-            warp.seen |= self.owed.pop(id(warp), set())
+        """Acquire the preceding arrival's phase, or wait until it completes."""
+        if id(warp) in self.owed:
+            warp.seen |= self.owed.pop(id(warp))
+            return
+        # A wait with no arrival cannot satisfy the all-thread arrival count.
+        # It blocks rather than silently allowing this warp to pass the barrier.
+        self.waiting.append(warp)
+        warp.blocked = Wait("cluster barrier", ins)
 
     def _release_cluster_barrier(self) -> bool:
         if not self.arrived:
@@ -58,7 +67,7 @@ class Cluster:
         here = {id(w) for w in self.arrived}
         if not all(w.done or id(w) in here for w in self.warps):
             return False
-        known = set().union(*(w.seen for w in self.arrived))
+        known = self.knowledge
         waiting = {id(w) for w in self.waiting}
         for warp in self.arrived:  # warps that met at the barrier share what they know,
             if id(warp) in waiting:  # each one when it waits
@@ -68,6 +77,7 @@ class Cluster:
                 self.owed[id(warp)] = known
         released = bool(self.waiting)
         self.arrived, self.waiting = [], []
+        self.knowledge = set()
         for cta in self.ctas:
             cta.smem.epoch += 1
         return released
@@ -92,7 +102,23 @@ class Cluster:
         cta = self.next_async()
         return cta.complete_next_async() if cta is not None else False
 
+    def retire_ctas(self) -> None:
+        """Record in-flight work at each CTA's exit, even while its peers run."""
+        for cta in self.ctas:
+            if not cta.retired and all(w.done for w in cta.warps):
+                after = max(w.time for w in cta.warps) if cta.timeline is not None else None
+                cta.retire(after=after)
+
     def finish(self) -> None:
+        self.retire_ctas()
+        # Complete pending work in cluster order before inspecting any remote
+        # mbarrier's final counts. A different CTA can still complete that bar.
+        while (source := self.next_async()) is not None:
+            if source.timeline is not None:
+                when = source.async_queue[0][0]
+                for cta in self.ctas:
+                    cta.timeline.now = when
+            source.complete_next_async()
         for cta in self.ctas:
             cta.finish()
 

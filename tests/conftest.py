@@ -53,3 +53,19 @@ def run_lanes(sim, instr: str, in_types, out_type: str, inputs):
 @pytest.fixture
 def sim():
     return warplens.Device("B200")
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """With WARPLENS_NO_SKIPS=1 a skipped test fails the run. CI's full job sets it, so a
+    missing toolchain or package there is an error instead of silently reduced coverage."""
+    import os
+    if os.environ.get("WARPLENS_NO_SKIPS") != "1":
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    skipped = reporter.stats.get("skipped", []) if reporter else []
+    if skipped:
+        reporter.write_line(f"WARPLENS_NO_SKIPS=1: {len(skipped)} test(s) were skipped; failing the run",
+                            red=True)
+        for report in skipped:
+            reporter.write_line(f"  {report.nodeid}: {report.longrepr[2] if isinstance(report.longrepr, tuple) else ''}")
+        session.exitstatus = 1

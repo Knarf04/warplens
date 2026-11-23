@@ -2,10 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "ci/**"]
   pull_request:
 
 jobs:
+  # The core suite on every supported Python, with nothing but NumPy and PyYAML.
+  # Tests that need a toolchain or an optional package are skipped here and run in `full`.
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -32,3 +34,28 @@ jobs:
       - run: pip install -e ".[dev,triton]"
       # Exercise the optional frontend, including install/cleanup, without a GPU.
       - run: pytest -q tests/test_triton*.py
+
+  # Everything, with no test allowed to skip: the conda env from env/ supplies nvcc and the
+  # CUDA headers (compile-only, no GPU), so the CUTLASS tutorials are fetched and built, the
+  # shim libraries are compiled, and Triton and the CuTe DSL are installed.
+  full:
+    runs-on: ubuntu-latest
+    env:
+      CUDA_VISIBLE_DEVICES: ""
+      WARPLENS_NO_SKIPS: "1"
+    defaults:
+      run:
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: env/environment.yml
+          cache-environment: true
+      - run: env/check.sh
+      - run: pip install -e ".[dev,triton]" nvidia-cutlass-dsl
+      - name: Build the CUTLASS tutorials (PTX and host programs)
+        run: examples/03_cutlass_mma/build.sh --programs
+      - name: Build the shim libraries
+        run: warplens/shim/build.sh
+      - run: pytest -q -rs

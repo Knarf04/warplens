@@ -63,9 +63,58 @@ float32 -> TF32 with cvt.rna.tf32.f32
 So an MMA result is correct to float32 rounding error, and is not meant to
 match hardware bit for bit. Tests compare against NumPy with a tolerance.
 
+## Small formats and block scaling (host side only)
+
+`warplens.numerics` models the formats behind Blackwell's low-precision MMAs
+through their bit patterns. **It does not execute the block-scaled
+`tcgen05.mma` instructions**; it encodes, decodes and quantizes on the host.
+
+| Format | Bits | Notes |
+| --- | --- | --- |
+| `E4M3` | 8 | one NaN code per sign, no infinity, largest 448 |
+| `E5M2` | 8 | IEEE-style infinity and NaNs, largest 57344 |
+| `E2M1` | 4 | no NaN or infinity; magnitudes 0, 0.5, 1, 1.5, 2, 3, 4, 6 |
+| `UE8M0` | 8 | unsigned power of two, `2^(code - 127)`; a block scale |
+| `UE4M3` | 8 | E4M3 without the sign; a block scale |
+
+Bit widths and NaN conventions are taken from `cutlass/exmy_base.h`. Every
+format has at most 256 codes, so decoding is tested for every code against the
+definition evaluated with exact arithmetic, and encoding is tested on every
+midpoint between neighbouring values (ties go to the even code). Encoding
+saturates at the largest finite value, like PTX's `.satfinite`. None of this
+has been compared with a GPU's conversion instructions.
+
+| Block format | Elements | Scale | Per block |
+| --- | --- | --- | --- |
+| MXFP8 | `E4M3` or `E5M2` | `UE8M0`, powers of two | 32 |
+| MXFP4 | `E2M1` | `UE8M0`, powers of two | 32 |
+| NVFP4 | `E2M1` | `UE4M3`, 8 steps per octave, plus one float32 scale per tensor | 16 |
+
+How a scale is chosen is a recipe, not part of the format. `quantize` uses the
+OCP Microscaling recipe for MX (put the block's peak in the element format's
+top binade) and peak / 6 for NVFP4; you can pass your own scales. Two effects
+are visible with `explain_block` and `compare_formats`:
+
+- Under the MX recipe the peak can saturate. E2M1's top binade is [4, 8) but
+  its largest value is 6, so a scaled value of 7.5 is stored as 6.
+- NVFP4's finer scale puts each block's peak within a few percent of the top
+  of the range, where a power-of-two scale can leave up to half of it unused.
+
+On 6400 standard normal samples:
+
+```
+format         bits/value   scale steps      RMS error   relative
+MXFP8 (E4M3)       8.25     powers of two    0.030038     3.01%
+MXFP8 (E5M2)       8.25     powers of two    0.053614     5.37%
+MXFP4              4.25     powers of two     0.11534    11.55%
+NVFP4              4.50     8 per octave     0.094871     9.50%
+```
+
 ## Not built
 
 - A reference mode that evaluates an MMA with explicit, documented rounding at
   every step, for small examples.
 - Bit inspection for anything other than a single TF32 conversion.
-- bf16, the 8-, 6- and 4-bit formats, and block scaling.
+- Execution of bf16, 8-, 6- and 4-bit and block-scaled MMAs: the packed operands,
+  the descriptor fields, and the scale matrices in TMEM with their layout and
+  synchronization. The 6-bit formats (E3M2, E2M3) are not in the host layer either.

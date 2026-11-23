@@ -41,10 +41,11 @@ def test_round_trip_does_not_depend_on_async_timing(delay):
 
 
 def test_expect_tx_too_small_is_caught():
-    _, stats = tma_copy("128B", (16, 32), EXPECT_TOO_FEW)
-    (f,) = stats.findings
-    assert f.kind == "mbarrier-tx-mismatch" and "cp.async.bulk.tensor.2d.shared" in f.text
-    assert "2048 byte(s) delivered" in f.message and "expected only 1024" in f.message
+    with pytest.raises(warplens.DeadlockError) as info:
+        tma_copy("128B", (16, 32), EXPECT_TOO_FEW)
+    msg = str(info.value)
+    assert "1024 completion byte(s) have not been accounted for" in msg
+    assert "expect_tx too small or missing" in msg
 
 
 def test_expect_tx_too_large_is_a_deadlock_that_names_the_mbarrier():

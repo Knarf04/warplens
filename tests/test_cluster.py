@@ -245,14 +245,14 @@ def test_pair_layout_view(capsys):
         tmem_view.pair_text(64, 16)
 
 
-def test_two_cta_mma_must_come_from_the_even_cta_of_a_pair(sim):
+def test_two_cta_mma_requires_a_complete_pair(sim):
     mod = kernel("""
         .reg .b32 %a; .reg .b64 %d; .reg .pred %p;
         setp.ne.u32 %p, %a, %a;
         tcgen05.mma.cta_group::2.kind::f16 [%a], %d, %d, 0x08200010, {0, 0, 0, 0, 0, 0, 0, 0}, %p;
         ret;
     """)
-    with pytest.raises(warplens.ExecutionError, match="even-ranked CTA of a\\s+pair; this is rank 0 in a cluster of 1"):
+    with pytest.raises(warplens.ExecutionError, match="requires both CTAs of a pair; this is rank 0 in a cluster of 1"):
         sim.launch(mod, "k", grid=1, block=1)
 
 

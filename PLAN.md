@@ -2,7 +2,7 @@
 
 **Understand a Blackwell GPU by watching it run, on your CPU.**
 
-> Status: planning (2026-11-23).
+> Status: M0 done (2026-11-23); see docs/m0.md.
 > GitHub description: *Understand a Blackwell GPU by watching it run, on your CPU.*
 > Topics: `cuda` `gpu` `blackwell` `simulator` `ptx` `cutlass` `triton` `tensor-cores` `gpu-programming`
 

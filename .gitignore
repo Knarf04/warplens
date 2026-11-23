@@ -1,2 +1,4 @@
 CLAUDE.md
-AGENTS.md
+AGENTS.md__pycache__/
+*.egg-info/
+.pytest_cache/

@@ -34,7 +34,7 @@ def dim3(value, what: str) -> tuple[int, int, int]:
     return tuple(int(d) for d in dims) + (1,) * (3 - len(dims))
 
 
-def encode_args(fn: Function, args) -> dict[str, tuple[int, int]]:
+def encode_args(fn: Function, args, *, mem) -> dict[str, tuple[int, int]]:
     """Convert host arguments to raw parameter bits: name -> (bits, size in bytes)."""
     from .device import DeviceArray
 
@@ -46,6 +46,8 @@ def encode_args(fn: Function, args) -> dict[str, tuple[int, int]]:
         dt = NP_TYPES[param.type]
         what = f"argument {k} (`{param.name}`, .{param.type})"
         if isinstance(arg, DeviceArray):
+            if arg.device.memory is not mem:
+                raise LaunchError(f"{what} belongs to a different device")
             if dt.itemsize != 8 or dt.kind == "f":
                 raise LaunchError(f"{what} cannot hold a device pointer")
             bits = arg.addr
@@ -73,7 +75,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, trace=None,
     threads = bx * by * bz
     if threads > MAX_THREADS_PER_BLOCK:
         raise LaunchError(f"block {(bx, by, bz)} has {threads} threads; the limit is {MAX_THREADS_PER_BLOCK}")
-    params = encode_args(program.fn, args)
+    params = encode_args(program.fn, args, mem=mem)
 
     # Per-lane thread coordinates for each warp of a CTA are the same in every CTA.
     nwarps = -(-threads // WARP_SIZE)

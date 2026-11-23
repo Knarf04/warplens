@@ -69,6 +69,56 @@ def test_mad_and_fma(sim):
     assert run_lanes(sim, "fma.rn.f32 %d, %a0, %a1, %a2;", ["f32"] * 3, "f32", [x, y, z]).tolist() == [3.25, -5.0]
 
 
+@pytest.mark.parametrize("opcode", ["fma", "mad"])
+def test_float_multiply_add_rounds_once(sim, opcode):
+    # Lane 0 cancels bits lost by a rounded f32 product. In lanes 1 and 2,
+    # the exact product is a rounding midpoint and a tiny addend selects its
+    # neighbor; evaluating the sum in f64 loses that addend and rounds wrong.
+    a = f32(1 + 2**-23, 1 + 2**-23, 1 + 2**-23)
+    b = f32(1 - 2**-23, 1.5, 1.5)
+    c = f32(-1, -2**-80, 2**-80)
+    out = run_lanes(sim, f"{opcode}.rn.f32 %d, %a0, %a1, %a2;", ["f32"] * 3, "f32", [a, b, c])
+    assert out[0] == -2**-46
+    assert out[1:].view(np.uint32).tolist() == [0x3FC00001, 0x3FC00002]
+
+
+@pytest.mark.parametrize("ty, dtype", [("f16", np.float16), ("f32", np.float32), ("f64", np.float64)])
+def test_fma_rounding_boundaries_and_exceptional_values(sim, ty, dtype):
+    info = np.finfo(dtype)
+    tiny = info.smallest_subnormal
+    largest_subnormal = np.nextafter(dtype(info.tiny), dtype(0))
+    # Expected results follow exact binary arithmetic, including ties to even
+    # at zero and the normal/subnormal boundary, and finite-product overflow
+    # that must not occur before the addition.
+    a = np.array([info.max, tiny, -tiny, tiny, tiny, np.nan, np.inf,
+                  np.inf, info.max, -np.inf, 1], dtype=dtype)
+    b = np.array([2, .5, .5, .5, .5, 1, 0, 1, info.max, -1, 1], dtype=dtype)
+    c = np.array([-info.max, 0, -0.0, tiny, largest_subnormal, 1, 0,
+                  -np.inf, -np.inf, 0, np.inf], dtype=dtype)
+    out = run_lanes(sim, f"fma.rn.{ty} %d, %a0, %a1, %a2;", [ty] * 3, ty, [a, b, c])
+    expected = np.array([info.max, 0, -0.0, 2 * tiny, info.tiny, np.nan,
+                         np.nan, np.nan, -np.inf, np.inf, np.inf], dtype=dtype)
+    np.testing.assert_array_equal(out, expected)
+    assert np.signbit(out[1:3]).tolist() == [False, True]
+
+
+@pytest.mark.parametrize("ty, dtype, delta", [("f16", np.float16, 2**-6),
+                                            ("f64", np.float64, 2**-27)])
+def test_fma_cancellation_other_widths(sim, ty, dtype, delta):
+    inputs = [np.array([v], dtype=dtype) for v in (1 + delta, 1 - delta, -1)]
+    out = run_lanes(sim, f"fma.rn.{ty} %d, %a0, %a1, %a2;", [ty] * 3, ty, inputs)
+    assert out[0] == -(delta**2)
+
+
+def test_fma_zero_signs(sim):
+    a = f32(0, 0, -0.0, -0.0, 0, 0, -0.0, -0.0, 1)
+    b = f32(1, 1, 1, 1, -1, -1, -1, -1, 1)
+    c = f32(0, -0.0, 0, -0.0, 0, -0.0, 0, -0.0, -1)
+    out = run_lanes(sim, "fma.rn.f32 %d, %a0, %a1, %a2;", ["f32"] * 3, "f32", [a, b, c])
+    assert (out == 0).all()
+    assert np.signbit(out).tolist() == [False, False, False, True, False, True, False, False, False]
+
+
 def test_float_arithmetic_on_bit_registers(sim):
     # nvcc keeps floats in .b32 registers and lets the instruction type interpret them.
     a, b = f32(1.5, -0.0, np.inf), f32(2.25, 0.0, -np.inf)
@@ -76,6 +126,17 @@ def test_float_arithmetic_on_bit_registers(sim):
     assert out[0] == 3.75 and out[1] == 0.0 and np.isnan(out[2])
     assert run_lanes(sim, "max.f32 %d, %a0, %a1;", ["f32", "f32"], "f32",
                      [f32(np.nan, 1.0), f32(2.0, np.nan)]).tolist() == [2.0, 1.0]
+
+
+@pytest.mark.parametrize("ty, dtype", [("f16", np.float16), ("f32", np.float32), ("f64", np.float64)])
+@pytest.mark.parametrize("opcode, signs", [("min", [True, True, True, False]),
+                                          ("max", [False, False, True, False])])
+def test_min_max_signed_zero_order(sim, ty, dtype, opcode, signs):
+    a = np.array([-0.0, 0.0, -0.0, 0.0, np.nan, -0.0], dtype=dtype)
+    b = np.array([0.0, -0.0, -0.0, 0.0, -0.0, np.nan], dtype=dtype)
+    out = run_lanes(sim, f"{opcode}.{ty} %d, %a0, %a1;", [ty] * 2, ty, [a, b])
+    assert (out == 0).all()
+    assert np.signbit(out).tolist() == signs + [True, True]
 
 
 def test_float_immediates(sim):
@@ -93,6 +154,19 @@ def test_cvt_float_to_int_rounds_and_saturates(sim):
     assert run_lanes(sim, "cvt.rmi.s32.f32 %d, %a0;", ["f32"], "s32", [x])[[0, 1, 6]].tolist() == [2, -3, -1]
     assert run_lanes(sim, "cvt.rzi.u32.f32 %d, %a0;", ["f32"], "u32", [x]).tolist() == \
         [2, 0, 3, 0xFFFFFFFF, 0, 0, 0]
+
+
+@pytest.mark.parametrize("aty", ["f16", "f32", "f64"])
+@pytest.mark.parametrize("dty", ["s8", "u8", "s16", "u16", "s32", "u32", "s64", "u64"])
+def test_cvt_nan_integer_result_depends_on_types(sim, aty, dty):
+    x = np.array([np.nan], dtype="float" + aty[1:])
+    out = run_lanes(sim, f"cvt.rzi.{dty}.{aty} %d, %a0;", [aty], dty, [x])
+    expected = 0
+    if aty == "f64" or dty in ("s64", "u64"):
+        expected = 1 << (int(dty[1:]) - 1)
+        if dty.startswith("s"):
+            expected = -expected
+    assert out.tolist() == [expected]
 
 
 def test_cvt_integer_widths(sim):

@@ -9,7 +9,9 @@ that names the instruction and its PTX line.
 | --- | --- |
 | `.version`, `.target`, `.address_size` | parsed |
 | `.entry` kernels with scalar `.param`s (`.ptr`, `.align` accepted) | yes |
+| `.entry` declarations without a body | no; rejected explicitly |
 | `.reg` declarations, including `%r<N>` ranges | yes |
+| decimal floating-point literals, including `1e-3`, `.5`, and `1.` | yes |
 | labels, `@%p` / `@!%p` predication on any instruction | yes |
 | performance directives before the body (`.maxntid`, ...), `.pragma` | ignored |
 | `.func` and `call`, `.global` / `.const` / `.shared` / `.local` variables | no |
@@ -21,7 +23,7 @@ that names the instruction and its PTX line.
 | --- | --- | --- |
 | Moves | `mov`, `cvta[.to].global` | no symbol addresses |
 | Integer | `add`, `sub`, `mul.{lo,hi,wide}`, `mad.{lo,hi,wide}`, `div`, `rem`, `min`, `max`, `neg`, `abs` | no `.sat`, no carry forms |
-| Float | `add`, `sub`, `mul`, `div`, `fma`, `min`, `max`, `neg`, `abs`, `sqrt` | round-to-nearest only |
+| Float | `add`, `sub`, `mul`, `div`, `fma`, `mad`, `min`, `max`, `neg`, `abs`, `sqrt` | round-to-nearest only; `fma` and floating `mad` round once |
 | Bitwise | `and`, `or`, `xor`, `not`, `shl`, `shr` | also on `.pred` (not shifts) |
 | Compare | `setp` with `eq ne lt le gt ge lo ls hi hs`, unordered `equ neu ltu leu gtu geu`, `num`, `nan`; `selp` | no combined-predicate or paired-destination forms |
 | Convert | `cvt` int↔int, int↔float, float↔float, float→int with `.rni/.rzi/.rmi/.rpi` (saturating) | no `.sat` on int→int |

@@ -11,6 +11,7 @@ import numpy as np
 
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
 from ..frontend.ir import Instr, Mem, NP_TYPES, Sym, UINT_BY_SIZE, Vec
+from .floating import fused_multiply_add
 
 HANDLERS: dict = {}
 
@@ -129,6 +130,9 @@ def _mul(w, ins, mask):
 
 @op("mad")
 def _mad(w, ins, mask):
+    if ins.mods and ins.mods[-1] in NP_TYPES and _is_float(ins.mods[-1]):
+        # On the supported sm_20+ targets, floating mad is an alias for fma.
+        return _fma(w, ins, mask)
     d, a, b, c = _operands(ins, 4)
     prod, ty = _mul_parts(w, ins, a, b)
     w.write(d, prod + w.read(c, ty), mask)
@@ -139,12 +143,7 @@ def _fma(w, ins, mask):
     ty, _ = _type(ins, allowed=_ROUND_NEAREST, kinds="f")
     d, a, b, c = _operands(ins, 4)
     x, y, z = w.read(a, ty), w.read(b, ty), w.read(c, ty)
-    if ty == "f64":
-        # No fused multiply-add in NumPy; double rounding is possible here.
-        w.write(d, x * y + z, mask)
-    else:
-        wide = np.float64
-        w.write(d, (x.astype(wide) * y.astype(wide) + z.astype(wide)).astype(x.dtype), mask)
+    w.write(d, fused_multiply_add(x, y, z), mask)
 
 
 @op("div", "rem")
@@ -178,9 +177,15 @@ def _min_max(w, ins, mask):
     x, y = w.read(a, ty), w.read(b, ty)
     if _is_float(ty):
         fn = np.fmin if ins.opcode == "min" else np.fmax  # a NaN operand yields the other one
+        result = fn(x, y)
+        both_zero = (x == 0) & (y == 0)
+        negative = (np.signbit(x) | np.signbit(y)) if ins.opcode == "min" else \
+            (np.signbit(x) & np.signbit(y))
+        result[both_zero] = np.copysign(np.zeros_like(x), np.where(negative, -1, 1))[both_zero]
     else:
         fn = np.minimum if ins.opcode == "min" else np.maximum
-    w.write(d, fn(x, y), mask)
+        result = fn(x, y)
+    w.write(d, result, mask)
 
 
 @op("neg", "abs")
@@ -306,7 +311,10 @@ def _cvt(w, ins, mask):
         high = r >= float(info.max)
         low = r <= float(info.min)
         mid = ~(nan | high | low)
-        out = np.zeros(len(r), dtype=dd)  # NaN converts to 0
+        out = np.zeros(len(r), dtype=dd)
+        if aty == "f64" or dty in ("s64", "u64"):
+            # PTX uses the sign-bit sentinel for these NaN conversions.
+            out[nan] = info.min if dd.kind == "i" else 1 << (dd.itemsize * 8 - 1)
         out[mid] = r[mid].astype(dd)
         out[high] = info.max  # float-to-int saturates
         out[low] = info.min

@@ -11,8 +11,11 @@ CUresult cuTensorMapEncodeTiled(CUtensorMap *tensorMap, CUtensorMapDataType tens
                                 const cuuint32_t *boxDim, const cuuint32_t *elementStrides,
                                 CUtensorMapInterleave interleave, CUtensorMapSwizzle swizzle,
                                 CUtensorMapL2promotion l2Promotion, CUtensorMapFloatOOBfill oobFill) {
-  (void)l2Promotion;
-  if (tensorRank < 1 || tensorRank > 5) return CUDA_ERROR_INVALID_VALUE;
+  if (!tensorMap || (uintptr_t)tensorMap % 64 || !globalDim || !boxDim || !elementStrides ||
+      tensorRank < 1 || tensorRank > 5 || (tensorRank > 1 && !globalStrides) ||
+      l2Promotion < CU_TENSOR_MAP_L2_PROMOTION_NONE || l2Promotion > CU_TENSOR_MAP_L2_PROMOTION_L2_256B ||
+      oobFill < CU_TENSOR_MAP_FLOAT_OOB_FILL_NONE || oobFill > CU_TENSOR_MAP_FLOAT_OOB_FILL_NAN_REQUEST_ZERO_FMA)
+    return CUDA_ERROR_INVALID_VALUE;
   uint32_t head[5] = {(uint32_t)tensorDataType, tensorRank, (uint32_t)swizzle, (uint32_t)oobFill,
                       (uint32_t)interleave};
   uint64_t address = (uint64_t)globalAddress, dims[5] = {0}, strides[4] = {0};
@@ -28,4 +31,4 @@ CUresult cuTensorMapEncodeTiled(CUtensorMap *tensorMap, CUtensorMapDataType tens
              ? CUDA_ERROR_INVALID_VALUE : CUDA_SUCCESS;
 }
 
-CUresult cuInit(unsigned int flags) { (void)flags; return CUDA_SUCCESS; }
+CUresult cuInit(unsigned int flags) { return flags ? CUDA_ERROR_INVALID_VALUE : CUDA_SUCCESS; }

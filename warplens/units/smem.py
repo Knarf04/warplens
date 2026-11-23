@@ -109,10 +109,14 @@ class SharedMemory:
         self.async_writer[idx] = op_id
         self.async_active = True
 
-    def finish_async_write(self, idx: np.ndarray, data: np.ndarray) -> None:
+    def finish_async_write(self, idx: np.ndarray, data: np.ndarray, *, writer_warp=None) -> None:
         self.data[idx] = data
-        self._writer[idx] = ASYNC_PROXY
-        self.unfenced[idx] = False
+        # Non-bulk cp.async is a generic-proxy write, unlike a TMA load. A later
+        # bulk copy/MMA still needs fence.proxy.async before consuming these bytes.
+        self._writer[idx] = ASYNC_PROXY if writer_warp is None else writer_warp
+        if writer_warp is not None:
+            self._write_epoch[idx] = self.epoch
+        self.unfenced[idx] = writer_warp is not None
 
     def fence_async(self, warp: int) -> None:
         """fence.proxy.async by `warp`: its own earlier writes, and writes that a

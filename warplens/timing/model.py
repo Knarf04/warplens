@@ -179,7 +179,8 @@ class Timeline:
             for address in new:
                 self.l2_ready[address] = min(self.l2_ready.get(address, done), done)
             self.bytes_loaded += nbytes
-            self.slice("TMA engine", f"TMA {operation.kind}", start, done, bytes=nbytes,
+            label = "cp.async copy" if operation.kind == "copy" else f"TMA {operation.kind}"
+            self.slice("TMA engine", label, start, done, bytes=nbytes,
                        from_hbm=int(fresh), issued_ns=issued, line=operation.ins.line)
         elif operation.kind == "mma":
             flops = work.get("flops", 0.0)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..errors import MemoryFault
+from ..errors import ExecutionError, MemoryFault
 
 
 class GlobalMemory:
@@ -35,6 +35,23 @@ class GlobalMemory:
         if len(hit) != 1:
             raise KeyError(f"no allocation starts at {addr:#x}")
         return self._bufs[int(hit[0])]
+
+    def free(self, addr: int) -> None:
+        """Release an allocation without reusing its address."""
+        if addr == 0:
+            return
+        (hit,) = np.nonzero(self._bases == np.uint64(addr))
+        if len(hit) != 1:
+            raise ExecutionError(f"cannot free {addr:#x}: no allocation starts at that address")
+        index = int(hit[0])
+        self._bufs.pop(index)
+        self._bases = np.delete(self._bases, index)
+        self._sizes = np.delete(self._sizes, index)
+
+    def validate_range(self, addr: int, nbytes: int, verb: str) -> None:
+        """Check a host transfer before allocating an index for every byte."""
+        if nbytes:
+            self._locate(np.array([addr], dtype=np.uint64), nbytes, verb)
 
     def _locate(self, addrs: np.ndarray, size: int, verb: str):
         idx = np.searchsorted(self._bases, addrs, side="right").astype(np.intp) - 1

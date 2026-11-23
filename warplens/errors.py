@@ -32,7 +32,16 @@ class ExecutionError(WarplensError):
 
 
 class DeadlockError(ExecutionError):
-    """Every unfinished warp is blocked and nothing can release them."""
+    """Every unfinished warp is blocked and nothing can release them.
+
+    `findings` holds what the checkers had reported up to that point, including
+    any mbarrier whose byte count did not balance. The deadlock is the outcome;
+    a finding there is often the cause.
+    """
+
+    def __init__(self, message: str, findings=()):
+        super().__init__(message)
+        self.findings = list(findings)
 
 
 class MemoryFault(ExecutionError):

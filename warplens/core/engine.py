@@ -26,9 +26,11 @@ class Engine:
                     return
                 if cta.release_barriers() or cta.complete_next_async():
                     continue
+                for bar in cta.mbarriers.values():  # record unbalanced byte counts as findings
+                    bar.finish(when="the kernel deadlocked")
                 raise DeadlockError(
                     f"deadlock in CTA {cta.id}: every unfinished warp is blocked and "
-                    f"nothing can release them\n{cta.describe_blocked()}")
+                    f"nothing can release them\n{cta.describe_blocked()}", cta.findings.items)
             for w in runnable:
                 w.step()
                 # Reset a completed phase before another warp can arrive. A

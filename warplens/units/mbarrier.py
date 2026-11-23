@@ -187,14 +187,14 @@ class Mbarrier:
             self.tx_source = (warp, ins, lanes)
         self._check()
 
-    def finish(self) -> None:
+    def finish(self, when: str = "the kernel returned") -> None:
         # Completions may precede expect_tx, so a temporary negative tx-count is
         # valid. Only diagnose unbalanced credits after the kernel has finished.
         if self.tx < 0 and self.tx_source is not None:
             warp, ins, lanes = self.tx_source
             self.cta.findings.add(
                 "mbarrier-tx-mismatch",
-                f"the kernel returned with {-self.tx} completion byte(s) not accounted for by "
+                f"{when} with {-self.tx} completion byte(s) not accounted for by "
                 f"expect_tx on the mbarrier at shared offset {self.offset}; expect_tx is missing "
                 "or too small", warp, ins, lanes)
 

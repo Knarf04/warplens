@@ -40,6 +40,8 @@ for bug in range(1, len(BUGS)):
         ok, stats = run("128B", (16, 32), bug)
     except warplens.DeadlockError as e:
         print(e)
+        for finding in e.findings:  # what the checkers saw before the deadlock
+            print(finding)
         continue
     print(f"output {'correct' if ok else 'WRONG'}")
     for finding in stats.findings:

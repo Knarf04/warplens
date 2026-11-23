@@ -46,11 +46,16 @@ def test_expect_tx_too_small_is_caught():
     msg = str(info.value)
     assert "1024 completion byte(s) have not been accounted for" in msg
     assert "expect_tx too small or missing" in msg
+    # The accounting problem is also available as a structured finding, not only as text.
+    (f,) = [f for f in info.value.findings if f.kind == "mbarrier-tx-mismatch"]
+    assert "the kernel deadlocked with 1024 completion byte(s) not accounted for" in f.message
+    assert "cp.async.bulk.tensor.2d.shared" in f.text and f.cta == (0, 0, 0)
 
 
 def test_expect_tx_too_large_is_a_deadlock_that_names_the_mbarrier():
     with pytest.raises(warplens.DeadlockError) as info:
         tma_copy("128B", (16, 32), EXPECT_TOO_MANY)
+    assert not info.value.findings  # nothing was delivered beyond what was expected
     msg = str(info.value)
     assert "warps 0-3 wait at line" in msg and "mbarrier.try_wait.parity" in msg
     assert "still needs 0 arrival(s) and 2048 byte(s) of TMA data" in msg

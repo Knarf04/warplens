@@ -90,3 +90,76 @@ def fused_multiply_add(x: np.ndarray, y: np.ndarray, z: np.ndarray) -> np.ndarra
     result = [_fma_bits(int(a), int(b), int(c), fraction_bits, exponent_bits)
               for a, b, c in zip(x.view(unsigned), y.view(unsigned), z.view(unsigned))]
     return np.array(result, dtype=unsigned).view(x.dtype)
+
+
+# -- TF32 -------------------------------------------------------------------------------------
+#
+# TF32 is float32 with only 10 fraction bits: sign, 8 exponent bits, 10 fraction
+# bits, and the low 13 fraction bits zero. PTX leaves its internal representation
+# implementation-defined; what is modeled here is the result of the conversion
+# instruction as a 32-bit pattern.
+
+TF32_DISCARDED_BITS = 13
+_TF32_LOW = np.uint32((1 << TF32_DISCARDED_BITS) - 1)
+_TF32_HALF = np.uint32(1 << (TF32_DISCARDED_BITS - 1))
+TF32_MODES = ("rna", "rn", "rz")
+
+
+def to_tf32(bits: np.ndarray, mode: str = "rna") -> np.ndarray:
+    """Convert float32 bit patterns to TF32, as `cvt.<mode>.tf32.f32` does.
+
+    rna  nearest, ties away from zero. Checked bit for bit against an RTX 3080 Ti
+         (validation/ampere/tf32_golden.txt), including these two behaviours:
+         rounding works on the magnitude bits, so subnormals round the same way
+         and the largest finite values round up to infinity; and for an exponent
+         of all ones the low bits are simply cleared, which leaves infinity as
+         it is and can turn a NaN whose payload was only in those bits into infinity.
+    rn   nearest, ties to even.   } Need Hopper or newer, so NOT checked on hardware.
+    rz   toward zero.             } Modeled like rna with a different tie rule.
+    """
+    if mode not in TF32_MODES:
+        raise ValueError(f"unknown TF32 rounding mode {mode!r}")
+    bits = np.asarray(bits, dtype=np.uint32)
+    sign = bits & np.uint32(0x8000_0000)
+    magnitude = bits & np.uint32(0x7FFF_FFFF)
+    low = magnitude & _TF32_LOW
+    kept = magnitude & ~_TF32_LOW
+    if mode == "rz":
+        up = np.zeros(bits.shape, dtype=bool)
+    elif mode == "rna":
+        up = low >= _TF32_HALF
+    else:
+        odd = (kept >> np.uint32(TF32_DISCARDED_BITS)) & np.uint32(1)
+        up = (low > _TF32_HALF) | ((low == _TF32_HALF) & (odd == 1))
+    special = magnitude >= np.uint32(0x7F80_0000)  # infinity or NaN: no rounding
+    rounded = kept + np.where(up & ~special, np.uint32(1 << TF32_DISCARDED_BITS), np.uint32(0))
+    return (sign | rounded).astype(np.uint32)
+
+
+def explain_tf32(value, mode: str = "rna") -> str:
+    """Show, bit by bit, what converting one float32 to TF32 keeps and discards."""
+    x = np.array([value], dtype=np.float32)
+    before = int(x.view(np.uint32)[0])
+    after = int(to_tf32(x.view(np.uint32), mode)[0])
+    y = np.array([after], dtype=np.uint32).view(np.float32)[0]
+
+    def fields(b: int) -> str:
+        return f"{b >> 31:01b} {(b >> 23) & 0xFF:08b} {(b >> 13) & 0x3FF:010b} {b & 0x1FFF:013b}"
+
+    low = before & 0x1FFF
+    lines = [f"float32 -> TF32 with cvt.{mode}.tf32.f32",
+             "              sign exponent fraction kept  fraction discarded",
+             f"  float32     {fields(before)}   {float(x[0]):.9g}",
+             f"  TF32        {fields(after)}   {float(y):.9g}"]
+    if np.isfinite(x[0]) and np.isfinite(y):
+        error = float(y) - float(x[0])
+        relative = f" ({abs(error) / abs(float(x[0])):.3g} relative)" if x[0] != 0 else ""
+        action = "nothing to round" if not low else \
+            ("rounded up" if (after & 0x7FFFFFFF) > (before & 0x7FFFE000) else "rounded down")
+        lines.append(f"  discarded bits {low:013b} ({low} of 8192 of the last kept place): {action}; "
+                     f"error {error:+.9g}{relative}")
+    elif not np.isfinite(y) and np.isfinite(x[0]):
+        lines.append("  rounding up carried past the largest finite TF32 value: the result is infinity")
+    else:
+        lines.append("  infinity or NaN: the low 13 bits are cleared without rounding")
+    return "\n".join(lines)

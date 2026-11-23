@@ -52,6 +52,7 @@ conda env with it.
 - [docs/m2.md](docs/m2.md): TMA, tensor maps, mbarriers, protocol checkers
 - [docs/m3.md](docs/m3.md): tcgen05, tensor memory, running a CUTLASS tutorial
 - [docs/m4.md](docs/m4.md): the timing model, its sources and assumptions, traces and reports
+- [docs/numerics.md](docs/numerics.md): what is computed bit-exactly, what is not, and TF32
 - [docs/coverage.md](docs/coverage.md): which PTX is supported
 - [validation/README.md](validation/README.md): cross-checks against a real GPU
 

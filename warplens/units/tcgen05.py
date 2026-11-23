@@ -243,6 +243,18 @@ def _mma(w, ins, lane: int) -> None:
     w.tcgen_issued.append(operation)
 
     def land():
+        if kind == "tf32":
+            # The operands are used as the float32 values they hold. Real TF32 has only
+            # 10 fraction bits and what the hardware does with the rest is not specified,
+            # so say so rather than silently pick an answer.
+            for which, idx in (("A", idx_a), ("B", idx_b)):
+                if (smem.data[idx].view(np.uint32) & np.uint32(0x1FFF)).any():
+                    cta.findings.add(
+                        "mma-tf32-operand-not-converted",
+                        f"operand {which} of a kind::tf32 MMA holds float32 values with bits "
+                        "below TF32 precision (the low 13 fraction bits). warplens multiplies "
+                        "them as float32; hardware may not. Convert with cvt.rna.tf32.f32 first",
+                        w, ins, [lane])
         a = smem.data[idx_a].view(formats[a_fmt])[..., 0].astype(np.float32)
         b = smem.data[idx_b].view(formats[b_fmt])[..., 0].astype(np.float32)
         result = (a @ b.T * np.float32(sign))[keep]

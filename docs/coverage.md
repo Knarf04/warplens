@@ -32,7 +32,7 @@ that names the instruction and its PTX line.
 | Float | `add`, `sub`, `mul`, `div`, `fma`, `mad`, `min`, `max`, `neg`, `abs`, `sqrt` | round-to-nearest only; `fma` and floating `mad` round once |
 | Bitwise | `and`, `or`, `xor`, `not`, `shl`, `shr` | also on `.pred` (not shifts) |
 | Compare | `setp` with `eq ne lt le gt ge lo ls hi hs`, unordered `equ neu ltu leu gtu geu`, `num`, `nan`; `selp` | no combined-predicate or paired-destination forms |
-| Convert | `cvt` int↔int, int↔float, float↔float, float→int with `.rni/.rzi/.rmi/.rpi` (saturating) | no `.sat` on int→int |
+| Convert | `cvt` int↔int, int↔float, float↔float, float→int with `.rni/.rzi/.rmi/.rpi` (saturating); `cvt.{rna,rn,rz}.tf32.f32` | no `.sat` on int→int |
 | Memory | `ld.param`, `ld.const`, `st.param` (call arguments), `ld`/`st` with `.global`, `.shared`, `.local` or no space (generic), scalar or `.v2`/`.v4` | parameter pointers can be loaded through `.param`, `.global` or generic addresses |
 | Election | `elect.sync d\|p, membermask` | the lowest participating lane is elected |
 | Barriers | `bar.sync a[, count]`, `bar.arrive a, count`; also spelled `barrier` and `.cta`, including `barrier[.cta].{sync,arrive}.aligned` | no `bar.red`; sync count zero means the whole CTA |

@@ -323,6 +323,15 @@ _FLOAT_TO_INT = {"rni": np.rint, "rzi": np.trunc, "rmi": np.floor, "rpi": np.cei
 
 @op("cvt")
 def _cvt(w, ins, mask):
+    if len(ins.mods) == 3 and ins.mods[1:] == ("tf32", "f32"):
+        # float32 -> TF32: keep 10 fraction bits. See units/floating.py for what was
+        # checked on hardware (rna) and what was not (rn, rz).
+        from .floating import TF32_MODES, to_tf32
+        if ins.mods[0] not in TF32_MODES:
+            raise unsupported(ins, "TF32 conversion needs .rna, .rn or .rz")
+        d, a = _operands(ins, 2)
+        w.write(d, to_tf32(w.read(a, "b32"), ins.mods[0]), mask)
+        return
     if len(ins.mods) < 2 or ins.mods[-1] not in NP_TYPES or ins.mods[-2] not in NP_TYPES:
         raise unsupported(ins, "expected cvt[.round].dtype.atype")
     *extra, dty, aty = ins.mods

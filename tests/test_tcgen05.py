@@ -104,11 +104,14 @@ def place(matrix, layout, start, image):
 
 
 def run(sim, m=128, n=32, layout="128B", dtype=np.float16, twice=0, wait=1, shift=0, free=1,
-        negate_a=False, ncols=None, seed=0, block=128, dlane=0):
+        negate_a=False, ncols=None, seed=0, block=128, dlane=0, to_tf32=True):
     rng = np.random.default_rng(seed)
     k = 32 // np.dtype(dtype).itemsize
     a = rng.uniform(-2, 2, (m, k)).astype(dtype)
     b = rng.uniform(-2, 2, (n, k)).astype(dtype)
+    if dtype == np.float32 and to_tf32:  # what a kernel does before a kind::tf32 MMA
+        from warplens.units.floating import to_tf32 as convert
+        a, b = (convert(x.view(np.uint32)).view(np.float32) for x in (a, b))
     image = np.zeros(32768, dtype=np.uint8)
     desc_a = place(a, layout, 0, image)
     desc_b = place(b, layout, 16384, image)
@@ -165,6 +168,14 @@ def test_accumulate_negate_and_tf32(sim):
     got, expect, stats = run(sim, dtype=np.float32, n=16)
     np.testing.assert_allclose(got, expect, rtol=1e-5, atol=1e-5)
     assert not stats.findings
+
+
+def test_tf32_mma_with_unconverted_float32_operands_is_reported(sim):
+    got, expect, stats = run(sim, dtype=np.float32, n=16, to_tf32=False)
+    (f,) = stats.findings
+    assert f.kind == "mma-tf32-operand-not-converted" and f.count == 2  # operands A and B
+    assert "low 13 fraction bits" in f.message and "cvt.rna.tf32.f32" in f.message
+    np.testing.assert_allclose(got, expect, rtol=1e-5, atol=1e-5)  # multiplied as plain float32
 
 
 def test_reading_accumulators_without_waiting_for_the_commit_is_caught(sim):

@@ -15,11 +15,23 @@ from conftest import kernel
 LAYOUTS = {"none": (0, 0, 16), "32B": (6, 1, 32), "64B": (4, 2, 64), "128B": (2, 3, 128)}
 PARAMS = (".param .u64 img, .param .u64 out, .param .u64 da, .param .u64 db, .param .u32 idesc, "
           ".param .u32 nbytes, .param .u32 ncols, .param .u32 n, .param .u32 twice, "
-          ".param .u32 wait, .param .u32 shift, .param .u32 free, .param .u32 dlane")
+          ".param .u32 wait, .param .u32 shift, .param .u32 free, .param .u32 dlane, .param .u64 img2")
 
 
-def mma_kernel(kind="f16"):
+RAW_COPY = ("@%one cp.async.bulk.shared::cluster.global.mbarrier::complete_tx::bytes "
+            "[%buf], [%img], %nb, [%bar];")
+TMA_LOADS = """
+        ld.param.u64 %da2, [img2];
+        add.u32 %x, %buf, 16384;
+        @%one cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%buf], [%img, {0, 0}], [%bar];
+        @%one cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%x], [%da2, {0, 0}], [%bar];"""
+
+
+def mma_kernel(kind="f16", fill=RAW_COPY):
+    """`fill` puts the operands in shared memory: one raw copy of a prepared image,
+    or two TMA tensor loads (A at offset 0, B at 16384)."""
     return kernel(f"""
+        .reg .b64 %da2;
         .reg .b64 %img, %out, %da, %db, %off;
         .reg .b32 %idesc, %nb, %nc, %n, %twice, %wait, %shift, %free;
         .reg .b32 %t, %w, %buf, %bar, %tp, %base, %taddr, %i, %v, %x, %dlane, %maddr;
@@ -42,7 +54,7 @@ def mma_kernel(kind="f16"):
         @%q tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%tp], %nc;
         bar.sync 0;
         @%one mbarrier.arrive.expect_tx.shared::cta.b64 _, [%bar], %nb;
-        @%one cp.async.bulk.shared::cluster.global.mbarrier::complete_tx::bytes [%buf], [%img], %nb, [%bar];
+        {fill}
         mbarrier.try_wait.parity.shared::cta.b64 %p, [%bar], 0;
         ld.shared.u32 %base, [%tp];
         ld.param.u32 %dlane, [dlane];
@@ -105,7 +117,7 @@ def run(sim, m=128, n=32, layout="128B", dtype=np.float16, twice=0, wait=1, shif
     out = sim.from_numpy(np.full((128, n), np.nan, dtype=np.float32))
     stats = sim.launch(mma_kernel("f16" if dtype == np.float16 else "tf32"), "k", grid=1, block=block,
                        args=[sim.from_numpy(image), out, desc_a, desc_b, idesc, len(image),
-                             ncols or max(32, 1 << (n - 1).bit_length()), n, twice, wait, shift, free, dlane])
+                             ncols or max(32, 1 << (n - 1).bit_length()), n, twice, wait, shift, free, dlane, 0])
     expect = a.astype(np.float32) @ b.astype(np.float32).T * (-1 if negate_a else 1) * (2 if twice else 1)
     return out.numpy(), expect, stats
 
@@ -314,3 +326,44 @@ def test_store_then_load_with_each_shape(sim, shape, count, half):
     expect = (32 * warp + 16 * half + np.tile(lanes, (4, 1))) * 1000 + np.tile(columns, (4, 1))
     np.testing.assert_array_equal(out.numpy(), expect)
     assert not stats.findings
+
+
+# -- TMA feeding the MMA --------------------------------------------------------------------
+
+def run_with_tma(sim, tma_swizzle, descriptor_layout, n=32):
+    """A (128 x K) and B (n x K) reach shared memory by TMA tensor loads, one box each
+    whose inner dimension is the swizzle span, then one MMA reads the first 16 of K."""
+    inner = {"32B": 32, "64B": 64, "128B": 128}[tma_swizzle]
+    k = inner // 2
+    rng = np.random.default_rng(1)
+    a = rng.uniform(-2, 2, (128, k)).astype(np.float16)
+    b = rng.uniform(-2, 2, (n, k)).astype(np.float16)
+    map_a = sim.tensor_map_tiled(sim.from_numpy(a), (128, k), swizzle=tma_swizzle)
+    map_b = sim.tensor_map_tiled(sim.from_numpy(b), (n, k), swizzle=tma_swizzle)
+    code, _, row_bytes = LAYOUTS[descriptor_layout]
+    descriptor = lambda start: (start >> 4) | (1 << 16) | ((8 * row_bytes >> 4) << 32) | (1 << 46) | (code << 61)
+    idesc = (1 << 4) | ((n >> 3) << 17) | (8 << 24)
+    out = sim.from_numpy(np.full((128, n), np.nan, dtype=np.float32))
+    stats = sim.launch(mma_kernel(fill=TMA_LOADS), "k", grid=1, block=128,
+                       args=[map_a, out, descriptor(0), descriptor(16384), idesc,
+                             a.nbytes + b.nbytes, 32, n, 0, 1, 0, 1, 0, map_b])
+    expect = a[:, :16].astype(np.float32) @ b[:, :16].astype(np.float32).T
+    return out.numpy(), expect, stats
+
+
+@pytest.mark.parametrize("swizzle", ["32B", "64B", "128B"])
+def test_tma_loaded_operands_feed_the_mma(sim, swizzle):
+    # What TMA writes for a swizzle mode is what the MMA expects for the same layout type.
+    got, expect, stats = run_with_tma(sim, swizzle, swizzle)
+    np.testing.assert_allclose(got, expect, rtol=1e-5, atol=1e-5)
+    assert not stats.findings
+
+
+def test_descriptor_that_disagrees_with_the_tma_swizzle_is_caught(sim):
+    got, expect, stats = run_with_tma(sim, "128B", "64B")
+    kinds = [f.kind for f in stats.findings]
+    assert kinds.count("mma-swizzle-mismatch") == 1  # one finding per MMA instruction
+    f = stats.findings[kinds.index("mma-swizzle-mismatch")]
+    assert "descriptor says 64B swizzle" in f.message and "with 128B swizzle" in f.message
+    assert f.text.startswith("@%one tcgen05.mma") and "TMA load at line" in f.message
+    assert not np.allclose(got, expect, atol=1e-3)  # and the result really is wrong

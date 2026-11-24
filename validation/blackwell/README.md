@@ -122,7 +122,7 @@ so the run is flagged rather than trusted:
   prints `BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE` between rows of `!` and
   writes `TOOLKIT-MISMATCH.txt` at the top of the results.
 - `compare.py` prints the same line before and after its table. `--require-same-toolkit`
-  refuses to compare at all (exit status 2).
+  refuses to compare at all (exit status 3).
 - `env/remote/setup.sh`, `preflight.sh` (check `predictions`) and `run.sh` say it too, and
   `run.sh` puts `PREDICTIONS-NOT-COMPARABLE.txt` at the top of its archive
   (`env/remote/RUNBOOK.md`, "Driver older than the toolkit").

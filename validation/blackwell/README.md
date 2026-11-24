@@ -76,7 +76,7 @@ validation/blackwell/compare.py validation/blackwell/results/gpu-<host>-<time>.t
 ```
 
 One command, no interaction. `run_all.py` builds (`build.sh --native`), records
-`nvidia-smi`, driver, toolkit and device, runs the 101 probe runs in manifest order, then the
+`nvidia-smi`, driver, toolkit and device, runs the 109 probe runs in manifest order, then the
 end-to-end programs, and writes `results/gpu-<host>-<time>.tar.gz` with every run's standard
 output, standard error and status (`status.tsv`), the build log and the environment. Bring
 the archive back; `compare.py` needs nothing but Python and this directory.
@@ -131,7 +131,7 @@ To keep the predictions' compiler on such a machine: `env/remote/run.sh --toolki
 The driver then refuses the PTX and the machine-code programs run (`bin-native/`).
 
 **Expected run time** (estimated; nothing here has been timed on a B200): the build takes a
-few minutes (51 programs, three compilations each with `--native`). Most runs take well
+few minutes (55 programs, three compilations each with `--native`). Most runs take well
 under a second of GPU time plus process start-up. Runs that hang are killed at their
 timeout, 30 s each; 12 runs are allowed to hang, and two of them (`mbarrier/expect_tx_large`,
 `tmem/alloc_blocks`) are expected to. So the probes take between 3 and 10 minutes. The
@@ -172,6 +172,9 @@ run is isolated for that reason.
 | `ampere_replay.cpasync` | `ampere_replay cpasync` | RT-01 | as on an RTX 3080 Ti (validation/ampere/cpasync_golden.txt): cp.async with a source size | runs | - |
 | `ampere_replay.barrier_exit` | `ampere_replay barrier_exit` | RT-01 | as on an RTX 3080 Ti (validation/ampere/barrier_exit_hw.cu prints 'output ok'): __syncthreads() completes when some threads have exited | runs (1 finding(s)) | - |
 | `ampere_replay.call` | `ampere_replay call` | RT-02 | as on an RTX 3080 Ti (validation/ampere/call_golden.txt): calls to device functions | runs | - |
+| `ampere_replay.callforms` | `ampere_replay callforms` | RT-02 | as on an RTX 3080 Ti (validation/ampere/callforms_golden.txt): structs passed and returned by value, calls through function pointers, recursion | runs | - |
+| `ampere_atom` | `ampere_atom` | RT-13 | as on an RTX 3080 Ti (validation/ampere/atom_golden.txt): every atomic function on global and shared words, by 4 CTAs of 128 threads; only results that do not depend on the threads' order | runs | - |
+| `ampere_reconvergence` | `ampere_reconvergence` | RT-14 | as on an RTX 3080 Ti (validation/ampere/reconvergence_golden.txt): lanes that reach a join by different paths pass it together with lane 0, in 20 PTX kernels (loaded with cuModuleLoadData), with bar.sync at the join and, as Ampere happens to, without | runs | - |
 
 ### `tma/`
 
@@ -205,6 +208,7 @@ run is isolated for that reason.
 | `lane_arrivals` | `lane_arrivals` | MB-09 | every lane that executes an arrive arrives once, also when only part of a warp does | runs | - |
 | `arrive_token` | `arrive_token` | MB-03 | test_wait with an arrive token is false while the token's phase is open and true once it completed, also during the next phase | runs | - |
 | `arrive_token.stale` | `arrive_token stale` | MB-03 | a token two phases old is invalid PTX use and is diagnosed; its predicate is informational only | runs (2 finding(s)) | - |
+| `ampere_token` | `ampere_token` | MB-03 | as on an RTX 3080 Ti (validation/ampere/mbarrier_token_golden.txt): test_wait answers from bit 63 of the token, the parity of the arrival's phase. For tokens two or more phases old and made-up tokens (invalid PTX use) a difference is Blackwell's, not a simulator error | runs (333 finding(s)) | - |
 | `init_count` | `init_count` | MB-10 | mbarrier.init accepts 2^20 - 1 arrivals, and an arrive with that count completes the phase | runs | - |
 | `init_count.over` | `init_count over` | MB-10 | an arrival count of 2^20 is refused | **refuses**: mbarrier.init with an arrival count of 1048576; it must be 1 to 2^20-1 | fault |
 | `init_count.zero` | `init_count zero` | MB-10 | an arrival count of 0 is refused | **refuses**: mbarrier.init with an arrival count of 0; it must be 1 to 2^20-1 | fault |
@@ -291,6 +295,10 @@ run is isolated for that reason.
 | `fma` | `fma` | NUM-10 | fma and mad round the exact product-sum once, f32 and f64: 1000 cases in full and checksums of 10^4 each | runs | - |
 | `fma.all` | `fma all` | NUM-10 | none: all 2 x 10^4 fma cases in full, to locate a checksum of formats/fma that differs | not run (no prediction) | - |
 | `scalar_edges` | `scalar_edges` | NUM-11, NUM-12 | min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, rem, mul.hi and shifts at theirs | runs (8 finding(s)) | - |
+| `ampere_replay.minmax_cvt` | `ampere_replay minmax_cvt` | NUM-11 | as on an RTX 3080 Ti (validation/ampere/minmax_cvt_golden.txt): min/max over zeros, infinities and NaNs, and cvt to s32, u32, s64, u64 in four rounding modes, with the bits of NaN results | runs | - |
+| `ampere_replay.intdiv` | `ampere_replay intdiv` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/intdiv_golden.txt): div and rem on 16, 32 and 64 bits; by zero (unspecified in PTX) both give all ones, the minimum over -1 gives the minimum and 0 | runs (12 finding(s)) | - |
+| `ampere_replay.nan` | `ampere_replay nan` | NUM-13 | as on an RTX 3080 Ti (validation/ampere/nan_golden.txt without its 44 cvt.ftz lines): the bits of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt, f32 and f64 | runs | - |
+| `ampere_replay.nan_cvt_ftz` | `ampere_replay nan_cvt_ftz` | NUM-13 | none: cvt.ftz.f64.f32 and cvt.rn.ftz.f32.f64 of NaNs, which the simulator does not implement; the 44 lines are to be read against the same lines of validation/ampere/nan_golden.txt | not run (no prediction) | - |
 <!-- end of tables -->
 
 ### End to end (`e2e/run_e2e.py`)
@@ -342,7 +350,7 @@ to see that it runs to the end.
 
 Every row of `docs/validation-matrix.md` outside the timing section has at least one run
 here, except four: TMA-01 to -15; MB-01 to -11; TM-01 to -13; MMA-01 to -11; CL-01 to -21;
-NUM-01 to -04 and -06 to -12; RT-01 to -09.
+NUM-01 to -04 and -06 to -13; RT-01 to -09, -13 and -14.
 
 Partly covered, and how: MMA-01 (only the M, N, format and major-ness fields are varied);
 MMA-05 (repeated accumulation of the same product; no case that isolates "one float32
@@ -366,6 +374,63 @@ ptxas, not a GPU. NUM-09 compares with `validation/ampere/ftz_golden.txt` except
 results are printed as `nan` (the payload differs between the simulator and the 3080 Ti).
 RT-01 and RT-02 are `e2e/ampere_replay`, one run per Ampere program.
 
+### Reruns of the Ampere programs
+
+Where the simulator does what an RTX 3080 Ti did because PTX gives no rule, or gives one
+that was only ever checked on Ampere, the program that recorded the golden file in
+`validation/ampere/` is rerun on the B200. Each run includes that program's source (the
+kernels and the host code that prints; nothing is copied) and prints the lines of the golden
+file. The simulator reproduces the golden files, so the committed prediction of such a run
+*is* the golden file; `tests/test_ampere_replay.py` checks that, and that no golden file is
+without a run. A line that differs on the B200 is then a difference between Blackwell and
+Ampere, on a compared line and not an `info:` one.
+
+| Golden file (`validation/ampere/`) | Run | Matrix | Lines compared |
+| --- | --- | --- | --- |
+| `shfl_golden.txt`, `ldmatrix_golden.txt`, `prmt_golden.txt`, `cpasync_golden.txt` | `e2e/ampere_replay.shfl`, `.ldmatrix`, `.prmt`, `.cpasync` | RT-01 | all |
+| `printf_golden.txt` | `e2e/ampere_replay.printf` | RT-01 | all, as a set (device and host lines reach the output in an undefined order) |
+| `call_golden.txt`, `callforms_golden.txt` | `e2e/ampere_replay.call`, `.callforms` | RT-02 | all |
+| `atom_golden.txt` | `e2e/ampere_atom` | RT-13 | all |
+| `reconvergence_golden.txt` | `e2e/ampere_reconvergence` | RT-14 | all; each kernel launched 100 times, as for the recording |
+| `mbarrier_token_golden.txt` | `mbarrier/ampere_token` | MB-03 | all, the answers for stale and made-up tokens included |
+| `minmax_cvt_golden.txt` | `formats/ampere_replay.minmax_cvt` | NUM-11 | all, NaN results as bits |
+| `intdiv_golden.txt` | `formats/ampere_replay.intdiv` | NUM-12 | all, division by zero included |
+| `nan_golden.txt` | `formats/ampere_replay.nan` | NUM-13 | 14226 of 14270. The other 44 (`cvt.ftz.f64.f32`, `cvt.rn.ftz.f32.f64`) are `formats/ampere_replay.nan_cvt_ftz`, which has no prediction: finding 17 |
+| `ftz_golden.txt` | `formats/ftz` | NUM-09 | all, but a NaN result as the word `nan` (its bits are the f32 pattern `formats/ampere_replay.nan` compares) |
+| `tf32_golden.txt` | `formats/tf32_modes` | NUM-08 | all, as the `.rna` column beside `.rn` and `.rz` (the inputs are written out again in that probe; `tests/test_blackwell_probes.py` holds the column to the golden file) |
+
+The whole of each file is printed, also the three large ones (`nan`, `minmax_cvt` and
+`intdiv`, 36 000 lines and 2.5 MB of predictions together): what would differ is unknown,
+a NaN policy shows only in particular operand positions, and each run is one launch that
+takes well under a second on a GPU and in the simulator.
+
+Why these are four programs beside `e2e/ampere_replay` and not more cases of it: one
+program is one PTX module, and a module the driver or the simulator will not take stops
+every case in it. The mbarrier token kernel uses the `sm_80` spellings (`.shared` without
+`::cta`), the atomics are spelled by each toolkit in its own way, the reconvergence kernels
+are PTX text loaded at run time, and the NaN program has two instructions the simulator
+refuses; each is kept from the cases that have nothing unusual in them. `callforms` is
+ordinary CUDA C++ like `call` and is a case of `e2e/ampere_replay`, whose other cases print
+what they printed before.
+
+`e2e/ampere_reconvergence` is the one probe that does not carry its kernels as the
+compiler's PTX: the layouts of the branches are the point, so the kernels are the PTX text
+of `validation/ampere/reconvergence_golden.py` (`.target sm_86`), in a header that script
+writes (`reconvergence_kernels.h`; a test keeps it current). The program finds
+`cuModuleLoadData`, `cuModuleGetFunction` and `cuLaunchKernel` through
+`cudaGetDriverEntryPointByVersion`, as `common.h` finds the tensor-map encoder, and uses
+them in the runtime's context, so it links nothing more than the other probes. `build.sh`
+cannot show that ptxas for `sm_100a` accepts these kernels (they are not compiled until
+the driver loads them); they use nothing but `bra`, `bar.sync`, `ld` and `st`. A module the
+driver will not load is reported as `LAUNCH FAILED`.
+
+Not rerun: the launch-error recordings (`launch_errors_3080ti.txt`,
+`driver_errors_3080ti.txt`) are taken at the 3080 Ti's own limits, so their lines cannot be
+a B200's; RT-04 and RT-12 test the same refusals at Blackwell's limits
+(`e2e/smem_limit`, `cluster/max_size`). The bank-conflict counters (`transpose_ncu_*.csv`,
+`wavefront_probe_*.csv`) are Nsight Compute measurements and belong to
+`validation/blackwell_timing/`.
+
 **No probe:** NUM-05 (UE4M3: CUDA has no conversion for it); RT-10 (the driver calls of a
 launch: needs `ltrace` or a debugger on the machine, not a program); RT-11 (a CuTe DSL
 kernel with TMA: needs a debugger breakpoint to save the descriptors). TIM-* belong to
@@ -385,6 +450,7 @@ What was done on the development machine (RTX 3080 Ti Laptop GPU, `sm_86`, drive
 | **on the GPU**: `build.sh --ampere`, `run_all.py --binaries ampere --no-build --only ...` | `mbarrier/phase_parity`, `mbarrier/phase_parity.counts` and `mbarrier/lane_arrivals` ran on the 3080 Ti and are **identical** to the predictions. `e2e/device_attributes` ran and differs, as it should (8.6, 58 SMs): that is the check that catches a wrong machine. The environment capture (`nvidia-smi`, `compute_cap`, driver, ...) was exercised by the same run |
 | **the driver refusing PTX, on the GPU**: `mbarrier/script` built by nvcc 13.5 for `compute_86` as a PTX-carrying program and as machine code; the driver supports CUDA 13.0 | the PTX program prints `LAUNCH FAILED` (`cudaErrorUnsupportedPtxVersion`, exit 4); `run_all.py` records `launch-failed`, exits 1, and `compare.py` says `FAILED TO LAUNCH`. With `--binaries auto` the canary fails from `bin/`, passes from `bin-native/`, and the three mbarrier runs are identical to the predictions. With `toolkit.txt` naming another nvcc the banner appears in `run_all.py` and `compare.py` |
 | **on the GPU**, the probes added later that need nothing newer than Ampere: `formats/fma`, `fma.all`, `scalar_edges`, `ftz`, `mbarrier/arrive_token`, the seven `e2e/ampere_replay` cases | identical to the predictions. `mbarrier/arrive_token.stale` records an **invalid-use observation**: the model now reproduces the 3080 Ti's parity fallback, but stale results and opaque token bits remain informational, not portable PTX expectations (finding 10 below) |
+| **on the GPU**, 2026-11-24, the reruns of the Ampere programs: `build.sh --ampere`, then `run_all.py --binaries ampere --no-build --no-e2e --only 'e2e/ampere_*' --only 'formats/ampere_*' --only 'mbarrier/ampere_*'`, and `compare.py` on the archive | all 14 predicted runs **identical** to the predictions, which are the golden files: the eight cases of `e2e/ampere_replay` (`callforms` is new), `e2e/ampere_atom`, `e2e/ampere_reconvergence` (20 kernels, 100 launches each, none unstable), `mbarrier/ampere_token`, `formats/ampere_replay.minmax_cvt`, `.intdiv` and `.nan`. `formats/ampere_replay.nan_cvt_ftz` (no prediction) printed the 44 lines the golden file has for those two instructions. The three Ampere programs whose sources changed for this (`nan_golden`, `minmax_cvt_golden`, `callforms_golden`: shared error checks; the two `.ftz` conversions in a kernel of their own) were rebuilt with nvcc 12.4 and print their golden files unchanged. The four new programs also build as PTX programs, assemble to `sm_100a` and link with `--native`, which makes 55 programs |
 | **another compiler**: every probe built by nvcc 13.0.88 (the toolkit `env/remote/setup.sh` falls back to on this machine's driver), then `run_all.py --mode predict` on those programs | all 98 predictions byte-identical to the committed ones, which come from nvcc 13.5.37 code. Before the barriers of finding 16 were added, 16 differed |
 | **the whole rental, rehearsed**: `env/remote/run.sh --keep-going` on the 3080 Ti with `PREFLIGHT_EXPECT_CAP=8.6`, env from `setup.sh` (fallback toolkit 13.0, PyTorch env) | 13 min 52 s. Preflight: the new `predictions` check warns, `torch` passes, the three Blackwell checks fail as they must. Both suites build. `run-blackwell`: the canary fails from `bin/` and `bin-native/` (`cudaErrorNoKernelImageForDevice`: `sm_100a` code on `sm_86`), `NEITHER BUILD RUNS`; 71 runs `launch-failed`, 28 `host-error` (no tensor maps on Ampere), 2 `ok`; the stage fails with the count in capitals. `compare.py`: 71 `FAILED TO LAUNCH`, 28 `HOST ERROR`, none "by design". `run-timing`: every benchmark `LAUNCH FAILED`. The archive has `PREDICTIONS-NOT-COMPARABLE.txt` at its top and the banner is the last thing printed. An interrupt (Ctrl-C) during the self-test stopped the stage and still wrote the archive |
 | end to end in the simulator | tutorials 1-4 pass their own check; Triton, the TIRx script and the CuTe DSL script match NumPy; the book's `hgemm_v1` to `v9` match NumPy |
@@ -525,6 +591,18 @@ Those marked "fixed since" were fixed on other branches.
     unsynchronized communication portable. The explicit rendezvous above is
     still needed when paths meet inside a control-flow cycle, which the early
     grouping policy deliberately leaves alone.
+
+17. **`cvt` with `.ftz` is not implemented** (known: `docs/numerics.md`, "NaN bit patterns"), and the
+    simulator refuses such a kernel at its launch, before any of it runs.
+    `validation/ampere/nan_golden.cu` had `cvt.ftz.f64.f32` and
+    `cvt.rn.ftz.f32.f64` in the same kernel as everything else, so the rerun of the whole
+    program was refused: `warplens: unsupported instruction 'cvt.rn.ftz.f32.f64' (modifier
+    .rn)`, `KERNEL FAILED`. Reproduction: `warplens run bin/formats/ampere_replay
+    nan_cvt_ftz`. The two instructions are now in a kernel of their own in that program
+    (its output on the 3080 Ti is unchanged), which `formats/ampere_replay.nan_cvt_ftz` runs
+    without a prediction; the other 14226 lines are predicted and compared. On the 3080 Ti
+    `cvt.ftz.f64.f32` of a NaN gives `0x7fffffffe0000000` and of a subnormal a zero of its sign; the 44
+    lines are in `validation/ampere/nan_golden.txt`.
 
 ## Adding a probe
 

@@ -13,6 +13,12 @@
 // and signalling, of either sign, with and without a payload, and the all-ones pattern. So
 // the file holds every invalid operation (inf - inf, 0 * inf, 0 / 0, inf / inf, sqrt(-1),
 // fma(0, inf, c), fma(inf, 1, -inf)) and a NaN in every operand position.
+//
+// The two conversions with .ftz (cvt.ftz.f64.f32, cvt.rn.ftz.f32.f64; 44 lines) are in a
+// kernel of their own, nan_cvt_ftz_probe, because the simulator does not implement them and
+// refuses a kernel that contains one. A GPU does not care, and the file is the same as when
+// one kernel held everything. validation/blackwell/formats/ampere_replay.cu includes this
+// file and runs the two parts as separate cases (nan_run below).
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -56,15 +62,26 @@ __global__ void nan_probe(const int* op, const u64* a, const u64* b, const u64* 
     switch (op[i]) {
         OPS(BIN32, BIN64, TRI32, TRI64, UN32, UN64)
         case 30: asm volatile("cvt.f64.f32 %0, %1;" : "=d"(rd) : "f"(xf)); out[i] = (u64)__double_as_longlong(rd); break;
-        case 31: asm volatile("cvt.ftz.f64.f32 %0, %1;" : "=d"(rd) : "f"(xf)); out[i] = (u64)__double_as_longlong(rd); break;
         case 32: asm volatile("cvt.rn.f32.f64 %0, %1;" : "=f"(rf) : "d"(xd)); out[i] = __float_as_uint(rf); break;
-        case 33: asm volatile("cvt.rn.ftz.f32.f64 %0, %1;" : "=f"(rf) : "d"(xd)); out[i] = __float_as_uint(rf); break;
         case 34: asm volatile("cvt.rn.f16.f32 %0, %1;" : "=h"(rh) : "f"(xf)); out[i] = rh; break;
         case 35: asm volatile("cvt.rn.f16.f64 %0, %1;" : "=h"(rh) : "d"(xd)); out[i] = rh; break;
         case 36: asm volatile("cvt.f32.f16 %0, %1;" : "=f"(rf) : "h"(xh)); out[i] = __float_as_uint(rf); break;
         case 37: asm volatile("cvt.f64.f16 %0, %1;" : "=d"(rd) : "h"(xh)); out[i] = (u64)__double_as_longlong(rd); break;
     }
 }
+
+// Operations 31 and 33, which nan_probe leaves alone.
+__global__ void nan_cvt_ftz_probe(const int* op, const u64* a, u64* out, int n) {
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= n) return;
+    float xf = __uint_as_float((unsigned)a[i]), rf = 0.0f;
+    double xd = __longlong_as_double((long long)a[i]), rd = 0.0;
+    switch (op[i]) {
+        case 31: asm volatile("cvt.ftz.f64.f32 %0, %1;" : "=d"(rd) : "f"(xf)); out[i] = (u64)__double_as_longlong(rd); break;
+        case 33: asm volatile("cvt.rn.ftz.f32.f64 %0, %1;" : "=f"(rf) : "d"(xd)); out[i] = __float_as_uint(rf); break;
+    }
+}
+static bool is_cvt_ftz(int op) { return op == 31 || op == 33; }
 
 #define NAME(id, text) names[id] = text;
 #define ARITY2(id, text) arity[id] = 2;
@@ -73,7 +90,11 @@ __global__ void nan_probe(const int* op, const u64* a, const u64* b, const u64* 
 #define IS32(id, text) width[id] = 32;
 #define IS64(id, text) width[id] = 64;
 
-int main() {
+// Which lines to compute and print: everything (the golden file), everything but the two
+// .ftz conversions, or only those.
+enum { NAN_ALL, NAN_WITHOUT_CVT_FTZ, NAN_ONLY_CVT_FTZ };
+
+static int nan_run(int part) {
     std::string names[38];
     int arity[38], width[38];
     OPS(NAME, NAME, NAME, NAME, NAME, NAME)
@@ -124,10 +145,21 @@ int main() {
     CHECK(cudaMemcpy(db, b.data(), n * 8, cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(dc, c.data(), n * 8, cudaMemcpyHostToDevice));
     CHECK(cudaMemset(dout, 0, n * 8));
-    nan_probe<<<(n + 255) / 256, 256>>>(dop, da, db, dc, dout, n);
-    CHECK_LAUNCH();
+    if (part != NAN_ONLY_CVT_FTZ) {
+        nan_probe<<<(n + 255) / 256, 256>>>(dop, da, db, dc, dout, n);
+        CHECK_LAUNCH();
+    }
+    if (part != NAN_WITHOUT_CVT_FTZ) {
+        nan_cvt_ftz_probe<<<(n + 255) / 256, 256>>>(dop, da, dout, n);
+        CHECK_LAUNCH();
+    }
     CHECK(cudaMemcpy(out.data(), dout, n * 8, cudaMemcpyDeviceToHost));
     for (int i = 0; i < n; ++i)
-        printf("%s %016llx %016llx %016llx %016llx\n", names[op[i]].c_str(), a[i], b[i], c[i], out[i]);
+        if (part == NAN_ALL || is_cvt_ftz(op[i]) == (part == NAN_ONLY_CVT_FTZ))
+            printf("%s %016llx %016llx %016llx %016llx\n", names[op[i]].c_str(), a[i], b[i], c[i], out[i]);
     return 0;
 }
+
+#ifndef NAN_NO_MAIN
+int main() { return nan_run(NAN_ALL); }
+#endif

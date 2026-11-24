@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 #include <cuda_runtime.h>
+#include "host_check.h"
 
 typedef unsigned long long u64;
 
@@ -102,14 +103,14 @@ int main() {
     int n = (int)op.size();
     std::vector<u64> out(n);
     int* dop; u64 *da, *db, *dout;
-    cudaMalloc(&dop, n * 4); cudaMalloc(&da, n * 8); cudaMalloc(&db, n * 8); cudaMalloc(&dout, n * 8);
-    cudaMemcpy(dop, op.data(), n * 4, cudaMemcpyHostToDevice);
-    cudaMemcpy(da, a.data(), n * 8, cudaMemcpyHostToDevice);
-    cudaMemcpy(db, b.data(), n * 8, cudaMemcpyHostToDevice);
-    cudaMemset(dout, 0, n * 8);
+    CHECK(cudaMalloc(&dop, n * 4)); CHECK(cudaMalloc(&da, n * 8)); CHECK(cudaMalloc(&db, n * 8)); CHECK(cudaMalloc(&dout, n * 8));
+    CHECK(cudaMemcpy(dop, op.data(), n * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(da, a.data(), n * 8, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(db, b.data(), n * 8, cudaMemcpyHostToDevice));
+    CHECK(cudaMemset(dout, 0, n * 8));
     minmax_cvt_probe<<<(n + 255) / 256, 256>>>(dop, da, db, dout, n);
-    if (cudaDeviceSynchronize() != cudaSuccess) { fprintf(stderr, "kernel failed\n"); return 1; }
-    cudaMemcpy(out.data(), dout, n * 8, cudaMemcpyDeviceToHost);
+    CHECK_LAUNCH();
+    CHECK(cudaMemcpy(out.data(), dout, n * 8, cudaMemcpyDeviceToHost));
     for (int i = 0; i < n; ++i)
         printf("%s %016llx %016llx %016llx\n", names[op[i]].c_str(), a[i], b[i], out[i]);
     return 0;

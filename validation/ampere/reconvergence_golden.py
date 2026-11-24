@@ -25,6 +25,13 @@ needs a GPU. Each kernel is launched 100 times and must give the same 64 words e
 One line per kernel: its name, then out[0..63] (99 where nothing was stored).
 
 tests/test_hardware_golden.py runs the same PTX in the simulator against the recorded file.
+
+    python validation/ampere/reconvergence_golden.py --header > validation/ampere/reconvergence_kernels.h
+
+writes the same kernels as C string literals, for validation/blackwell/e2e/ampere_reconvergence.cu,
+which loads them on the B200. The header is committed (building the probe must not need
+Python); tests/test_ampere_replay.py fails when it is not what this script writes. It needs
+no GPU.
 """
 import sys
 
@@ -107,7 +114,25 @@ def run_on_gpu(ptx: str, words: int = 64, fill: int = 99) -> list[int]:
     return host.tolist()
 
 
+def header() -> str:
+    """The kernels as a C header: RECONVERGENCE_KERNELS[] of {name, whole PTX module}."""
+    def literal(text: str) -> str:
+        assert '"' not in text and "\\" not in text
+        return "\n".join(f'        "{line}\\n"' for line in text.splitlines())
+    entries = ",\n".join(f'    {{"{name}",\n{literal(HEADER + body)}}}' for name, body in kernels().items())
+    return ("// Written by `python validation/ampere/reconvergence_golden.py --header`. Do not edit:\n"
+            "// tests/test_ampere_replay.py compares this file with what that command prints.\n"
+            "// The PTX modules that recorded validation/ampere/reconvergence_golden.txt, one per kernel;\n"
+            "// each has one entry point `k(out)`, launched as one block of 32 threads.\n"
+            "#pragma once\n"
+            "struct ReconvergenceKernel { const char* name; const char* ptx; };\n"
+            f"static const ReconvergenceKernel RECONVERGENCE_KERNELS[] = {{\n{entries}\n}};\n")
+
+
 def main() -> int:
+    if sys.argv[1:] == ["--header"]:
+        sys.stdout.write(header())
+        return 0
     from cuda.bindings import driver
     if int(driver.cuInit(0)[0]) != 0:
         print("cuInit failed: no usable GPU", file=sys.stderr)

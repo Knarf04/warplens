@@ -54,9 +54,11 @@ simulator they share the code of `div.rn` and `sqrt.rn` and so give
 f16 arithmetic. `cvt` with `.ftz` is recorded in the golden file and not
 implemented. A NaN that the tensor core or
 TMA's NaN fill produces is a separate claim (TMA-05). All of this is Ampere
-observations; NUM-13 records Blackwell NaN bits as informational. The hardware
-probes compare NaN classification and non-NaN values bit for bit. The Ampere
-golden tests also pin the empirical payload policy, without requiring it of Blackwell.
+observations. The scalar probes compare NaN classification and non-NaN values
+bit for bit; `validation/blackwell/formats/ampere_replay` reruns the Ampere
+programs on the B200 and compares the NaN bits too (NUM-11, NUM-13), so a
+Blackwell payload policy that differs from Ampere's shows as a difference. The
+Ampere golden tests pin the empirical policy without requiring it of Blackwell.
 
 ### Integer zero divisors
 
@@ -65,7 +67,10 @@ and [`rem`](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#in
 with a zero divisor produce an unspecified, machine-specific value. Active lanes
 report `integer-divide-by-zero`; execution continues with the measured Ampere
 all-ones fallback, signed or unsigned, at 16, 32 and 64 bits. The scalar-edge
-probe records those values as informational only. Floating-point division by
+probe records those values as informational only; the rerun of
+`validation/ampere/intdiv_golden.cu` on the B200
+(`validation/blackwell/formats/ampere_replay`, NUM-12) compares them with
+Ampere's. Floating-point division by
 zero is a separate IEEE operation and does not trigger this integer diagnostic.
 
 ## TF32

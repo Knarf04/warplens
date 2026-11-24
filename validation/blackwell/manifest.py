@@ -95,6 +95,10 @@ def _mbarrier() -> list[Probe]:
               "completed, also during the next phase"),
         Probe("mbarrier/arrive_token.stale", "mbarrier/arrive_token", ("stale",), ("MB-03",),
               "a token two phases old is invalid PTX use and is diagnosed; its predicate is informational only"),
+        Probe("mbarrier/ampere_token", "mbarrier/ampere_token", (), ("MB-03",),
+              "as on an RTX 3080 Ti (validation/ampere/mbarrier_token_golden.txt): test_wait answers from bit 63 "
+              "of the token, the parity of the arrival's phase. For tokens two or more phases old and made-up "
+              "tokens (invalid PTX use) a difference is Blackwell's, not a simulator error"),
         Probe("mbarrier/init_count", "mbarrier/init_count", (), ("MB-10",),
               "mbarrier.init accepts 2^20 - 1 arrivals, and an arrive with that count completes the phase"),
         Probe("mbarrier/init_count.over", "mbarrier/init_count", ("over",), ("MB-10",),
@@ -273,6 +277,19 @@ def _formats() -> list[Probe]:
         Probe("formats/scalar_edges", "formats/scalar_edges", (), ("NUM-11", "NUM-12"),
               "min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, "
               "rem, mul.hi and shifts at theirs"),
+        Probe("formats/ampere_replay.minmax_cvt", "formats/ampere_replay", ("minmax_cvt",), ("NUM-11",),
+              "as on an RTX 3080 Ti (validation/ampere/minmax_cvt_golden.txt): min/max over zeros, infinities "
+              "and NaNs, and cvt to s32, u32, s64, u64 in four rounding modes, with the bits of NaN results"),
+        Probe("formats/ampere_replay.intdiv", "formats/ampere_replay", ("intdiv",), ("NUM-12",),
+              "as on an RTX 3080 Ti (validation/ampere/intdiv_golden.txt): div and rem on 16, 32 and 64 bits; "
+              "by zero (unspecified in PTX) both give all ones, the minimum over -1 gives the minimum and 0"),
+        Probe("formats/ampere_replay.nan", "formats/ampere_replay", ("nan",), ("NUM-13",),
+              "as on an RTX 3080 Ti (validation/ampere/nan_golden.txt without its 44 cvt.ftz lines): the bits "
+              "of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt, f32 and f64"),
+        Probe("formats/ampere_replay.nan_cvt_ftz", "formats/ampere_replay", ("nan_cvt_ftz",), ("NUM-13",),
+              "none: cvt.ftz.f64.f32 and cvt.rn.ftz.f32.f64 of NaNs, which the simulator does not implement; "
+              "the 44 lines are to be read against the same lines of validation/ampere/nan_golden.txt",
+              predict="none"),
     ]
 
 
@@ -303,7 +320,17 @@ def _device() -> list[Probe]:
             ("barrier_exit", ("RT-01",), "barrier_exit_hw.cu prints 'output ok'",
              "__syncthreads() completes when some threads have exited"),
             ("call", ("RT-02",), "call_golden.txt", "calls to device functions"),
+            ("callforms", ("RT-02",), "callforms_golden.txt",
+             "structs passed and returned by value, calls through function pointers, recursion"),
         )
+    ] + [
+        Probe("e2e/ampere_atom", "e2e/ampere_atom", (), ("RT-13",),
+              "as on an RTX 3080 Ti (validation/ampere/atom_golden.txt): every atomic function on global and "
+              "shared words, by 4 CTAs of 128 threads; only results that do not depend on the threads' order"),
+        Probe("e2e/ampere_reconvergence", "e2e/ampere_reconvergence", (), ("RT-14",),
+              "as on an RTX 3080 Ti (validation/ampere/reconvergence_golden.txt): lanes that reach a join by "
+              "different paths pass it together with lane 0, in 20 PTX kernels (loaded with cuModuleLoadData), "
+              "with bar.sync at the join and, as Ampere happens to, without"),
     ]
 
 

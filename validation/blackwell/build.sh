@@ -28,9 +28,11 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 NVCC="${NVCC:-nvcc}"
 native=0
 ampere=0
-# What an Ampere GPU can run: mbarrier.init / arrive / test_wait, and the host-only program.
+# What an Ampere GPU can run: mbarrier.init / arrive / test_wait, the host-only program, the
+# scalar probes, and the reruns of validation/ampere (which must print the golden files there).
 AMPERE_PROBES=(mbarrier/script mbarrier/lane_arrivals e2e/device_attributes mbarrier/arrive_token
-               formats/fma formats/scalar_edges formats/ftz e2e/ampere_replay)
+               formats/fma formats/scalar_edges formats/ftz e2e/ampere_replay
+               formats/ampere_replay mbarrier/ampere_token e2e/ampere_atom e2e/ampere_reconvergence)
 jobs="$(nproc 2>/dev/null || echo 4)"
 probes=()
 while [[ $# -gt 0 ]]; do

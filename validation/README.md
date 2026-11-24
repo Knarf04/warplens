@@ -7,6 +7,13 @@ Only features that Ampere shares with Blackwell can be checked this way.
 Build everything with `validation/ampere/build.sh`. It needs a full CUDA
 toolkit for the GPU binaries and the `warplens` conda env for the PTX.
 
+Every program below that records a `*_golden.txt` file is rerun on the rented
+B200 by the Blackwell probe suite, which includes these sources and predicts
+these files (`validation/blackwell/README.md`, "Reruns of the Ampere
+programs"; `tests/test_ampere_replay.py`). A new golden program needs a run
+there: write its host code with `CHECK` and `CHECK_LAUNCH` of `host_check.h`,
+which the probe suite redefines to report failures its own way.
+
 | Check | How | Status |
 | --- | --- | --- |
 | `shfl.sync` semantics | `bin/shfl_golden > shfl_golden.txt` records 720 cases (4 modes x 5 widths x 36 operands) from the GPU. `tests/test_hardware_golden.py` runs the same kernel's PTX in the simulator. | all 720 match |

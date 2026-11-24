@@ -1,0 +1,1005 @@
+status: ok
+warplens: 4 kernel launch(es) simulated on B200, 333 finding(s)
+  mbarrier_token_probe: 1 CTA(s), 4815 warp-instructions
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000001 (phase 1) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 104: mbarrier.test_wait.shared.b64 p, [%r4], %rd68;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (6 times)
+      line 127: mbarrier.test_wait.shared.b64 p, [%r18], %rd77;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (6 times)
+      line 150: mbarrier.test_wait.shared.b64 p, [%r22], %rd80;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000008 (phase 8) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (7 times)
+      line 178: mbarrier.test_wait.shared.b64 p, [%r26], %rd87;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000010 (phase 16) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 203: mbarrier.test_wait.shared.b64 p, [%r30], %rd91;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000020 (phase 32) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 228: mbarrier.test_wait.shared.b64 p, [%r34], %rd95;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000040 (phase 64) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 253: mbarrier.test_wait.shared.b64 p, [%r38], %rd99;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000080 (phase 128) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 278: mbarrier.test_wait.shared.b64 p, [%r42], %rd103;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000100 (phase 256) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 303: mbarrier.test_wait.shared.b64 p, [%r46], %rd107;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000200 (phase 512) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 328: mbarrier.test_wait.shared.b64 p, [%r50], %rd111;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000400 (phase 1024) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 353: mbarrier.test_wait.shared.b64 p, [%r54], %rd115;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000800 (phase 2048) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 378: mbarrier.test_wait.shared.b64 p, [%r58], %rd119;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000001000 (phase 4096) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 403: mbarrier.test_wait.shared.b64 p, [%r62], %rd123;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000002000 (phase 8192) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 428: mbarrier.test_wait.shared.b64 p, [%r66], %rd127;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000004000 (phase 16384) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 453: mbarrier.test_wait.shared.b64 p, [%r70], %rd131;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000008000 (phase 32768) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 478: mbarrier.test_wait.shared.b64 p, [%r74], %rd135;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000010000 (phase 65536) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 503: mbarrier.test_wait.shared.b64 p, [%r78], %rd139;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000020000 (phase 131072) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 528: mbarrier.test_wait.shared.b64 p, [%r82], %rd143;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000040000 (phase 262144) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 553: mbarrier.test_wait.shared.b64 p, [%r86], %rd147;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000080000 (phase 524288) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 578: mbarrier.test_wait.shared.b64 p, [%r90], %rd151;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000100000 (phase 1048576) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 603: mbarrier.test_wait.shared.b64 p, [%r94], %rd155;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000200000 (phase 2097152) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 628: mbarrier.test_wait.shared.b64 p, [%r98], %rd159;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000400000 (phase 4194304) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 653: mbarrier.test_wait.shared.b64 p, [%r102], %rd163;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000800000 (phase 8388608) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 678: mbarrier.test_wait.shared.b64 p, [%r106], %rd167;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000001000000 (phase 16777216) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 703: mbarrier.test_wait.shared.b64 p, [%r110], %rd171;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000002000000 (phase 33554432) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 728: mbarrier.test_wait.shared.b64 p, [%r114], %rd175;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000004000000 (phase 67108864) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 753: mbarrier.test_wait.shared.b64 p, [%r118], %rd179;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000008000000 (phase 134217728) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 778: mbarrier.test_wait.shared.b64 p, [%r122], %rd183;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000010000000 (phase 268435456) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 803: mbarrier.test_wait.shared.b64 p, [%r126], %rd187;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000020000000 (phase 536870912) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 828: mbarrier.test_wait.shared.b64 p, [%r130], %rd191;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000040000000 (phase 1073741824) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 853: mbarrier.test_wait.shared.b64 p, [%r134], %rd195;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000080000000 (phase 2147483648) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 878: mbarrier.test_wait.shared.b64 p, [%r138], %rd199;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000100000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 904: mbarrier.test_wait.shared.b64 p, [%r142], %rd204;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000200000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 931: mbarrier.test_wait.shared.b64 p, [%r146], %rd210;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000400000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 958: mbarrier.test_wait.shared.b64 p, [%r150], %rd216;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000800000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 985: mbarrier.test_wait.shared.b64 p, [%r154], %rd222;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000001000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1012: mbarrier.test_wait.shared.b64 p, [%r158], %rd228;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000002000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1039: mbarrier.test_wait.shared.b64 p, [%r162], %rd234;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000004000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1066: mbarrier.test_wait.shared.b64 p, [%r166], %rd240;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000008000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1093: mbarrier.test_wait.shared.b64 p, [%r170], %rd246;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000010000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1120: mbarrier.test_wait.shared.b64 p, [%r174], %rd252;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000020000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1147: mbarrier.test_wait.shared.b64 p, [%r178], %rd258;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000040000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1174: mbarrier.test_wait.shared.b64 p, [%r182], %rd264;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000080000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1201: mbarrier.test_wait.shared.b64 p, [%r186], %rd270;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000100000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1228: mbarrier.test_wait.shared.b64 p, [%r190], %rd276;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000200000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1255: mbarrier.test_wait.shared.b64 p, [%r194], %rd282;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000400000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1282: mbarrier.test_wait.shared.b64 p, [%r198], %rd288;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000800000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1309: mbarrier.test_wait.shared.b64 p, [%r202], %rd294;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0001000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1336: mbarrier.test_wait.shared.b64 p, [%r206], %rd300;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0002000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1363: mbarrier.test_wait.shared.b64 p, [%r210], %rd306;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0004000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1390: mbarrier.test_wait.shared.b64 p, [%r214], %rd312;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0008000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1417: mbarrier.test_wait.shared.b64 p, [%r218], %rd318;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0010000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1444: mbarrier.test_wait.shared.b64 p, [%r222], %rd324;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0020000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1471: mbarrier.test_wait.shared.b64 p, [%r226], %rd330;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0040000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1498: mbarrier.test_wait.shared.b64 p, [%r230], %rd336;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0080000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1525: mbarrier.test_wait.shared.b64 p, [%r234], %rd342;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0100000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1552: mbarrier.test_wait.shared.b64 p, [%r238], %rd348;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0200000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1579: mbarrier.test_wait.shared.b64 p, [%r242], %rd354;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0400000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1606: mbarrier.test_wait.shared.b64 p, [%r246], %rd360;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0800000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1633: mbarrier.test_wait.shared.b64 p, [%r250], %rd366;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x1000000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1660: mbarrier.test_wait.shared.b64 p, [%r254], %rd372;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x2000000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1687: mbarrier.test_wait.shared.b64 p, [%r258], %rd378;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x4000000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1714: mbarrier.test_wait.shared.b64 p, [%r262], %rd384;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000000 (phase 0) used in phase 1; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (8 times)
+      line 1741: mbarrier.test_wait.shared.b64 p, [%r266], %rd390;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (7 times)
+      line 95: mbarrier.test_wait.shared.b64 p, [%r4], %rd67;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (6 times)
+      line 115: mbarrier.test_wait.shared.b64 p, [%r16], %rd75;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (5 times)
+      line 138: mbarrier.test_wait.shared.b64 p, [%r20], %rd78;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (4 times)
+      line 166: mbarrier.test_wait.shared.b64 p, [%r24], %rd85;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (3 times)
+      line 191: mbarrier.test_wait.shared.b64 p, [%r28], %rd89;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (2 times)
+      line 216: mbarrier.test_wait.shared.b64 p, [%r32], %rd93;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 241: mbarrier.test_wait.shared.b64 p, [%r36], %rd97;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbarrier_token_probe: 1 CTA(s), 9999 warp-instructions
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000001 (phase 1) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 104: mbarrier.test_wait.shared.b64 p, [%r4], %rd68;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (12 times)
+      line 127: mbarrier.test_wait.shared.b64 p, [%r18], %rd77;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (12 times)
+      line 150: mbarrier.test_wait.shared.b64 p, [%r22], %rd80;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000008 (phase 8) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (15 times)
+      line 178: mbarrier.test_wait.shared.b64 p, [%r26], %rd87;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000010 (phase 16) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 203: mbarrier.test_wait.shared.b64 p, [%r30], %rd91;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000020 (phase 32) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 228: mbarrier.test_wait.shared.b64 p, [%r34], %rd95;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000040 (phase 64) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 253: mbarrier.test_wait.shared.b64 p, [%r38], %rd99;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000080 (phase 128) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 278: mbarrier.test_wait.shared.b64 p, [%r42], %rd103;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000100 (phase 256) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 303: mbarrier.test_wait.shared.b64 p, [%r46], %rd107;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000200 (phase 512) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 328: mbarrier.test_wait.shared.b64 p, [%r50], %rd111;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000400 (phase 1024) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 353: mbarrier.test_wait.shared.b64 p, [%r54], %rd115;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000800 (phase 2048) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 378: mbarrier.test_wait.shared.b64 p, [%r58], %rd119;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000001000 (phase 4096) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 403: mbarrier.test_wait.shared.b64 p, [%r62], %rd123;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000002000 (phase 8192) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 428: mbarrier.test_wait.shared.b64 p, [%r66], %rd127;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000004000 (phase 16384) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 453: mbarrier.test_wait.shared.b64 p, [%r70], %rd131;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000008000 (phase 32768) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 478: mbarrier.test_wait.shared.b64 p, [%r74], %rd135;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000010000 (phase 65536) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 503: mbarrier.test_wait.shared.b64 p, [%r78], %rd139;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000020000 (phase 131072) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 528: mbarrier.test_wait.shared.b64 p, [%r82], %rd143;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000040000 (phase 262144) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 553: mbarrier.test_wait.shared.b64 p, [%r86], %rd147;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000080000 (phase 524288) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 578: mbarrier.test_wait.shared.b64 p, [%r90], %rd151;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000100000 (phase 1048576) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 603: mbarrier.test_wait.shared.b64 p, [%r94], %rd155;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000200000 (phase 2097152) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 628: mbarrier.test_wait.shared.b64 p, [%r98], %rd159;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000400000 (phase 4194304) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 653: mbarrier.test_wait.shared.b64 p, [%r102], %rd163;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000800000 (phase 8388608) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 678: mbarrier.test_wait.shared.b64 p, [%r106], %rd167;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000001000000 (phase 16777216) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 703: mbarrier.test_wait.shared.b64 p, [%r110], %rd171;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000002000000 (phase 33554432) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 728: mbarrier.test_wait.shared.b64 p, [%r114], %rd175;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000004000000 (phase 67108864) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 753: mbarrier.test_wait.shared.b64 p, [%r118], %rd179;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000008000000 (phase 134217728) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 778: mbarrier.test_wait.shared.b64 p, [%r122], %rd183;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000010000000 (phase 268435456) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 803: mbarrier.test_wait.shared.b64 p, [%r126], %rd187;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000020000000 (phase 536870912) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 828: mbarrier.test_wait.shared.b64 p, [%r130], %rd191;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000040000000 (phase 1073741824) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 853: mbarrier.test_wait.shared.b64 p, [%r134], %rd195;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000080000000 (phase 2147483648) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 878: mbarrier.test_wait.shared.b64 p, [%r138], %rd199;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000100000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 904: mbarrier.test_wait.shared.b64 p, [%r142], %rd204;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000200000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 931: mbarrier.test_wait.shared.b64 p, [%r146], %rd210;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000400000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 958: mbarrier.test_wait.shared.b64 p, [%r150], %rd216;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000800000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 985: mbarrier.test_wait.shared.b64 p, [%r154], %rd222;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000001000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1012: mbarrier.test_wait.shared.b64 p, [%r158], %rd228;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000002000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1039: mbarrier.test_wait.shared.b64 p, [%r162], %rd234;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000004000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1066: mbarrier.test_wait.shared.b64 p, [%r166], %rd240;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000008000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1093: mbarrier.test_wait.shared.b64 p, [%r170], %rd246;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000010000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1120: mbarrier.test_wait.shared.b64 p, [%r174], %rd252;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000020000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1147: mbarrier.test_wait.shared.b64 p, [%r178], %rd258;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000040000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1174: mbarrier.test_wait.shared.b64 p, [%r182], %rd264;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000080000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1201: mbarrier.test_wait.shared.b64 p, [%r186], %rd270;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000100000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1228: mbarrier.test_wait.shared.b64 p, [%r190], %rd276;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000200000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1255: mbarrier.test_wait.shared.b64 p, [%r194], %rd282;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000400000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1282: mbarrier.test_wait.shared.b64 p, [%r198], %rd288;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000800000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1309: mbarrier.test_wait.shared.b64 p, [%r202], %rd294;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0001000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1336: mbarrier.test_wait.shared.b64 p, [%r206], %rd300;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0002000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1363: mbarrier.test_wait.shared.b64 p, [%r210], %rd306;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0004000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1390: mbarrier.test_wait.shared.b64 p, [%r214], %rd312;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0008000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1417: mbarrier.test_wait.shared.b64 p, [%r218], %rd318;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0010000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1444: mbarrier.test_wait.shared.b64 p, [%r222], %rd324;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0020000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1471: mbarrier.test_wait.shared.b64 p, [%r226], %rd330;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0040000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1498: mbarrier.test_wait.shared.b64 p, [%r230], %rd336;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0080000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1525: mbarrier.test_wait.shared.b64 p, [%r234], %rd342;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0100000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1552: mbarrier.test_wait.shared.b64 p, [%r238], %rd348;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0200000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1579: mbarrier.test_wait.shared.b64 p, [%r242], %rd354;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0400000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1606: mbarrier.test_wait.shared.b64 p, [%r246], %rd360;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0800000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1633: mbarrier.test_wait.shared.b64 p, [%r250], %rd366;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x1000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1660: mbarrier.test_wait.shared.b64 p, [%r254], %rd372;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x2000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1687: mbarrier.test_wait.shared.b64 p, [%r258], %rd378;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x4000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1714: mbarrier.test_wait.shared.b64 p, [%r262], %rd384;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 1741: mbarrier.test_wait.shared.b64 p, [%r266], %rd390;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (13 times)
+      line 95: mbarrier.test_wait.shared.b64 p, [%r4], %rd67;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (13 times)
+      line 115: mbarrier.test_wait.shared.b64 p, [%r16], %rd75;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (11 times)
+      line 138: mbarrier.test_wait.shared.b64 p, [%r20], %rd78;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (11 times)
+      line 166: mbarrier.test_wait.shared.b64 p, [%r24], %rd85;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (9 times)
+      line 191: mbarrier.test_wait.shared.b64 p, [%r28], %rd89;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (9 times)
+      line 216: mbarrier.test_wait.shared.b64 p, [%r32], %rd93;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (7 times)
+      line 241: mbarrier.test_wait.shared.b64 p, [%r36], %rd97;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (7 times)
+      line 266: mbarrier.test_wait.shared.b64 p, [%r40], %rd101;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (5 times)
+      line 291: mbarrier.test_wait.shared.b64 p, [%r44], %rd105;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (5 times)
+      line 316: mbarrier.test_wait.shared.b64 p, [%r48], %rd109;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (3 times)
+      line 341: mbarrier.test_wait.shared.b64 p, [%r52], %rd113;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (3 times)
+      line 366: mbarrier.test_wait.shared.b64 p, [%r56], %rd117;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 391: mbarrier.test_wait.shared.b64 p, [%r60], %rd121;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 416: mbarrier.test_wait.shared.b64 p, [%r64], %rd125;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbarrier_token_probe: 1 CTA(s), 15567 warp-instructions
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000001 (phase 1) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 104: mbarrier.test_wait.shared.b64 p, [%r4], %rd68;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (18 times)
+      line 127: mbarrier.test_wait.shared.b64 p, [%r18], %rd77;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (18 times)
+      line 150: mbarrier.test_wait.shared.b64 p, [%r22], %rd80;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000008 (phase 8) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (23 times)
+      line 178: mbarrier.test_wait.shared.b64 p, [%r26], %rd87;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000010 (phase 16) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 203: mbarrier.test_wait.shared.b64 p, [%r30], %rd91;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000020 (phase 32) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 228: mbarrier.test_wait.shared.b64 p, [%r34], %rd95;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000040 (phase 64) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 253: mbarrier.test_wait.shared.b64 p, [%r38], %rd99;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000080 (phase 128) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 278: mbarrier.test_wait.shared.b64 p, [%r42], %rd103;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000100 (phase 256) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 303: mbarrier.test_wait.shared.b64 p, [%r46], %rd107;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000200 (phase 512) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 328: mbarrier.test_wait.shared.b64 p, [%r50], %rd111;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000400 (phase 1024) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 353: mbarrier.test_wait.shared.b64 p, [%r54], %rd115;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000800 (phase 2048) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 378: mbarrier.test_wait.shared.b64 p, [%r58], %rd119;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000001000 (phase 4096) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 403: mbarrier.test_wait.shared.b64 p, [%r62], %rd123;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000002000 (phase 8192) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 428: mbarrier.test_wait.shared.b64 p, [%r66], %rd127;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000004000 (phase 16384) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 453: mbarrier.test_wait.shared.b64 p, [%r70], %rd131;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000008000 (phase 32768) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 478: mbarrier.test_wait.shared.b64 p, [%r74], %rd135;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000010000 (phase 65536) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 503: mbarrier.test_wait.shared.b64 p, [%r78], %rd139;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000020000 (phase 131072) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 528: mbarrier.test_wait.shared.b64 p, [%r82], %rd143;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000040000 (phase 262144) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 553: mbarrier.test_wait.shared.b64 p, [%r86], %rd147;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000080000 (phase 524288) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 578: mbarrier.test_wait.shared.b64 p, [%r90], %rd151;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000100000 (phase 1048576) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 603: mbarrier.test_wait.shared.b64 p, [%r94], %rd155;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000200000 (phase 2097152) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 628: mbarrier.test_wait.shared.b64 p, [%r98], %rd159;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000400000 (phase 4194304) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 653: mbarrier.test_wait.shared.b64 p, [%r102], %rd163;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000800000 (phase 8388608) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 678: mbarrier.test_wait.shared.b64 p, [%r106], %rd167;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000001000000 (phase 16777216) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 703: mbarrier.test_wait.shared.b64 p, [%r110], %rd171;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000002000000 (phase 33554432) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 728: mbarrier.test_wait.shared.b64 p, [%r114], %rd175;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000004000000 (phase 67108864) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 753: mbarrier.test_wait.shared.b64 p, [%r118], %rd179;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000008000000 (phase 134217728) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 778: mbarrier.test_wait.shared.b64 p, [%r122], %rd183;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000010000000 (phase 268435456) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 803: mbarrier.test_wait.shared.b64 p, [%r126], %rd187;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000020000000 (phase 536870912) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 828: mbarrier.test_wait.shared.b64 p, [%r130], %rd191;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000040000000 (phase 1073741824) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 853: mbarrier.test_wait.shared.b64 p, [%r134], %rd195;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000080000000 (phase 2147483648) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 878: mbarrier.test_wait.shared.b64 p, [%r138], %rd199;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000100000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 904: mbarrier.test_wait.shared.b64 p, [%r142], %rd204;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000200000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 931: mbarrier.test_wait.shared.b64 p, [%r146], %rd210;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000400000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 958: mbarrier.test_wait.shared.b64 p, [%r150], %rd216;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000800000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 985: mbarrier.test_wait.shared.b64 p, [%r154], %rd222;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000001000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1012: mbarrier.test_wait.shared.b64 p, [%r158], %rd228;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000002000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1039: mbarrier.test_wait.shared.b64 p, [%r162], %rd234;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000004000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1066: mbarrier.test_wait.shared.b64 p, [%r166], %rd240;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000008000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1093: mbarrier.test_wait.shared.b64 p, [%r170], %rd246;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000010000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1120: mbarrier.test_wait.shared.b64 p, [%r174], %rd252;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000020000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1147: mbarrier.test_wait.shared.b64 p, [%r178], %rd258;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000040000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1174: mbarrier.test_wait.shared.b64 p, [%r182], %rd264;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000080000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1201: mbarrier.test_wait.shared.b64 p, [%r186], %rd270;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000100000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1228: mbarrier.test_wait.shared.b64 p, [%r190], %rd276;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000200000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1255: mbarrier.test_wait.shared.b64 p, [%r194], %rd282;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000400000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1282: mbarrier.test_wait.shared.b64 p, [%r198], %rd288;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000800000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1309: mbarrier.test_wait.shared.b64 p, [%r202], %rd294;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0001000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1336: mbarrier.test_wait.shared.b64 p, [%r206], %rd300;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0002000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1363: mbarrier.test_wait.shared.b64 p, [%r210], %rd306;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0004000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1390: mbarrier.test_wait.shared.b64 p, [%r214], %rd312;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0008000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1417: mbarrier.test_wait.shared.b64 p, [%r218], %rd318;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0010000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1444: mbarrier.test_wait.shared.b64 p, [%r222], %rd324;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0020000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1471: mbarrier.test_wait.shared.b64 p, [%r226], %rd330;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0040000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1498: mbarrier.test_wait.shared.b64 p, [%r230], %rd336;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0080000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1525: mbarrier.test_wait.shared.b64 p, [%r234], %rd342;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0100000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1552: mbarrier.test_wait.shared.b64 p, [%r238], %rd348;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0200000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1579: mbarrier.test_wait.shared.b64 p, [%r242], %rd354;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0400000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1606: mbarrier.test_wait.shared.b64 p, [%r246], %rd360;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0800000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1633: mbarrier.test_wait.shared.b64 p, [%r250], %rd366;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x1000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1660: mbarrier.test_wait.shared.b64 p, [%r254], %rd372;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x2000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1687: mbarrier.test_wait.shared.b64 p, [%r258], %rd378;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x4000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1714: mbarrier.test_wait.shared.b64 p, [%r262], %rd384;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (24 times)
+      line 1741: mbarrier.test_wait.shared.b64 p, [%r266], %rd390;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (19 times)
+      line 95: mbarrier.test_wait.shared.b64 p, [%r4], %rd67;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (19 times)
+      line 115: mbarrier.test_wait.shared.b64 p, [%r16], %rd75;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (19 times)
+      line 138: mbarrier.test_wait.shared.b64 p, [%r20], %rd78;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 166: mbarrier.test_wait.shared.b64 p, [%r24], %rd85;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 191: mbarrier.test_wait.shared.b64 p, [%r28], %rd89;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 216: mbarrier.test_wait.shared.b64 p, [%r32], %rd93;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (13 times)
+      line 241: mbarrier.test_wait.shared.b64 p, [%r36], %rd97;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (13 times)
+      line 266: mbarrier.test_wait.shared.b64 p, [%r40], %rd101;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (13 times)
+      line 291: mbarrier.test_wait.shared.b64 p, [%r44], %rd105;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (10 times)
+      line 316: mbarrier.test_wait.shared.b64 p, [%r48], %rd109;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (10 times)
+      line 341: mbarrier.test_wait.shared.b64 p, [%r52], %rd113;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (10 times)
+      line 366: mbarrier.test_wait.shared.b64 p, [%r56], %rd117;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (7 times)
+      line 391: mbarrier.test_wait.shared.b64 p, [%r60], %rd121;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (7 times)
+      line 416: mbarrier.test_wait.shared.b64 p, [%r64], %rd125;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (7 times)
+      line 441: mbarrier.test_wait.shared.b64 p, [%r68], %rd129;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (4 times)
+      line 466: mbarrier.test_wait.shared.b64 p, [%r72], %rd133;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (4 times)
+      line 491: mbarrier.test_wait.shared.b64 p, [%r76], %rd137;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (4 times)
+      line 516: mbarrier.test_wait.shared.b64 p, [%r80], %rd141;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 541: mbarrier.test_wait.shared.b64 p, [%r84], %rd145;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 566: mbarrier.test_wait.shared.b64 p, [%r88], %rd149;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 591: mbarrier.test_wait.shared.b64 p, [%r92], %rd153;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbarrier_token_probe: 1 CTA(s), 27891 warp-instructions
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000001 (phase 1) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 104: mbarrier.test_wait.shared.b64 p, [%r4], %rd68;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (30 times)
+      line 127: mbarrier.test_wait.shared.b64 p, [%r18], %rd77;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (30 times)
+      line 150: mbarrier.test_wait.shared.b64 p, [%r22], %rd80;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000008 (phase 8) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (39 times)
+      line 178: mbarrier.test_wait.shared.b64 p, [%r26], %rd87;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000010 (phase 16) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 203: mbarrier.test_wait.shared.b64 p, [%r30], %rd91;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000020 (phase 32) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 228: mbarrier.test_wait.shared.b64 p, [%r34], %rd95;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000040 (phase 64) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 253: mbarrier.test_wait.shared.b64 p, [%r38], %rd99;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000080 (phase 128) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 278: mbarrier.test_wait.shared.b64 p, [%r42], %rd103;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000100 (phase 256) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 303: mbarrier.test_wait.shared.b64 p, [%r46], %rd107;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000200 (phase 512) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 328: mbarrier.test_wait.shared.b64 p, [%r50], %rd111;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000400 (phase 1024) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 353: mbarrier.test_wait.shared.b64 p, [%r54], %rd115;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000800 (phase 2048) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 378: mbarrier.test_wait.shared.b64 p, [%r58], %rd119;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000001000 (phase 4096) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 403: mbarrier.test_wait.shared.b64 p, [%r62], %rd123;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000002000 (phase 8192) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 428: mbarrier.test_wait.shared.b64 p, [%r66], %rd127;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000004000 (phase 16384) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 453: mbarrier.test_wait.shared.b64 p, [%r70], %rd131;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000008000 (phase 32768) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 478: mbarrier.test_wait.shared.b64 p, [%r74], %rd135;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000010000 (phase 65536) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 503: mbarrier.test_wait.shared.b64 p, [%r78], %rd139;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000020000 (phase 131072) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 528: mbarrier.test_wait.shared.b64 p, [%r82], %rd143;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000040000 (phase 262144) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 553: mbarrier.test_wait.shared.b64 p, [%r86], %rd147;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000080000 (phase 524288) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 578: mbarrier.test_wait.shared.b64 p, [%r90], %rd151;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000100000 (phase 1048576) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 603: mbarrier.test_wait.shared.b64 p, [%r94], %rd155;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000200000 (phase 2097152) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 628: mbarrier.test_wait.shared.b64 p, [%r98], %rd159;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000400000 (phase 4194304) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 653: mbarrier.test_wait.shared.b64 p, [%r102], %rd163;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000800000 (phase 8388608) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 678: mbarrier.test_wait.shared.b64 p, [%r106], %rd167;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000001000000 (phase 16777216) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 703: mbarrier.test_wait.shared.b64 p, [%r110], %rd171;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000002000000 (phase 33554432) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 728: mbarrier.test_wait.shared.b64 p, [%r114], %rd175;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000004000000 (phase 67108864) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 753: mbarrier.test_wait.shared.b64 p, [%r118], %rd179;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000008000000 (phase 134217728) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 778: mbarrier.test_wait.shared.b64 p, [%r122], %rd183;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000010000000 (phase 268435456) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 803: mbarrier.test_wait.shared.b64 p, [%r126], %rd187;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000020000000 (phase 536870912) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 828: mbarrier.test_wait.shared.b64 p, [%r130], %rd191;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000040000000 (phase 1073741824) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 853: mbarrier.test_wait.shared.b64 p, [%r134], %rd195;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000080000000 (phase 2147483648) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 878: mbarrier.test_wait.shared.b64 p, [%r138], %rd199;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000100000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 904: mbarrier.test_wait.shared.b64 p, [%r142], %rd204;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000200000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 931: mbarrier.test_wait.shared.b64 p, [%r146], %rd210;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000400000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 958: mbarrier.test_wait.shared.b64 p, [%r150], %rd216;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000800000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 985: mbarrier.test_wait.shared.b64 p, [%r154], %rd222;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000001000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1012: mbarrier.test_wait.shared.b64 p, [%r158], %rd228;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000002000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1039: mbarrier.test_wait.shared.b64 p, [%r162], %rd234;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000004000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1066: mbarrier.test_wait.shared.b64 p, [%r166], %rd240;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000008000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1093: mbarrier.test_wait.shared.b64 p, [%r170], %rd246;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000010000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1120: mbarrier.test_wait.shared.b64 p, [%r174], %rd252;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000020000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1147: mbarrier.test_wait.shared.b64 p, [%r178], %rd258;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000040000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1174: mbarrier.test_wait.shared.b64 p, [%r182], %rd264;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000080000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1201: mbarrier.test_wait.shared.b64 p, [%r186], %rd270;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000100000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1228: mbarrier.test_wait.shared.b64 p, [%r190], %rd276;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000200000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1255: mbarrier.test_wait.shared.b64 p, [%r194], %rd282;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000400000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1282: mbarrier.test_wait.shared.b64 p, [%r198], %rd288;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000800000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1309: mbarrier.test_wait.shared.b64 p, [%r202], %rd294;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0001000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1336: mbarrier.test_wait.shared.b64 p, [%r206], %rd300;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0002000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1363: mbarrier.test_wait.shared.b64 p, [%r210], %rd306;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0004000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1390: mbarrier.test_wait.shared.b64 p, [%r214], %rd312;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0008000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1417: mbarrier.test_wait.shared.b64 p, [%r218], %rd318;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0010000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1444: mbarrier.test_wait.shared.b64 p, [%r222], %rd324;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0020000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1471: mbarrier.test_wait.shared.b64 p, [%r226], %rd330;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0040000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1498: mbarrier.test_wait.shared.b64 p, [%r230], %rd336;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0080000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1525: mbarrier.test_wait.shared.b64 p, [%r234], %rd342;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0100000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1552: mbarrier.test_wait.shared.b64 p, [%r238], %rd348;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0200000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1579: mbarrier.test_wait.shared.b64 p, [%r242], %rd354;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0400000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1606: mbarrier.test_wait.shared.b64 p, [%r246], %rd360;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0800000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1633: mbarrier.test_wait.shared.b64 p, [%r250], %rd366;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x1000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1660: mbarrier.test_wait.shared.b64 p, [%r254], %rd372;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x2000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1687: mbarrier.test_wait.shared.b64 p, [%r258], %rd378;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x4000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1714: mbarrier.test_wait.shared.b64 p, [%r262], %rd384;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000000 (phase 0) used in phase 0; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (40 times)
+      line 1741: mbarrier.test_wait.shared.b64 p, [%r266], %rd390;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (31 times)
+      line 95: mbarrier.test_wait.shared.b64 p, [%r4], %rd67;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (31 times)
+      line 115: mbarrier.test_wait.shared.b64 p, [%r16], %rd75;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (31 times)
+      line 138: mbarrier.test_wait.shared.b64 p, [%r20], %rd78;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (31 times)
+      line 166: mbarrier.test_wait.shared.b64 p, [%r24], %rd85;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (31 times)
+      line 191: mbarrier.test_wait.shared.b64 p, [%r28], %rd89;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (26 times)
+      line 216: mbarrier.test_wait.shared.b64 p, [%r32], %rd93;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (26 times)
+      line 241: mbarrier.test_wait.shared.b64 p, [%r36], %rd97;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (26 times)
+      line 266: mbarrier.test_wait.shared.b64 p, [%r40], %rd101;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (26 times)
+      line 291: mbarrier.test_wait.shared.b64 p, [%r44], %rd105;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (26 times)
+      line 316: mbarrier.test_wait.shared.b64 p, [%r48], %rd109;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (21 times)
+      line 341: mbarrier.test_wait.shared.b64 p, [%r52], %rd113;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (21 times)
+      line 366: mbarrier.test_wait.shared.b64 p, [%r56], %rd117;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (21 times)
+      line 391: mbarrier.test_wait.shared.b64 p, [%r60], %rd121;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (21 times)
+      line 416: mbarrier.test_wait.shared.b64 p, [%r64], %rd125;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000002 (phase 2) used in phase 4; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (21 times)
+      line 441: mbarrier.test_wait.shared.b64 p, [%r68], %rd129;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 466: mbarrier.test_wait.shared.b64 p, [%r72], %rd133;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 491: mbarrier.test_wait.shared.b64 p, [%r76], %rd137;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 516: mbarrier.test_wait.shared.b64 p, [%r80], %rd141;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 541: mbarrier.test_wait.shared.b64 p, [%r84], %rd145;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000003 (phase 3) used in phase 5; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (16 times)
+      line 566: mbarrier.test_wait.shared.b64 p, [%r88], %rd149;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (11 times)
+      line 591: mbarrier.test_wait.shared.b64 p, [%r92], %rd153;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (11 times)
+      line 616: mbarrier.test_wait.shared.b64 p, [%r96], %rd157;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (11 times)
+      line 641: mbarrier.test_wait.shared.b64 p, [%r100], %rd161;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (11 times)
+      line 666: mbarrier.test_wait.shared.b64 p, [%r104], %rd165;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000004 (phase 4) used in phase 6; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (11 times)
+      line 691: mbarrier.test_wait.shared.b64 p, [%r108], %rd169;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (6 times)
+      line 716: mbarrier.test_wait.shared.b64 p, [%r112], %rd173;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (6 times)
+      line 741: mbarrier.test_wait.shared.b64 p, [%r116], %rd177;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (6 times)
+      line 766: mbarrier.test_wait.shared.b64 p, [%r120], %rd181;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (6 times)
+      line 791: mbarrier.test_wait.shared.b64 p, [%r124], %rd185;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000005 (phase 5) used in phase 7; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization (6 times)
+      line 816: mbarrier.test_wait.shared.b64 p, [%r128], %rd189;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 841: mbarrier.test_wait.shared.b64 p, [%r132], %rd193;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 866: mbarrier.test_wait.shared.b64 p, [%r136], %rd197;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 891: mbarrier.test_wait.shared.b64 p, [%r140], %rd201;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 918: mbarrier.test_wait.shared.b64 p, [%r144], %rd207;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000006 (phase 6) used in phase 8; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 945: mbarrier.test_wait.shared.b64 p, [%r148], %rd213;
+      first in CTA (0, 0, 0), warp 0, lanes 0

@@ -1,0 +1,3 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  _Z16minmax_cvt_probePKiPKyS2_Pyi: 62 CTA(s), 21135 warp-instructions

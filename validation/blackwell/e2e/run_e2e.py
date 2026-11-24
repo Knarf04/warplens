@@ -79,8 +79,10 @@ def main() -> int:
     parser.add_argument("--mode", choices=["gpu", "sim"], default="gpu")
     parser.add_argument("--out", required=True)
     parser.add_argument("--book", default=os.environ.get("WARPLENS_BOOK", ""))
-    parser.add_argument("--cutlass-bin", default=os.environ.get("CUTLASS_BIN", str(CUTLASS / "bin")))
-    parser.add_argument("--cutlass-source", default=str(CUTLASS / ".cutlass"))
+    parser.add_argument("--cutlass-bin", default=os.environ.get("CUTLASS_BIN", str(CUTLASS / "bin")),
+                        help="original tutorial availability gate; capture programs are rebuilt from --cutlass-source")
+    parser.add_argument("--cutlass-source", default=str(CUTLASS / ".cutlass"),
+                        help="source clone used to build the executed, host-instrumented capture programs")
     parser.add_argument("--predicted")
     parser.add_argument("--timeout-scale", type=float, default=1.0)
     args = parser.parse_args()
@@ -110,15 +112,26 @@ def main() -> int:
         print(f"e2e: build the CUTLASS tutorials: {status} ({seconds:.0f} s)", flush=True)
     capture_build = out / "e2e" / "cutlass_capture_build"
     capture_tool = HERE / "capture_cutlass.py"
-    build_command = [sys.executable, str(capture_tool), "build", "--cutlass", str(Path(args.cutlass_source).resolve()),
-                     "--out", str(capture_build)]
-    build_status, _, build_stdout, build_stderr = run_process(build_command, 3600, env=env, cwd=REPO)
-    (out / "e2e" / "cutlass_capture_build.log").write_bytes(build_stdout + build_stderr)
-    infrastructure_failures += build_status != "ok"
+    requested = {n: bin_dir / f"tutorial_0{n}" for n in range(1, 5)}
+    available = {n for n, program in requested.items() if program.is_file()}
+    build_status = "not run (no requested tutorial programs)"
+    if available:
+        source = Path(args.cutlass_source).resolve()
+        identity = (f"Capture programs are rebuilt from {source}.\n"
+                    f"Original tutorial availability is checked in {bin_dir}; those binaries are not executed.\n")
+        print("e2e: " + identity.replace("\n", " ").strip(), flush=True)
+        build_command = [sys.executable, str(capture_tool), "build", "--cutlass", str(source),
+                         "--out", str(capture_build)]
+        build_status, _, build_stdout, build_stderr = run_process(build_command, 3600, env=env, cwd=REPO)
+        (out / "e2e" / "cutlass_capture_build.log").write_bytes(identity.encode() + build_stdout + build_stderr)
+        infrastructure_failures += build_status != "ok"
     for n in range(1, 5):
         program = capture_build / "bin" / f"tutorial_0{n}"
         name = f"e2e/cutlass_tutorials.tutorial_0{n}"
-        if build_status != "ok" or not program.exists():
+        if n not in available:
+            infrastructure_failures += 1
+            steps.append((name, None, f"{requested[n]} is not built"))
+        elif build_status != "ok" or not program.exists():
             infrastructure_failures += 1
             steps.append((name, None, f"{program} is not built"))
         else:

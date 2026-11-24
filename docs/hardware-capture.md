@@ -29,7 +29,9 @@ run the saved PTX replay below to compare the simulator against hardware outputs
 
 CUTLASS capture builds use generated **host instrumentation** of the pinned tutorial
 sources and TMA encoder wrapper; original device code is retained. Original tutorial
-acceptance tests remain separate. TIRx captures export the exact host module used
+acceptance tests remain separate. `--cutlass-bin` checks that the requested original
+tutorials are available; the captured executables are rebuilt from `--cutlass-source`,
+with their source and binary identity recorded. TIRx captures export the exact host module used
 for the run. A CPU-only pass through that module recovers its launch ABI, verifies
 its PTX and initialized allocations, and intercepts launches without executing device
 instructions. Its hardware expected outputs always come from the hardware run.

@@ -13,8 +13,10 @@ between TMEM and their registers.
 
 What is implemented, and where each rule comes from (CUTLASS/CuTe sources):
 
-* `cta_group::1` only. Operands A (M x K) and B (N x K) come from shared memory
-  in K-major layout; D is M x N in TMEM as float32, one column per n.
+* Operands A (M x K) and B (N x K) come from shared memory, K-major or, for half
+  precision, MN-major (`_operand_bytes` has the MN-major layout); D is M x N in
+  TMEM as float32, one column per n. With `cta_group::2` the MMA spans an even/odd
+  pair of CTAs (M of 128 or 256), and so do alloc, dealloc and commit.
 * Instruction descriptor (cute/arch/mma_sm100_desc.hpp, InstrDescriptor):
   c_format bits 4-5, a_format 7-9, b_format 10-12, a/b negate 13/14,
   a/b major 15/16, N/8 in bits 17-22, M/16 in bits 24-28.

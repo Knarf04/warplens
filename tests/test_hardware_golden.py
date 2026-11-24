@@ -185,3 +185,49 @@ def test_device_function_calls_match_real_gpu(sim):
     stats = sim.launch(AMPERE / "call_probe.ptx", "call_probe", grid=4, block=64, args=[out])
     assert not stats.findings
     np.testing.assert_array_equal(out.numpy().reshape(256, 5), expect)
+
+
+def test_min_max_and_float_to_integer_match_real_gpu(sim):
+    """minmax_cvt_golden.txt is bin/minmax_cvt_golden on an RTX 3080 Ti: `min` and `max` on f32
+    and f64 over all pairs of zeros, infinities, NaNs and a few ordinary values, and `cvt` from
+    f32 and f64 to s32, u32, s64 and u64 in all four rounding modes over NaNs, infinities,
+    halves and the values around every integer limit. Each line is "instruction a b result"
+    with 64-bit hex patterns. Compared bit for bit, NaN results included."""
+    from collections import defaultdict
+    from conftest import kernel
+    cases = defaultdict(list)
+    for line in (AMPERE / "minmax_cvt_golden.txt").read_text().splitlines():
+        name, *values = line.split()
+        cases[name].append([int(x, 16) for x in values])
+    assert len(cases) == 4 + 4 * 4 * 2 and sum(map(len, cases.values())) == 15844
+    problems = []
+    for name, rows in cases.items():
+        rows = np.array(rows, dtype=np.uint64)
+        n = len(rows)
+        *_, src = name.split(".")
+        dst, operands = (name.split(".")[2], "%a") if name.startswith("cvt") else (src, "%a, %b")
+        mod = kernel(f"""
+            .reg .b64 %pa, %pb, %po, %off; .reg .b32 %i, %x, %y;
+            .reg .{src} %a, %b; .reg .{dst} %d;
+            ld.param.u64 %pa, [a]; ld.param.u64 %pb, [b]; ld.param.u64 %po, [o];
+            mov.u32 %x, %ctaid.x; mov.u32 %y, %tid.x;
+            mad.lo.u32 %i, %x, 256, %y;
+            mul.wide.u32 %off, %i, 8;
+            add.u64 %pa, %pa, %off; add.u64 %pb, %pb, %off; add.u64 %po, %po, %off;
+            ld.global.{src} %a, [%pa]; ld.global.{src} %b, [%pb];
+            {name} %d, {operands};
+            st.global.{dst} [%po], %d;
+            ret;
+        """, ".param .u64 a, .param .u64 b, .param .u64 o")
+        pad = -n % 256
+        columns = [np.concatenate([rows[:, k], np.zeros(pad, np.uint64)]) for k in (0, 1)]
+        out = sim.from_numpy(np.zeros(n + pad, np.uint64))  # a 32-bit result leaves the high half zero
+        stats = sim.launch(mod, "k", grid=(n + pad) // 256, block=256,
+                           args=[*(sim.from_numpy(c) for c in columns), out])
+        assert not stats.findings
+        got, expect = out.numpy()[:n], rows[:, 2]
+        wrong = np.flatnonzero(got != expect)
+        if len(wrong):
+            problems.append(f"{name}: {len(wrong)} of {n} differ, e.g. " + "; ".join(
+                f"{rows[i, 0]:x} {rows[i, 1]:x} -> gpu {expect[i]:x}, sim {got[i]:x}" for i in wrong[:4]))
+    assert not problems, "\n".join(problems)

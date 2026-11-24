@@ -18,6 +18,12 @@
 //   ampere_replay callforms     structs by value, calls through function pointers, recursion
 //                               (RT-02)
 //   ampere_replay barrier_exit  __syncthreads() with exited threads, cases 0 and 1
+//   ampere_replay vote          vote.sync all/any/uni/ballot in full and partial warps, with
+//                               lanes that returned or are on another branch, and member
+//                               masks that name lanes which do not vote (RT-16). Only the
+//                               launches of the golden file: the ones that never return on
+//                               an RTX 3080 Ti (validation/ampere/vote_other_3080ti.txt)
+//                               are not run
 //
 // `printf` prints from the device. The device's lines and the host's "out:" line reach
 // standard output through different buffers, so their relative order is not defined;
@@ -64,6 +70,9 @@
 #define main replay_barrier_exit
 #include "../../ampere/barrier_exit_hw.cu"
 #undef main
+#define main replay_vote
+#include "../../ampere/vote_golden.cu"
+#undef main
 
 int main(int argc, char** argv) {
     const char* which = argc > 1 ? argv[1] : "";
@@ -82,6 +91,7 @@ int main(int argc, char** argv) {
         fflush(stdout);
         return status ? status : replay_barrier_exit(2, second);
     }
-    printf("HOST ERROR: usage: ampere_replay shfl|printf|ldmatrix|prmt|cpasync|call|callforms|barrier_exit\n");
+    if (!strcmp(which, "vote")) return replay_vote(1, argv);
+    printf("HOST ERROR: usage: ampere_replay shfl|printf|ldmatrix|prmt|cpasync|call|callforms|barrier_exit|vote\n");
     return 2;
 }

@@ -28,6 +28,96 @@ def test_shfl_matches_real_gpu(sim):
     assert not mismatches, f"{len(mismatches)} of {len(cases)} cases differ: {mismatches[:10]}"
 
 
+def _vote_lines(path):
+    """Lines of a vote recording: (mode, roles, predicates, masks, the rest of the line)."""
+    for line in path.read_text().splitlines():
+        mode, n, roles, preds, *words = line.split()
+        n = int(n)
+        assert len(roles) == len(preds) == n
+        yield (int(mode), np.array(list(roles), dtype=np.int32), np.array(list(preds), dtype=np.int32),
+               np.array([int(x, 16) for x in words[:n]], dtype=np.uint32), words[n:])
+
+
+def _vote_launch(sim, ptx, mode, roles, preds, masks):
+    out = sim.from_numpy(np.full(3 * len(roles), 0xEEEEEEEE, dtype=np.uint32))
+    stats = sim.launch(AMPERE / ptx, "vote_probe", grid=1, block=len(roles),
+                       args=[out, sim.from_numpy(preds), sim.from_numpy(masks), sim.from_numpy(roles), mode])
+    return out.numpy(), stats
+
+
+@pytest.mark.parametrize("ptx, golden", [("vote_probe.ptx", "vote_golden.txt"),
+                                         ("vote_probe_cuda12.ptx", "vote_golden.txt"),
+                                         ("vote_legacy_probe.ptx", "vote_legacy_golden.txt")])
+def test_vote_matches_real_gpu(sim, ptx, golden):
+    """vote_golden.txt is bin/vote_golden on an RTX 3080 Ti: `__all_sync`, `__any_sync`,
+    `__uni_sync` and `__ballot_sync` (vote.sync) in full and partial warps, with lanes that
+    returned, lanes on a branch without a vote, lanes on a branch with a ballot of their own,
+    several groups with their own masks at one instruction, and masks that name lanes which
+    do not exist or have returned (see vote_probe.cu and vote_golden.cu). Each line is a
+    launch: mode, threads, a role and a predicate per thread, the masks, three words per thread.
+
+    The probe runs as nvcc 13.5 compiles it for sm_100a and as nvcc 12.4 does for sm_86, the
+    compiler and target of the GPU binary. vote_legacy_golden.txt is the same launches with
+    the forms without .sync, which ptxas only takes for targets before sm_70: the program was
+    built for sm_60 and the driver compiled its PTX for the GPU."""
+    text = (AMPERE / ptx).read_text()
+    spellings = set(re.findall(r"^\s*(vote\.[\w.]+)", text, re.M))
+    sync = {"vote.sync.all.pred", "vote.sync.any.pred", "vote.sync.uni.pred", "vote.sync.ballot.b32"}
+    legacy = {"vote.all.pred", "vote.any.pred", "vote.uni.pred", "vote.ballot.b32"}
+    assert spellings == (sync | legacy if "legacy" in ptx else sync)
+    assert ".target sm_60" in text if "legacy" in ptx else ".target sm_60" not in text
+    assert "!p" in text  # a negated source
+    lines = list(_vote_lines(AMPERE / golden))
+    assert len(lines) == 5 * 444
+    assert {mode for mode, *_ in lines} == set(range(5, 10) if "legacy" in ptx else range(5))
+    wrong = []
+    for k, (mode, roles, preds, masks, results) in enumerate(lines):
+        got, stats = _vote_launch(sim, ptx, mode, roles, preds, masks)
+        assert not stats.findings, (k, stats.findings)
+        expect = np.array([int(x, 16) for x in results], dtype=np.uint32)
+        if not np.array_equal(got, expect):
+            t = int(np.flatnonzero(got != expect)[0])
+            wrong.append(f"line {k + 1} (mode {mode}, {len(roles)} threads): word {t % 3} of thread {t // 3}: "
+                         f"gpu {expect[t]:08x}, sim {got[t]:08x}")
+    assert not wrong, f"{len(wrong)} of {len(lines)} launches differ: {wrong[:6]}"
+    # What the recording itself says. A lane that returned has no vote though the mask names
+    # it, and a lane that does not exist has none either.
+    for mode, roles, preds, masks, results in lines:
+        if mode % 5 == 3 and (masks == 0xFFFFFFFF).all() and len(roles) <= 32 and set(roles.tolist()) <= {0, 1}:
+            ballot = sum(int(p) << t for t, (p, r) in enumerate(zip(preds, roles)) if r == 0)
+            assert {results[3 * t] for t in np.flatnonzero(roles == 0)} == {f"{ballot:08x}"}
+
+
+def test_vote_masks_a_gpu_does_not_answer_are_refused_or_reported(sim):
+    """vote_other_3080ti.txt is validation/ampere/run_vote_other.sh on an RTX 3080 Ti: launches
+    whose member mask names a lane on another branch, or leaves out the caller. They are not
+    golden results. Where the mask names a lane that is elsewhere and has to wait for the
+    voters itself, the GPU gave no result (the kernel never returned), or it gave one because
+    two different `vote.sync.ballot` of the source share machine code and voted as one. The
+    simulator refuses each of these. A mask without its caller is reported, as the GPU ended
+    some of those with an illegal-instruction error."""
+    import warplens
+    path = AMPERE / "vote_other_3080ti.txt"
+    lines = list(_vote_lines(path))
+    assert len(lines) == 100
+    outcomes = {"refused": 0, "reported": 0}
+    for mode, roles, preds, masks, results in lines:
+        hung = results[:2] == ["no", "result"]
+        left_out = not ((masks >> np.arange(len(masks), dtype=np.uint32)) & 1).all()
+        try:
+            got, stats = _vote_launch(sim, "vote_probe_cuda12.ptx", mode, roles, preds, masks)
+        except warplens.UnsupportedError as error:
+            assert "names a lane that is on another path" in str(error) and not left_out
+            outcomes["refused"] += 1
+            continue
+        assert not hung, "the GPU did not return and the simulator did"
+        assert left_out and {f.kind for f in stats.findings} == {"vote-membermask-mismatch"}
+        outcomes["reported"] += 1
+    assert outcomes == {"refused": 40, "reported": 60}
+    text = path.read_text()
+    assert text.count("no result after") == 24 and text.count("cudaErrorIllegalInstruction") == 30
+
+
 def test_bank_conflict_counters_match_ncu(sim):
     """transpose_ncu_3080ti_grid64.csv is `ncu --csv` output for bin/transpose_hw 64."""
     import csv
@@ -484,11 +574,37 @@ def test_nan_results_match_real_gpu(sim):
     operand position and over every invalid operation. Compared bit for bit: an f32 NaN
     result is 0x7fffffff whatever went in; an f64 one is a NaN operand made quiet (which one
     depends on the instruction) or 0xfff8000000000000 for an invalid operation.
-    `cvt` with `.ftz` is recorded but not implemented by the simulator."""
-    problems, counts = _golden_instruction_mismatches(
-        sim, AMPERE / "nan_golden.txt", 3, skip=("cvt.ftz.f64.f32", "cvt.rn.ftz.f32.f64"))
+    `cvt.ftz.f64.f32` gives 0x7fffffffe0000000 for every NaN."""
+    problems, counts = _golden_instruction_mismatches(sim, AMPERE / "nan_golden.txt", 3)
     assert len(counts) == 38 and sum(counts.values()) == 14270
+    assert counts["cvt.ftz.f64.f32"] == counts["cvt.rn.ftz.f32.f64"] == 22
     assert not problems, "\n".join(problems)
+
+
+def test_cvt_with_ftz_matches_real_gpu(sim):
+    """cvt_ftz_golden.txt is bin/cvt_ftz_golden on an RTX 3080 Ti: `cvt` with `.ftz` between
+    f16, f32 and f64, from f32 to the integer types and to an integer in f32 (what fast-math
+    emits for casts, floorf and the like), each next to the form without `.ftz`, over the
+    subnormal range of the source and of the result. Each line is "instruction a result".
+    Compared bit for bit, NaN results included."""
+    path = AMPERE / "cvt_ftz_golden.txt"
+    problems, counts = _golden_instruction_mismatches(sim, path, 1)
+    assert len(counts) == 40 and sum(counts.values()) == 8120
+    assert sum(".ftz." in name for name in counts) == 25
+    assert not problems, "\n".join(problems)
+    # What the recording says. An f32 result is flushed when it is tiny after rounding: below
+    # 2^-126 (1 - 2^-25), although from 2^-126 (1 - 2^-24) on it rounds to the smallest normal
+    # number. f16 subnormals are not flushed, as source or as result.
+    case = {(name, int(a, 16)): int(r, 16) for name, a, r in map(str.split, path.read_text().splitlines())}
+    assert case["cvt.rn.f32.f64", 0x380FFFFFEFFFFFFF] == 0x00800000
+    assert case["cvt.rn.ftz.f32.f64", 0x380FFFFFEFFFFFFF] == 0
+    assert case["cvt.rn.ftz.f32.f64", 0x380FFFFFF0000000] == 0x00800000
+    assert case["cvt.rn.ftz.f32.f64", 0xB800000000000000] == 0x80000000
+    assert case["cvt.ftz.f64.f32", 0x807FFFFF] == 0x8000000000000000
+    assert case["cvt.rn.ftz.f16.f32", 0x33000001] == 1 and case["cvt.ftz.f32.f16", 0x0001] == 0x33800000
+    assert case["cvt.rpi.f32.f32", 0x00000001] == 0x3F800000 and case["cvt.rpi.ftz.f32.f32", 0x00000001] == 0
+    assert case["cvt.rmi.ftz.s32.f32", 0x807FFFFF] == 0 and case["cvt.rmi.ftz.s32.f32", 0x80800000] == 0xFFFFFFFF
+    assert case["cvt.ftz.f32.f32", 0xFFC12345] == 0x7FFFFFFF and case["cvt.f32.f32", 0xFFC12345] == 0xFFC12345
 
 
 def test_integer_division_matches_real_gpu(sim):

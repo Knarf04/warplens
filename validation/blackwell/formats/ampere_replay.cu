@@ -9,19 +9,17 @@
 // It runs the SAME host programs and kernels that recorded the Ampere golden files (they are
 // included, not copied), and prints the lines of the golden file, in its order. The
 // committed prediction (what this program prints under `warplens run`) is therefore the
-// golden file itself, byte for byte (for `nan`, without the 44 lines of `nan_cvt_ftz`);
-// tests/test_ampere_replay.py checks that. A line that differs on the B200 is a difference
+// golden file itself, byte for byte; tests/test_ampere_replay.py checks that. A line that differs on the B200 is a difference
 // between Blackwell and Ampere, and says which instruction and operands.
 //
 //   ampere_replay nan         validation/ampere/nan_golden.cu: NaN results of add, sub, mul,
-//                             div, fma, sqrt, neg, abs, mov and cvt between f16, f32 and f64,
-//                             "instruction a b c result" (matrix row NUM-13): the 14226 of
-//                             the file's 14270 lines that are not the next case
-//   ampere_replay nan_cvt_ftz the other 44: cvt.ftz.f64.f32 and cvt.rn.ftz.f32.f64. The
-//                             simulator does not implement cvt with .ftz and refuses a
-//                             kernel that has one, so these are in a kernel and a run of
-//                             their own, which has no prediction: its output on the B200 is
-//                             to be read against the same lines of nan_golden.txt
+//                             div, fma, sqrt, neg, abs, mov and cvt between f16, f32 and f64
+//                             (with .ftz too), 14270 lines "instruction a b c result"
+//                             (matrix row NUM-13)
+//   ampere_replay cvt_ftz     cvt_ftz_golden.cu: cvt with .ftz between f16, f32 and f64, from
+//                             f32 to the integer types and to an integer in f32, each next to
+//                             the form without .ftz, over the subnormal range of the source
+//                             and of the result, 8120 lines "instruction a result" (NUM-09)
 //   ampere_replay intdiv      intdiv_golden.cu: div and rem on s16 to u64, with every
 //                             dividend over zero and the minimum over -1, 5808 lines
 //                             "instruction a b result" (NUM-12)
@@ -53,8 +51,12 @@
 #define CHECK(call) HOST_CHECK(call)
 #define CHECK_LAUNCH() probe_sync("ampere_replay")
 
-#define NAN_NO_MAIN
+#define main replay_nan
 #include "../../ampere/nan_golden.cu"
+#undef main
+#define main replay_cvt_ftz
+#include "../../ampere/cvt_ftz_golden.cu"
+#undef main
 #define main replay_intdiv
 #include "../../ampere/intdiv_golden.cu"
 #undef main
@@ -67,11 +69,11 @@
 
 int main(int argc, char** argv) {
     const char* which = argc > 1 ? argv[1] : "";
-    if (!strcmp(which, "nan")) return nan_run(NAN_WITHOUT_CVT_FTZ);
-    if (!strcmp(which, "nan_cvt_ftz")) return nan_run(NAN_ONLY_CVT_FTZ);
+    if (!strcmp(which, "nan")) return replay_nan();
+    if (!strcmp(which, "cvt_ftz")) return replay_cvt_ftz();
     if (!strcmp(which, "intdiv")) return replay_intdiv();
     if (!strcmp(which, "minmax_cvt")) return replay_minmax_cvt();
     if (!strcmp(which, "bitfield")) return replay_bitfield();
-    printf("HOST ERROR: usage: ampere_replay nan|nan_cvt_ftz|intdiv|minmax_cvt|bitfield\n");
+    printf("HOST ERROR: usage: ampere_replay nan|cvt_ftz|intdiv|minmax_cvt|bitfield\n");
     return 2;
 }

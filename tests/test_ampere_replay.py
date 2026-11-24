@@ -24,9 +24,6 @@ PREDICTED = SUITE / "predicted"
 sys.path.insert(0, str(SUITE))
 import manifest  # noqa: E402
 
-NAN_CVT_FTZ = ("cvt.ftz.f64.f32 ", "cvt.rn.ftz.f32.f64 ")  # the simulator does not implement these
-
-
 def _whole(lines):
     return lines
 
@@ -34,10 +31,6 @@ def _whole(lines):
 def _sorted(lines):
     """Device printf and the host's line reach standard output through different buffers."""
     return sorted(lines)
-
-
-def _without_cvt_ftz(lines):
-    return [line for line in lines if not line.startswith(NAN_CVT_FTZ)]
 
 
 def _ftz_nan_as_text(lines):
@@ -56,17 +49,21 @@ REPLAYED = {
     "cpasync_golden.txt": ("e2e/ampere_replay.cpasync", "cpasync_golden.cu", _whole, _whole),
     "call_golden.txt": ("e2e/ampere_replay.call", "call_golden.cu", _whole, _whole),
     "callforms_golden.txt": ("e2e/ampere_replay.callforms", "callforms_golden.cu", _whole, _whole),
+    "vote_golden.txt": ("e2e/ampere_replay.vote", "vote_golden.cu", _whole, _whole),
     "atom_golden.txt": ("e2e/ampere_atom", "atom_golden.cu", _whole, _whole),
     "reconvergence_golden.txt": ("e2e/ampere_reconvergence", "reconvergence_kernels.h", _whole, _whole),
     "mbarrier_token_golden.txt": ("mbarrier/ampere_token", "mbarrier_token_golden.cu", _whole, _whole),
     "minmax_cvt_golden.txt": ("formats/ampere_replay.minmax_cvt", "minmax_cvt_golden.cu", _whole, _whole),
     "intdiv_golden.txt": ("formats/ampere_replay.intdiv", "intdiv_golden.cu", _whole, _whole),
     "bitfield_golden.txt": ("formats/ampere_replay.bitfield", "bitfield_golden.cu", _whole, _whole),
-    "nan_golden.txt": ("formats/ampere_replay.nan", "nan_golden.cu", _without_cvt_ftz, _whole),
+    "nan_golden.txt": ("formats/ampere_replay.nan", "nan_golden.cu", _whole, _whole),
+    "cvt_ftz_golden.txt": ("formats/ampere_replay.cvt_ftz", "cvt_ftz_golden.cu", _whole, _whole),
     "ftz_golden.txt": ("formats/ftz", "ftz_golden.cu", _ftz_nan_as_text, _whole),
 }
 # Golden files a run covers in another way, and where that is checked.
 OTHERWISE = {
+    "vote_legacy_golden.txt": "vote without .sync: ptxas refuses it for sm_70 and newer, so nothing built for "
+                              "sm_100a can hold it; tests/test_hardware_golden.py::test_vote_matches_real_gpu",
     "tf32_golden.txt": "formats/tf32_modes prints the same inputs with the .rn and .rz columns beside .rna; "
                        "tests/test_blackwell_probes.py::test_predicted_rna_column_is_what_the_rtx_3080_ti_gave",
 }
@@ -111,15 +108,13 @@ def test_the_run_includes_the_source_that_recorded_the_golden_file(golden):
     assert f'#include "../../ampere/{source}"' in program, f"{run} does not include validation/ampere/{source}"
 
 
-def test_the_part_of_the_nan_file_the_simulator_cannot_predict_is_its_own_run():
-    """`cvt` with `.ftz` is not implemented, and a kernel that has one is refused. Those 44
-    lines are a run with no prediction; the predicted run holds every other line."""
-    lines = (AMPERE / "nan_golden.txt").read_text().splitlines()
-    apart = [line for line in lines if line.startswith(NAN_CVT_FTZ)]
-    assert len(lines) == 14270 and len(apart) == 44
-    assert len((PREDICTED / "formats" / "ampere_replay.nan.txt").read_text().splitlines()) == 14270 - 44
-    probe = manifest.BY_NAME["formats/ampere_replay.nan_cvt_ftz"]
-    assert probe.predict == "none" and probe.program == manifest.BY_NAME["formats/ampere_replay.nan"].program
+def test_the_nan_run_predicts_the_conversions_with_ftz_too():
+    """`cvt` with `.ftz` was once a run of its own without a prediction, because the simulator
+    did not implement it. Its 44 lines are now among the predicted ones."""
+    predicted = (PREDICTED / "formats" / "ampere_replay.nan.txt").read_text().splitlines()
+    assert len(predicted) == 14270
+    assert sum(line.startswith(("cvt.ftz.f64.f32 ", "cvt.rn.ftz.f32.f64 ")) for line in predicted) == 44
+    assert "formats/ampere_replay.nan_cvt_ftz" not in manifest.BY_NAME
 
 
 def test_mbarrier_token_replay_reports_the_invalid_uses():

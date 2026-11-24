@@ -1,3 +1,3 @@
 status: ok
 warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
-  _Z9nan_probePKiPKyS2_S2_Pyi: 56 CTA(s), 21543 warp-instructions
+  _Z9nan_probePKiPKyS2_S2_Pyi: 56 CTA(s), 21774 warp-instructions

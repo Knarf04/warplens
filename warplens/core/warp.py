@@ -231,6 +231,18 @@ class Warp:
                 m in ins.mods for m in ("sync", "arrive"))
         return ins.opcode == "tcgen05" and "sync" in ins.mods and "aligned" in ins.mods
 
+    def _vote_waits(self, ins, active: np.ndarray) -> bool:
+        """Whether a `vote.sync` has to wait: a lane its member masks name has not returned
+        and is not executing it. The lanes of the mask vote together, so the others run
+        first, until they arrive or return (see `SimtStack.rendezvous_at`). A GPU does the
+        same: validation/ampere/vote_golden.txt has masks that name lanes which return, and
+        every such lane was gone from the vote."""
+        if ins.mods[:1] != ("sync",) or len(ins.operands) != 3:
+            return False
+        named = np.bitwise_or.reduce(self.read(ins.operands[2], "u32")[active])
+        waited = ((named >> np.arange(WARP_SIZE, dtype=np.uint32)) & 1).astype(bool)
+        return bool((waited & self.live_lanes() & ~active).any())
+
     def step(self):
         """Execute one instruction and return the instruction actually issued.
 
@@ -265,6 +277,16 @@ class Warp:
                     stack.rendezvous_at(pc, active)
                 except UnsupportedError as error:
                     raise UnsupportedError(f"{ins.name}: {error}") from None
+                continue
+            if ins.opcode == "vote" and active.any() and self._vote_waits(ins, active):
+                try:
+                    stack.rendezvous_at(pc, active)
+                except UnsupportedError as error:
+                    raise UnsupportedError(
+                        f"{ins.name}: {error}: the member mask names a lane that is on another "
+                        "path and does not get here or return without waiting itself; on an RTX "
+                        "3080 Ti such a kernel did not return (validation/README.md)\n"
+                        f"  line {ins.line}: {ins.text}") from None
                 continue
             # Once every remaining lane has arrived, ordinary divergence after
             # this instruction may reuse the entry as a static reconvergence point.

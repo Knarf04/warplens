@@ -43,7 +43,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 from ..errors import UnsupportedError
-from .ir import NP_TYPES, Frame, Function, Imm, Instr, Mem, Module, Pair, Reg, Sym, TensorRef, Vec
+from .ir import NP_TYPES, Frame, Function, Imm, Instr, Mem, Module, Not, Pair, Reg, Sym, TensorRef, Vec
 
 
 def _rename(operand, regs: dict[str, str], syms: dict[str, str]):
@@ -58,6 +58,8 @@ def _rename(operand, regs: dict[str, str], syms: dict[str, str]):
         return Vec(tuple(_rename(e, regs, syms) for e in operand.elems))
     if kind is Pair:
         return Pair(_rename(operand.first, regs, syms), _rename(operand.second, regs, syms))
+    if kind is Not:
+        return Not(_rename(operand.reg, regs, syms))
     if kind is TensorRef:
         return TensorRef(_rename(operand.base, regs, syms), tuple(_rename(c, regs, syms) for c in operand.coords))
     return operand

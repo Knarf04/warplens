@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
-from ..frontend.ir import B128, Instr, Mem, NP_TYPES, Pair, Reg, Sym, UINT_BY_SIZE, Vec
+from ..frontend.ir import B128, Instr, Mem, NP_TYPES, Not, Pair, Reg, Sym, UINT_BY_SIZE, Vec
 from .floating import fused_multiply_add
 from .smem import (CLUSTER_STRIDE, CLUSTER_WINDOW, GENERIC_WINDOW, MAX_SMEM_BYTES,
                    local_shared_offset)
@@ -694,6 +694,15 @@ def _cvt(w, ins, mask):
         raise unsupported(ins, "predicates cannot be converted")
     d, a = _operands(ins, 2)
     x = w.read(a, aty)
+    ftz = "ftz" in extra
+    if ftz:
+        # ptxas: "Modifier '.ftz' does not apply to this type of convert operation" unless the
+        # source or the result is f32. With an integer source it was not measured.
+        if da.kind != "f" or "f32" not in (dty, aty) or extra.count("ftz") > 1:
+            raise unsupported(ins, ".ftz needs a floating-point source, and .f32 as source or result")
+        extra.remove("ftz")
+        if aty == "f32":
+            x = _flush(x)  # a subnormal source is a zero of its sign
     if da.kind == "f" and dd.kind in "iu":
         if len(extra) != 1 or extra[0] not in _FLOAT_TO_INT:
             raise unsupported(ins, "float-to-int needs one of .rni/.rzi/.rmi/.rpi")
@@ -712,12 +721,43 @@ def _cvt(w, ins, mask):
         out[low] = info.min
         w.write(d, out, mask)
         return
+    if da.kind == "f" and dd.kind == "f":
+        w.write(d, _float_to_float(ins, x, dty, aty, extra, ftz), mask)
+        return
     if extra and not (dd.kind == "f" and set(extra) <= _ROUND_NEAREST):
         raise unsupported(ins, f"modifier .{extra[0]}")
-    result = x.astype(dd)
-    if da.kind == "f" and dd.kind == "f":
-        result = _converted_nans(x, result)
-    w.write(d, result, mask)
+    w.write(d, x.astype(dd), mask)
+
+
+def _float_to_float(ins: Instr, x: np.ndarray, dty: str, aty: str, extra, ftz: bool) -> np.ndarray:
+    """`cvt` between floating types, as an RTX 3080 Ti does it (validation/ampere/
+    cvt_ftz_golden.txt and nan_golden.txt). `x` is the source, already flushed under `.ftz`.
+
+    * `cvt.{rni,rzi,rmi,rpi}.T.T` rounds to an integer in the same type (rint, trunc, floor,
+      ceil); its NaNs are those of arithmetic (`_gpu_nans`).
+    * `cvt[.rn].T.U` converts, rounding to nearest even; NaNs as in `_converted_nans`. With
+      the same type on both sides it copies the bits, NaNs included.
+    * `.ftz` (the source or the result is f32): a subnormal f32 source counts as a zero of its
+      sign. An f32 result that is tiny after rounding (see `_float_result`) is a zero of its
+      sign: of f64 to f32, everything below 2^-126 (1 - 2^-25) in magnitude. An f32 NaN source
+      counts as 0x7fffffff, so `cvt.ftz.f64.f32` gives 0x7fffffffe0000000 for every NaN and
+      `cvt.ftz.f32.f32` gives 0x7fffffff. Subnormal f16 values, as source or result, are
+      left alone: `.ftz` is about f32 only."""
+    dd = NP_TYPES[dty]
+    if len(extra) == 1 and extra[0] in _FLOAT_TO_INT:
+        if dty != aty:
+            raise unsupported(ins, "rounding to an integer needs the same floating type on both sides")
+        with np.errstate(all="ignore"):
+            return _gpu_nans(_FLOAT_TO_INT[extra[0]](x), x)
+    if not set(extra) <= _ROUND_NEAREST:
+        raise unsupported(ins, f"modifier .{extra[0]}")
+    if ftz and aty == "f32":
+        x = _gpu_nans(x)
+    with np.errstate(all="ignore"):
+        result = x.astype(dd)
+    if ftz and dty == "f32" and aty == "f64":
+        result = _flush(result, np.abs(x) < _TINY)
+    return _converted_nans(x, result)
 
 
 _FLOAT_LAYOUT = {2: (np.uint16, 10), 4: (np.uint32, 23), 8: (np.uint64, 52)}  # (bits, fraction width)
@@ -1185,6 +1225,66 @@ def membermask_check(w, member, mask):
     same_group = mask[None, :] & (member_values[:, None] == member_values[None, :])
     missing = (members & w.live_lanes()[None, :] & ~same_group).any(axis=1)
     return members, named, mask & (~named | missing)
+
+
+_VOTES = frozenset({("all", "pred"), ("any", "pred"), ("uni", "pred"), ("ballot", "b32")})
+
+
+@op("vote")
+def _vote(w, ins, mask):
+    """vote.sync.{all,any,uni}.pred d, {!}a, membermask;  vote.sync.ballot.b32 d, {!}a, membermask
+    (`__all_sync`, `__any_sync`, `__uni_sync`, `__ballot_sync`), and the forms without `.sync`
+    and without a mask (`vote.all.pred d, {!}a`), which ptxas refuses for sm_70 and newer.
+
+    Each lane's result is over the lanes that execute the instruction with it and, with
+    `.sync`, are named in its member mask: whether the predicate is true for all of them, for
+    any of them, the same for all of them, or (ballot) a word with bit j set when it is true
+    for lane j. A lane that has returned, is on another path or does not exist has no vote
+    and no bit, whatever the mask says. Without a voter, `all` and `uni` are true and `any`
+    is false.
+
+    This is what an RTX 3080 Ti returns (validation/ampere/vote_golden.txt,
+    vote_legacy_golden.txt), including several groups with different masks at one instruction.
+
+    `vote.sync` waits until every lane of the mask that has not returned has arrived:
+    `Warp._vote_waits` lets the other paths run first, to this instruction or to their end. A
+    lane of the mask that cannot do either without waiting itself (it is at another
+    `vote.sync` that names the voters, say) is an error there; on the GPU such a kernel did
+    not return (validation/ampere/vote_other_3080ti.txt). A caller that is not in its own
+    mask, which PTX does not allow, is reported as `vote-membermask-mismatch`; the GPU
+    answered some such launches like this model and ended others with an illegal-instruction
+    error."""
+    sync = ins.mods[:1] == ("sync",)
+    form = ins.mods[1:] if sync else ins.mods
+    if form not in _VOTES:
+        raise unsupported(ins, "expected vote[.sync].{all,any,uni}.pred or vote[.sync].ballot.b32")
+    d, a, *member = _operands(ins, 3 if sync else 2)
+    negated = isinstance(a, Not)
+    said = w.read(a.reg if negated else a, "pred")
+    if negated:
+        said = ~said
+    voters = np.broadcast_to(mask, (len(mask), len(mask)))  # voters[lane, j]: j votes with lane
+    if sync:
+        members, _, mismatch = membermask_check(w, member[0], mask)
+        if mismatch.any():
+            w.cta.findings.add(
+                "vote-membermask-mismatch",
+                "vote.sync caller is absent from its member mask, or a non-exited member is not "
+                "executing with the same member mask; PTX leaves the result undefined, and a GPU "
+                "may end the kernel with an illegal-instruction error",
+                w, ins, np.flatnonzero(mismatch))
+        voters = voters & members
+    yes = voters & said[None, :]
+    count, agree = voters.sum(axis=1), yes.sum(axis=1)
+    if form[0] == "ballot":
+        result = (yes.astype(np.uint32) << _LANES.astype(np.uint32)).sum(axis=1, dtype=np.uint32)
+    elif form[0] == "all":
+        result = agree == count
+    elif form[0] == "any":
+        result = agree > 0
+    else:
+        result = (agree == count) | (agree == 0)
+    w.write(d, result, mask)
 
 
 @op("shfl")

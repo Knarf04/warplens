@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ..core.clocks import join
 from ..core.cta import Wait
 from ..errors import ExecutionError
 from ..frontend.ir import Sym
@@ -134,6 +135,7 @@ def _mbarrier(w, ins, mask):
             if done:
                 if "relaxed" not in ins.mods:
                     w.seen |= bar.completed_knowledge
+                    cta.clocks.acquire(w.sync_id, bar.completed_released)
                 else:
                     # A successful relaxed wait can order tcgen05 operations
                     # when followed by fence::after_thread_sync. It does not
@@ -171,7 +173,7 @@ def _fence(w, ins, mask):
     if mods in (("proxy", "async"), ("proxy", "async", "shared::cta"),
                 ("proxy", "async", "shared::cluster"), ("proxy", "async", "global")):
         if mods[-1] != "global":
-            w.cta.smem.fence_async(w.warp_id)
+            w.cta.smem.fence_async(w.sync_id)
     elif mods in (("mbarrier_init", "release", "cluster"), ("proxy", "alias")):
         pass
     elif len(mods) == 2 and mods[0] in ("acq_rel", "sc") and mods[1] in (
@@ -191,7 +193,8 @@ def token_of(phase: int) -> int:
 
 class Mbarrier:
     __slots__ = ("cta", "offset", "expected", "pending", "tx", "phase", "init_warp",
-                 "init_epoch", "knowledge", "completed_knowledge", "in_flight", "tx_source")
+                 "init_stamp", "knowledge", "completed_knowledge", "released",
+                 "completed_released", "in_flight", "tx_source")
 
     def __init__(self, cta, offset: int, expected: int, warp_id: int):
         self.cta = cta
@@ -201,9 +204,13 @@ class Mbarrier:
         self.tx = 0  # bytes still expected in this phase
         self.phase = 0
         self.init_warp = warp_id
-        self.init_epoch = cta.smem.epoch
+        self.init_stamp = None  # core.clocks stamp of the mbarrier.init, for mbarrier-init-race
         self.knowledge: set[int] = set()  # async operations contributed to the current phase
         self.completed_knowledge: set[int] = set()  # the immediately preceding completed phase
+        # What the arriving warps had done (core.clocks), which a successful wait acquires.
+        # It only grows: a phase completes after the phases before it.
+        self.released = None
+        self.completed_released = None
         self.in_flight = 0  # TMA loads that will still report to this barrier
         self.tx_source = None  # completion responsible for an unresolved negative tx-count
 
@@ -221,9 +228,14 @@ class Mbarrier:
         self.tx += n
         self._check()
 
-    def arrive(self, n: int, warp, ins, lanes, *, knowledge=None) -> None:
+    def arrive(self, n: int, warp, ins, lanes, *, knowledge=None, released=None) -> None:
+        """`knowledge` and `released` are given for an arrival made on a warp's behalf some
+        time after the instruction (tcgen05.commit): what the warp had then, not now."""
         if "relaxed" not in ins.mods:
             self.knowledge |= warp.seen if knowledge is None else knowledge
+            if released is None:
+                released = self.cta.clocks.release(warp.sync_id)
+            self.released = join(self.released, released)
         if n > self.pending:
             # The PTX manual gives no meaning to this. warplens carries the surplus into the
             # following phases (docs/m2.md, an assumption) and reports it.
@@ -255,6 +267,7 @@ class Mbarrier:
         if self.pending > 0 or self.tx != 0:
             return
         self.completed_knowledge = self.knowledge
+        self.completed_released = self.released
         self.knowledge = set()
         self.tx_source = None
         # More arrivals than one phase needs complete as many phases as they cover, so the
@@ -274,4 +287,5 @@ def mbarrier_init(cta, offset: int, count: int, warp, ins) -> None:
                              f"{cta.smem.size} bytes of shared memory")
     if not 1 <= count < 1 << 20:
         raise ExecutionError(f"mbarrier.init with an arrival count of {count}; it must be 1 to 2^20-1")
-    cta.mbarriers[offset] = Mbarrier(cta, offset, count, warp.warp_id)
+    bar = cta.mbarriers[offset] = Mbarrier(cta, offset, count, warp.warp_id)
+    bar.init_stamp = cta.clocks.stamp(warp.sync_id)

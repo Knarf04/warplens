@@ -197,6 +197,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
             qx, qy, qz = started
             group = Cluster(started, cluster)
             group.launch = queue
+            group.clocks.grow(kx * ky * kz * nwarps)
             # CTAs within a cluster overlap in time, so they must agree when
             # fetched lines become readable in L2. Earlier clusters have
             # finished and remain warm through Timing.l2_lines.
@@ -221,6 +222,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                     cta.warps.append(Warp(program, cta=cta, warp_id=wi, tid=t,
                                           mask=valid[wi], specials=specials, params=params,
                                           mem=mem, trace=trace))
+                    cta.warps[-1].sync_id = cta.rank * nwarps + wi
                 group.warps.extend(cta.warps)
                 stats.smem.warps += len(cta.warps)
             engine.run(group)

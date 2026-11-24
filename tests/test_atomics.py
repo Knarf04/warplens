@@ -363,7 +363,7 @@ def test_proxy_fence_uses_latest_atomic_writer_after_multiple_contenders():
     smem = SharedMemory(4)
     at, dt = np.array([0], dtype=np.uint64), np.dtype("u4")
     smem.write(at, np.array([0], dtype=dt), 0)
-    smem.epoch += 1
+    smem.clocks.acquire(1, smem.clocks.release(0))  # a barrier orders warp 1 after that store
     smem.atomic(at, dt, 0, lambda old: old + 1)
     smem.atomic(at, dt, 1, lambda old: old + 1)
     smem.fence_async(0)

@@ -310,7 +310,7 @@ def _ldmatrix(w, ins, mask):
         rows = addrs[8 * j:8 * j + 8]  # the lanes that supply this matrix's row addresses
         offsets = (rows[:, None] + np.arange(8, dtype=np.uint64) * np.uint64(2)).reshape(-1)
         try:
-            values, unwritten, racy = cta.smem.read(offsets, np.dtype(np.uint16), w.warp_id)
+            values, unwritten, racy = cta.smem.read(offsets, np.dtype(np.uint16), w.sync_id)
         except MemoryFault as e:
             e.lanes = sorted({8 * j + int(k) // 8 for k in e.which})
             raise
@@ -834,11 +834,6 @@ def _cluster_groups(w, addrs: np.ndarray, mask: np.ndarray):
         yield target, lanes, addrs % stride
 
 
-def _remote_id(w) -> int:
-    """How a warp of another CTA is named in a CTA's shared-memory shadow state."""
-    return 1_000_000 + 1000 * w.cta.rank + w.warp_id
-
-
 def _split_generic(space: str, addrs: np.ndarray, mask: np.ndarray):
     """(lanes addressing global memory, lanes addressing shared memory, shared offsets,
     lanes addressing local memory, local offsets)."""
@@ -884,7 +879,7 @@ def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
                 value[lanes] = _load(w, ins, "shared", offsets, dt, lanes)[lanes]
                 continue
             try:
-                value[lanes], unwritten, _ = target.smem.read(offsets[lanes], dt, _remote_id(w))
+                value[lanes], unwritten, _ = target.smem.read(offsets[lanes], dt, w.sync_id)
             except MemoryFault as e:
                 _fault_lanes(e, lanes)
                 raise
@@ -931,7 +926,7 @@ def _load(w, ins, space, addrs, dt, mask) -> np.ndarray:
     if s is not None and s.any():
         cta = w.cta
         try:
-            value[s], unwritten, racy = cta.smem.read(offsets[s], dt, w.warp_id)
+            value[s], unwritten, racy = cta.smem.read(offsets[s], dt, w.sync_id)
         except MemoryFault as e:
             _fault_lanes(e, s)
             raise
@@ -1002,7 +997,7 @@ def _store(w, ins, space, addrs, value, mask) -> None:
                 _store(w, ins, "shared", offsets, value, lanes)
                 continue
             try:
-                target.smem.write(offsets[lanes], value[lanes], _remote_id(w))
+                target.smem.write(offsets[lanes], value[lanes], w.sync_id)
             except MemoryFault as e:
                 _fault_lanes(e, lanes)
                 raise
@@ -1030,7 +1025,7 @@ def _store(w, ins, space, addrs, value, mask) -> None:
                 idx = w.cta.smem.index(offsets[s], value.dtype.itemsize, "write")
                 _async_check(w, ins, s, offsets, value.dtype.itemsize, "write to", writing=True)
                 w.cta.smem.async_writer[idx] = 0  # overwritten by an ordinary store
-            racy = w.cta.smem.write(offsets[s], value[s], w.warp_id)
+            racy = w.cta.smem.write(offsets[s], value[s], w.sync_id)
         except MemoryFault as e:
             _fault_lanes(e, s)
             raise

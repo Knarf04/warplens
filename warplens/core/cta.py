@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 
 from ..errors import ExecutionError
 from ..units.smem import SharedMemory
+from .clocks import join
 
 NUM_BARRIERS = 16
 WARP_SIZE = 32
@@ -37,11 +38,16 @@ class Barrier:
 
     Arrivals are counted per warp, as 32 threads each. A barrier with no
     explicit thread count waits for every warp of the CTA that is still running.
+
+    Only the warps that take part are ordered by it (`core/clocks.py`): each arrival
+    releases what the warp did before, and the warps blocked in `bar.sync` acquire it
+    when the barrier completes. A `bar.arrive` caller acquires nothing.
     """
     arrived: list = field(default_factory=list)  # warps that arrived in this round
     waiters: list = field(default_factory=list)  # (warp, instr) blocked in bar.sync
     count: int | None = None  # explicit thread count, if any arrival gave one
     knowledge: set[int] = field(default_factory=set)  # copies known at arrival, not later
+    released: object = None  # the arrivals' clocks, joined (core.clocks)
 
     def satisfied(self, warps) -> bool:
         if self.count is not None:
@@ -66,6 +72,7 @@ class Cta:
         self.retired = False  # its warps exited; peers may still be running
         self.clc_failed = False  # a thread saw a clusterlaunchcontrol.try_cancel fail
         self.smem = SharedMemory(smem_bytes)
+        self.clocks = self.smem.clocks  # the cluster's, once the CTA is in one
         self.smem_report = smem_report
         self.findings = findings
         self.barriers: dict[int, Barrier] = {}
@@ -83,6 +90,7 @@ class Cta:
                 f"phase's thread count {bar.count}")
         bar.arrived.append(warp)
         bar.knowledge |= warp.seen
+        bar.released = self.clocks.release(warp.sync_id, bar.released)
         if count is not None:
             bar.count = count
         if wait:
@@ -96,14 +104,22 @@ class Cta:
             if bar.arrived and bar.satisfied(self.warps):
                 # Arrivals release prior knowledge; only waiting warps acquire
                 # it. A bar.arrive caller may have run ahead since its arrival.
+                done = bar.released
+                if bar.count is None:
+                    # The all-CTA form completed without the warps that had exited, so
+                    # what those did came before it too. A counted barrier does not
+                    # say which warps it is for, and orders its arrivals only.
+                    for warp in self.warps:
+                        if warp.done:
+                            done = join(done, self.clocks.row(warp.sync_id))
                 for warp, _ in bar.waiters:
                     warp.seen |= bar.knowledge
+                    self.clocks.acquire(warp.sync_id, done)
                     warp.blocked = None
                 released = released or bool(bar.waiters)
-                self.smem.epoch += 1
                 self.smem_report.barrier_completions += 1
                 bar.arrived, bar.waiters, bar.count = [], [], None
-                bar.knowledge = set()
+                bar.knowledge, bar.released = set(), None
         return released
 
     # -- mbarriers ------------------------------------------------------------
@@ -116,11 +132,12 @@ class Cta:
         if bar is None:
             from ..errors import ExecutionError
             raise ExecutionError(f"mbarrier at shared offset {offset} is used before mbarrier.init")
-        if warp.cta is self and bar.init_warp != warp.warp_id and bar.init_epoch == self.smem.epoch:
+        if (warp.cta is self and bar.init_warp != warp.warp_id and bar.init_stamp is not None
+                and not self.clocks.ordered(bar.init_stamp, warp.sync_id)):
             self.findings.add(
                 "mbarrier-init-race",
                 f"mbarrier at shared offset {offset} was initialized by warp {bar.init_warp} and "
-                "is used by another warp with no barrier in between", warp, ins, lanes)
+                "is used by another warp with no barrier between the two", warp, ins, lanes)
         return bar
 
     def peer(self, rank: int, ins=None):
@@ -132,8 +149,8 @@ class Cta:
         return ctas[rank]
 
     def phase_completed(self) -> None:
-        """An mbarrier phase completed: wake its waiters; it also orders shared-memory accesses."""
-        self.smem.epoch += 1
+        """An mbarrier phase completed: wake its waiters. What it orders is between the warps
+        that arrived and the warps whose wait succeeds (`units/mbarrier.py`)."""
         if self.timeline is not None:
             self.timeline.timing.instants.append(("mbarrier phase completes", self.timeline.now, self.id))
         self._wake("mbarrier")

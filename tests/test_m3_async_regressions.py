@@ -15,7 +15,7 @@ from warplens.units.tcgen05 import _tcgen05
 
 def commit_context():
     cta = Cta((0, 0, 0), 32, None, Findings(), async_delay=10)
-    w = SimpleNamespace(cta=cta, warp_id=0, seen=set(), tcgen_issued=[],
+    w = SimpleNamespace(cta=cta, warp_id=0, sync_id=0, seen=set(), tcgen_issued=[],
                         program=SimpleNamespace(fn=SimpleNamespace(name="k")))
     w.read_address = lambda operand: np.full(32, operand.value, dtype=np.uint64)
     for offset in (0, 8):

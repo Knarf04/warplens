@@ -30,6 +30,7 @@ class Warp:
         self.tcgen_issued: list = []  # all issued MMAs; each commit snapshots its thread's history
         self.tcgen_observed: set[int] = set()  # relaxed waits awaiting an after_thread_sync fence
         self.warp_id = warp_id
+        self.sync_id = warp_id  # among the warps of its cluster: core.clocks, units.smem
         self.tid = tid  # (x, y, z) arrays, one entry per lane
         self.specials = specials
         self.params = params  # name -> raw little-endian bytes

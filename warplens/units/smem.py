@@ -2,24 +2,32 @@
 
 Shared addresses are byte offsets from the start of the CTA's shared memory.
 
-Every byte carries shadow state: which warp last wrote it and last read it,
-and in which barrier epoch. The epoch advances each time a barrier completes.
-Two warps touching the same byte in the same epoch, at least one of them
-writing, have no barrier ordering them: that is a race on real hardware even
-if this run's schedule happened to order them. Reads of never-written bytes
-are reported too.
+Every byte carries shadow state for the race check: who last wrote it and who
+read it, each with the accessing warp's clock at that moment (`core/clocks.py`).
+Two warps touching the same byte, at least one of them writing, race unless a
+barrier that both took part in ordered the earlier access before the later
+warp: that is a race on real hardware even if this run's schedule happened to
+order them. Reads of never-written bytes are reported too.
+
+One last writer per byte is enough, because two unordered writes are
+themselves reported. Reads do not conflict with each other, so several warps
+can have unordered reads of a byte on record at once, and a later write must
+be checked against each of them. `_Accesses` keeps one (warp, clock) per byte
+while the readers are ordered one after another, and a clock per warp for the
+bytes where they are not.
 
 `atom` instructions are the exception: two warps updating the same byte atomically
 are ordered by the instruction itself, so they do not race with each other. An
 atom still races with another warp's ordinary load or store of that byte, in
-either order. The shadow state for this is separate (`_atom_warp`): the warp
-whose atoms touched the byte in the current epoch, or ATOM_MANY for several.
+either order. Atomic updates are therefore recorded like reads, in a second
+`_Accesses` (`_atoms`), and checked against ordinary loads as well as stores.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
+from ..core.clocks import Clocks
 from ..errors import MemoryFault
 
 # Largest shared memory one CTA may have on sm_100a, static plus dynamic: 227 KB. The CUDA
@@ -54,12 +62,10 @@ def default_max_dynamic(static: int) -> int:
 # Shadow "writer" value for bytes last written by TMA rather than by a warp.
 ASYNC_PROXY = -2
 
-# Shadow "writer" value for bytes whose last write was an `atom` and that no warp has
-# written with an ordinary store in the current epoch. Negative, so the byte counts as
-# written but not as an ordinary write that an atom of another warp would race with.
+# Shadow "writer" value for bytes that only `atom` instructions have written. Negative, so
+# the byte counts as written but not as an ordinary write that an atom of another warp
+# would race with.
 ATOMIC = -3
-# `_atom_warp` value for bytes that more than one warp updated atomically in an epoch.
-ATOM_MANY = -3
 
 # Shared pointers carry the CTA rank above the byte offset. In particular,
 # bit 24 selects the peer within a pair, as used by CUTLASS SM100 TMA code.
@@ -84,25 +90,96 @@ def resolve_shared(cta, address: int):
 GENERIC_WINDOW = 0x1_0000_0000
 
 
+class _Accesses:
+    """Per byte, accesses that do not conflict with each other: reads, or atomic updates.
+
+    While each accessor of a byte is ordered after the one before, the byte has one entry
+    (`who`, `clock`): whatever is ordered after the latest accessor is ordered after the
+    earlier ones too. When a warp accesses a byte whose recorded accessor is not ordered
+    before it, the byte switches to one clock per warp in `table`, until `clear`.
+    """
+
+    def __init__(self, size: int, clocks: Clocks):
+        self.clocks = clocks
+        self.who = np.full(size, -1, dtype=np.int32)  # -1: none on record, or see `table`
+        self.clock = np.zeros(size, dtype=np.int32)
+        self.several = np.zeros(size, dtype=np.bool_)  # the byte's accessors are in `table`
+        self.any_several = False
+        self.table = None  # (size, warps) clocks, 0 = no access; rows are valid where `several`
+
+    def _table(self) -> np.ndarray:
+        n = self.clocks.n
+        if self.table is None:
+            self.table = np.zeros((len(self.who), n), dtype=np.int32)  # pages are touched on use
+        elif self.table.shape[1] < n:
+            wider = np.zeros((len(self.who), n), dtype=np.int32)
+            wider[:, :self.table.shape[1]] = self.table
+            self.table = wider
+        return self.table
+
+    def unordered(self, idx: np.ndarray, warp: int, row: np.ndarray) -> np.ndarray:
+        """Bytes with an access on record by another warp that is not ordered before `warp`."""
+        who = self.who[idx]
+        out = (who >= 0) & (who != warp) & (self.clock[idx] > row.take(who, mode="clip"))
+        if self.any_several:
+            several = self.several[idx]
+            if several.any():
+                later = self._table()[idx[several]] > row
+                later[:, warp] = False
+                out[several] = later.any(axis=1)
+        return out
+
+    def record(self, idx: np.ndarray, warp: int, row: np.ndarray) -> None:
+        flat = idx.ravel()
+        who = self.who[flat]
+        apart = (who >= 0) & (who != warp) & (self.clock[flat] > row.take(who, mode="clip"))
+        if apart.any():
+            at = flat[apart]
+            table = self._table()
+            table[at] = 0
+            table[at, who[apart]] = self.clock[at]
+            self.several[at] = True
+            self.who[at] = -1
+            self.any_several = True
+        if self.any_several:
+            several = self.several[flat]
+            if several.any():
+                self._table()[flat[several], warp] = row[warp]
+                flat = flat[~several]
+        self.who[flat] = warp
+        self.clock[flat] = row[warp]
+
+    def clear(self, idx: np.ndarray) -> None:
+        self.who[idx] = -1
+        if self.any_several:
+            self.several[idx] = False
+
+
 class SharedMemory:
-    def __init__(self, size: int):
+    def __init__(self, size: int, clocks: Clocks | None = None):
         self.size = size
         self.data = np.zeros(size, dtype=np.uint8)
-        self.epoch = 0  # advanced by the CTA whenever a barrier completes
-        self._writer = np.full(size, -1, dtype=np.int32)  # warp id, -1 = never written
-        self._write_epoch = np.zeros(size, dtype=np.int32)
-        # Proxy-fence ownership must not reuse the race history: an atomic may
-        # preserve an earlier ordinary writer or have several atomic contenders.
+        # The clocks of the cluster's warps. A warp is named here by its id among them
+        # (`Warp.sync_id`), so that a peer CTA's warp is told apart from a local one.
+        self.clocks = clocks if clocks is not None else Clocks()
+        # The last ordinary store: warp, -1 = never written, ASYNC_PROXY or ATOMIC.
+        self._writer = np.full(size, -1, dtype=np.int32)
+        self._write_clock = np.zeros(size, dtype=np.int32)
+        # Proxy-fence ownership must not reuse the race history: an atomic
+        # preserves an earlier ordinary writer and may have several contenders.
         self._last_writer = np.full(size, -1, dtype=np.int32)
-        self._reader = np.full(size, -1, dtype=np.int32)
-        self._read_epoch = np.zeros(size, dtype=np.int32)
-        self._atom_warp = np.full(size, -1, dtype=np.int32)  # -1 = no atom yet, or ATOM_MANY
-        self._atom_epoch = np.zeros(size, dtype=np.int32)
+        self._last_clock = np.zeros(size, dtype=np.int32)
+        self._reads = _Accesses(size, self.clocks)
+        self._atoms = _Accesses(size, self.clocks)
         # TMA (async proxy) shadow state; ids refer to Cta.async_ops.
         self.async_active = False  # stays False for kernels that never use TMA
         self.async_writer = np.zeros(size, dtype=np.int32)  # TMA load that last targeted the byte
         self.async_reader = np.zeros(size, dtype=np.int32)  # TMA store that last read the byte
         self.unfenced = np.zeros(size, dtype=np.bool_)  # ordinary write not yet fenced for TMA
+
+    def use_clocks(self, clocks: Clocks) -> None:
+        """Share the clocks of a cluster. Call before any access."""
+        self.clocks = self._reads.clocks = self._atoms.clocks = clocks
 
     def _index(self, offsets: np.ndarray, size: int, verb: str) -> np.ndarray:
         ok = offsets <= np.uint64(self.size - size) if self.size >= size else np.zeros(len(offsets), bool)
@@ -113,38 +190,41 @@ class SharedMemory:
                 f"the CTA's {self.size} bytes of shared memory", bad, offsets[bad])
         return offsets.astype(np.intp)[:, None] + np.arange(size, dtype=np.intp)
 
+    def _other_write(self, idx: np.ndarray, writer: np.ndarray, warp: int, row: np.ndarray) -> np.ndarray:
+        """Bytes whose last ordinary store, by another warp, is not ordered before `warp`."""
+        return (writer >= 0) & (writer != warp) & (self._write_clock[idx] > row.take(writer, mode="clip"))
+
     def read(self, offsets: np.ndarray, dtype: np.dtype, warp: int):
         """Returns (values, accesses that touched a never-written byte, accesses
         that race with another warp's write)."""
         idx = self._index(offsets, dtype.itemsize, "read")
+        row = self.clocks.row(warp)
         values = self.data[idx].view(dtype).ravel()
         writer = self._writer[idx]
         unwritten = np.flatnonzero((writer == -1).any(axis=1))
-        racy = (writer >= 0) & (writer != warp) & (self._write_epoch[idx] == self.epoch)
-        racy |= self._other_atom(idx, warp)
-        self._reader[idx] = warp
-        self._read_epoch[idx] = self.epoch
+        racy = self._other_write(idx, writer, warp, row)
+        racy |= self._atoms.unordered(idx, warp, row)
+        self._reads.record(idx, warp, row)
         return values, unwritten, np.flatnonzero(racy.any(axis=1))
 
     def write(self, offsets: np.ndarray, values: np.ndarray, warp: int) -> np.ndarray:
         """Returns the accesses that race with another warp's read or write."""
         size = values.dtype.itemsize
         idx = self._index(offsets, size, "write")
-        writer, reader = self._writer[idx], self._reader[idx]
-        racy = (writer >= 0) & (writer != warp) & (self._write_epoch[idx] == self.epoch)
-        racy |= (reader >= 0) & (reader != warp) & (self._read_epoch[idx] == self.epoch)
-        racy |= self._other_atom(idx, warp)
+        row = self.clocks.row(warp)
+        racy = self._other_write(idx, self._writer[idx], warp, row)
+        racy |= self._reads.unordered(idx, warp, row)
+        racy |= self._atoms.unordered(idx, warp, row)
         self.data[idx] = np.ascontiguousarray(values).view(np.uint8).reshape(len(offsets), size)
-        self._writer[idx] = warp
-        self._last_writer[idx] = warp
-        self._write_epoch[idx] = self.epoch
+        self._writer[idx] = self._last_writer[idx] = warp
+        self._write_clock[idx] = self._last_clock[idx] = row[warp]
+        # This store was checked against every access on record. A later access that is not
+        # ordered after one of them is not ordered after this store either, unless this
+        # store itself raced with that access and was reported.
+        self._reads.clear(idx)
+        self._atoms.clear(idx)
         self.unfenced[idx] = True
         return np.flatnonzero(racy.any(axis=1))
-
-    def _other_atom(self, idx: np.ndarray, warp: int) -> np.ndarray:
-        """Bytes that a warp other than `warp` updated atomically in this epoch."""
-        by = self._atom_warp[idx]
-        return (by != -1) & (by != warp) & (self._atom_epoch[idx] == self.epoch)
 
     def atomic(self, offsets: np.ndarray, dtype: np.dtype, warp: int, update):
         """An `atom`: replace the value at each offset by `update(old values)`.
@@ -156,23 +236,20 @@ class SharedMemory:
         """
         size = dtype.itemsize
         idx = self._index(offsets, size, "atomic update")
+        row = self.clocks.row(warp)
         old = self.data[idx].view(dtype).ravel()
-        writer, reader = self._writer[idx], self._reader[idx]
+        writer = self._writer[idx]
         unwritten = np.flatnonzero((writer == -1).any(axis=1))
-        plain = (writer >= 0) & (self._write_epoch[idx] == self.epoch)  # ordinary write, this epoch
-        racy = plain & (writer != warp)
-        racy |= (reader >= 0) & (reader != warp) & (self._read_epoch[idx] == self.epoch)
+        racy = self._other_write(idx, writer, warp, row)
+        racy |= self._reads.unordered(idx, warp, row)
         new = np.ascontiguousarray(np.asarray(update(old), dtype=dtype))
         self.data[idx] = new.view(np.uint8).reshape(len(offsets), size)
-        # An ordinary write of this epoch stays on record: it races with a later atom of
-        # another warp, which this atom does not.
-        self._writer[idx] = np.where(plain, writer, ATOMIC)
+        # An ordinary store stays on record: it races with a later atom of another warp
+        # that is not ordered after it, which this atom does not. So do the reads.
+        self._writer[idx] = np.where(writer >= 0, writer, ATOMIC)
         self._last_writer[idx] = warp
-        self._write_epoch[idx] = self.epoch
-        by = self._atom_warp[idx]
-        several = (by != -1) & (by != warp) & (self._atom_epoch[idx] == self.epoch)
-        self._atom_warp[idx] = np.where(several, ATOM_MANY, warp)
-        self._atom_epoch[idx] = self.epoch
+        self._last_clock[idx] = row[warp]
+        self._atoms.record(idx, warp, row)
         self.unfenced[idx] = True
         return old, unwritten, np.flatnonzero(racy.any(axis=1))
 
@@ -198,12 +275,14 @@ class SharedMemory:
         self._writer[idx] = ASYNC_PROXY if writer_warp is None else writer_warp
         self._last_writer[idx] = self._writer[idx]
         if writer_warp is not None:
-            self._write_epoch[idx] = self.epoch
+            self._write_clock[idx] = self._last_clock[idx] = self.clocks.row(writer_warp)[writer_warp]
         self.unfenced[idx] = writer_warp is not None
 
     def fence_async(self, warp: int) -> None:
         """fence.proxy.async by `warp`: its own earlier writes, and writes that a
-        completed barrier already ordered before it, become visible to TMA."""
+        barrier it took part in ordered before it, become visible to TMA."""
         if self.unfenced.any():
-            ordered = (self._last_writer == warp) | (self._write_epoch < self.epoch)
+            last = self._last_writer
+            ordered = (last == warp) | ((last >= 0) & (
+                self._last_clock <= self.clocks.row(warp).take(last, mode="clip")))
             self.unfenced &= ~ordered

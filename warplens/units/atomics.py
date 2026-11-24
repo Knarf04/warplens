@@ -22,7 +22,7 @@ import numpy as np
 from ..errors import ExecutionError, MemoryFault
 from ..frontend.ir import Imm, NP_TYPES, Reg, Sym
 from .alu import (_address, _async_check, _fault_lanes, _flush, _operands,
-                  _record_memory_banks, _remote_id, op, route, unsupported)
+                  _record_memory_banks, op, route, unsupported)
 from .smem import CLUSTER_STRIDE, local_shared_offset
 
 _TYPES = {
@@ -147,8 +147,7 @@ def _atomic(w, ins, mask):
             return _flush(updated) if ftz else updated
 
         if target is not None:
-            writer = w.warp_id if target is w.cta else _remote_id(w)
-            old, unwritten, racy = target.smem.atomic(at, dt, writer, update)
+            old, unwritten, racy = target.smem.atomic(at, dt, w.sync_id, update)
             if len(unwritten):
                 uninitialized.append(lane)
             if len(racy):

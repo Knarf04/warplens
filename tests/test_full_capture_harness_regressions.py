@@ -151,6 +151,7 @@ def test_e2e_collector_rejects_failure_or_missing_capture_and_records_every_step
     (out / "e2e" / "cutlass_capture_build" / "bin").mkdir(parents=True)
     for n in range(1, 5):
         (out / "e2e" / "cutlass_capture_build" / "bin" / f"tutorial_0{n}").touch()
+        (tmp_path / f"tutorial_0{n}").touch()
     seen = []
     def process(command, timeout, **kwargs):
         if "build" in command or "finalize" in command:
@@ -179,3 +180,45 @@ def test_e2e_collector_rejects_failure_or_missing_capture_and_records_every_step
     triton = next(line for line in rows if line.startswith("e2e/triton\t"))
     assert ("verification-failed" if failed_status == "ok" else failed_status) in triton
     assert all(env["WARPLENS_CAPTURE_MODE"] == "gpu" and env["WARPLENS_CAPTURE_DIR"].startswith(str(out)) for env in seen)
+
+
+@pytest.mark.parametrize("available", [0, 1])
+def test_custom_cutlass_binary_availability_is_honored_without_substituting_missing_tutorials(
+        tmp_path, monkeypatch, available):
+    runner = load("capture_requested_cutlass", SUITE / "e2e" / "run_e2e.py")
+    requested = tmp_path / "requested-bin"
+    requested.mkdir()
+    if available:
+        (requested / "tutorial_01").touch()
+    source, out = tmp_path / "chosen-source", tmp_path / "out"
+    calls = []
+    def process(command, timeout, **kwargs):
+        calls.append(command)
+        if "build" in command:
+            assert command[command.index("--cutlass") + 1] == str(source)
+            binaries = out / "e2e" / "cutlass_capture_build" / "bin"
+            binaries.mkdir(parents=True)
+            for n in range(1, 5):
+                (binaries / f"tutorial_0{n}").touch()
+            return "ok", 0, b"", b""
+        if "finalize" in command:
+            return "ok", 0, b"", b""
+        if command[-1].endswith("tutorial_01"):
+            assert command[-1] != str(requested / "tutorial_01")
+            return "ok", 0, b"Relative error: 0\nExecution is successful.\n", b""
+        return "exit 2", 0, b"SKIPPED: unavailable test frontend\n", b""
+    monkeypatch.setattr(runner, "run_process", process)
+    monkeypatch.setattr(runner, "cudart_directory", lambda: "")
+    monkeypatch.setattr(runner, "validate_capture_tree", lambda *args: [])
+    monkeypatch.setattr(sys, "argv", ["run_e2e", "--out", str(out), "--cutlass-bin", str(requested),
+                                     "--cutlass-source", str(source), "--book", str(tmp_path / "no-book")])
+    assert runner.main() == 1
+    statuses = dict(line.split("\t")[:2] for line in (out / "status.tsv").read_text().splitlines()[1:])
+    for n in range(1, 5):
+        status = statuses[f"e2e/cutlass_tutorials.tutorial_0{n}"]
+        assert status == "ok" if n <= available else status == f"skipped ({requested / f'tutorial_0{n}'} is not built)"
+    assert sum("build" in command for command in calls) == available
+    assert not any(str(runner.CUTLASS / "build.sh") in command for command in calls)
+    if available:
+        log = (out / "e2e" / "cutlass_capture_build.log").read_text()
+        assert f"rebuilt from {source}" in log and "those binaries are not executed" in log

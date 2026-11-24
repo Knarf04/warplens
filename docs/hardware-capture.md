@@ -24,8 +24,11 @@ made yet; simulator captures exercise the collection path and are labelled `sim`
 The end-to-end inventory is four CUTLASS tutorials, two Triton kernels, TIRx SAXPY,
 CuTe DSL SAXPY, and all nine book GEMMs. Missing dependencies, skipped cases, failed
 programs, incomplete captures and corrupt artifacts fail collection. Successful
-collection means the evidence is complete and the programs passed their own checks;
-run the saved PTX replay below to compare the simulator against hardware outputs.
+collection means the evidence is complete and the programs passed their own checks.
+`validation/blackwell/compare.py` then compares every captured output tensor with the
+simulator's, with the tolerances of validation matrix rows RT-06 to RT-09
+(`validation/blackwell/README.md`, "End to end"); the replay below is the same
+comparison under each fixture's own, self-declared policy.
 
 CUTLASS capture builds use generated **host instrumentation** of the pinned tutorial
 sources and TMA encoder wrapper; original device code is retained. Original tutorial
@@ -53,6 +56,10 @@ their arbitrary outputs do not become a universal hardware contract.
    python validation/blackwell/compare.py /path/to/run/out/blackwell
    ```
 
+   `compare.py` replays each end-to-end capture in the simulator and fails on any
+   element outside its matrix row's tolerance, a NaN, or a missing artifact; add
+   `--require-hardware` there too. Give it `--sim-captures DIR` to use the tensors of a
+   simulator run of the same programs where the PTX and inputs are the same.
    The individual suite archive also contains `captures/`. The verifier rejects
    simulator fixtures when `--require-hardware` is set; this label is provenance,
    not cryptographic attestation of the machine.

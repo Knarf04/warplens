@@ -308,16 +308,53 @@ run is isolated for that reason.
 
 | Run | What | Matrix | Prediction |
 | --- | --- | --- | --- |
-| `cutlass_tutorials.tutorial_01` .. `_04` | the four CUTLASS Blackwell tutorials, unmodified, built by `examples/03_cutlass_mma/build.sh --programs`; the same binaries on the GPU and in the simulator | RT-06 | committed (`predicted/e2e/`), from the simulator |
+| `cutlass_tutorials.tutorial_01` .. `_04` | the four CUTLASS Blackwell tutorials at the pinned commit, with host-side capture hooks added by `e2e/capture_cutlass.py` (the device code is the tutorials'); the same binaries on the GPU and in the simulator | RT-06 | committed (`predicted/e2e/`), from the simulator |
 | `triton` | the vector add and the matmul of `examples/05_triton`. On the GPU through `e2e/triton_gpu.py`, which imports the kernels from the example and gives them PyTorch tensors, because the example itself always installs the simulator's driver. Run by the interpreter `WARPLENS_TORCH_PYTHON` names: PyTorch lives in an env of its own (`env/remote/pins.env` says why), pinned to torch 2.15.0 with Triton 3.9.0. Without PyTorch the step is recorded as `skipped (...)`, not as a crash | RT-07 | committed, from `warplens run examples/05_triton/run.py` |
+| `unchanged_scripts.tirx`, `.cute_dsl` | `examples/07_tirx/run.py` and `examples/06_cute_dsl/saxpy.py`, with plain `python` on the GPU and under `warplens run` in the simulator | RT-09 | committed, from the simulator |
 | `book_hgemm` | `hgemm_v1` to `v9` of *Modern GPU Programming for MLSys* through `examples/08_book/run.py <clone>`. The book has no license; its code is never copied here, and the clone is an argument (`--book`, or `WARPLENS_BOOK`). Skipped without it | RT-08 | committed (`predicted/e2e/book_hgemm.txt`: nine "matches NumPy" lines), from the simulator against the book's commit `3a24144d`, the one `tests/test_book.py` names. Regenerate with `predict.sh --book <clone>` |
 
-These print error norms and "matches NumPy" lines, not bit patterns, and their outputs
-contain times. `compare.py` treats them as informational and shows the result lines from the
-GPU next to the simulator's. The `max error` of a "matches NumPy" line is measured against
-NumPy on the machine that ran the script, whose BLAS decides the last float16 digit of the
-reference (0.0078 on one CPU, 0.0156 on another, for the same kernel output): the claim is
-the name, the size and "matches NumPy", and `compare.py` says so when only that number differs.
+Every run saves, per kernel, its input and output tensors, the PTX it launched, the launch
+parameters and provenance (`captures/<run>/<case>/`, format in `docs/hardware-capture.md`):
+17 cases in all. A run counts as `ok` only if the program passed its own check **and** its
+captures are complete, so `run_e2e.py`, `run_all.py` and `env/remote/run.sh` exit non-zero
+for a child that fails, times out, is skipped or leaves no capture.
+
+`compare.py` then judges these runs on the tensors, not on the printed lines. Every element
+of each output the GPU produced is held against the simulator's, with the tolerance of the
+matrix row (the table is `e2e_compare.py:CRITERIA`):
+
+| Cases | Row | Every element of the GPU's output is |
+| --- | --- | --- |
+| `cutlass_tutorial_01` .. `_04` (`d`) | RT-06 | within `1e-5 * max(abs(sim))` of the simulator's |
+| `triton_vector_add` (`out`) | RT-07 | bit-identical to the simulator's |
+| `triton_matmul` (`c`) | RT-07 | within `1e-5 * max(abs(sim))` |
+| `book_hgemm_v1` .. `v9` (`d`) | RT-08 | within 1 half-precision unit in the last place, and (both sides) inside `rtol=2e-2, atol=1e-2` of NumPy's product of the captured inputs |
+| `tirx_saxpy`, `cute_dsl_saxpy` (`y`) | RT-09 | within `1e-6` relative |
+
+A NaN or an infinity on either side fails. The simulator's tensors are, per case, those of
+`--sim-captures DIR` (the output of `e2e/run_e2e.py --mode sim --out DIR`) if the simulator
+ran the same PTX with the same launch on bit-identical initial buffers; otherwise, and
+always without `--sim-captures`, the GPU's own capture is replayed in the simulator (its
+PTX, its buffers; about a minute for all 17) and that is the simulator's result. That is
+what RT-07 asks for when the two environments compiled different PTX. `--no-replay` forbids
+it, `--replay-out DIR` keeps the replayed tensors, `--require-hardware` fails captures that
+are labelled as a simulator's. Verdicts: `bit-identical`, `within tolerance`, `DIFFERS`,
+`NOT COMPARED` (no simulator result for a tensor: a failure, e.g. a kernel the simulator
+refuses), `verification failed` (the program's own check, or a missing, incomplete or
+altered capture), and `crashed`, `timed out`, `not run`. Only the first two pass.
+
+The printed result lines are still shown, GPU next to simulator, but decide nothing. The
+`max error` of a "matches NumPy" line is measured against NumPy on the machine that ran the
+script, whose BLAS decides the last float16 digit of the reference (0.0078 on one CPU,
+0.0156 on another, for the same kernel output).
+
+Dry run on the RTX 3080 Ti (2026-11-24, driver 580, torch 2.13.0+cu130 with Triton 3.7.1 as
+`WARPLENS_TORCH_PYTHON`): `triton` and `unchanged_scripts.cute_dsl` ran on the GPU and left
+captures; their PTX targets `sm_86`, so `compare.py` replayed it. The vector add and the
+saxpy were bit-identical to the simulator's replay; the matmul is `mma.sync` there, which
+the simulator does not implement, so it was `NOT COMPARED`. The CUTLASS tutorials and the
+book need `sm_100a`, and the TIRx script's PTX was refused by that driver
+(`CUDA_ERROR_UNSUPPORTED_PTX_VERSION`): those were `crashed`, as they should be.
 
 ## Reading the comparison
 

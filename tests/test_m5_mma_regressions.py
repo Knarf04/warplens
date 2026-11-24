@@ -114,10 +114,13 @@ def test_pair_view_rejects_unsupported_column_counts(n):
         tmem_view.pair_text(128, n)
 
 
-def test_pair_view_rejects_ignored_lane_offset_and_svg_option(capsys, tmp_path):
+def test_pair_view_rejects_ignored_lane_offset_and_draws_the_svg(capsys, tmp_path):
     with pytest.raises(ValueError, match="lane offset"):
         tmem_view.locate(0, 0, 128, 16, pair=True, lane_offset=16)
     assert tmem_view.main(["128", "16", "--pair", "--lane-offset", "16"]) == 2
     assert "lane offset" in capsys.readouterr().err
-    assert tmem_view.main(["128", "16", "--pair", "--svg", str(tmp_path / "pair.svg")]) == 2
-    assert "SVG" in capsys.readouterr().err
+    # The option used to be refused as not implemented; the picture exists now.
+    assert tmem_view.main(["128", "16", "--pair", "--svg", str(tmp_path / "pair.svg")]) == 0
+    assert (tmp_path / "pair.svg").read_text().startswith("<svg")
+    assert tmem_view.main(["128", "16", "--pair", "--lane-offset", "16", "--svg", str(tmp_path / "no.svg")]) == 2
+    assert not (tmp_path / "no.svg").exists()

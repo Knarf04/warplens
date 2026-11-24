@@ -49,6 +49,10 @@ class InstrBanks:
     worst: int = 0  # most wavefronts in a single execution
     worst_ideal: int = 1
     bank_words: np.ndarray = field(default_factory=lambda: np.zeros(BANKS, dtype=np.int64))
+    # Per bank, the most distinct words a single execution put there: the wavefronts that
+    # bank alone demanded. The sum above cannot show a conflict whose bank moves from one
+    # execution to the next. Read by warplens.viz.smem.
+    bank_peak: np.ndarray = field(default_factory=lambda: np.zeros(BANKS, dtype=np.int64))
 
     @property
     def conflicts(self) -> int:
@@ -66,6 +70,13 @@ class SmemReport:
     instructions: dict[tuple[str, int], InstrBanks] = field(default_factory=dict)  # by kernel and PC
     warps: int = 0  # warps launched
     barrier_completions: int = 0  # completed `bar.sync` / `bar.arrive` phases, over all CTAs
+    # What the layout views of warplens.viz draw, each with how often it happened. Nothing
+    # in the simulator reads these.
+    #   tiles: (kernel, line, "load" | "store", shared offset, rows, bytes per row,
+    #           element size, swizzle bits) of each TMA tensor copy
+    #   mmas:  (kernel, line, M, N, cta_group::2?, lane of the destination) of each tcgen05.mma
+    tiles: dict[tuple, int] = field(default_factory=dict)
+    mmas: dict[tuple, int] = field(default_factory=dict)
 
     def record(self, ins, kernel: str, offsets: np.ndarray, size: int, *, pc: int) -> int:
         """Returns the wavefronts this access took."""
@@ -93,6 +104,7 @@ class SmemReport:
         entry.wavefronts += waves
         entry.ideal += ideal
         entry.bank_words += per_bank
+        np.maximum(entry.bank_peak, per_bank, out=entry.bank_peak)
         if waves * entry.worst_ideal > entry.worst * ideal:
             entry.worst, entry.worst_ideal = waves, ideal
         return waves

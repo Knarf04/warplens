@@ -3,6 +3,7 @@ thread's registers reach in a tcgen05.ld / tcgen05.st.
 
     python -m warplens.viz.tmem 64 32                 # accumulator layout as text
     python -m warplens.viz.tmem 64 32 --svg out.svg   # the same as a picture
+    python -m warplens.viz.tmem 128 16 --pair --svg p.svg   # a cta_group::2 MMA over two CTAs
     python -m warplens.viz.tmem --transfer 16x128b 2  # a load/store shape
 
 TMEM has 128 lanes; warp w of a CTA can reach lanes 32 * (w % 4) .. + 31.
@@ -65,9 +66,7 @@ def pair_text(m_dim: int, n_dim: int) -> str:
     """The TMEM layout of a cta_group::2 MMA result, for both CTAs of the pair."""
     locate(0, 0, m_dim, n_dim, pair=True)  # validates M
     half = m_dim // 2
-    lines = [f"TMEM layout of a {m_dim} x {n_dim} tcgen05.mma result (cta_group::2"
-             + (", Layout B)" if m_dim == 128 else ")"),
-             "  CTA    lanes      holds"]
+    lines = [_pair_title(m_dim, n_dim), "  CTA    lanes      holds"]
     for cta, name in enumerate(("even", "odd ")):
         rows = f"rows {cta * half}-{cta * half + half - 1}"
         if m_dim == 256:
@@ -76,6 +75,53 @@ def pair_text(m_dim: int, n_dim: int) -> str:
             lines.append(f"  {name}   0-63       {rows}, columns 0-{n_dim // 2 - 1} in TMEM columns 0-{n_dim // 2 - 1}")
             lines.append(f"  {name}   64-127     {rows}, columns {n_dim // 2}-{n_dim - 1} in TMEM columns 0-{n_dim // 2 - 1}")
     return "\n".join(lines)
+
+
+def _pair_title(m_dim: int, n_dim: int) -> str:
+    return (f"TMEM layout of a {m_dim} x {n_dim} tcgen05.mma result (cta_group::2"
+            + (", Layout B)" if m_dim == 128 else ")"))
+
+
+def pair_svg(m_dim: int, n_dim: int) -> str:
+    """The picture of `pair_text`: the tensor memory of the even-ranked and of the odd-ranked
+    CTA side by side, drawn like `accumulator_svg`, each block of 32 lanes labelled with the
+    result rows and columns it holds."""
+    locate(0, 0, m_dim, n_dim, pair=True)  # validates M and N
+    cell, left, top, width, gap = 5, 150, 62, 300, 110
+    colors = ["#4c78a8", "#f58518", "#54a24b", "#b279a2"]
+    half_n = n_dim // 2
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{left + 2 * width + gap + 190}" '
+           f'height="{top + LANES * cell + 30}" font-family="sans-serif" font-size="12">',
+           f'<text x="10" y="20" font-size="14">{_pair_title(m_dim, n_dim)}</text>']
+    for cta, name in enumerate(("even", "odd")):
+        x = left + cta * (width + gap)
+        out.append(f'<text x="{x + width / 2}" y="{top - 10}" text-anchor="middle" font-size="13">'
+                   f'{name}-ranked CTA of the pair</text>')
+        for warp in range(4):
+            first = 32 * warp
+            row = cta * (m_dim // 2) + (first if m_dim == 256 else first % 64)
+            n0 = 0 if m_dim == 256 or first < 64 else half_n
+            # The labels are derived here; `locate` is what the tests pin to the simulator.
+            assert locate(row, n0, m_dim, n_dim, pair=True) == (cta, first, 0)
+            columns = f"columns 0-{n_dim - 1}" if m_dim == 256 else f"columns {n0}-{n0 + half_n - 1}"
+            y, h = top + first * cell, 32 * cell
+            out.append(f'<rect x="{x}" y="{y}" width="{width}" height="{h}" fill="{colors[warp]}" '
+                       f'fill-opacity="0.85" stroke="#ffffff"/>')
+            out.append(f'<text x="{x + width / 2}" y="{y + h / 2 - 4}" text-anchor="middle" '
+                       f'fill="#ffffff">rows {row}-{row + 31}</text>')
+            out.append(f'<text x="{x + width / 2}" y="{y + h / 2 + 12}" text-anchor="middle" '
+                       f'fill="#ffffff">{columns}</text>')
+            out.append(f'<text x="{x - 8}" y="{y + h / 2 + 4}" text-anchor="end">lanes {first}-{first + 31}</text>')
+            out.append(f'<rect x="{x}" y="{y}" width="{width}" height="{h}" fill="none" stroke="#333333"/>')
+            if cta == 1:
+                out.append(f'<text x="{x + width + 10}" y="{y + h / 2 + 4}">reachable by warp {warp} (mod 4)</text>')
+        last = n_dim - 1 if m_dim == 256 else half_n - 1
+        held = "result column n is TMEM column n" if m_dim == 256 else \
+            f"result column n is TMEM column n mod {half_n}"
+        out.append(f'<text x="{x + width / 2}" y="{top + LANES * cell + 20}" text-anchor="middle">'
+                   f'TMEM columns 0-{last}: {held}</text>')
+    out.append("</svg>")
+    return "\n".join(out)
 
 
 def _runs(rows: np.ndarray):
@@ -162,9 +208,11 @@ def main(argv=None) -> int:
         if args.pair:
             if args.lane_offset:
                 raise ValueError("the lane offset must be 0 for cta_group::2")
-            if args.svg:
-                raise ValueError("SVG output is not implemented for cta_group::2")
             print(pair_text(args.m, args.n))
+            if args.svg:
+                with open(args.svg, "w") as f:
+                    f.write(pair_svg(args.m, args.n))
+                print(f"wrote {args.svg}")
             return 0
         print(accumulator_text(args.m, args.n, args.lane_offset))
         if args.svg:

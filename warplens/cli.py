@@ -5,6 +5,11 @@
 runs a program with its GPU work executed by the simulator. `program` is either a
 compiled CUDA executable, or a Python script (a `.py` file) that uses Triton, TIRx or the
 CuTe DSL; `warplens run script.py` is `warplens run python script.py` with this interpreter.
+
+    warplens report [-o DIRECTORY] [options] program [arguments...]
+
+runs the program the same way, with the timing model on, and writes a report of every
+kernel launch: DIRECTORY/index.html and, beside it, each view as a file (warplens/viz/report.py).
 """
 
 from __future__ import annotations
@@ -269,6 +274,14 @@ def child_options(args) -> dict:
             "active_sms": getattr(args, "active_sms", None), "clc_limit": getattr(args, "clc_limit", None)}
 
 
+def report_sections(launches, directory, prefix: str) -> list[str]:
+    """The part of the report page for each of (kernel name, LaunchStats), with its files
+    written into `directory` under names that start with `prefix`."""
+    from .viz.report import _stem, launch_section
+    return [launch_section(name, stats, directory, f"{prefix}{i + 1:02d}_{_stem(name)}")
+            for i, (name, stats) in enumerate(launches)]
+
+
 def install_triton_driver() -> None:
     """In a Python program under `warplens run`, once it has imported Triton (called by
     warplens/shim/python/sitecustomize.py): make Triton target the simulator with the options
@@ -276,12 +289,21 @@ def install_triton_driver() -> None:
     from . import triton_driver
     options = json.loads(os.environ.get(RUN_OPTIONS) or "{}")
     report = options.pop("report", None)
+    report_dir = options.pop("report_dir", None)  # of `warplens report`: render the launches here
     options.pop("package", None)
     driver = triton_driver.install(options.pop("model", "B200"), **launch_options(**options))
 
     def tell() -> None:
         launches = [{"lines": launch_lines(name, stats), "findings": len(stats.findings)}
                     for name, stats in driver.launches]
+        if report_dir and launches:
+            # The statistics do not cross to `warplens report`; the page fragments do.
+            try:
+                sections = report_sections(driver.launches, report_dir, f"p{os.getpid()}_")
+                for launch, section in zip(launches, sections):
+                    launch["section"] = section
+            except OSError as error:
+                print(f"warplens: could not write the report of the Triton launches: {error}", file=sys.stderr)
         if report and launches:
             try:
                 with open(report, "a") as file:  # one line per process that launched
@@ -292,7 +314,7 @@ def install_triton_driver() -> None:
     atexit.register(tell)
 
 
-def run_script(args) -> int:
+def run_script(args, collect=None) -> int:
     """A Python script, where the shim libraries cannot be had: make Triton target the
     simulator, then run the script in this process. Only its Triton kernels are simulated.
     The script creates its tensors with `triton.runtime.driver.active.tensor(...)`."""
@@ -324,10 +346,14 @@ def run_script(args) -> int:
             summary(driver.launches, args.model)
         else:
             print("warplens: the script launched no Triton kernels", file=sys.stderr)
+    if collect is not None:
+        collect(driver.launches, [])
     return code
 
 
-def run(args) -> int:
+def run(args, collect=None) -> int:
+    """`collect`, if given, is called with the launches of the run in the two forms `summary`
+    takes, whatever the program's exit status."""
     from .host.shim_server import ShimServer
 
     program = shutil.which(args.program) or args.program
@@ -350,7 +376,7 @@ def run(args) -> int:
         lib = None
     if lib is None:  # outside the handler, so that the script's own errors are not chained to it
         args.program = program
-        return run_script(args)
+        return run_script(args, collect)
     command = [sys.executable, program] if script else [program]
     options = child_options(args)
     launch = launch_options(**{k: v for k, v in options.items() if k != "model"})
@@ -359,6 +385,8 @@ def run(args) -> int:
     scratch = tempfile.TemporaryDirectory(prefix="warplens_kept_ptx_")
     handle, report = tempfile.mkstemp(prefix="warplens_triton_launches_")
     os.close(handle)
+    if getattr(args, "report_dir", None):  # `warplens report`: see install_triton_driver
+        options["report_dir"] = args.report_dir
     env[RUN_OPTIONS] = json.dumps({**options, "report": report,
                                    "package": str(Path(__file__).resolve().parent.parent)})
     server = ShimServer(args.model, kept_ptx=frontend_environment(env, args.model, lib, Path(scratch.name)),
@@ -411,7 +439,33 @@ def run(args) -> int:
             print("warplens: the program launched no kernels", file=out)
             if not server.machine_code and (server.needs_ptx or not server.modules):
                 print(BUILD_HINT, file=out)
+    if collect is not None:
+        collect(server.launches, reported)
     return code if code >= 0 else 128 - code
+
+
+def report(args) -> int:
+    """`warplens report`: run the program, then write the report of its launches."""
+    from .viz.report import render_page
+
+    directory = Path(args.output).absolute()
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        sys.exit(f"warplens: cannot create the report directory {args.output}: {error.strerror}")
+    args.report_dir = str(directory)
+    collected = []
+    code = run(args, lambda launches, reported: collected.append((list(launches), list(reported))))
+    launches, reported = collected[0] if collected else ([], [])
+    sections = report_sections(launches, directory, "") + [r["section"] for r in reported if "section" in r]
+    if not sections:
+        print("warplens: no report written: no kernel was launched", file=sys.stderr)
+        return code
+    findings = sum(len(s.findings) for _, s in launches) + sum(r["findings"] for r in reported)
+    title = f"warplens report: {Path(args.program).name}"
+    (directory / "index.html").write_text(render_page(sections, args.model, title, findings))
+    print(f"warplens: wrote {directory / 'index.html'}", file=sys.stderr)
+    return code
 
 
 def count(least: int):
@@ -449,27 +503,46 @@ def main(argv=None) -> int:
     runner = commands.add_parser("run", help="run a compiled CUDA program, or a Triton, TIRx or CuTe DSL "
                                              "script, in the simulator",
                                  epilog=BUILD_HINT, formatter_class=argparse.RawDescriptionHelpFormatter)
-    runner.add_argument("--model", default="B200", choices=["B200", "B300"], help="GPU to simulate")
-    runner.add_argument("--timing", action="store_true",
-                        help="also run the approximate timing model (uncalibrated)")
-    runner.add_argument("--timing-config", metavar="CONFIG",
-                        help="the parameters of the timing model: a YAML file like warplens/configs/b200.yaml, "
-                             "or the name of a built-in config (b200, b300). Implies --timing. "
-                             "Default: the config of --model")
-    runner.add_argument("--active-sms", type=count(1), metavar="N",
-                        help="how many SMs the timing model assumes to share the memory bandwidth, from 1 to "
-                             "the SM count of the timing config. Implies --timing. Default: all of them")
-    runner.add_argument("--clc-limit", type=count(0), metavar="N",
-                        help="cluster launch control: how many cancellations each cluster that starts is "
-                             "granted before its requests fail; 0 makes every cluster start by itself. "
-                             "Default: every request is granted while clusters are left")
-    runner.add_argument("--quiet", action="store_true", help="do not print the summary")
-    runner.add_argument("program", help="a compiled CUDA executable, or a Python script (a .py file), "
-                                        "which is run by this Python interpreter")
-    runner.add_argument("arguments", nargs=argparse.REMAINDER)
+    reporter = commands.add_parser("report", help="run a program as `run` does and write a report of its "
+                                                  "kernel launches: findings, bank conflicts, shared-memory "
+                                                  "and TMEM layouts, timeline",
+                                   epilog=BUILD_HINT, formatter_class=argparse.RawDescriptionHelpFormatter)
+    reporter.add_argument("-o", "--output", metavar="DIRECTORY", default="warplens_report",
+                          help="where to write index.html and the files it links. Default: warplens_report")
+    reporter.add_argument("--no-timing", action="store_true",
+                          help="do not run the timing model; the report then has no timeline")
+    for command in (runner, reporter):
+        command.add_argument("--model", default="B200", choices=["B200", "B300"], help="GPU to simulate")
+        # `report` takes it too: without it, argparse would read `--timing` as an abbreviation
+        # of --timing-config and take the program for its value.
+        command.add_argument("--timing", action="store_true",
+                             help="also run the approximate timing model (uncalibrated)" if command is runner
+                             else "run the approximate timing model (uncalibrated). This is the default")
+        command.add_argument("--timing-config", metavar="CONFIG",
+                             help="the parameters of the timing model: a YAML file like "
+                                  "warplens/configs/b200.yaml, or the name of a built-in config (b200, b300). "
+                                  "Implies --timing. Default: the config of --model")
+        command.add_argument("--active-sms", type=count(1), metavar="N",
+                             help="how many SMs the timing model assumes to share the memory bandwidth, from "
+                                  "1 to the SM count of the timing config. Implies --timing. Default: all of "
+                                  "them")
+        command.add_argument("--clc-limit", type=count(0), metavar="N",
+                             help="cluster launch control: how many cancellations each cluster that starts is "
+                                  "granted before its requests fail; 0 makes every cluster start by itself. "
+                                  "Default: every request is granted while clusters are left")
+        command.add_argument("--quiet", action="store_true", help="do not print the summary")
+        command.add_argument("program", help="a compiled CUDA executable, or a Python script (a .py file), "
+                                             "which is run by this Python interpreter")
+        command.add_argument("arguments", nargs=argparse.REMAINDER)
     runner.set_defaults(handler=run)
+    reporter.set_defaults(handler=report)
     args = parser.parse_args(argv)
-    check_timing(runner, args)
+    chosen = runner if args.command == "run" else reporter
+    if args.command == "report":
+        if args.no_timing and (args.timing or args.timing_config is not None or args.active_sms is not None):
+            reporter.error("argument --no-timing: not allowed with --timing, --timing-config or --active-sms")
+        args.timing = not args.no_timing
+    check_timing(chosen, args)
     def terminate(signum, _frame):
         raise SystemExit(128 + signum)
 

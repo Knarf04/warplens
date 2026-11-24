@@ -103,6 +103,15 @@ def _check_alignment(w, ins, info, start: int, lane: int) -> None:
             "indexes this buffer by offset will not find the data where it expects", w, ins, [lane])
 
 
+def _note_tile(w, ins, verb: str, start: int, info) -> None:
+    """Record a tensor copy's box in shared memory for the layout view (SmemReport.tiles)."""
+    row_bytes = info.counts[0] * info.elem_size
+    key = (w.program.fn.name, ins.line, verb, start, info.box_bytes // row_bytes, row_bytes,
+           info.elem_size, info.swizzle)
+    tiles = w.cta.smem_report.tiles
+    tiles[key] = tiles.get(key, 0) + 1
+
+
 def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
           swizzle: int | None = None, source=None, global_bytes: int | None = None,
           target=None) -> None:
@@ -382,6 +391,7 @@ def _cp(w, ins, mask):
             start, targets = _load_targets(w, ins, lane, dst_address, bar_address, dst,
                                           cta_group or "cta_group::1", ranks)
             _check_alignment(w, ins, info, start, lane)
+            _note_tile(w, ins, "load", start, info)
             indices = [_smem_bytes(w, ins, start, info.box_bytes, info.swizzle, "load", target)
                        for target, _ in targets]
             addrs, inside = tm.element_addresses(info, coords)
@@ -415,6 +425,7 @@ def _cp(w, ins, mask):
             info, coords = _tensor_map(w, ins, ops[0], lane, nd)
             start = local_shared_offset(int(_address(w, ins, ops[1])[lane]))
             _check_alignment(w, ins, info, start, lane)
+            _note_tile(w, ins, "store", start, info)
             idx = _smem_bytes(w, ins, start, info.box_bytes, info.swizzle, "store")
             addrs, inside = tm.element_addresses(info, coords)
             dt = _UINT[info.elem_size]

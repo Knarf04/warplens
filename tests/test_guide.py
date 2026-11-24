@@ -262,6 +262,11 @@ if pytest is not None:
         everything = NOTEBOOK.read_text()
         assert "T.device_entry" not in everything and "def hgemm_v" not in everything
         assert "WARPLENS_BOOK" in everything
+        # Kept outputs must not carry the paths of whoever ran it.
+        assert str(Path.home()) not in everything and "/home/" not in everything
+        prose = "\n".join("".join(c["source"]) for c in cells if c["cell_type"] == "markdown")
+        links = [t for t in re.findall(r"\]\(([^)\s]+)\)", prose) if not re.match(r"[a-z][a-z0-9+.-]*:", t)]
+        assert links and not [t for t in links if not (NOTEBOOK.parent / t.partition("#")[0]).exists()]
 
     def test_notebook_runs_end_to_end(tmp_path, monkeypatch):
         for need in ("book", "tirx", "shim"):

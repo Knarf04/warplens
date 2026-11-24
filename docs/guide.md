@@ -440,6 +440,10 @@ warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
   _Z11gemm_deviceI13SharedStorageIN7cutlass6half_tES2_N4cute14C...: 16 CTA(s), 79207 warp-instructions
 ```
 
+The first launch is a `for_each` kernel from the CUDA libraries that the
+tutorial's host code uses on its device vectors; it is simulated like any
+other.
+
 ### 5.3 Triton
 
 Triton compiles for `sm_100a` with its own bundled toolchain and needs no GPU

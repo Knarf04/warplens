@@ -1,0 +1,16 @@
+# ptxas: NVIDIA (R) Ptx optimizing assembler; Copyright (c) 2005-2026 NVIDIA Corporation; Built on Mon_Oct_12_19:25:48_PDT_2026
+e4m3x2   from .f32  cvt.rn.satfinite.e4m3x2.f32 %n, %a, %b;      ptxas accepts
+e4m3x2   to .f16x2  cvt.rn.f16x2.e4m3x2 %w, %n;                  ptxas accepts
+e5m2x2   from .f32  cvt.rn.satfinite.e5m2x2.f32 %n, %a, %b;      ptxas accepts
+e5m2x2   to .f16x2  cvt.rn.f16x2.e5m2x2 %w, %n;                  ptxas accepts
+e2m1x2   from .f32  cvt.rn.satfinite.e2m1x2.f32 %n8, %a, %b;     ptxas accepts
+e2m1x2   to .f16x2  cvt.rn.f16x2.e2m1x2 %w, %n8;                 ptxas accepts
+ue8m0x2  from .f32  cvt.rz.satfinite.ue8m0x2.f32 %n, %a, %b;     ptxas accepts
+ue8m0x2  to .bf16x2 cvt.rn.bf16x2.ue8m0x2 %w, %n;                ptxas accepts
+ue4m3x2  from .f32  cvt.rn.satfinite.ue4m3x2.f32 %n, %a, %b;     ptxas rejects: Unknown modifier '.ue4m3x2'
+ue4m3x2  to .f16x2  cvt.rn.f16x2.ue4m3x2 %w, %n;                 ptxas rejects: Unknown modifier '.ue4m3x2'
+ue4m3    from .f32  cvt.rn.satfinite.ue4m3.f32 %n, %a, %b;       ptxas rejects: Unexpected instruction types specified for 'cvt'
+ue4m3    to .f16x2  cvt.rn.f16x2.ue4m3 %w, %n;                   ptxas rejects: Unexpected instruction types specified for 'cvt'
+ue4m3x4  from .f32  cvt.rn.satfinite.ue4m3x4.f32 %n, %a, %b;     ptxas rejects: Unknown modifier '.ue4m3x4'
+ue4m3x4  to .f16x2  cvt.rn.f16x2.ue4m3x4 %w, %n;                 ptxas rejects: Unknown modifier '.ue4m3x4'
+NUM-05: no UE4M3 conversion in this toolkit; the row stays open (docs/validation-matrix.md)

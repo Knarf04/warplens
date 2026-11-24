@@ -36,9 +36,11 @@ under `warplens run`.
 | `compare.py` | compares an archive with `predicted/` and prints one verdict per run |
 | `common.h`, `tcgen05_common.h`, `tma/tma_dump.h` | the PTX wrappers and the shared kernels |
 | `e2e/run_e2e.py`, `e2e/triton_gpu.py` | the end-to-end programs |
+| `run_rows.py` | the three matrix rows that are not probes, run at the end of a GPU run into `rows/`: `formats/ue4m3_ptxas.py` (NUM-05), `e2e/driver_call_trace.py` with `e2e/gdb_driver_trace.py` (RT-10), `e2e/cute_dsl_tma.py` (RT-11). See [Rows without a probe](#rows-without-a-probe) |
 | `tests/test_blackwell_probes.py` (in the repository's `tests/`) | fails when a committed prediction is no longer what the simulator prints |
 | `tests/test_predict_path.py` | runs `run_all.py --mode predict` whole (probes, small formats, end to end) into a temporary directory and holds it against `predicted/` |
 | `tests/test_rental_harness.py` | a probe that does not launch is never a result; a run built by another toolkit is flagged |
+| `tests/test_rows_without_probes.py` | the rows without a probe say `skipped` with a reason where they cannot run, and never fail a run |
 
 Conventions the probes share:
 
@@ -433,10 +435,26 @@ a B200's; RT-04 and RT-12 test the same refusals at Blackwell's limits
 `wavefront_probe_*.csv`) are Nsight Compute measurements and belong to
 `validation/blackwell_timing/`.
 
-**No probe:** NUM-05 (UE4M3: CUDA has no conversion for it); RT-10 (the driver calls of a
-launch: needs `ltrace` or a debugger on the machine, not a program); RT-11 (a CuTe DSL
-kernel with TMA: needs a debugger breakpoint to save the descriptors). TIM-* belong to
-`validation/blackwell_timing/`.
+**No probe, but a scripted run:** NUM-05, RT-10 and RT-11; see
+[Rows without a probe](#rows-without-a-probe). TIM-* belong to `validation/blackwell_timing/`.
+
+### Rows without a probe
+
+Three rows are not a kernel with a predicted output, so they are not in the manifest and
+`compare.py` does not read them. `run_all.py` ends a GPU run (not `--only`) with
+`run_rows.py`, which runs each as a step under a timeout and writes `rows/status.tsv`
+(`ok`, `skipped (why)`, `news (...)`, or what failed) and the outputs under `rows/`. Nothing
+there fails the run.
+
+| Row | Step | Script | What it does | Without a B200 |
+| --- | --- | --- | --- | --- |
+| NUM-05 | `formats/ue4m3_ptxas` | `formats/ue4m3_ptxas.py` | CUDA has no conversion to or from UE4M3, so the row cannot be tested bit for bit. Rather than take that from a document, the script asks the installed ptxas: one `cvt` kernel per format and direction, with the four formats that do convert as controls. With ptxas 13.5 (`formats/ue4m3_ptxas.txt`): all controls accepted, `.ue4m3x2` and `.ue4m3x4` are unknown modifiers, `.ue4m3` is a known type that `cvt` does not take. Status `news` if a toolkit ever accepts one | runs (needs ptxas only) |
+| RT-10 | `e2e/driver_call_trace.tirx`, `.cute_dsl` | `e2e/driver_call_trace.py` | Runs `examples/07_tirx/run.py` and `examples/06_cute_dsl/saxpy.py` under gdb with `e2e/gdb_driver_trace.py`: a breakpoint on the address of every export of `libcuda.so` (674 on driver 580.173.02) and of the shared `libcudart.so`, each call logged in order (`calls.txt`, `summary.txt`). No symbols, no root | runs on any GPU the scripts run on. On the 3080 Ti: the CuTe DSL trace is complete (26 distinct calls, one `cuLaunchKernelEx`); TIRx stops at `cuModuleLoadData`, because the 13.0 driver refuses NVRTC 13.5's PTX |
+| RT-11 | `e2e/cute_dsl_tma` | `e2e/cute_dsl_tma.py` | Runs CUTLASS's `fp16_gemm_0.py` (from the clone `examples/03_cutlass_mma/build.sh` makes; PyTorch from `WARPLENS_TORCH_PYTHON`) plain, then under the same tracer. At `cuLaunchKernel` / `cuLaunchKernelEx` the tracer asks the driver for every parameter's offset and size (`cuFuncGetParamInfo`) and saves the bytes: `trace/launches.txt`, `launches.json`, and `launchNN.paramMM.bin` for each parameter of 64 bytes or more. The 128-byte tensor maps the DSL wrote are among them | `skipped (needs sm_100 ...)`. The capture itself was checked on the 3080 Ti with a CUDA C++ kernel that takes a 128-byte struct by value (bytes read back identical) and with `--script examples/06_cute_dsl/saxpy.py` |
+
+Needs gdb with Python support (`WARPLENS_GDB`, else `gdb` on `PATH`; `env/remote/setup.sh`
+provides one). What to do on the day when a step is skipped, and the one part of RT-11
+that stays manual (`create_tensor_map_tiled`): `env/remote/RUNBOOK.md`, section 3.
 
 ## Dry run
 

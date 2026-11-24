@@ -7,8 +7,8 @@ RESULTS is the archive run_all.py wrote (or its unpacked directory). Each probe 
 verdict:
 
     identical       its output is the committed prediction, line for line
-    rounding        only float32 words differ (probes compared with a tolerance); the largest
-                    distance in units in the last place is given
+    unverified      only finite float32 words differ; the ULP distance is reported, but
+                    no tolerance or hardware-equivalence claim is inferred
     DIFFERS         it is not; the first differing lines are shown below the table
     informational   there is no prediction to hold it against: the probe has none, or the
                     simulator refuses the kernel and the GPU ran it
@@ -20,6 +20,7 @@ verdict:
 "(by design)" marks an outcome the manifest allows for that probe. Lines that start with
 "info:" carry machine-dependent values and are never compared. The exit status is 1 if any
 probe DIFFERS, crashed, was not run, or failed or timed out without that being by design.
+Exit 2 means only unverified numeric differences remain; human assessment is needed.
 """
 
 from __future__ import annotations
@@ -72,7 +73,7 @@ def ulp_distance(got: list[str], want: list[str]):
                 total += 1
                 if x != y:
                     i, j = int(x, 16), int(y, 16)
-                    if is_nan(i) or is_nan(j):
+                    if (i & 0x7FFFFFFF) >= 0x7F800000 or (j & 0x7FFFFFFF) >= 0x7F800000:
                         return None
                     differing += 1
                     worst = max(worst, abs(float_order(i) - float_order(j)))
@@ -125,7 +126,7 @@ def main() -> int:
         if len(fields) >= 2:
             statuses[fields[0]] = fields[1]
 
-    rows, details, bad = [], [], 0
+    rows, details, bad, unverified = [], [], 0, 0
     for probe in PROBES:
         status = statuses.get(probe.name)
         got_text = read(results / (probe.name + ".stdout"))
@@ -169,7 +170,8 @@ def main() -> int:
             distance = ulp_distance(got, want) if probe.compare == "ulp" else None
             if distance is not None:
                 worst, differing, total = distance
-                verdict = "rounding"
+                verdict = "unverified"
+                unverified += 1
                 detail = f"{differing} of {total} float32 words differ, by at most {worst} ulp"
             else:
                 verdict, detail = "DIFFERS", ""
@@ -204,7 +206,7 @@ def main() -> int:
         print("\nDetails\n" + "\n".join(details))
     if scratch:
         scratch.cleanup()
-    return 1 if bad else 0
+    return 1 if bad else 2 if unverified else 0
 
 
 if __name__ == "__main__":

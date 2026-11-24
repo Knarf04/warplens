@@ -26,8 +26,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import signal
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -35,27 +33,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 CUTLASS = REPO / "examples" / "03_cutlass_mma"
-
-
-def run_process(command, timeout, env=None, cwd=None):
-    start = time.monotonic()
-    try:
-        child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=cwd,
-                                 start_new_session=True)
-    except OSError as error:
-        return f"not run ({error.strerror})", 0.0, b"", str(error).encode()
-    try:
-        out, err = child.communicate(timeout=timeout)
-        code = child.returncode
-        status = "ok" if code == 0 else f"exit {code}" if code > 0 else f"signal {-code}"
-    except subprocess.TimeoutExpired:
-        try:
-            os.killpg(child.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        out, err = child.communicate()
-        status = "timeout"
-    return status, time.monotonic() - start, out, err
+sys.path.insert(0, str(HERE.parent))
+from probe_process import forward_interrupts, run_process  # noqa: E402
 
 
 def main() -> int:
@@ -77,16 +56,19 @@ def main() -> int:
     warplens_run = [sys.executable, "-m", "warplens.cli", "run"]
     limit = (3600 if sim else 900) * args.timeout_scale
 
+    infrastructure_failures = 0
     steps: list[tuple[str, list[str] | None, str]] = []  # (name, command or None, why not)
     bin_dir = Path(args.cutlass_bin)
     if not all((bin_dir / f"tutorial_0{n}").exists() for n in range(1, 5)) and bin_dir == CUTLASS / "bin":
         status, seconds, stdout, stderr = run_process([str(CUTLASS / "build.sh"), "--programs"], 3600)
+        infrastructure_failures += status != "ok"
         (out / "e2e" / "cutlass_build.log").write_bytes(stdout + stderr)
         print(f"e2e: build the CUTLASS tutorials: {status} ({seconds:.0f} s)", flush=True)
     for n in range(1, 5):
         program = bin_dir / f"tutorial_0{n}"
         name = f"e2e/cutlass_tutorials.tutorial_0{n}"
         if not program.exists():
+            infrastructure_failures += 1
             steps.append((name, None, f"{program} is not built"))
         else:
             steps.append((name, (warplens_run if sim else []) + [str(program)], ""))
@@ -109,6 +91,7 @@ def main() -> int:
             status, seconds, stdout, stderr = f"skipped ({why})", 0.0, b"", b""
         else:
             status, seconds, stdout, stderr = run_process(command, limit, env=env, cwd=REPO)
+            infrastructure_failures += status.startswith("not run")
         (out / (name + ".stdout")).write_bytes(stdout)
         (out / (name + ".stderr")).write_bytes(stderr)
         shown = " ".join(command) if command else "-"
@@ -120,8 +103,9 @@ def main() -> int:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(stdout)
             target.with_suffix(".sim.txt").write_text(f"status: {status}\n" + stderr.decode(errors="replace"))
-    return 0
+    return 1 if infrastructure_failures else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    with forward_interrupts():
+        sys.exit(main())

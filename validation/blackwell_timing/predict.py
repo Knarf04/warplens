@@ -15,7 +15,8 @@ Writes into --out:
                 (if not, why)
   predictions.md  a table of ns per repetition per configuration
 
---config runs with another timing config in place of warplens/configs/b200.yaml, e.g.
+--model selects the model and its default config (B200 unless specified).
+--config runs with another timing config in place of that default, e.g.
 the calibrated.yaml that fit.py writes, to check that the calibrated model reproduces
 the measurements.
 """
@@ -25,7 +26,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -33,6 +33,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import fit  # noqa: E402
+sys.path.insert(0, str(HERE.parent / "blackwell"))
+from probe_process import forward_interrupts, run_process  # noqa: E402
 
 BENCHES = ["launch", "alu_chain", "smem_wavefronts", "global_load", "gstream", "cp_async",
            "mbar", "tma", "mma_rate", "tmem_access"]
@@ -73,6 +75,7 @@ def predict(out: Path, benches=None, config: Path | None = None, bin_dir: Path |
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     bin_dir = Path(bin_dir) if bin_dir else HERE / "bin" / "sim"
+    config = Path(config) if config else fit.DEFAULT_CONFIG.with_name(model.lower() + ".yaml")
     status = {}
     for bench in benches or BENCHES:
         program = bin_dir / bench
@@ -81,18 +84,16 @@ def predict(out: Path, benches=None, config: Path | None = None, bin_dir: Path |
             continue
         with tempfile.TemporaryDirectory() as scratch:
             record = Path(scratch) / "launches.json"
-            command = [sys.executable, str(Path(__file__).resolve()), "--one", str(program), "--record", str(record)]
+            command = [sys.executable, str(Path(__file__).resolve()), "--one", str(program), "--record", str(record), "--model", model]
             if config:
                 command += ["--config", str(config)]
-            try:
-                done = subprocess.run(command, capture_output=True, text=True, timeout=timeout,
-                                      env=dict(os.environ, PYTHONPATH=os.pathsep.join(
-                                          filter(None, [str(HERE.parent.parent), os.environ.get("PYTHONPATH")]))))
-                code, stdout, stderr = done.returncode, done.stdout, done.stderr
-            except subprocess.TimeoutExpired as expired:
-                code, stdout, stderr = -1, expired.stdout or "", f"timed out after {timeout} s"
-                if isinstance(stdout, bytes):
-                    stdout = stdout.decode(errors="replace")
+            process_status, _, output, errors = run_process(command, timeout, env=dict(
+                os.environ, CUDA_VISIBLE_DEVICES="", PYTHONPATH=os.pathsep.join(
+                    filter(None, [str(HERE.parent.parent), os.environ.get("PYTHONPATH")]))))
+            code = 0 if process_status == "ok" else -1
+            stdout, stderr = output.decode(errors="replace"), errors.decode(errors="replace")
+            if process_status != "ok":
+                stderr = process_status + "\n" + stderr
             launches = json.loads(record.read_text()) if record.exists() else []
         lines, at = [], 0
         for line in stdout.splitlines():
@@ -158,4 +159,5 @@ def main(argv=None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    with forward_interrupts():
+        sys.exit(main())

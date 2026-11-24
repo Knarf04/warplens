@@ -8,6 +8,8 @@
 
 The callee reads its parameters from the storage the caller filled (`param0`) and stores its
 result where the caller will load it (`retval0`), so those names replace the callee's own.
+When a caller uses the same slot for an input and a return value, the input is copied first:
+formal input parameters are passed by value, independent of writes to formal return slots.
 Its registers, labels and variables get a prefix that is unique to the call; its local
 variables become more local variables of the caller, a frame per call site. `ret` becomes a
 branch to the instruction after the call. Lanes that return at different points therefore
@@ -146,7 +148,7 @@ def inline_calls(module: Module, fn: Function, _active: tuple[str, ...] = ()) ->
             syms.update({key: prefix + key for key in table})
         for variable in (*callee.locals, *callee.shared):
             syms[variable.name] = prefix + variable.name
-        entry, after = prefix + "entry", prefix + "return"
+        entry, after = prefix + "#entry", prefix + "#return"  # cannot collide with a callee identifier
 
         out.regs.update({regs[reg]: ty for reg, ty in callee.regs.items()})
         out.call_params.update({syms[key]: ty for key, ty in callee.call_params.items()})
@@ -156,6 +158,21 @@ def inline_calls(module: Module, fn: Function, _active: tuple[str, ...] = ()) ->
             out.frames[syms[inner_prefix]] = Frame(
                 frame.name, syms[frame.entry], tuple(regs[r] for r in frame.regs),
                 *(tuple(syms[s] for s in names) for names in (frame.params, frame.locals, frame.args, frame.rets)))
+        return_slots = {given.name for given in rets}
+        for number, (given, param) in enumerate(zip(args, callee.params)):
+            if given.name not in return_slots:
+                continue
+            saved = prefix + f"#input{number}"
+            temporary = Reg("%" + saved)
+            out.call_params[saved] = param.type
+            out.regs[temporary.name] = param.type
+            syms[param.name] = saved
+            out.instrs += [
+                Instr("ld", ("param", param.type), (temporary, Mem(given)), None, False,
+                      ins.line, ins.text),
+                Instr("st", ("param", param.type), (Mem(Sym(saved)), temporary), None, False,
+                      ins.line, ins.text),
+            ]
         start = len(out.instrs)
         out.labels[entry] = start
         for label, target in callee.labels.items():

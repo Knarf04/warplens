@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import statistics
 import sys
 from pathlib import Path
@@ -172,7 +173,8 @@ def derive(meas: dict, pred: dict, cfg: dict, device: dict, stat: str = "min"):
     p = lambda ident: value(pred, ident)
 
     def add(key, val, formula, note=""):
-        if val is None or val != val:
+        if val is None or not math.isfinite(val):
+            diag.append((key, "not derived", "", "the formula did not give a finite value: " + formula))
             return
         if key != "sm_count" and val < 0:
             note = (note + " " if note else "") + f"The formula gave {val:.4g}; clamped to 0, the model's lower limit."
@@ -197,15 +199,18 @@ def derive(meas: dict, pred: dict, cfg: dict, device: dict, stat: str = "min"):
     f_cfg = cfg["clock_ghz"]
     f = f_cfg
     a, b = m("alu_chain/warps=1"), p("alu_chain/warps=1")
-    if a and b:
+    if a is not None and b is not None and math.isfinite(a) and math.isfinite(b) and a > 0 and b > 0:
         f = f_cfg * b / a
         instr = pred["alu_chain/warps=1"].get("sim_instr_per_rep")
         add("clock_ghz", f,
             f"clock_ghz(config) {f_cfg:g} * predicted {b:.4g} / measured {a:.4g} ns per repetition of alu_chain/warps=1"
             + (f" ({instr:.3g} PTX instructions per repetition)" if instr else ""),
             "Effective issue clock for one warp of register-only instructions, not the core clock.")
+    elif a is not None:
+        diag.append(("clock_ghz", "not derived", "", "alu_chain has no positive finite timing slope; "
+                     "clock-based fits retain the config clock"))
     clock_note = (f"Clocks converted with the fitted clock_ghz = {f:.4g}." if f != f_cfg else
-                  f"Clocks converted with the config's clock_ghz = {f_cfg:g} (alu_chain was not measured).")
+                  f"Clocks converted with the config's clock_ghz = {f_cfg:g} (no usable alu_chain clock fit).")
     ticks = meas.get("alu_chain/warps=1", {})
     if ticks.get("clk_per_rep") and a:
         diag.append(("%clock64 ticks per ns", ticks["clk_per_rep"] / a, "ticks/ns",

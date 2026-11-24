@@ -128,10 +128,19 @@ stage_command() {
 }
 
 commit="$(repo_commit)"
+# A successful stage is reusable only with the same inputs to the orchestration.
+# Changing a toolkit or suite selection must not reuse an older successful run.
+resume_id="$( {
+  printf '%s\0' "$commit" "${setup_args[@]}" "${WARPLENS_ENV_RUN:-}" "${CUDA_VISIBLE_DEVICES-unset}" \
+    "${WARPLENS_BLACKWELL_BUILD_ARGS:-}" "${WARPLENS_BLACKWELL_RUN_ARGS:-}" \
+    "${WARPLENS_TIMING_BUILD_ARGS:-}" "${WARPLENS_TIMING_RUN_ARGS:-}" \
+    "${WARPLENS_BOOK:-}" "${CUTLASS_BIN:-}"
+  cat "$PINS_FILE"
+} | sha256sum | cut -d' ' -f1)"
 is_done() {  # finished earlier, for this commit, and not asked to be redone
   local stage="$1" r
   for r in "${redo[@]}"; do [[ "$r" == all || "$r" == "$stage" ]] && return 1; done
-  [[ -f "$RUN_DIR/state/$stage.ok" && "$(cat "$RUN_DIR/state/$stage.ok")" == "$commit" ]]
+  [[ -f "$RUN_DIR/state/$stage.ok" && "$(cat "$RUN_DIR/state/$stage.ok")" == "$resume_id" ]]
 }
 suite_script() {  # suite_script build-blackwell -> path of the script it runs
   local kind="${1%%-*}" suite="SUITE_${1#*-}"
@@ -195,6 +204,17 @@ run_stage() {
     return 0
   fi
   rm -f "$RUN_DIR/state/$stage.ok"
+  # Rebuilt programs or a changed environment invalidate dependent results.
+  case "$stage" in
+    setup) rm -f "$RUN_DIR/state/"{preflight,selftest,build-blackwell,build-timing,run-blackwell,run-timing}.ok ;;
+    preflight) rm -f "$RUN_DIR/state/"{build-blackwell,build-timing,run-blackwell,run-timing}.ok ;;
+    build-blackwell) rm -f "$RUN_DIR/state/run-blackwell.ok" ;;
+    build-timing) rm -f "$RUN_DIR/state/run-timing.ok" ;;
+  esac
+  if [[ -f "$RUN_DIR/logs/$stage.log" ]]; then
+    mkdir -p "$RUN_DIR/logs/history"
+    mv "$RUN_DIR/logs/$stage.log" "$(mktemp "$RUN_DIR/logs/history/$stage.XXXXXX.log")"
+  fi
   start="$(utc_now)"; t0=$SECONDS
   say "$stage: started $start (limit $minutes min, log $RUN_DIR/logs/$stage.log)"
   # In the background, so that Ctrl-C reaches the trap while the stage runs.
@@ -209,7 +229,7 @@ run_stage() {
   stage_pid=""
   end="$(utc_now)"
   case "$rc" in
-    0) status=ok; echo "$commit" > "$RUN_DIR/state/$stage.ok" ;;
+    0) status=ok; echo "$resume_id" > "$RUN_DIR/state/$stage.ok" ;;
     124|137) status=timeout ;;
     130) status=interrupted ;;
     *) status=failed ;;
@@ -317,26 +337,28 @@ collect() {
     echo
     echo "# versions: see resolved/versions.txt (what setup.sh installed) and pins.env (what was asked for)"
     echo "# stage history, every attempt: stages.tsv. Preflight reports: preflight-quick.txt, preflight.txt"
-  } > "$RUN_DIR/manifest.txt"
-  rm -rf "$RUN_DIR/resolved" "$RUN_DIR/suite-dirs"
-  [[ -d "$REMOTE_HOME/resolved" ]] && cp -r "$REMOTE_HOME/resolved" "$RUN_DIR/resolved"
-  cp "$PINS_FILE" "$RUN_DIR/pins.env"
-  nvidia-smi > "$RUN_DIR/nvidia-smi.txt" 2>&1 || true
-  nvidia-smi -q > "$RUN_DIR/nvidia-smi-q.txt" 2>&1 || true
+  } > "$RUN_DIR/manifest.txt" || return 1
+  rm -rf "$RUN_DIR/resolved" "$RUN_DIR/suite-dirs" || return 1
+  if [[ -d "$REMOTE_HOME/resolved" ]]; then
+    cp -r "$REMOTE_HOME/resolved" "$RUN_DIR/resolved" || return 1
+  fi
+  cp "$PINS_FILE" "$RUN_DIR/pins.env" || return 1
+  timeout --kill-after=5 15 nvidia-smi > "$RUN_DIR/nvidia-smi.txt" 2>&1 || true
+  timeout --kill-after=5 15 nvidia-smi -q > "$RUN_DIR/nvidia-smi-q.txt" 2>&1 || true
   # Outputs a suite left in its own directory instead of WARPLENS_RESULTS_DIR.
   # Only what this run made: directories that came with the checkout are older
   # than the run's first start.
   for suite in "$SUITE_blackwell" "$SUITE_timing"; do
     [[ -d "$REPO_DIR/$suite" ]] || continue
     while IFS= read -r -d '' made; do
-      mkdir -p "$RUN_DIR/suite-dirs/$suite"
-      cp -r "$made" "$RUN_DIR/suite-dirs/$suite/"
+      mkdir -p "$RUN_DIR/suite-dirs/$suite" || return 1
+      cp -r "$made" "$RUN_DIR/suite-dirs/$suite/" || return 1
     done < <(find "$REPO_DIR/$suite" -mindepth 1 -maxdepth 1 -type d \
                \( -name 'results*' -o -name out -o -name output \) \
                -newer "$RUN_DIR/state/first-start" -print0)
   done
   (cd "$RUN_DIR" && find . -type f ! -name SHA256SUMS ! -path './state/*' -print0 | sort -z | xargs -0 sha256sum > state/sums \
-     && mv state/sums SHA256SUMS)
+     && mv state/sums SHA256SUMS) || return 1
 
   first="$(tr -d ':-' < "$RUN_DIR/state/first-start")"
   name="warplens-b200-${first}-${commit:0:10}"
@@ -347,7 +369,7 @@ collect() {
     return 1
   fi
   sums="$archive.sha256"
-  (cd "$REMOTE_HOME/results" && sha256sum "$name.tar.gz" > "$sums")
+  (cd "$REMOTE_HOME/results" && sha256sum "$name.tar.gz" > "$sums.part" && mv "$sums.part" "$sums") || return 1
   say "archive:  $archive"
   say "size:     $(du -h "$archive" | cut -f1) ($(stat -c %s "$archive") bytes)"
   say "sha256:   $(cut -d' ' -f1 "$sums")"
@@ -356,13 +378,28 @@ collect() {
 }
 
 finish() {  # finish EXIT_STATUS
-  collect || failures=$((failures + 1))
+  local code="$1"
+  if ! collect; then
+    say "collect: archive or checksum failed; keep the raw run directory and retry --collect-only"
+    (( code == 0 )) && code=1
+  fi
   say "stages: $(for s in "${STAGES[@]}"; do [[ $s == collect ]] || printf '%s=%s ' "$s" "${result[$s]:-not-reached}"; done)"
-  exit "$1"
+  exit "$code"
 }
 
-ptx_jit=unknown
-ncu_state=unavailable
+read_preflight_status() {
+  ptx_jit=unknown
+  ncu_state=unavailable
+  if [[ -f "$RUN_DIR/preflight.status" ]]; then
+    case "$(awk '$1 == "ptx-jit" {print $2}' "$RUN_DIR/preflight.status")" in
+      PASS) ptx_jit=ok ;;
+      WARN|FAIL) ptx_jit=refused ;;
+    esac
+    [[ "$(awk '$1 == "ncu" {print $2}' "$RUN_DIR/preflight.status")" == PASS ]] && ncu_state=ok
+  fi
+  return 0
+}
+read_preflight_status
 if (( collect_only )); then
   # The status each stage had when it last ran, from the history.
   for stage in "${STAGES[@]}"; do
@@ -391,16 +428,25 @@ if ! run_stage setup 45 bash "$REMOTE_DIR/setup.sh" "${setup_args[@]}"; then
 fi
 
 # 3. Kernels on the GPU.
-run_stage preflight 15 bash "$REMOTE_DIR/preflight.sh" --out "$RUN_DIR/preflight.txt" --status "$RUN_DIR/preflight.status"
+preflight_args=(--out "$RUN_DIR/preflight.txt" --status "$RUN_DIR/preflight.status")
+# run_all.py omits the end-to-end programs for --no-e2e or any --only selector.
+blackwell_words=()
+read -r -a blackwell_words <<<"${WARPLENS_BLACKWELL_RUN_ARGS:-}"
+with_e2e=1
+next_book=0
+for word in "${blackwell_words[@]}"; do
+  if (( next_book )); then preflight_args+=(--book "$word"); next_book=0; continue; fi
+  case "$word" in
+    --no-e2e|--only|--only=*) with_e2e=0 ;;
+    --book) next_book=1 ;;
+    --book=*) preflight_args+=(--book "${word#*=}") ;;
+  esac
+done
+if (( with_e2e )) && ! is_skipped run-blackwell; then preflight_args+=(--e2e); fi
+run_stage preflight 15 bash "$REMOTE_DIR/preflight.sh" "${preflight_args[@]}"
 rc=$?
 [[ -f "$RUN_DIR/preflight.txt" && "${result[preflight]}" != "done" ]] && sed 's/^/    /' "$RUN_DIR/preflight.txt"
-if [[ -f "$RUN_DIR/preflight.status" ]]; then
-  case "$(awk '$1 == "ptx-jit" {print $2}' "$RUN_DIR/preflight.status")" in
-    PASS) ptx_jit=ok ;;
-    WARN|FAIL) ptx_jit=refused ;;
-  esac
-  [[ "$(awk '$1 == "ncu" {print $2}' "$RUN_DIR/preflight.status")" == PASS ]] && ncu_state=ok
-fi
+read_preflight_status
 if (( rc != 0 && ! keep_going )); then
   say "stopping: the full preflight failed. See 'When preflight fails' in env/remote/RUNBOOK.md."
   say "To run the suites regardless: env/remote/run.sh --keep-going"

@@ -105,6 +105,9 @@ cluster now running, and not canceled already.
 
 A request that is not announced with `expect_tx`, or announced with the wrong byte count,
 shows up as the usual `mbarrier-tx-mismatch` finding or as a deadlock on the mbarrier.
+Reusing a TMA store's source or an MMA operand for the response without waiting for
+that reader produces `tma-store-source-overwritten` or `mma-operand-overwritten`.
+Multicast checks the response bytes in each receiving CTA.
 
 The CuTe DSL's `cute.arch.clc_response` reads all three coordinates without a predicate,
 so a CuTe DSL kernel gets one `clc-ctaid-of-failed-cancel` when its last request fails.

@@ -66,6 +66,9 @@ __global__ void mma_kernel(uint64_t* out, int reps, int batch, uint32_t idesc, i
     __shared__ uint64_t bar;
     __shared__ uint32_t tmem_base;
     for (int i = threadIdx.x; i < OPERAND_BYTES / 4; i += blockDim.x) operand[i] = fill;
+    // Publish generic shared stores to the proxy that tcgen05.mma reads.
+    // This is setup, outside both clock reads and the repeated batch loop.
+    fence_proxy_async();
     if (threadIdx.x == 0) mbarrier_init(&bar, 1);
     tmem_alloc(&tmem_base, 256);
     __syncthreads();

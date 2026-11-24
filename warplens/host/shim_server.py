@@ -85,8 +85,9 @@ class ShimServer:
         self.launches: list[tuple[str, object]] = []  # (kernel name, LaunchStats)
         self.needs_ptx = False
         self.machine_code = False  # a runtime handed over a compiled module instead of PTX
-        self.kept_ptx = kept_ptx  # the directory where a compiler keeps the PTX of such modules
-        self.kept: set[int] = set()  # the modules whose kernels are looked up there
+        self.kept_ptx = Path(kept_ptx) if kept_ptx is not None else None
+        self.kept: set[int] = set()  # modules whose kernels come from kept PTX
+        self.kept_sources: dict[int, list[tuple[str, str]]] = {}  # sources frozen at each module load
         self.debug = bool(os.environ.get("WARPLENS_SHIM_DEBUG"))  # log every request
 
     def serve(self, sock) -> None:
@@ -135,17 +136,21 @@ class ShimServer:
         if self.kept_ptx is None:
             self.machine_code = True
             raise WarplensError(MACHINE_CODE)
-        self.kept.add(len(self.modules))
+        module = len(self.modules)
+        # A later compilation may overwrite the same path or emit another kernel with
+        # the same name before this module's first GetFunction/GetKernel call. Preserve
+        # the sources now; function lookup must not change which module was loaded.
+        files = sorted(self.kept_ptx.glob("*.ptx"), key=lambda p: p.stat().st_mtime_ns, reverse=True)
+        self.kept_sources[module] = [(p.name, p.read_text(errors="replace")) for p in files]
+        self.kept.add(module)
         return []
 
-    def find_kept(self, kernel: str):
-        """The newest PTX file in `kept_ptx` that defines `kernel`, parsed."""
+    def find_kept(self, module: int, kernel: str):
+        """Parse the newest source defining `kernel` when this module was loaded."""
         entry = re.compile(rf"\.entry\s+{re.escape(kernel)}\s*\(")
-        files = sorted(self.kept_ptx.glob("*.ptx"), key=lambda p: p.stat().st_mtime, reverse=True)
-        for path in files:
-            text = path.read_text(errors="replace")
+        for name, text in self.kept_sources[module]:
             if entry.search(text):
-                return parse_ptx(text, name=path.name)
+                return parse_ptx(text, name=name)
         self.machine_code = True
         raise WarplensError(f"kernel `{kernel}`: {MACHINE_CODE}")
 
@@ -177,7 +182,7 @@ class ShimServer:
             except UnicodeDecodeError:
                 raise WarplensError("kernel name is not UTF-8") from None
             if module in self.kept and not any(name in p.functions for p in self.modules[module]):
-                self.modules[module].append(self.find_kept(name))
+                self.modules[module].append(self.find_kept(module, name))
             for index, parsed in enumerate(self.modules[module]):
                 if name in parsed.functions:
                     self.functions.append((module, index, name))

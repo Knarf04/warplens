@@ -3,12 +3,15 @@
 
     check_env.py versions        key=value for every package the launch paths need
     check_env.py nvrtc ARCH      compile a kernel with NVRTC for ARCH (e.g. sm_100a)
+    check_env.py e2e             native Triton CUDA and book prerequisites (needs a GPU)
 
-Needs no GPU. Exit status 1 when a package is missing or NVRTC refuses ARCH.
+versions and nvrtc need no GPU. Exit status 1 when a requested check fails.
 """
 
 import importlib
 import importlib.metadata
+import os
+from pathlib import Path
 import re
 import sys
 
@@ -91,7 +94,31 @@ def nvrtc(arch):
     return 0
 
 
+def e2e(book=None):
+    """Fail early for the optional native programs the full remote suite selects."""
+    status = 0
+    try:
+        torch = importlib.import_module("torch")
+        importlib.import_module("triton")
+        if not torch.version.cuda:
+            raise RuntimeError("PyTorch is a CPU-only build; native Triton requires CUDA-enabled PyTorch")
+        if not torch.cuda.is_available():
+            raise RuntimeError("PyTorch cannot access a CUDA device")
+        print(f"torch={torch.__version__} (CUDA {torch.version.cuda})")
+    except Exception as error:
+        print(f"error=native Triton: {type(error).__name__}: {error}; "
+              "the pinned setup does not install PyTorch")
+        status = 1
+    book = os.environ.get("WARPLENS_BOOK", "") if book is None else book
+    if not book or not (Path(book) / "chapter_gemm_basics" / "index.md").is_file():
+        print("error=book GEMMs: set WARPLENS_BOOK to a clone of modern-gpu-programming-for-mlsys")
+        status = 1
+    return status
+
+
 def main(argv):
+    if len(argv) in (2, 3) and argv[1] == "e2e":
+        return e2e(argv[2] if len(argv) == 3 else None)
     if len(argv) == 2 and argv[1] == "versions":
         return versions()
     if len(argv) == 3 and argv[1] == "nvrtc":

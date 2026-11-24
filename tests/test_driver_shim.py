@@ -33,6 +33,7 @@ PTX = HEADER + """
 """
 CLIENT = r"""
 #include <cuda.h>
+#include <cudaTypedefs.h>
 #include <cuda_runtime_api.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -116,6 +117,7 @@ int main(int argc, char **argv) {
     return 0;
   }
   if (!strcmp(argv[1], "library")) {  /* the runtime's module API, handed machine code */
+#if CUDART_VERSION >= 12080
     static const unsigned char cubin[64] = {0x7f, 'E', 'L', 'F', 2, 1, 1};
     cudaLibrary_t library; cudaKernel_t kernel, missing;
     int value = -1;
@@ -141,21 +143,85 @@ int main(int argc, char **argv) {
     for (unsigned i = 0; i < N; ++i) CHECK(output[i] == (i + 1) * factor);
     CHECK(cudaLibraryUnload(library) == cudaSuccess);
     return 0;
+#else
+    return 77;
+#endif
   }
   if (!strcmp(argv[1], "lookup")) {  /* how cuda-python's driver module finds functions */
     void *found = NULL;
     CUdriverProcAddressQueryResult status;
     int version = 0;
     CUdevice device = -1;
-    CHECK(cuGetProcAddress("cuInit", &found, 13000, 0, &status) == CUDA_SUCCESS);
+    CHECK(cuGetProcAddress("cuInit", &found, CUDA_VERSION, 0, &status) == CUDA_SUCCESS);
     CHECK(found == (void *)cuInit && status == CU_GET_PROC_ADDRESS_SUCCESS);
-    CHECK(cuGetProcAddress("cuGetProcAddress", &found, 13000, 0, NULL) == CUDA_SUCCESS && found);
-    CHECK(cuGetProcAddress("cuCtxCreate", &found, 13000, 0, NULL) == CUDA_SUCCESS && found == (void *)cuCtxCreate);
-    CHECK(cuGetProcAddress("cuMemAllocManaged", &found, 13000, 0, &status) == CUDA_ERROR_NOT_FOUND);
+    CHECK(cuGetProcAddress("cuGetProcAddress", &found, CUDA_VERSION, 0, NULL) == CUDA_SUCCESS && found);
+#if CUDA_VERSION >= 13000
+    CHECK(cuGetProcAddress("cuCtxCreate", &found, 12050, 0, NULL) == CUDA_SUCCESS && found == (void *)cuCtxCreate);
+#else
+    CHECK(cuGetProcAddress("cuCtxCreate", &found, 3020, 0, NULL) == CUDA_SUCCESS && found == (void *)cuCtxCreate);
+#endif
+    CHECK(cuGetProcAddress("cuMemAllocManaged", &found, CUDA_VERSION, 0, &status) == CUDA_SUCCESS);
     CHECK(found == NULL && status == CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND);
     CHECK(cuDriverGetVersion(&version) == CUDA_SUCCESS && version == CUDA_VERSION);
     CHECK(cuDeviceGet(&device, 0) == CUDA_SUCCESS && device == 0);
     CHECK(cuDeviceGet(&device, 1) == CUDA_ERROR_INVALID_DEVICE);
+    return 0;
+  }
+  if (!strcmp(argv[1], "abi")) {
+    void *found = NULL, *other = NULL;
+    CUcontext context = NULL;
+    CUdriverProcAddressQueryResult query_status;
+    CHECK(cuGetProcAddress("cuCtxCreate", &found, 3020, 0, NULL) == CUDA_SUCCESS && found);
+    PFN_cuCtxCreate_v3020 legacy_create = (PFN_cuCtxCreate_v3020)found;
+    CHECK(legacy_create(&context, 0, 0) == CUDA_SUCCESS && context);
+    CHECK(cuCtxPopCurrent(NULL) == CUDA_SUCCESS);
+    CHECK(legacy_create(&context, 0, 1) == CUDA_ERROR_INVALID_DEVICE);
+    CHECK(cuGetProcAddress("cuCtxCreate", &other, 11040, 0, NULL) == CUDA_SUCCESS && other && other != found);
+    PFN_cuCtxCreate_v11040 affinity_create = (PFN_cuCtxCreate_v11040)other;
+    CHECK(affinity_create(&context, NULL, 0, 0, 0) == CUDA_SUCCESS && context);
+    CHECK(cuCtxPopCurrent(NULL) == CUDA_SUCCESS);
+#if CUDA_VERSION >= 12050
+    CHECK(cuGetProcAddress("cuCtxCreate", &found, 12050, 0, NULL) == CUDA_SUCCESS && found && found != other);
+    CHECK(((PFN_cuCtxCreate_v12050)found)(&context, NULL, 0, 0) == CUDA_SUCCESS && context);
+    CHECK(cuCtxPopCurrent(NULL) == CUDA_SUCCESS);
+#endif
+#if CUDA_VERSION >= 13000
+    CUdevice device = -1;
+    CHECK(cuGetProcAddress("cuCtxGetDevice", &found, 13000, 0, NULL) == CUDA_SUCCESS && found);
+    CHECK(((PFN_cuCtxGetDevice_v13000)found)(&device, context) == CUDA_SUCCESS && device == 0);
+    CHECK(((PFN_cuCtxGetDevice_v13000)found)(&device, (CUcontext)1) == CUDA_ERROR_INVALID_CONTEXT);
+    CHECK(cuGetProcAddress("cuCtxGetDevice", &other, 2000, 0, NULL) == CUDA_SUCCESS && other != found);
+    CHECK(((PFN_cuCtxGetDevice_v2000)other)(&device) == CUDA_ERROR_INVALID_CONTEXT);
+    CHECK(cuGetProcAddress("cuCtxSynchronize", &found, 13000, 0, NULL) == CUDA_SUCCESS && found);
+    CHECK(((PFN_cuCtxSynchronize_v13000)found)(context) == CUDA_SUCCESS);
+    CHECK(((PFN_cuCtxSynchronize_v13000)found)((CUcontext)1) == CUDA_ERROR_INVALID_CONTEXT);
+#endif
+    CHECK(cuGetProcAddress("cuGetProcAddress", &found, 11030, 0, NULL) == CUDA_SUCCESS && found);
+    CHECK(found != (void *)cuGetProcAddress);
+    PFN_cuGetProcAddress_v11030 legacy_lookup = (PFN_cuGetProcAddress_v11030)found;
+    CHECK(legacy_lookup("cuInit", &other, 2000, 0) == CUDA_SUCCESS && other == (void *)cuInit);
+    CHECK(legacy_lookup("not_a_cuda_function", &other, 11030, 0) == CUDA_ERROR_NOT_FOUND && !other);
+    CHECK(cuGetProcAddress("not_a_cuda_function", &other, CUDA_VERSION, 0, &query_status) == CUDA_SUCCESS);
+    CHECK(!other && query_status == CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND);
+    CHECK(cuGetProcAddress("cuInit", &other, CUDA_VERSION + 1000, 0, NULL) == CUDA_ERROR_INVALID_VALUE);
+    return 0;
+  }
+  if (!strcmp(argv[1], "nested-context")) {
+    CUcontext context = NULL, after = NULL;
+    CUdevice device = -1;
+    CHECK(cuDevicePrimaryCtxRetain(&context, 0) == CUDA_SUCCESS && context);
+    CHECK(cuCtxSetCurrent(context) == CUDA_SUCCESS);
+    CHECK(cuCtxPushCurrent(context) == CUDA_SUCCESS);
+    CHECK(cuCtxSetCurrent(context) == CUDA_SUCCESS);  /* replace, not another push */
+    CHECK(cuCtxPopCurrent(&after) == CUDA_SUCCESS && after == context);
+    CHECK(cuCtxGetCurrent(&after) == CUDA_SUCCESS && after == context);
+    CHECK(cuCtxGetDevice(&device) == CUDA_SUCCESS && device == 0);
+    CHECK(cuCtxPushCurrent(context) == CUDA_SUCCESS);
+    CHECK(cuCtxSetCurrent(NULL) == CUDA_SUCCESS);  /* removes only the top */
+    CHECK(cuCtxGetCurrent(&after) == CUDA_SUCCESS && after == context);
+    CHECK(cuCtxPopCurrent(&after) == CUDA_SUCCESS && after == context);
+    CHECK(cuCtxGetCurrent(&after) == CUDA_SUCCESS && after == NULL);
+    CHECK(cuCtxSetCurrent(NULL) == CUDA_SUCCESS);  /* empty stack is a no-op */
     return 0;
   }
   if (!strcmp(argv[1], "memory")) {  /* arrays held through the driver, as cuda-python does */
@@ -167,7 +233,11 @@ int main(int argc, char **argv) {
     size_t total = 0;
     CHECK(cuCtxGetCurrent(&other) == CUDA_SUCCESS && other == NULL);
     CHECK(cuCtxGetDevice(&device) == CUDA_ERROR_INVALID_CONTEXT);
+#if CUDA_VERSION >= 13000
     CHECK(cuCtxCreate(&context, NULL, 0, 0) == CUDA_SUCCESS && context);
+#else
+    CHECK(cuCtxCreate(&context, 0, 0) == CUDA_SUCCESS && context);
+#endif
     CHECK(cuCtxGetCurrent(&other) == CUDA_SUCCESS && other == context);
     CHECK(cuCtxGetDevice(&device) == CUDA_SUCCESS && device == 0);
     CHECK(cuCtxPopCurrent(&other) == CUDA_SUCCESS && other == context);
@@ -251,6 +321,8 @@ def run_client(build, mode, model="B200", server=None):
         theirs.close()
         thread.join(timeout=5)
         ours.close()
+    if done.returncode == 77:
+        pytest.skip("the runtime library API needs CUDA 12.8 or newer headers")
     assert done.returncode == 0, f"native client exited {done.returncode}:\n{done.stderr}"
     return server, done
 
@@ -309,3 +381,41 @@ def test_server_registers_ptx_text_as_a_module():
     (module,) = struct.unpack("<I", server.handle(REGISTER_MODULE, PTX.encode()))
     function, count, *sizes = struct.unpack("<5I", server.handle(REGISTER_FUNCTION, struct.pack("<I", module) + b"scale"))
     assert (function, count, sizes) == (0, 3, [8, 8, 4])
+
+
+def test_driver_lookup_preserves_each_requested_function_abi(client):
+    run_client(client, "abi")
+
+
+def test_driver_nested_context_push_pop_restores_previous_context(client):
+    run_client(client, "nested-context")
+
+
+@pytest.mark.parametrize("overwrite", [False, True])
+def test_kept_ptx_is_bound_when_each_module_loads_not_when_its_kernel_is_looked_up(tmp_path, overwrite):
+    import struct
+    import numpy as np
+
+    server = ShimServer(kept_ptx=tmp_path)
+    first = tmp_path / "first.ptx"
+    first.write_text(PTX)
+    os.utime(first, ns=(1, 1))
+    first_module = server.handle(REGISTER_MODULE, b"\x7fELF")
+    second = first if overwrite else tmp_path / "second.ptx"
+    second.write_text(PTX.replace("mul.lo.u32 %v, %v, %f;", "add.u32 %v, %v, %f;"))
+    second_module = server.handle(REGISTER_MODULE, b"\x7fELF")
+    # Lookup is deliberately deferred until after the second module compiles/loads.
+    values = np.arange(32, dtype=np.uint32)
+    source = server.device.from_numpy(values)
+    for module_id, expected in ((first_module, values * 3), (second_module, values + 3)):
+        function = struct.unpack_from("<I", server.handle(REGISTER_FUNCTION, module_id + b"scale"))[0]
+        module, index, name = server.functions[function]
+        out = server.device.empty(32, "u32")
+        server.device.launch(server.modules[module][index], name, grid=1, block=32, args=[source, out, 3])
+        np.testing.assert_array_equal(out.numpy(), expected)
+
+
+def test_direct_ptx_module_does_not_snapshot_kept_sources(tmp_path):
+    server = ShimServer(kept_ptx=tmp_path)
+    server.handle(REGISTER_MODULE, PTX.encode())
+    assert not server.kept_sources

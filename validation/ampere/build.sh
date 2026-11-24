@@ -14,6 +14,7 @@ PTX_NVCC="${PTX_NVCC:-conda run -n warplens nvcc}"
 mkdir -p bin
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/shfl_golden shfl_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/transpose_hw transpose_hw.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/wavefront_probe wavefront_probe.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/barrier_exit_hw barrier_exit_hw.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/printf_hw printf_hw.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/tf32_golden tf32_golden.cu

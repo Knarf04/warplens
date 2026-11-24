@@ -33,8 +33,8 @@ def simulate(kernel: str, ctas: int) -> dict[str, int]:
     return {
         "smsp__inst_executed_op_shared_ld.sum": by_op["ld"][0],
         "smsp__inst_executed_op_shared_st.sum": by_op["st"][0],
-        "l1tex__data_pipe_lsu_wavefronts_mem_shared.sum": stats.smem.wavefronts,
-        "l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum": stats.smem.wavefronts - stats.smem.conflicts,
+        "l1tex__data_pipe_lsu_wavefronts_mem_shared.sum": stats.smem.ncu_wavefronts,
+        "l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum": stats.smem.ncu_wavefronts - stats.smem.conflicts,
         "l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum": stats.smem.conflicts,
         "l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum": by_op["ld"][1],
         "l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum": by_op["st"][1],

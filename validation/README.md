@@ -21,7 +21,7 @@ toolkit for the GPU binaries and the `warplens` conda env for the PTX.
 | Structs by value, function pointers, recursion | `bin/callforms_golden > callforms_golden.txt`: 256 threads pass and return structs of 8, 40 and 256 bytes by value, call through function pointers taken from a local table, from a global table and from an argument, and recurse (two recursive calls in one function, mutual recursion, a local array per call that the next call reads, a struct argument). `tests/test_hardware_golden.py` runs `callforms_probe.ptx` in the simulator. | all 3072 values match |
 | `cp.async` with a source size | `bin/cpasync_golden > cpasync_golden.txt`: 32 lanes copy 16 bytes each, reading 0 to 16 of them. | all match; the GPU zero-fills the bytes it does not read |
 | Transpose output | `bin/transpose_hw` | correct on the GPU and in the simulator |
-| Shared-memory bank counters | `run_ncu.sh` profiles `bin/transpose_hw` with Nsight Compute and compares its counters with the simulator's bank model. Recorded in `transpose_ncu_3080ti_grid64.csv`; `tests/test_hardware_golden.py` checks the simulator against it. | conflict and instruction counters match exactly; the total wavefront counter does not (see below) |
+| Shared-memory bank counters | `run_ncu.sh` profiles `bin/transpose_hw` with Nsight Compute and compares its counters with the simulator's bank model. Recorded in `transpose_ncu_3080ti_grid64.csv`; `tests/test_hardware_golden.py` checks the simulator against it. | conflict and instruction counters match exactly; the total wavefront counter is 4160 higher, which `run_wavefront_probe.sh` explains (see below) |
 
 ## Running the bank-counter comparison
 
@@ -56,9 +56,54 @@ What this shows:
   and store. A 32-way conflict costs 31 extra wavefronts per warp access, as
   the model says.
 - The **total wavefront counter is 4160 higher on hardware in every layout**,
-  conflicts or not. That is 65 per CTA here, or equivalently one extra per
-  shared load and store plus one per CTA. This run cannot tell those apart,
-  and the cause is unknown. So hardware "wavefronts minus conflicts" is not
-  the simulator's `ideal`. Runs with other block shapes would separate the
-  per-instruction part from the per-CTA part.
+  conflicts or not. The probe below shows what that is: two wavefronts per
+  warp and one per CTA per `__syncthreads()`, here 2 x 2048 + 64. Neither has
+  to do with shared-memory accesses, so hardware "wavefronts minus conflicts"
+  is not the simulator's `ideal`.
 - The `ideal` counter is not available on this GPU with ncu 2024.1.
+
+## The wavefront offset (TIM-17)
+
+```bash
+sudo env "PATH=$PATH" validation/ampere/run_wavefront_probe.sh
+```
+
+`bin/wavefront_probe` launches one conflict-free kernel 59 times and changes
+one thing at a time: the grid, the block shape (whole and partial warps), the
+number of shared loads and stores per thread, of global loads and stores, and
+of `__syncthreads()` calls. A second kernel has no shared memory at all.
+`wavefront_fit.py` joins `ncu`'s counters with the launch list and fits the
+offset. Recorded in `wavefront_probe_ncu_3080ti.csv` and
+`wavefront_probe_configs_3080ti.csv` (2026-11-23);
+`tests/test_hardware_golden.py` checks the rule against them.
+
+In all 59 launches, exactly:
+
+    l1tex__data_pipe_lsu_wavefronts_mem_shared
+        = shared loads + shared stores      (one per warp access; plus conflicts)
+        + 2 per warp launched
+        + 1 per CTA per __syncthreads()
+
+| What was varied | Effect on the offset |
+| --- | --- |
+| Shared loads and stores per thread, 0 to 5 | none: each access adds exactly the one wavefront the model counts |
+| Global loads and stores per thread, 0 to 4 | none |
+| Grid, 1 to 500 | proportional |
+| Block shape, 1 to 32 warps per CTA | 2 per warp. A warp of 1, 16 or 31 threads counts like a full one |
+| `__syncthreads()` per thread, 0 to 4, at 1, 2, 4, 5 and 32 warps per CTA | 1 per CTA for each, whatever the number of warps |
+| A kernel with no shared memory and an empty body | still 2 per warp |
+
+What this does not show:
+
+- **Why.** The counter evidently includes events that are not shared loads or
+  stores. That the two per warp are the warp's start and exit, and the one per
+  CTA the barrier's release, is a guess.
+- **Blackwell.** Measured on Ampere only. `validation/blackwell_timing/ncu_banks`
+  should check the same rule on a B200 before it is relied on there.
+- **Other barriers and kernels that end early.** Only `__syncthreads()` executed
+  by every thread was measured: not named barriers, not a barrier some warps
+  skip.
+
+The simulator's `wavefronts` is left as it is: the count of what shared
+accesses cost. `stats.smem.ncu_wavefronts` adds the two terms above, and is
+what `compare_ncu.py` compares with the `ncu` counter.

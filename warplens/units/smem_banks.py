@@ -64,6 +64,8 @@ class InstrBanks:
 @dataclass(slots=True)
 class SmemReport:
     instructions: dict[tuple[str, int], InstrBanks] = field(default_factory=dict)  # by kernel and PC
+    warps: int = 0  # warps launched
+    barrier_completions: int = 0  # completed `bar.sync` / `bar.arrive` phases, over all CTAs
 
     def record(self, ins, kernel: str, offsets: np.ndarray, size: int, *, pc: int) -> int:
         """Returns the wavefronts this access took."""
@@ -103,6 +105,18 @@ class SmemReport:
     def conflicts(self) -> int:
         return sum(e.conflicts for e in self.instructions.values())
 
+    @property
+    def ncu_wavefronts(self) -> int:
+        """`wavefronts` as Nsight Compute counts it (l1tex__data_pipe_lsu_wavefronts_mem_shared).
+
+        The hardware counter also includes two wavefronts per warp and one per
+        CTA per completed barrier, which are not shared-memory accesses. This is
+        measured on Ampere only, with `__syncthreads()` that every thread
+        executes (validation/README.md, "The wavefront offset"); for named or
+        partial barriers and for other architectures it is an extrapolation.
+        """
+        return self.wavefronts + 2 * self.warps + self.barrier_completions
+
     def format(self) -> str:
         if not self.instructions:
             return "No shared-memory accesses."
@@ -116,4 +130,6 @@ class SmemReport:
         for r in rows:
             cells = [r[c].ljust(widths[c]) if c == 1 else r[c].rjust(widths[c]) for c in range(len(r))]
             lines.append("  " + "  ".join(cells).rstrip())
+        lines.append(f"  total wavefronts {self.wavefronts}; as ncu counts them {self.ncu_wavefronts} "
+                     f"(+2 per warp, +1 per CTA per barrier; measured on Ampere)")
         return "\n".join(lines)

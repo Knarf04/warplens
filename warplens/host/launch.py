@@ -207,6 +207,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                                           mask=valid[wi], specials=specials, params=params,
                                           mem=mem, trace=trace))
                 group.warps.extend(cta.warps)
+                stats.smem.warps += len(cta.warps)
             engine.run(group)
             queue.close(group)
             for w in group.warps:

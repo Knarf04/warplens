@@ -84,7 +84,7 @@ The details are in [validation/README.md](../validation/README.md).
 | --- | --- | --- |
 | `shfl.sync`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive) | recorded outputs of the real GPU, replayed in `tests/test_hardware_golden.py` | match exactly |
 | `cvt.rna.tf32.f32`, `ldmatrix`, `bfe`, `prmt`, `.ftz` arithmetic, `cp.async` zero fill | the same, bit for bit | match exactly |
-| Shared-memory bank conflicts | Nsight Compute counters on the transpose example | conflict counters match exactly; the total wavefront counter is a constant 4160 higher on hardware, unexplained |
+| Shared-memory bank conflicts | Nsight Compute counters on the transpose example | conflict counters match exactly; the total wavefront counter matches once two per warp and one per CTA per barrier, which hardware also counts, are added |
 | TMA, tensor maps, mbarriers | PTX specification, CUDA headers, CUTLASS sources; real kernels give right answers | **not compared with hardware** |
 | `tcgen05.mma`, tensor memory, descriptors | the same | **not compared with hardware** |
 | Clusters, multicast, two-CTA MMA | the same | **not compared with hardware** |
@@ -867,9 +867,9 @@ Shared-memory bank conflicts (32 banks x 4 bytes)
 `wavefronts` is the largest number of distinct words in one bank, summed over
 executions; `ideal` is the minimum for that many words; `conflicts` is the
 difference. On the real Ampere GPU the conflict counters of this example match
-Nsight Compute exactly. The hardware's total wavefront counter is a constant
-4160 higher in every layout, so read `wavefronts` and `ideal` as relative
-costs, not as that counter. `stats.smem.wavefronts` and `stats.smem.conflicts`
+Nsight Compute exactly. The hardware's total wavefront counter is 4160 higher
+in every layout: it also counts two wavefronts per warp and one per CTA per
+`__syncthreads()`, which are not shared accesses (`validation/README.md`). `stats.smem.wavefronts` and `stats.smem.conflicts`
 are the totals.
 
 ### 6.6 Traces and views

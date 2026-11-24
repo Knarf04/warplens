@@ -293,7 +293,7 @@ def _cp_async(w, ins, mask) -> None:
                           "lines": np.unique((source[:, None] + span[None, :])[reads] >> np.uint64(7))}
 
     def land():
-        cta.smem.finish_async_write(idx.reshape(-1), data.reshape(-1), writer_warp=w.warp_id)
+        cta.smem.finish_async_write(idx.reshape(-1), data.reshape(-1), writer_warp=w.sync_id)
         for operation in operations:
             operation.done = True
 

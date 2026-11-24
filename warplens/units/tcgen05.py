@@ -542,7 +542,7 @@ def _tcgen05(w, ins, mask):
                              detail=lambda: f"waiting for {ncols} tensor-memory columns to become available")
             return
         tmem.allocations[column] = (ncols, (w, ins, lane))
-        cta.smem.write(offsets, np.full(len(offsets), column, dtype=np.uint32), w.warp_id)
+        cta.smem.write(offsets, np.full(len(offsets), column, dtype=np.uint32), w.sync_id)
     elif kind == "dealloc":
         if len(ins.operands) != 2 or tuple(ins.mods) != (
                 "dealloc", "cta_group::1", "sync", "aligned", "b32"):
@@ -599,13 +599,14 @@ def _tcgen05(w, ins, mask):
             covered = tuple(o for o in w.tcgen_issued if o.lane == l)
             operation = cta.new_async("commit", w, ins, l)
             released = frozenset(w.seen)
+            clock = cta.clocks.release(w.sync_id)
 
-            def land(bars=bars, covered=covered, l=l, released=released):
+            def land(bars=bars, covered=covered, l=l, released=released, clock=clock):
                 for bar in bars:
                     bar.knowledge.update(o.id for o in covered)
                     # Do not acquire knowledge the issuing warp learns later,
                     # while this asynchronous arrival is waiting to complete.
-                    bar.arrive(1, w, ins, [l], knowledge=released)
+                    bar.arrive(1, w, ins, [l], knowledge=released, released=clock)
 
             cta.schedule(operation, land)
     elif kind == "ld":

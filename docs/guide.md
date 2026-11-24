@@ -231,7 +231,8 @@ LaunchStats(ctas=4, canceled_ctas=0, warps=32, threads=1024, instructions=704, l
 ```
 
 `Device.launch(ptx, entry, *, grid, block, args=(), smem=0, cluster=None,
-timing=False, active_sms=None, trace=None, max_steps=None, async_delay=4)`:
+timing=False, active_sms=None, trace=None, max_steps=None, async_delay=4,
+schedule=None)`:
 
 - `ptx` is a path, or a module from `warplens.parse_ptx(text)`. `entry` is the
   kernel's name as it appears after `.entry`; for C++ that is the mangled name
@@ -249,6 +250,10 @@ timing=False, active_sms=None, trace=None, max_steps=None, async_delay=4)`:
 - `max_steps` stops a kernel that does not finish. `async_delay` is how many
   scheduling rounds a TMA copy or an MMA takes to complete in an untimed run;
   findings do not depend on it.
+- `schedule` is the order in which runnable warps are stepped in an untimed
+  run: round-robin by default, a seed for a pseudo-random order, or
+  `"adversarial"`. A correct kernel computes the same under all of them
+  ([scheduling.md](scheduling.md)).
 - `timing`, `active_sms` and `trace` are covered in sections 6.6 and 6.7.
 
 Memory is `sim.from_numpy(array)`, `sim.empty(shape, dtype)` and
@@ -863,8 +868,7 @@ Two of these report the simulator's uncertainty more than a bug in the kernel:
 - **`mma-tf32-operand-not-converted`.** What hardware does with the low
   mantissa bits of a TF32 operand is not specified ([numerics.md](numerics.md)).
 
-Known gaps in the checkers: the race check keeps one last reader per byte and
-treats any completed barrier as ordering the whole CTA; synchronization is
+Known gaps in the checkers: synchronization is
 tracked per warp, not per thread; races between CTAs are not looked for; the
 generic-to-async proxy rule for MMA operands in shared memory is not checked.
 [m1.md](m1.md), [m2.md](m2.md), [m3.md](m3.md) and [m5.md](m5.md) have the

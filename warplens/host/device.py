@@ -113,7 +113,7 @@ class Device:
     def launch(self, ptx, entry: str, *, grid, block, args=(), smem: int = 0, trace=None,
                max_steps: int | None = None, async_delay: int = 4, timing=False,
                active_sms: int | None = None, cluster=None,
-               clc_limit: int | None = None) -> LaunchStats:
+               clc_limit: int | None = None, schedule=None) -> LaunchStats:
         """Run kernel `entry` from `ptx` (a path or a parsed Module) to completion.
 
         `smem` is the dynamic shared memory per CTA in bytes, as passed to a
@@ -133,13 +133,22 @@ class Device:
         granted before its requests fail: None for as many as there are clusters left, 0 for
         none, so that every cluster starts by itself. See docs/clc.md.
 
+        `schedule` is the order in which the warps that can run are stepped in an untimed
+        launch. The default is round-robin, one instruction per warp per round in warp
+        order. An integer is a seed: a pseudo-random order, the same for the same seed.
+        "adversarial" takes the warps last to first and lets each run ahead of the others
+        until it blocks; "adversarial:N" draws that from seed N. A correct kernel computes
+        the same under every schedule, so a result that changes with it shows a dependence
+        on an order nothing guarantees. Without the argument, the environment variable
+        WARPLENS_SCHEDULE is used, with the same spellings. See docs/scheduling.md.
+
         `trace`, if given, is called as trace(warp, pc, instr, active_mask)
         before every instruction.
         """
         return run_kernel(self.program(ptx, entry), self.memory, grid=grid, block=block,
                           args=args, smem=smem, trace=trace, max_steps=max_steps,
                           async_delay=async_delay, timing=self._timing(timing, active_sms),
-                          cluster=cluster, clc_limit=clc_limit)
+                          cluster=cluster, clc_limit=clc_limit, schedule=schedule)
 
     def program(self, ptx, entry: str) -> Program:
         """Kernel `entry` of `ptx` (a path or a parsed Module) prepared for launching, which

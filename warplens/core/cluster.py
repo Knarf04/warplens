@@ -7,6 +7,7 @@ different CTAs interleave.
 
 from __future__ import annotations
 
+from .clocks import Clocks, join
 from .cta import Wait
 from ..errors import ExecutionError
 
@@ -22,6 +23,8 @@ class Cluster:
         self.arrived: list = []  # warps that arrived at the cluster barrier in this round
         self.waiting: list = []
         self.knowledge: set[int] = set()  # only knowledge released at arrival
+        self.clocks = Clocks()  # of all its warps: what each is ordered after
+        self.released = None  # the clocks released at the cluster barrier in this round
         self.owed: dict[int, set] = {}  # knowledge for warps whose round completed before they waited
         self.launch = None  # core.launch_queue.LaunchQueue of the launch this cluster belongs to
         self.cancel_requests: list = []  # its clusterlaunchcontrol.try_cancel requests
@@ -30,6 +33,8 @@ class Cluster:
     def add(self, cta) -> None:
         cta.cluster, cta.rank = self, len(self.ctas)
         cta.async_ops = self.async_ops
+        cta.clocks = self.clocks
+        cta.smem.use_clocks(self.clocks)
         self.ctas.append(cta)
 
     @property
@@ -54,11 +59,14 @@ class Cluster:
         self.arrived.append(warp)
         if release:
             self.knowledge |= warp.seen
+            self.released = self.clocks.release(warp.sync_id, self.released)
 
     def barrier_wait(self, warp, ins) -> None:
         """Acquire the preceding arrival's phase, or wait until it completes."""
         if id(warp) in self.owed:
-            warp.seen |= self.owed.pop(id(warp))
+            known, released = self.owed.pop(id(warp))
+            warp.seen |= known
+            self.clocks.acquire(warp.sync_id, released)
             return
         # A wait with no arrival cannot satisfy the all-thread arrival count.
         # It blocks rather than silently allowing this warp to pass the barrier.
@@ -71,19 +79,21 @@ class Cluster:
         here = {id(w) for w in self.arrived}
         if not all(w.done or id(w) in here for w in self.warps):
             return False
-        known = self.knowledge
+        known, done = self.knowledge, self.released
+        for warp in self.warps:  # the barrier completed without the warps that had exited
+            if warp.done:
+                done = join(done, self.clocks.row(warp.sync_id))
         waiting = {id(w) for w in self.waiting}
         for warp in self.arrived:  # warps that met at the barrier share what they know,
             if id(warp) in waiting:  # each one when it waits
                 warp.blocked = None
                 warp.seen |= known
+                self.clocks.acquire(warp.sync_id, done)
             else:
-                self.owed[id(warp)] = known
+                self.owed[id(warp)] = (known, done)
         released = bool(self.waiting)
         self.arrived, self.waiting = [], []
-        self.knowledge = set()
-        for cta in self.ctas:
-            cta.smem.epoch += 1
+        self.knowledge, self.released = set(), None
         return released
 
     # -- what the engine needs -----------------------------------------------------------

@@ -47,6 +47,40 @@ Unmodified programs run too: `warplens run ./program` for a CUDA C++ program
 built to carry PTX, `warplens run script.py` for Triton, and
 `warplens run python script.py` for TIRx and the CuTe DSL.
 
+## Install
+
+warplens is not on PyPI yet; install it from a checkout. The base install is
+the simulator and its Python API. Each frontend is an extra, and every package
+an extra names is on PyPI:
+
+| Extra | Installs | For |
+| --- | --- | --- |
+| `dev` | `pytest` | running the tests |
+| `triton` | `triton` 3.9 or newer | Triton scripts (`warplens run script.py`) |
+| `tirx` | `apache-tvm-tirx` 0.1.0 or newer, `cuda-bindings` 13.5 or newer | TIRx scripts, and the book's kernels |
+| `cute-dsl` | `nvidia-cutlass-dsl` 4.8.1 or newer | CuTe DSL scripts |
+| `jupyter` | `notebook`, `nbclient`, `nbformat`, `ipykernel`, and the `tirx` extra | [notebooks/book_tour.ipynb](notebooks/book_tour.ipynb) |
+| `all` | all of the above | |
+
+```bash
+pip install -e ".[dev]"             # the simulator and its tests
+pip install -e ".[triton,tirx]"     # with the frontends you use
+pip install -e ".[all]"             # everything
+```
+
+The frontend versions are the ones the tests run against; older ones have not
+been tried. Three things a frontend needs do not come from pip:
+
+- `nvcc` from CUDA 12.8 or newer, to compile your own CUDA C++ to PTX;
+- an NVRTC library that knows `sm_100a`, which TIRx compiles with;
+- a C compiler and the CUDA headers, for the shim libraries that
+  `warplens run` builds on first use.
+
+`env/setup.sh` creates a conda env with all three and no GPU driver
+([env/README.md](env/README.md)). The notebook also needs your own clone of
+the book. [Section 3 of the guide](docs/guide.md#3-installation) has the
+details.
+
 ## Documentation
 
 - **[docs/guide.md](docs/guide.md)**: the user guide. Installation, every way

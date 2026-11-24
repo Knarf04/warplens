@@ -128,15 +128,15 @@ file checked in under `examples/`. The other ways in need more:
 | Compile your own CUDA C++ to PTX | `nvcc` from CUDA 12.8 or newer (it must know `sm_100a`). No GPU or driver. |
 | `warplens run` on a compiled program, a TIRx script or a CuTe DSL script | Linux, a C compiler, and the CUDA toolkit headers. Two small shim libraries are compiled on first use (see below). |
 | Triton | `pip install -e ".[triton]"` (Triton 3.9 is what is tested). No shim. |
-| TIRx | `pip install apache-tvm-tirx cuda-bindings`, and an NVRTC library that knows `sm_100a` (CUDA 12.8 or newer; the conda env has 13.5). |
-| The CuTe DSL | `pip install nvidia-cutlass-dsl` (4.8.1 is what is tested). |
-| The tutorial notebook | Jupyter (`pip install notebook`, or `nbclient` and `ipykernel` to execute it from a script), the TIRx packages, and a clone of the book. |
+| TIRx | `pip install -e ".[tirx]"` (`apache-tvm-tirx` and `cuda-bindings`; 0.1.0 and 13.5.0 are what is tested), and an NVRTC library that knows `sm_100a` (CUDA 12.8 or newer; the conda env has 13.5). |
+| The CuTe DSL | `pip install -e ".[cute-dsl]"` (`nvidia-cutlass-dsl`; 4.8.1 is what is tested). |
+| The tutorial notebook | `pip install -e ".[jupyter]"` (Jupyter's `notebook`, `nbclient` and `ipykernel` to execute it from a script, and the TIRx packages), and a clone of the book. |
+| All of the above | `pip install -e ".[all]"`. Every package the extras name is on PyPI. |
 
 The repository's conda env, created by `env/setup.sh`, has the compiler side
 of CUDA 13.5 (`nvcc`, headers, NVRTC) and nothing that needs a GPU;
 [env/README.md](../env/README.md) describes it. This guide was run in that env
-with `pip install -e ".[dev,triton]" nvidia-cutlass-dsl apache-tvm-tirx
-cuda-bindings` on top.
+with `pip install -e ".[dev,triton,tirx,cute-dsl]"` on top.
 
 **The shim.** `warplens run` works by putting two libraries in front of the
 CUDA runtime: `libcudart.so.N` and `libcuda.so.1`, written in C in
@@ -605,6 +605,21 @@ one finding each, `tmem-dealloc-repeated`, explained in section 6.4.
 nine kernels chapter by chapter and shows, for each, what the simulator can
 see: the PTX the kernel became, which warp does what, the findings, the tensor
 memory layout and the timing model's account.
+
+The notebook gets those objects from `warplens.run_program`, which is
+`warplens run` as a Python function: it runs a command with its GPU work done
+by the simulator and returns the program's output and, for every launch, the
+parsed PTX and the `LaunchStats` that the command only summarizes.
+
+```python
+import sys, warplens
+from warplens.viz import timeline_svg
+
+done = warplens.run_program([sys.executable, "examples/07_tirx/run.py"], timing=True)
+launch = done.launch                       # the only launch; done.launches has them all
+print(launch.kernel, launch.grid, launch.stats.timing.summary())
+svg = timeline_svg(launch.stats.timing)    # the picture the HTML report draws
+```
 
 ## 6. Reading the results
 

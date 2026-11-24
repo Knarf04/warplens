@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include <cuda.h>
+#include <cuda_runtime_api.h>
 
 #include "protocol.h"
 
@@ -55,10 +56,10 @@ CUresult cuGetProcAddress_v2(const char *symbol, void **pfn, int cudaVersion, cu
     Dl_info info;
     if (dladdr((void *)cuInit, &info)) self = dlopen(info.dli_fname, RTLD_NOW | RTLD_NOLOAD);
   }
-  static const char *const suffixes[] = {"", "_v2", "_v3"};  /* the name is asked for unversioned */
+  static const char *const suffixes[] = {"", "_v2", "_v3", "_v4"};  /* the name is asked for unversioned */
   char name[128];
   void *found = NULL;
-  for (int i = 0; self && i < 3 && !found; ++i) {
+  for (int i = 0; self && i < 4 && !found; ++i) {
     snprintf(name, sizeof name, "%s%s", symbol, suffixes[i]);
     found = dlsym(self, name);
   }
@@ -188,3 +189,106 @@ CUresult cuLaunchKernelEx(const CUlaunchConfig *config, CUfunction f, void **ker
     }
   return launch(f, grid, block, cluster, config->sharedMemBytes, kernelParams, extra);
 }
+
+/* -- contexts, memory and streams: what a program needs to hold arrays through the driver ---
+ * (cuda-python's driver module, and the CuTe DSL's helpers built on it). There is one
+ * device and one context; a thread has it current once it creates, retains, sets or pushes
+ * it. Memory goes through the runtime shim, whose error numbers the driver shares. */
+
+static int the_context;
+static __thread int current;
+
+#if CUDA_VERSION >= 13000
+CUresult cuCtxCreate(CUcontext *pctx, CUctxCreateParams *params, unsigned int flags, CUdevice dev) {
+  (void)params;
+#else
+CUresult cuCtxCreate(CUcontext *pctx, unsigned int flags, CUdevice dev) {
+#endif
+  (void)flags;
+  if (!pctx) return CUDA_ERROR_INVALID_VALUE;
+  if (dev != 0) return CUDA_ERROR_INVALID_DEVICE;
+  *pctx = (CUcontext)&the_context;
+  current = 1;
+  return CUDA_SUCCESS;
+}
+CUresult cuDevicePrimaryCtxRetain(CUcontext *pctx, CUdevice dev) {
+  if (!pctx) return CUDA_ERROR_INVALID_VALUE;
+  if (dev != 0) return CUDA_ERROR_INVALID_DEVICE;
+  *pctx = (CUcontext)&the_context;
+  return CUDA_SUCCESS;
+}
+CUresult cuDevicePrimaryCtxRelease(CUdevice dev) { return dev == 0 ? CUDA_SUCCESS : CUDA_ERROR_INVALID_DEVICE; }
+CUresult cuCtxDestroy(CUcontext ctx) { (void)ctx; current = 0; return CUDA_SUCCESS; }
+CUresult cuCtxSetCurrent(CUcontext ctx) { current = ctx != NULL; return CUDA_SUCCESS; }
+CUresult cuCtxPushCurrent(CUcontext ctx) { current = ctx != NULL; return CUDA_SUCCESS; }
+CUresult cuCtxPopCurrent(CUcontext *pctx) {
+  if (pctx) *pctx = current ? (CUcontext)&the_context : NULL;
+  current = 0;
+  return CUDA_SUCCESS;
+}
+CUresult cuCtxGetCurrent(CUcontext *pctx) {
+  if (!pctx) return CUDA_ERROR_INVALID_VALUE;
+  *pctx = current ? (CUcontext)&the_context : NULL;
+  return CUDA_SUCCESS;
+}
+CUresult cuCtxGetDevice(CUdevice *device) {
+  if (!device) return CUDA_ERROR_INVALID_VALUE;
+  if (!current) return CUDA_ERROR_INVALID_CONTEXT;
+  *device = 0;
+  return CUDA_SUCCESS;
+}
+CUresult cuCtxSynchronize(void) { return (CUresult)cudaDeviceSynchronize(); }
+
+CUresult cuDeviceGetCount(int *count) {
+  if (!count) return CUDA_ERROR_INVALID_VALUE;
+  *count = 1;
+  return CUDA_SUCCESS;
+}
+CUresult cuDeviceTotalMem(size_t *bytes, CUdevice dev) {
+  size_t unused;
+  if (!bytes) return CUDA_ERROR_INVALID_VALUE;
+  if (dev != 0) return CUDA_ERROR_INVALID_DEVICE;
+  return (CUresult)cudaMemGetInfo(&unused, bytes);
+}
+CUresult cuMemGetInfo(size_t *free_bytes, size_t *total) { return (CUresult)cudaMemGetInfo(free_bytes, total); }
+
+CUresult cuMemAlloc(CUdeviceptr *dptr, size_t bytesize) {
+  void *address = NULL;
+  if (!dptr || !bytesize) return CUDA_ERROR_INVALID_VALUE;
+  CUresult status = (CUresult)cudaMalloc(&address, bytesize);
+  *dptr = (CUdeviceptr)address;
+  return status;
+}
+CUresult cuMemAllocAsync(CUdeviceptr *dptr, size_t bytesize, CUstream stream) {
+  (void)stream;
+  return cuMemAlloc(dptr, bytesize);
+}
+CUresult cuMemFree(CUdeviceptr dptr) { return (CUresult)cudaFree((void *)dptr); }
+CUresult cuMemFreeAsync(CUdeviceptr dptr, CUstream stream) { (void)stream; return cuMemFree(dptr); }
+
+CUresult cuMemcpyHtoD(CUdeviceptr dst, const void *src, size_t bytes) {
+  return (CUresult)cudaMemcpy((void *)dst, src, bytes, cudaMemcpyHostToDevice);
+}
+CUresult cuMemcpyDtoH(void *dst, CUdeviceptr src, size_t bytes) {
+  return (CUresult)cudaMemcpy(dst, (const void *)src, bytes, cudaMemcpyDeviceToHost);
+}
+CUresult cuMemcpyDtoD(CUdeviceptr dst, CUdeviceptr src, size_t bytes) {
+  return (CUresult)cudaMemcpy((void *)dst, (const void *)src, bytes, cudaMemcpyDeviceToDevice);
+}
+CUresult cuMemcpyHtoDAsync(CUdeviceptr dst, const void *src, size_t bytes, CUstream stream) {
+  (void)stream;
+  return cuMemcpyHtoD(dst, src, bytes);
+}
+CUresult cuMemcpyDtoHAsync(void *dst, CUdeviceptr src, size_t bytes, CUstream stream) {
+  (void)stream;
+  return cuMemcpyDtoH(dst, src, bytes);
+}
+CUresult cuMemsetD8(CUdeviceptr dst, unsigned char value, size_t count) {
+  return (CUresult)cudaMemset((void *)dst, value, count);
+}
+
+CUresult cuStreamCreate(CUstream *stream, unsigned int flags) {
+  return (CUresult)cudaStreamCreateWithFlags((cudaStream_t *)stream, flags);
+}
+CUresult cuStreamDestroy(CUstream stream) { return (CUresult)cudaStreamDestroy((cudaStream_t)stream); }
+CUresult cuStreamSynchronize(CUstream stream) { return (CUresult)cudaStreamSynchronize((cudaStream_t)stream); }

@@ -11,11 +11,12 @@ import pytest
 
 pytest.importorskip("cutlass")
 
-EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "06_cute_dsl" / "run.py"
+EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "06_cute_dsl"
 
 
-def run(*arguments):
-    return subprocess.run([sys.executable, "-m", "warplens.cli", "run", *arguments, sys.executable, str(EXAMPLE)],
+def run(*arguments, script="run.py"):
+    return subprocess.run([sys.executable, "-m", "warplens.cli", "run", *arguments, sys.executable,
+                           str(EXAMPLES / script)],
                           capture_output=True, text=True, timeout=900,
                           env={**os.environ, "CUDA_VISIBLE_DEVICES": ""})
 
@@ -30,3 +31,10 @@ def test_cute_dsl_script_launches_in_the_simulator_without_a_gpu(model):
     assert "thread 3 of" not in done.stdout and "launched 2 blocks of 32 threads" in done.stdout
     assert f"1 kernel launch(es) simulated on {model}, 0 finding(s)" in done.stderr
     assert ": 2 CTA(s)" in done.stderr
+
+
+def test_cute_dsl_script_holds_its_arrays_through_the_driver():
+    done = run(script="saxpy.py")
+    assert done.returncode == 0, done.stdout[-1500:] + done.stderr[-1500:]
+    assert "saxpy over 256 elements: matches NumPy" in done.stdout
+    assert "1 kernel launch(es) simulated on B200, 0 finding(s)" in done.stderr and ": 4 CTA(s)" in done.stderr

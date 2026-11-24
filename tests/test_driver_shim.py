@@ -150,11 +150,46 @@ int main(int argc, char **argv) {
     CHECK(cuGetProcAddress("cuInit", &found, 13000, 0, &status) == CUDA_SUCCESS);
     CHECK(found == (void *)cuInit && status == CU_GET_PROC_ADDRESS_SUCCESS);
     CHECK(cuGetProcAddress("cuGetProcAddress", &found, 13000, 0, NULL) == CUDA_SUCCESS && found);
+    CHECK(cuGetProcAddress("cuCtxCreate", &found, 13000, 0, NULL) == CUDA_SUCCESS && found == (void *)cuCtxCreate);
     CHECK(cuGetProcAddress("cuMemAllocManaged", &found, 13000, 0, &status) == CUDA_ERROR_NOT_FOUND);
     CHECK(found == NULL && status == CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND);
     CHECK(cuDriverGetVersion(&version) == CUDA_SUCCESS && version == CUDA_VERSION);
     CHECK(cuDeviceGet(&device, 0) == CUDA_SUCCESS && device == 0);
     CHECK(cuDeviceGet(&device, 1) == CUDA_ERROR_INVALID_DEVICE);
+    return 0;
+  }
+  if (!strcmp(argv[1], "memory")) {  /* arrays held through the driver, as cuda-python does */
+    CUcontext context = NULL, other = (CUcontext)1;
+    CUdevice device = -1;
+    CUdeviceptr first, second;
+    CUstream stream;
+    unsigned char host[32], back[32];
+    size_t total = 0;
+    CHECK(cuCtxGetCurrent(&other) == CUDA_SUCCESS && other == NULL);
+    CHECK(cuCtxGetDevice(&device) == CUDA_ERROR_INVALID_CONTEXT);
+    CHECK(cuCtxCreate(&context, NULL, 0, 0) == CUDA_SUCCESS && context);
+    CHECK(cuCtxGetCurrent(&other) == CUDA_SUCCESS && other == context);
+    CHECK(cuCtxGetDevice(&device) == CUDA_SUCCESS && device == 0);
+    CHECK(cuCtxPopCurrent(&other) == CUDA_SUCCESS && other == context);
+    CHECK(cuCtxGetCurrent(&other) == CUDA_SUCCESS && other == NULL);
+    CHECK(cuDevicePrimaryCtxRetain(&other, 0) == CUDA_SUCCESS && other == context);
+    CHECK(cuCtxPushCurrent(context) == CUDA_SUCCESS && cuCtxSetCurrent(context) == CUDA_SUCCESS);
+    CHECK(cuDeviceTotalMem(&total, 0) == CUDA_SUCCESS && total >= ((size_t)192 << 30));
+    CHECK(cuStreamCreate(&stream, 0) == CUDA_SUCCESS);
+    CHECK(cuMemAlloc(&first, 0) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cuMemAlloc(&first, sizeof host) == CUDA_SUCCESS);
+    CHECK(cuMemAllocAsync(&second, sizeof host, stream) == CUDA_SUCCESS && second != first);
+    for (unsigned i = 0; i < sizeof host; ++i) host[i] = (unsigned char)(3 * i + 1);
+    CHECK(cuMemcpyHtoD(first, host, sizeof host) == CUDA_SUCCESS);
+    CHECK(cuMemcpyDtoD(second, first, sizeof host) == CUDA_SUCCESS);
+    CHECK(cuMemsetD8(second, 0xee, 4) == CUDA_SUCCESS);
+    CHECK(cuMemcpyDtoHAsync(back, second, sizeof back, stream) == CUDA_SUCCESS);
+    CHECK(cuStreamSynchronize(stream) == CUDA_SUCCESS && cuCtxSynchronize() == CUDA_SUCCESS);
+    for (unsigned i = 0; i < sizeof host; ++i) CHECK(back[i] == (i < 4 ? 0xee : host[i]));
+    CHECK(cuMemcpyHtoDAsync(first + 30, host, 4, stream) != CUDA_SUCCESS);  /* past the end */
+    CHECK(cuMemFree(first) == CUDA_SUCCESS && cuMemFreeAsync(second, stream) == CUDA_SUCCESS);
+    CHECK(cuMemcpyDtoH(back, first, 1) != CUDA_SUCCESS);  /* freed */
+    CHECK(cuStreamDestroy(stream) == CUDA_SUCCESS && cuCtxDestroy(context) == CUDA_SUCCESS);
     return 0;
   }
   if (!strcmp(argv[1], "tokens")) {  /* streams, events and host memory, as TVM's runtime uses them */
@@ -257,6 +292,11 @@ def test_runtime_library_of_machine_code_takes_its_kernels_from_kept_ptx(client,
 def test_runtime_library_of_machine_code_is_refused_without_kept_ptx(client):
     with pytest.raises(AssertionError, match="machine code for a real GPU"):
         run_client(client, "library")
+
+
+def test_arrays_are_held_through_the_driver(client):
+    _, done = run_client(client, "memory")
+    assert done.stderr.count("warplens:") == 2  # the copy past the end and the one from freed memory
 
 
 def test_driver_functions_are_found_by_name(client):

@@ -15,6 +15,7 @@ import pytest
 import warplens
 
 from conftest import EXAMPLES, HEADER
+from warplens.timing.config import GpuConfig
 
 TRY_CANCEL = "clusterlaunchcontrol.try_cancel.async.shared::cta.mbarrier::complete_tx::bytes.b128"
 QUERY = "clusterlaunchcontrol.query_cancel"
@@ -284,6 +285,28 @@ def test_timed_launch(sim):
     out = sim.zeros((6, 2), "u32")
     stats = sim.launch(module(WORKER), "k", grid=6, block=1, args=[out], timing=True)
     assert out.numpy().tolist() == [[1, 1]] * 6 and stats.findings == []
+
+
+def test_a_request_takes_clc_latency_ns_in_a_timed_launch(sim):
+    """The response lands `clc_latency_ns` after the request, and the warp waiting on its mbarrier
+    resumes then. The value is an uncalibrated placeholder (validation matrix, TIM-20)."""
+    def launch(**override):
+        out = sim.zeros((6, 2), "u32")
+        timing = GpuConfig.load("B200").replace(**override) if override else True
+        stats = sim.launch(module(WORKER), "k", grid=6, block=1, args=[out], timing=timing)
+        assert out.numpy().tolist() == [[1, 1]] * 6 and stats.findings == []
+        return stats.timing
+
+    param = GpuConfig.load("B200").params["clc_latency_ns"]
+    assert param.value == 100 and param.unit == "ns" and param.is_assumption
+    assert "placeholder" in param.note and GpuConfig.load("B300").params["clc_latency_ns"].is_assumption
+    free, default, slow = launch(clc_latency_ns=0), launch(), launch(clc_latency_ns=1000)
+    # One cluster runs the whole grid: six requests, five granted and the last refused, each
+    # waited for before the next is made.
+    assert free.time_ns < default.time_ns
+    assert slow.time_ns - default.time_ns == pytest.approx(6 * 900)
+    waits = [s for s in slow.slices if s.name.startswith("wait")]
+    assert len(waits) == 6 and all(900 < s.end - s.start <= 1000 for s in waits)
 
 
 # -- findings --------------------------------------------------------------------------------

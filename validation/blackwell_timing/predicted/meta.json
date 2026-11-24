@@ -8,6 +8,7 @@
   "hbm_bandwidth_tb_s": 4.141,
   "l2_bandwidth_per_sm_gb_s": 400.0,
   "tma_latency_ns": 100.0,
+  "clc_latency_ns": 100.0,
   "tma_bytes_per_clk": 128.0,
   "smem_wavefront_clk": 1.0,
   "global_access_latency_clk": 30.0,

@@ -12,7 +12,8 @@ these resources, each a server that handles one piece of work at a time:
 
 A warp's instruction starts when the warp and its issue slot are free. A TMA
 copy or an MMA is asynchronous: it queues on its servers and completes later,
-and warps waiting on its mbarrier resume at that time.
+and warps waiting on its mbarrier resume at that time. A cluster launch control
+request queues on nothing; its response lands a fixed `clc_latency_ns` later.
 
 This explains where time goes; it does not predict it. The microarchitecture
 is not public, several parameters are assumptions (the config files say which),
@@ -183,10 +184,12 @@ class Timeline:
             self.slice("TMA engine", label, start, done, bytes=nbytes,
                        from_hbm=int(fresh), issued_ns=issued, line=operation.ins.line)
         elif operation.kind == "clc":
-            # A clusterlaunchcontrol.try_cancel response. How long the launch takes to answer
-            # is not known, so it is not modeled: the response lands as it is issued.
-            self.end = max(self.end, issued)
-            return issued
+            # A clusterlaunchcontrol.try_cancel response lands a fixed time after the request.
+            # How long a launch takes to answer is not known: `clc_latency_ns` is a placeholder.
+            # The request uses none of the SM's servers, so it is not part of their busy window.
+            done = issued + cfg["clc_latency_ns"]
+            self.end = max(self.end, done)
+            return done
         elif operation.kind == "mma":
             flops = work.get("flops", 0.0)
             rate = self.flop_rate[work.get("kind", "f16")]

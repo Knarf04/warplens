@@ -37,6 +37,11 @@ tma_latency_ns:
   unit: ns
   source: assumption
   note: Fixed delay from issuing a TMA copy to its completion, on top of the transfer itself.
+clc_latency_ns:
+  value: 100
+  unit: ns
+  source: assumption
+  note: Uncalibrated placeholder. Delay from a clusterlaunchcontrol.try_cancel to its response landing and completing the mbarrier. Nothing public says how long a launch takes to answer; set equal to tma_latency_ns, the model's other fixed delay of an asynchronous request. Validation-matrix row TIM-20 is the measurement that replaces it.
 tma_bytes_per_clk:
   value: 128
   unit: bytes/clk

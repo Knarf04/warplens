@@ -11,6 +11,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      # Each Python reports its own result: one failing does not cancel the others.
+      fail-fast: false
       matrix:
         python: ["3.11", "3.12", "3.13"]
     steps:
@@ -20,7 +22,14 @@ jobs:
           python-version: ${{ matrix.python }}
       # No CUDA needed: tests run the .ptx files checked in under examples/.
       - run: pip install -e ".[dev]"
-      - run: pytest -q
+      - name: Run the suite with nothing but NumPy and PyYAML
+        run: |
+          set -o pipefail
+          pytest -q 2>&1 | tee pytest.log
+      - name: Report the pytest failure
+        if: failure()
+        shell: bash {0}
+        run: .github/report_pytest_failure.sh
 
   triton:
     runs-on: ubuntu-latest
@@ -38,6 +47,9 @@ jobs:
   # Everything, with no test allowed to skip: the conda env from env/ supplies nvcc and the
   # CUDA headers (compile-only, no GPU), so the CUTLASS tutorials are fetched and built, the
   # shim libraries are compiled, and Triton, the CuTe DSL and TIRx are installed.
+  # env/environment.yml pins the toolkit to the exact nvcc the committed predictions were made
+  # with, and env/check.sh fails on any other: a toolkit change is a commit that regenerates
+  # them (env/README.md, "Changing the toolkit"), never something conda-forge does to this job.
   full:
     runs-on: ubuntu-latest
     env:
@@ -69,19 +81,10 @@ jobs:
       - name: Run the whole suite; no test may skip
         run: |
           set -o pipefail
-          pytest -q -rs 2>&1 | tee pytest.log
+          pytest -q -rfEs 2>&1 | tee pytest.log
       # Put the failure summary where it can be read without downloading the log, as a few
-      # short annotations. The tail of the log is included because a crashed interpreter
-      # leaves no summary lines to match. A separate step, so it runs however pytest ended.
+      # short annotations. A separate step, so it runs however pytest ended.
       - name: Report the pytest failure
         if: failure()
         shell: bash {0}
-        run: |
-          echo "::notice title=pytest log::$(wc -l < pytest.log) lines"
-          { grep -E '^(FAILED|ERROR|SKIPPED|E  |Fatal Python error|WARPLENS_NO_SKIPS|  tests/|[0-9]+ (passed|failed))' pytest.log | head -30
-            echo "--- last lines of the log ---"; tail -20 pytest.log; } \
-            | tr -cd '\11\12\40-\176' | cut -c1-200 | sed 's/%/%25/g; s/::/: :/g' > summary.txt
-          split -l 10 summary.txt summary.part.
-          for part in summary.part.*; do
-            echo "::error title=pytest ${part##*.}::$(awk '{printf "%s%%0A", $0}' "$part")"
-          done
+        run: .github/report_pytest_failure.sh

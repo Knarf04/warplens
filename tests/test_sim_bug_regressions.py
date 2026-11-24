@@ -175,6 +175,8 @@ def test_the_shim_reports_the_limit_the_launch_enforces():
 
 
 def test_the_triton_driver_reports_the_same_limit():
-    from warplens import triton_driver
-    source = Path(triton_driver.__file__).read_text()
+    # Read, not imported: importing the driver needs the optional `triton` package, and what
+    # is checked here is a line of its source.
+    source = (SHIM.parent / "triton_driver.py").read_text()
     assert '"max_shared_mem": MAX_SMEM_BYTES' in source
+    assert "from .units.smem import MAX_SMEM_BYTES" in source

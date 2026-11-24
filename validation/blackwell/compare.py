@@ -52,6 +52,23 @@ from manifest import E2E, PROBES  # noqa: E402
 HEX_WORD = re.compile(r"^[0-9a-f]{8}$")
 E2E_KEY = re.compile(r"Relative error|Execution is|max abs error|matches NumPy|FAILED|SKIPPED|rror")
 SECONDS = re.compile(r", \d+\.\d+ s\)")
+# "matches NumPy (max error 0.0156)": the number is the distance to NumPy's result on the
+# machine that ran the script, and NumPy's float32 matrix product is its BLAS's, whose order
+# of summation depends on the CPU and the thread count. Rounded to float16 the reference
+# moves by one unit in the last place on some elements, so the same kernel output is 0.0078
+# from it on one machine and 0.0156 on another. The claim is "matches NumPy" (the script
+# asserts its tolerance before it prints that); the number is not part of it.
+MAX_ERROR = re.compile(r" \(max error \d+\.\d+\)")
+
+
+def key_lines(text: str) -> list[str]:
+    """The result lines of an end-to-end program, without the times in them."""
+    return [SECONDS.sub(")", line.strip()) for line in text.splitlines() if E2E_KEY.search(line)]
+
+
+def claims(lines: list[str]) -> list[str]:
+    """`key_lines` without what depends on the machine: "hgemm_v6 128x128x256: matches NumPy"."""
+    return [MAX_ERROR.sub("", line) for line in lines]
 
 
 def compared_lines(text: str) -> list[str]:
@@ -252,14 +269,16 @@ def main() -> int:
         if status is None:
             rows.append((name, "not run", ""))
             continue
-        keys = lambda text: [SECONDS.sub(")", l.strip()) for l in text.splitlines() if E2E_KEY.search(l)]
-        got, want = keys(read(results / (name + ".stdout"))), keys(read(predicted / (name + ".txt")))
+        got, want = key_lines(read(results / (name + ".stdout"))), key_lines(read(predicted / (name + ".txt")))
         verdict = {"ok": "informational", "timeout": "timed out"}.get(status, "crashed")
         if status.startswith("skipped"):
             verdict = "not run"
         rows.append((name, verdict, status if status != "ok" else f"{len(got)} result line(s), below"))
         details += [f"{name}: result lines, GPU then simulator"] + ["    GPU: " + l[:160] for l in got[:12]] + \
                    ["    sim: " + l[:160] for l in want[:12]]
+        if got != want and claims(got) == claims(want):
+            details += ["    the same claims: a max error is the distance to NumPy's result on the machine that "
+                        "ran the script, and that depends on its BLAS"]
 
     width = max(len(name) for name, _, _ in rows)
     print(f"{'probe':{width}}  {'verdict':26}  detail")

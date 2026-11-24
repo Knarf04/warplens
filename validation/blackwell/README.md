@@ -303,7 +303,10 @@ run is isolated for that reason.
 
 These print error norms and "matches NumPy" lines, not bit patterns, and their outputs
 contain times. `compare.py` treats them as informational and shows the result lines from the
-GPU next to the simulator's.
+GPU next to the simulator's. The `max error` of a "matches NumPy" line is measured against
+NumPy on the machine that ran the script, whose BLAS decides the last float16 digit of the
+reference (0.0078 on one CPU, 0.0156 on another, for the same kernel output): the claim is
+the name, the size and "matches NumPy", and `compare.py` says so when only that number differs.
 
 ## Reading the comparison
 

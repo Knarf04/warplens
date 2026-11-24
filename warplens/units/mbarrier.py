@@ -193,10 +193,12 @@ class Mbarrier:
         if "relaxed" not in ins.mods:
             self.knowledge |= warp.seen if knowledge is None else knowledge
         if n > self.pending:
+            # The PTX manual gives no meaning to this. warplens carries the surplus into the
+            # following phases (docs/m2.md, an assumption) and reports it.
             self.cta.findings.add(
                 "mbarrier-over-arrival",
-                f"{n} arrival(s) on an mbarrier that needed only {self.pending} more in this phase; "
-                "the extra ones count toward the next phase", warp, ins, lanes)
+                f"{n} arrival(s) on an mbarrier that needed only {max(self.pending, 0)} more in "
+                "this phase; the extra ones count toward the following phases", warp, ins, lanes)
         self.pending -= n
         self._check()
 
@@ -218,12 +220,17 @@ class Mbarrier:
                 "or too small", warp, ins, lanes)
 
     def _check(self) -> None:
-        if self.pending <= 0 and self.tx == 0:
+        if self.pending > 0 or self.tx != 0:
+            return
+        self.completed_knowledge = self.knowledge
+        self.knowledge = set()
+        self.tx_source = None
+        # More arrivals than one phase needs complete as many phases as they cover, so the
+        # pending count is positive again afterwards (it is negative only while a surplus
+        # waits for the phase's bytes).
+        while self.pending <= 0:
             self.phase += 1
             self.pending += self.expected
-            self.completed_knowledge = self.knowledge
-            self.knowledge = set()
-            self.tx_source = None
             self.cta.phase_completed()
 
 

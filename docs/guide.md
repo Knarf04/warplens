@@ -236,7 +236,7 @@ timing=False, active_sms=None, trace=None, max_steps=None, async_delay=4)`:
   refused, and the reverse), and `bytes`, a NumPy record or a `ctypes`
   structure for a struct passed by value.
 - `smem` is the dynamic shared memory per CTA in bytes, as in a real launch.
-  It sizes `extern __shared__` arrays. The limit per CTA is 228 KB.
+  It sizes `extern __shared__` arrays. The limit per CTA is 227 KB.
 - `cluster` is the cluster shape in CTAs, at most 16 CTAs per cluster; the
   grid must be a whole number of clusters.
 - `max_steps` stops a kernel that does not finish. `async_delay` is how many

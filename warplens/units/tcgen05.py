@@ -26,8 +26,9 @@ What is implemented, and where each rule comes from (CUTLASS/CuTe sources):
   where row_bytes is 16/32/64/128 for none/32B/64B/128B and step is 16 (LBO when
   unswizzled); the swizzle is then applied to the address. K = 2T per MMA.
 * Accumulator placement (cute/atom/mma_traits_sm100_frag.hpp): for M = 128, row m
-  is lane m. For M = 64, row m is lane 32 * (m // 16) + m % 16: the low 16 lanes
-  of each warp's 32.
+  is lane m. For M = 64, row m is lane 32 * (m // 16) + m % 16 + a: the low (a = 0)
+  or high (a = 16) 16 lanes of each warp's 32, a being the lane of the destination
+  address. Any other destination lane is an error.
 * `tcgen05.ld.32x32b.xN [addr]`: the thread on lane l of its warp reads TMEM lane
   32 * (warpid % 4) + (lane(addr) % 32) + l, columns column(addr) .. + N - 1.
   NVIDIA CUTLASS's tcgen05_ld primitive documents the local 5-bit row index;
@@ -260,6 +261,13 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
                                  f"{len(cta.cluster.ctas)}")
         # Matrix placement follows rank parity, not which CTA issued the MMA.
         members = [cta.peer(even_rank), cta.peer(even_rank + 1)]
+    # The lane field of the destination selects where the result's rows go, and only an
+    # M = 64 result of one CTA leaves a choice: the low or the high 16 lanes of each warp's
+    # 32 (CuTe tiles its 64-row atom at datapath 0 and, interleaved, at 16).
+    lane_choices = (0, 16) if m_dim == 64 and not pair else (0,)
+    if d_lane not in lane_choices:
+        raise ExecutionError(f"tcgen05.mma result with M={m_dim} at lane {d_lane}; the lane of the "
+                             f"destination must be {' or '.join(map(str, lane_choices))}")
     rows_m, rows_n = m_dim // len(members), n_dim // len(members)
     n = np.arange(n_dim)[None, :]
     m = np.arange(rows_m)[:, None]

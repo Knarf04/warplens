@@ -16,8 +16,13 @@ import numpy as np
 
 from ..errors import MemoryFault
 
-# Largest shared memory one CTA may have on sm_100a (PTX ISA 9.5, section 5.1.7).
-MAX_SMEM_BYTES = 228 * 1024
+# Largest shared memory one CTA may have on sm_100a, static plus dynamic: 227 KB. The CUDA
+# C++ Programming Guide's table of technical specifications gives 227 KB per thread block
+# and 228 KB per SM for compute capability 10.x, and CUTLASS sizes its sm_100 kernels by
+# `sm100_smem_capacity_bytes = 232448` (cutlass/arch/arch.h). The shim libraries report the
+# same number to programs as WL_MAX_SMEM_BYTES (warplens/shim/protocol.h), which
+# tests/test_sim_bug_regressions.py keeps equal to this one.
+MAX_SMEM_BYTES = 227 * 1024
 
 # Shadow "writer" value for bytes last written by TMA rather than by a warp.
 ASYNC_PROXY = -2

@@ -56,7 +56,7 @@ def test_dynamic_smem_too_small_faults(sim):
 
 def test_smem_limit(sim):
     x = sim.empty(256, "s32")
-    with pytest.raises(warplens.LaunchError, match="the limit is 233472"):
+    with pytest.raises(warplens.LaunchError, match="the limit is 232448"):
         sim.launch(REDUCE, "block_sum", grid=1, block=256, smem=300_000, args=[x, x])
 
 

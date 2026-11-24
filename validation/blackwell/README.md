@@ -136,7 +136,7 @@ run is isolated for that reason.
 | `arrivals_and_bytes` | `script tx` | MB-02 | a phase completes when pending arrivals and the byte count are both zero, in either order | runs | - |
 | `lane_arrivals` | `lane_arrivals` | MB-09 | every lane that executes an arrive arrives once, also when only part of a warp does | runs | - |
 | `complete_before_expect` | `script negative` | MB-07 | the byte count is signed: complete_tx before expect_tx completes once balanced | runs | fault |
-| `over_arrival` | `script over` | MB-04 | arrivals beyond the pending count complete the phase and carry into the next | runs (4 finding(s)) | fault |
+| `over_arrival` | `script over` | MB-04 | arrivals beyond the pending count complete the phase and carry into the next | runs (2 finding(s)) | fault |
 | `expect_tx_small` | `expect_tx` | MB-05, MB-06, MB-07, MB-08 | undersized, oversized and missing expect_tx against real TMA loads, with bounded polls | runs | - |
 | `expect_tx_small.wait` | `expect_tx wait-small` | MB-05, MB-11 | an undersized expect_tx with one load never completes: the usual wait loop deadlocks | **refuses**: deadlock in CTA (0, 0, 0) | hang |
 | `expect_tx_large` | `expect_tx wait-large` | MB-08, MB-11 | an oversized expect_tx never completes: the usual wait loop deadlocks | **refuses**: deadlock in CTA (0, 0, 0) | hang |
@@ -150,7 +150,7 @@ run is isolated for that reason.
 | `lane_window.1` | `lane_window 1` | TM-03 | lane field 1: a 32x32b transfer running past the warp's window is refused | **refuses**: unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer spanning the local 32-row tensor-m | fault |
 | `lane_window.48` | `lane_window 48` | TM-03 | lane field 48: a 32x32b transfer running past the warp's window is refused | **refuses**: unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer spanning the local 32-row tensor-m | fault |
 | `layout_f` | `layout_f` | TM-04, TM-01 | M = 128: row m on lane m. M = 64: row m on lane 32 (m / 16) + m % 16 + a, a = 0 or 16 | runs | - |
-| `layout_f.64_8` | `layout_f 64 8` | TM-04 | M = 64 with lane offset 8: the simulator just adds the offset | runs | fault |
+| `layout_f.64_8` | `layout_f 64 8` | TM-04 | M = 64 with lane offset 8, neither of Layout F's two positions: refused | refused | fault |
 | `transfer_shapes` | `transfer_shapes` | TM-05 | thread and register to (lane, column) for 32x32b, 16x64b, 16x128b, 16x256b, load and store | runs | - |
 | `alloc_addresses` | `alloc` | TM-07 | alloc returns the lowest free block aligned to its size, as (lane 0, column) | runs | - |
 | `alloc_increasing` | `alloc increasing` | TM-08 | a later allocation may not be larger than an earlier one | **refuses**: tcgen05.alloc of 64 columns increases the previous allocation size of 32 columns | fault |
@@ -298,18 +298,20 @@ Simulator gaps and oddities. None was fixed here; this suite does not touch the 
    consequence here is that `formats/small_formats` cannot be predicted by running it, so
    its predictions come from `formats/predict_small_formats.py`, a second implementation of
    the probe's input generation that has to be kept in step by hand.
-4. **Over-arrival does not carry the way its finding says.** With one arrival expected, an
-   `arrive` with count 5 completes one phase and leaves the pending count at -3; every later
-   single arrival then completes one more phase and the count stays at -3 for ever (the
-   finding text reads "needed only -3 more in this phase"). With two expected and three
-   arriving the carry works out. `Mbarrier._check` advances at most one phase per call and
-   never consumes a surplus larger than one phase. Reproduction: `mbarrier/script over`,
-   second script; `predicted/mbarrier/over_arrival.txt` records the behaviour as it is.
-   Hardware behaviour here is unknown and possibly undefined.
-5. **An M = 64 MMA accepts any destination lane offset.** `docs/m3.md` gives Layout F for
-   offsets 0 and 16; the simulator adds whatever lane field the destination has (offset 8
-   puts the rows on lanes 8-23 of each window; `tmem/layout_f.64_8`), without a finding.
-   An offset of 32 is refused only because the result no longer fits.
+4. **Over-arrival did not carry the way its finding says** (fixed since, on branch
+   `work/sim-bugs`). With one arrival expected, an `arrive` with count 5 completed one phase
+   and left the pending count at -3; every later single arrival then completed one more
+   phase and the count stayed at -3 for ever. `Mbarrier._check` now completes as many phases
+   as the surplus covers (five here), so the count is positive again afterwards. What
+   `mbarrier/over_arrival` prints is the same either way, because the probe prints parities
+   and one phase and five have the same one; only the findings in
+   `predicted/mbarrier/over_arrival.sim.txt` changed, from four to two. Hardware behaviour
+   here is unknown and possibly undefined.
+5. **An M = 64 MMA accepted any destination lane offset** (fixed since, on branch
+   `work/sim-bugs`). `docs/m3.md` gives Layout F for offsets 0 and 16; the simulator added
+   whatever lane field the destination had (offset 8 put the rows on lanes 8-23 of each
+   window). It now refuses any other lane, and `tmem/layout_f.64_8` predicts a failed
+   kernel.
 6. **`arrive.expect_tx 0` before a load completes the phase at once**, and the load's bytes
    are then charged to the next phase. That is the signed-count model working as designed,
    but it means a box wholly outside the tensor cannot be used to ask whether `complete_tx`

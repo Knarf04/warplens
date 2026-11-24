@@ -10,6 +10,10 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* Largest shared memory per CTA, which a program may be told and a launch may use. The
+ * simulator enforces MAX_SMEM_BYTES of warplens/units/smem.py; the two must be equal. */
+#define WL_MAX_SMEM_BYTES (227 * 1024)
+
 enum {
   WL_REGISTER_FATBIN = 1,   /* fat binary bytes                      -> uint32 module            */
   WL_REGISTER_FUNCTION = 2, /* uint32 module, name                   -> uint32 function, uint32 n, uint32 size[n] */

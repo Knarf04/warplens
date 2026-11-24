@@ -1,16 +1,10 @@
 status: ok
-warplens: 2 kernel launch(es) simulated on B200, 4 finding(s)
+warplens: 2 kernel launch(es) simulated on B200, 2 finding(s)
   mbar_script: 1 CTA(s), 168 warp-instructions
-    [mbarrier-over-arrival] 3 arrival(s) on an mbarrier that needed only 2 more in this phase; the extra ones count toward the next phase
+    [mbarrier-over-arrival] 3 arrival(s) on an mbarrier that needed only 2 more in this phase; the extra ones count toward the following phases
       line 130: mbarrier.arrive.shared::cta.b64 _, [%r26], %r4;
       first in CTA (0, 0, 0), warp 0, lanes 0
   mbar_script: 1 CTA(s), 109 warp-instructions
-    [mbarrier-over-arrival] 5 arrival(s) on an mbarrier that needed only 1 more in this phase; the extra ones count toward the next phase
+    [mbarrier-over-arrival] 5 arrival(s) on an mbarrier that needed only 1 more in this phase; the extra ones count toward the following phases
       line 130: mbarrier.arrive.shared::cta.b64 _, [%r26], %r4;
-      first in CTA (0, 0, 0), warp 0, lanes 0
-    [mbarrier-over-arrival] 1 arrival(s) on an mbarrier that needed only -3 more in this phase; the extra ones count toward the next phase
-      line 197: mbarrier.arrive.shared::cta.b64 _, [%r37], %r5;
-      first in CTA (0, 0, 0), warp 0, lanes 0
-    [mbarrier-over-arrival] 1 arrival(s) on an mbarrier that needed only -3 more in this phase; the extra ones count toward the next phase
-      line 264: mbarrier.arrive.shared::cta.b64 _, [%r48], %r6;
       first in CTA (0, 0, 0), warp 0, lanes 0

@@ -390,12 +390,13 @@ Found by this work in the simulator and not yet fixed:
   `%clock64` are not supported; ordinary CUDA C++ emits the first two.
 - The FP8 and FP4 `cvt` forms of `cuda_fp8.h` and `cuda_fp4.h` are not
   implemented, although the formats are (`warplens.numerics`).
-- After more arrivals than an mbarrier's count, the pending count stays
-  negative and every later arrival completes a phase.
-- An M = 64 MMA accepts any destination lane offset; `docs/m3.md` allows 0
-  and 16.
-- A launch accepts 228 KB of shared memory, and the shim reports an opt-in
-  maximum of 227 KB.
+- After more arrivals than an mbarrier's count, the pending count stayed
+  negative and every later arrival completed a phase. Fixed: the surplus
+  completes as many phases as it covers.
+- An M = 64 MMA accepted any destination lane offset; `docs/m3.md` allows 0
+  and 16. Fixed: any other lane is an error.
+- A launch accepted 228 KB of shared memory, and the shim reported an opt-in
+  maximum of 227 KB. Fixed: both are 227 KB.
 - Timing model: TMA stores and `cp.async` are always charged to HBM;
   `warplens run` cannot set the number of active SMs or the config; B300
   timing equals B200; utilization is averaged over CTAs that do no work.

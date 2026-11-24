@@ -15,7 +15,7 @@
 // to the bytes actually inside the tensor. If hardware counted only those, these phases
 // would complete; the simulator predicts they do not.
 //
-//   tma_oob [inbounds]
+//   oob_fill [inbounds]
 #include "tma_dump.h"
 
 #define ROWS 6

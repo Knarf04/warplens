@@ -16,8 +16,9 @@
 // The probe also assumes that the shared address of an `alignas(1024)` buffer is a multiple
 // of 1024, which it prints.
 //
-//   tma_swizzle                  offsets 0, 128, 256, 512 for every mode
-//   tma_swizzle sixteen          offset 16: the destination is not aligned to a 128-byte row
+//   swizzle aligned          offset 0 for every mode: the permutation itself
+//   swizzle misaligned       offsets 128, 256, 512 for every mode
+//   swizzle sixteen          offset 16: the destination is not aligned to a 128-byte row
 #include "tma_dump.h"
 
 static const int SPAN[4] = {128, 32, 64, 128};  // bytes per tensor row, by swizzle mode
@@ -79,8 +80,9 @@ int main(int argc, char** argv) {
         for (int mode = 0; mode < 4; ++mode) run(mode, 16, d_tensor);
         return 0;
     }
-    const int offsets[] = {0, 128, 256, 512};
+    bool aligned = argc > 1 && !strcmp(argv[1], "aligned");
     for (int mode = 0; mode < 4; ++mode)
-        for (int offset : offsets) run(mode, offset, d_tensor);
+        for (int offset : {0, 128, 256, 512})
+            if ((offset == 0) == aligned) run(mode, offset, d_tensor);
     return 0;
 }

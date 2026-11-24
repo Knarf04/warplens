@@ -12,7 +12,7 @@
 // Case `unaligned` (own process): an innermost coordinate that is not a multiple of 16
 // bytes. The simulator refuses it; whether hardware accepts it is not known.
 //
-//   tma_rank [unaligned]
+//   ranks [unaligned]
 #include "tma_dump.h"
 
 static const uint64_t DIMS[5] = {8, 6, 5, 4, 3};

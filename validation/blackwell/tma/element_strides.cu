@@ -15,7 +15,7 @@
 // than 1 in dimension 0. The simulator ignores it, as cuTensorMapEncodeTiled documents for
 // non-interleaved tensors.
 //
-//   tma_elem_stride [inner]
+//   element_strides [inner]
 #include "tma_dump.h"
 
 static void run(int rank, const uint32_t* box, const uint32_t* strides, uint32_t* d_tensor) {

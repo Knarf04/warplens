@@ -14,7 +14,7 @@
 // A parameter is varied alone from a baseline first (so its field can be located), then in
 // combinations, then one bit at a time.
 //
-//   tensormap_sweep
+//   tensormap_encode_sweep
 #include "../common.h"
 
 static probe_encode_fn encode;

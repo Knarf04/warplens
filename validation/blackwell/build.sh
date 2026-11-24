@@ -41,11 +41,11 @@ build_one() {
   mkdir -p "bin/$(dirname "$probe")"
   "$NVCC" $flags -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared \
     "$probe.cu" -o "bin/$probe" || { echo "FAILED (PTX program): $probe"; return 1; }
-  "$NVCC" $flags -arch=sm_100a -c "$probe.cu" -o "bin/$probe.o" \
+  "$NVCC" $flags -gencode arch=compute_100a,code=sm_100a -c "$probe.cu" -o "bin/$probe.o" \
     || { echo "FAILED (ptxas for sm_100a): $probe"; return 1; }
   if [[ "$native" == 1 ]]; then
     mkdir -p "bin-native/$(dirname "$probe")"
-    "$NVCC" $flags -arch=sm_100a --cudart shared "$probe.cu" -o "bin-native/$probe" \
+    "$NVCC" $flags -gencode arch=compute_100a,code=sm_100a --cudart shared "$probe.cu" -o "bin-native/$probe" \
       || { echo "FAILED (native program): $probe"; return 1; }
   fi
   echo "built $probe"

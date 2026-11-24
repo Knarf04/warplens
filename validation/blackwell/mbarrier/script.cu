@@ -13,7 +13,7 @@
 //     until expect_tx balances it (case `negative`);
 //   * arrivals beyond the pending count carry into the next phase (case `over`).
 //
-//   mbar_script [basic|count|tx|negative|over]      default: basic, count and tx
+//   script [basic|count|tx|negative|over]      default: basic, count and tx
 #include "../common.h"
 
 enum Op { INIT = 1, ARRIVE = 2, EXPECT = 3, COMPLETE = 4, ARRIVE_EXPECT = 5 };

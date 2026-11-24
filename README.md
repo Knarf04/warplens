@@ -44,8 +44,8 @@ assert np.array_equal(C.numpy(), a + b) and not stats.findings
 ```
 
 Unmodified programs run too: `warplens run ./program` for a CUDA C++ program
-built to carry PTX, `warplens run script.py` for Triton, and
-`warplens run python script.py` for TIRx and the CuTe DSL.
+built to carry PTX, and `warplens run script.py` for a Triton, TIRx or CuTe DSL
+script.
 
 ## Documentation
 

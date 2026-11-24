@@ -33,3 +33,14 @@ def test_tirx_sees_the_selected_model():
     done = run("--model", "B300")
     assert done.returncode == 0, done.stdout[-1500:] + done.stderr[-1500:]
     assert "on compute capability 10.3: matches NumPy" in done.stdout
+
+
+def test_tirx_script_needs_no_python_in_front_of_it():
+    """`warplens run script.py` is `warplens run python script.py`, as for a Triton script."""
+    done = subprocess.run([sys.executable, "-m", "warplens.cli", "run", "--timing", str(EXAMPLE)],
+                          capture_output=True, text=True, timeout=900,
+                          env={**os.environ, "CUDA_VISIBLE_DEVICES": ""})
+    assert done.returncode == 0, done.stdout[-1500:] + done.stderr[-1500:]
+    assert "on compute capability 10.0: matches NumPy" in done.stdout
+    assert "1 kernel launch(es) simulated on B200, 0 finding(s)" in done.stderr
+    assert "saxpy_kernel: 4 CTA(s)" in done.stderr and " ns simulated (" in done.stderr

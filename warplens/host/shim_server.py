@@ -73,9 +73,13 @@ def ptx_from_fatbin(blob: bytes) -> list[str]:
 class ShimServer:
     """Serves one program. `kernels` records every launch for the summary."""
 
-    def __init__(self, model: str = "B200", timing: bool = False, kept_ptx=None):
+    def __init__(self, model: str = "B200", timing=False, kept_ptx=None,
+                 active_sms: int | None = None, clc_limit: int | None = None):
         self.device = Device(model)
-        self.timing = timing
+        # Passed to every `Device.launch`: the program cannot say them through the CUDA runtime.
+        self.timing = timing  # True, or a timing.config.GpuConfig
+        self.active_sms = active_sms
+        self.clc_limit = clc_limit
         self.modules: list = []
         self.functions: list[tuple[int, int, str]] = []
         self.launches: list[tuple[str, object]] = []  # (kernel name, LaunchStats)
@@ -231,6 +235,7 @@ class ShimServer:
                 at += p.size
             stats = self.device.launch(parsed, name, grid=(gx, gy, gz), block=(bx, by, bz),
                                        smem=smem, args=args, timing=self.timing,
+                                       active_sms=self.active_sms, clc_limit=self.clc_limit,
                                        cluster=(kx, ky, kz) if kx else None)
             self.launches.append((name, stats))
             return stats.output.encode()

@@ -1,0 +1,4 @@
+mbarrier with 2 arrivals per phase, 8 chained MMAs
+after the first commit:  phase 0 completed 0 (polled)
+after the second commit: phase 0 completed 1 (after the wait)
+loaded after the wait: D[0][0] = 41000000, D[1][2] = 45018000, D[127][7] = 487e1000; 1024 of 1024 elements equal 8 (256 m + n + 1)

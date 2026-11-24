@@ -1,0 +1,7 @@
+plain                                phase completed 1; words 1000000c 1000000d 1000000e 1000000f 10000014 10000015 10000016 10000017; word after the box eeeeeeee; same as plain
+cache hint evict_normal              phase completed 1; words 1000000c 1000000d 1000000e 1000000f 10000014 10000015 10000016 10000017; word after the box eeeeeeee; same as plain
+cache hint evict_first               phase completed 1; words 1000000c 1000000d 1000000e 1000000f 10000014 10000015 10000016 10000017; word after the box eeeeeeee; same as plain
+cache hint evict_last                phase completed 1; words 1000000c 1000000d 1000000e 1000000f 10000014 10000015 10000016 10000017; word after the box eeeeeeee; same as plain
+after prefetch.tensormap             phase completed 1; words 1000000c 1000000d 1000000e 1000000f 10000014 10000015 10000016 10000017; word after the box eeeeeeee; same as plain
+after cp.async.bulk.prefetch.tensor  phase completed 1; words 1000000c 1000000d 1000000e 1000000f 10000014 10000015 10000016 10000017; word after the box eeeeeeee; same as plain
+after cp.async.bulk.prefetch         phase completed 1; words 1000000c 1000000d 1000000e 1000000f 10000014 10000015 10000016 10000017; word after the box eeeeeeee; same as plain

@@ -1,0 +1,20 @@
+12 tiles in clusters of two CTAs, 30 launch(es):
+  output correct in 30 of 30
+  every tile computed once, by a CTA that started, in 30 of 30
+info: CTAs that started: between 2 and 2 of 12 (first launch: 2)
+info: first launch, tile -> CTA that computed it, tiles 0-11: 0 1 0 1 0 1 0 1 0 1 0 1
+128 tiles in clusters of two CTAs, 5 launch(es):
+  output correct in 5 of 5
+  every tile computed once, by a CTA that started, in 5 of 5
+info: CTAs that started: between 2 and 2 of 128 (first launch: 2)
+info: first launch, tile -> CTA that computed it, tiles 0-11: 0 1 0 1 0 1 0 1 0 1 0 1
+512 tiles in clusters of two CTAs, 5 launch(es):
+  output correct in 5 of 5
+  every tile computed once, by a CTA that started, in 5 of 5
+info: CTAs that started: between 2 and 2 of 512 (first launch: 2)
+info: first launch, tile -> CTA that computed it, tiles 0-11: 0 1 0 1 0 1 0 1 0 1 0 1
+2048 tiles in clusters of two CTAs, 5 launch(es):
+  output correct in 5 of 5
+  every tile computed once, by a CTA that started, in 5 of 5
+info: CTAs that started: between 2 and 2 of 2048 (first launch: 2)
+info: first launch, tile -> CTA that computed it, tiles 0-11: 0 1 0 1 0 1 0 1 0 1 0 1

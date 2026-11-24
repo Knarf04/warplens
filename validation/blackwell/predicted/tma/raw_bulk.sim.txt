@@ -1,0 +1,5 @@
+status: ok
+warplens: 3 kernel launch(es) simulated on B200, 0 finding(s)
+  raw_bulk: 1 CTA(s), 604 warp-instructions
+  raw_bulk: 1 CTA(s), 675 warp-instructions
+  raw_bulk: 1 CTA(s), 7164 warp-instructions

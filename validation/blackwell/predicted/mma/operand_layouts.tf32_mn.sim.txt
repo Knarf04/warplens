@@ -1,4 +1,5 @@
 status: exit 3
 warplens: unsupported instruction `tcgen05.mma.cta_group::1.kind::tf32` (MN-major TF32 requires 128B swizzling with 32-byte atomicity, which is not implemented)
-  line 326: tcgen05.mma.cta_group::1.kind::tf32 [%r60], %rd18, %rd19, %r61, p;
+  line 327: tcgen05.mma.cta_group::1.kind::tf32 [%r60], %rd18, %rd19, %r61, p;
+KERNEL FAILED: mma_dump: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
 warplens: the program launched no kernels

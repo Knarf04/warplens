@@ -1,0 +1,17 @@
+status: ok
+warplens: 3 kernel launch(es) simulated on B200, 4 finding(s)
+  missing_fence: 1 CTA(s), 44034 warp-instructions
+    [tma-store-missing-fence] TMA store of shared memory written by ordinary stores with no fence.proxy.async in between; TMA may read stale data (500 times)
+      line 58: cp.async.bulk.tensor.2d.global.shared::cta.bulk_group [%rd3, {%r14, %r15}], [%r13];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-store-missing-fence] TMA store of shared memory written by ordinary stores with no fence.proxy.async in between; TMA may read stale data (500 times)
+      line 136: cp.async.bulk.tensor.2d.global.shared::cta.bulk_group [%rd5, {%r19, %r3}], [%r18];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-store-missing-fence] TMA store of shared memory written by ordinary stores with no fence.proxy.async in between; TMA may read stale data (500 times)
+      line 187: cp.async.bulk.tensor.2d.global.shared::cta.bulk_group [%rd7, {%r23, %r33}], [%r22];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-store-missing-fence] TMA store of shared memory written by ordinary stores with no fence.proxy.async in between; TMA may read stale data (500 times)
+      line 237: cp.async.bulk.tensor.2d.global.shared::cta.bulk_group [%rd9, {%r27, %r5}], [%r26];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  missing_fence: 1 CTA(s), 46034 warp-instructions
+  missing_fence: 1 CTA(s), 60534 warp-instructions

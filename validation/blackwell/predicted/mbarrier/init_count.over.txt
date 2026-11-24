@@ -1,0 +1,3 @@
+script: init 2^20 (one more than the documented maximum)
+KERNEL FAILED: init 2^20 (one more than the documented maximum)
+info: error cudaErrorLaunchFailure

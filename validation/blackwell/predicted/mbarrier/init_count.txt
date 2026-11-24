@@ -1,0 +1,6 @@
+script: init 2^20 - 1 (the documented maximum)
+  step  operation        test_wait(parity 0)  test_wait(parity 1)
+     0  init    1048575                    0                    1
+     1  arrive  1048574                    0                    1
+     2  arrive        1                    1                    0
+     3  arrive  1048575                    0                    1

@@ -5,6 +5,8 @@ where a row of the matrix names it, with a `.case` suffix for further cases of t
 program; the prediction for it is `predicted/<name>.txt`.
 
     python validation/blackwell/manifest.py          # print the table
+    python validation/blackwell/manifest.py --tables # the tables of README.md, as Markdown
+    python validation/blackwell/manifest.py --update-readme   # write them into README.md
 """
 
 from __future__ import annotations
@@ -64,6 +66,17 @@ def _tma() -> list[Probe]:
               "a store wholly outside the tensor writes nothing", risk="fault"),
         Probe("tma/tensormap_encode_sweep", "tma/tensormap_encode_sweep", (), ("TMA-11", "TMA-12"),
               "none: records the driver's 128-byte tensor maps over a parameter sweep", predict="none"),
+        Probe("tma/raw_bulk", "tma/raw_bulk", (), ("TMA-08",),
+              "cp.async.bulk without a tensor map copies 16, 64 and 4096 bytes verbatim in both directions "
+              "and reports the size to the mbarrier"),
+        Probe("tma/hints", "tma/hints", (), ("TMA-14",),
+              "a cache-hint operand, prefetch.tensormap and cp.async.bulk.prefetch do not change what a load loads"),
+        Probe("tma/missing_fence", "tma/missing_fence", (), ("TMA-13",),
+              "a TMA store right after ordinary stores carries the current bytes with and without "
+              "fence.proxy.async (2000 stores per variant)"),
+        Probe("tma/missing_fence.long", "tma/missing_fence", ("100000",), ("TMA-13",),
+              "none: the same with 10^5 stores per variant, too slow to simulate; the prediction of "
+              "tma/missing_fence applies line for line", predict="none"),
     ]
 
 
@@ -77,6 +90,17 @@ def _mbarrier() -> list[Probe]:
               "a phase completes when pending arrivals and the byte count are both zero, in either order"),
         Probe("mbarrier/lane_arrivals", "mbarrier/lane_arrivals", (), ("MB-09",),
               "every lane that executes an arrive arrives once, also when only part of a warp does"),
+        Probe("mbarrier/arrive_token", "mbarrier/arrive_token", (), ("MB-03",),
+              "test_wait with an arrive token is false while the token's phase is open and true once it "
+              "completed, also during the next phase"),
+        Probe("mbarrier/arrive_token.stale", "mbarrier/arrive_token", ("stale",), ("MB-03",),
+              "a token two phases old still tests true (the simulator's answer; an RTX 3080 Ti says false)"),
+        Probe("mbarrier/init_count", "mbarrier/init_count", (), ("MB-10",),
+              "mbarrier.init accepts 2^20 - 1 arrivals, and an arrive with that count completes the phase"),
+        Probe("mbarrier/init_count.over", "mbarrier/init_count", ("over",), ("MB-10",),
+              "an arrival count of 2^20 is refused", risk="fault"),
+        Probe("mbarrier/init_count.zero", "mbarrier/init_count", ("zero",), ("MB-10",),
+              "an arrival count of 0 is refused", risk="fault"),
         Probe("mbarrier/complete_before_expect", "mbarrier/script", ("negative",), ("MB-07",),
               "the byte count is signed: complete_tx before expect_tx completes once balanced", risk="fault"),
         Probe("mbarrier/over_arrival", "mbarrier/script", ("over",), ("MB-04",),
@@ -106,6 +130,12 @@ def _tmem() -> list[Probe]:
               "M = 64 with lane offset 8: the simulator just adds the offset", risk="fault"),
         Probe("tmem/transfer_shapes", "tmem/transfer_shapes", (), ("TM-05",),
               "thread and register to (lane, column) for 32x32b, 16x64b, 16x128b, 16x256b, load and store"),
+        Probe("tmem/repeat_counts", "tmem/repeat_counts", (), ("TM-06", "TM-05"),
+              "every power-of-two repeat count up to 128 registers per thread exists (the build assembles "
+              "them) and loads the cells the mapping names"),
+        Probe("tmem/fresh_contents", "tmem/fresh_contents", (), ("TM-13",),
+              "tensor memory that was never written reads as zero, in a first launch and after a launch "
+              "that wrote it"),
         Probe("tmem/alloc_addresses", "tmem/alloc", (), ("TM-07",),
               "alloc returns the lowest free block aligned to its size, as (lane 0, column)"),
         Probe("tmem/alloc_increasing", "tmem/alloc", ("increasing",), ("TM-08",),
@@ -141,6 +171,15 @@ def _mma() -> list[Probe]:
               "each negate bit flips the product's sign, both leave it; a second MMA accumulates"),
         Probe("mma/tf32_low_bits", "mma/tf32_low_bits", (), ("MMA-08",),
               "kind::tf32 multiplies the operands as stored float32 values; low bits take part"),
+        Probe("mma/scale_input_d", "mma/scale_input_d", (), ("MMA-06",),
+              "scale-input-d = s multiplies the old accumulator by 2^-s before the addition, for s = 0, 1, 7, 15"),
+        Probe("mma/disable_lanes", "mma/disable_lanes", (), ("MMA-09",),
+              "bit l of word i of the disable-output-lane operand leaves TMEM lane 32 i + l unwritten"),
+        Probe("mma/commit_arrival", "mma/commit_arrival", (), ("MMA-10",),
+              "tcgen05.commit makes exactly one arrival; data loaded after waiting on it is the sum of all "
+              "eight chained MMAs"),
+        Probe("mma/swizzle_mismatch", "mma/swizzle_mismatch", (), ("MMA-11", "TMA-01", "MMA-02"),
+              "an operand loaded with a 128B swizzle and described as 64B is read by the descriptor's formula"),
     ]
 
 
@@ -154,6 +193,14 @@ def _cluster() -> list[Probe]:
               "a mask naming a rank outside the cluster is refused", risk="fault"),
         Probe("cluster/pair_accounting", "cluster/pair_accounting", (), ("CL-08",),
               "with .cta_group::2 a pair's completions go to the member with the mbarrier address's parity"),
+        Probe("cluster/max_size", "cluster/max_size", (), ("CL-02",),
+              "clusters of 8 and 16 CTAs launch and one of 32 is refused, with 1 KiB and with the most "
+              "shared memory per CTA"),
+        Probe("cluster/address_dump", "cluster/address_dump", (), ("CL-05",),
+              "mapa addresses each rank's copy of a shared symbol; in the simulator's encoding clearing "
+              "bit 24 names the even member of a pair"),
+        Probe("cluster/remote_arrive", "cluster/remote_arrive", (), ("CL-06",),
+              "mbarrier.arrive.shared::cluster on a mapa address counts on the target CTA's mbarrier"),
     ]
     for m, issuer, ids in ((256, 0, ("CL-10", "CL-13", "CL-09")), (128, 0, ("CL-11", "CL-09")),
                            (256, 1, ("CL-12",)), (128, 1, ("CL-12",))):
@@ -164,6 +211,42 @@ def _cluster() -> list[Probe]:
              "Layout B: 64 rows per CTA, columns folded onto lanes 64-127"),
             risk="hang", timeout=30))
     return probes
+
+
+def _clc() -> list[Probe]:
+    """Cluster launch control. Under `warplens run` every request is granted, so the
+    predictions are the extreme where the first cluster takes over the grid; what a GPU's mix
+    of started and canceled clusters changes is printed on `info:` lines only."""
+    return [
+        Probe("cluster/clc_tx_bytes", "cluster/clc_tx_bytes", (), ("CL-20",),
+              "a request completes its mbarrier with complete_tx of 16 bytes in each receiving CTA: "
+              "expect_tx 16 completes, 8 and 32 do not"),
+        Probe("cluster/clc_multicast", "cluster/clc_multicast", (), ("CL-19",),
+              "the plain form writes the response and completes the mbarrier in the requesting CTA only; "
+              ".multicast::cluster::all does both in every CTA of the cluster"),
+        Probe("cluster/clc_failed_response", "cluster/clc_failed_response", (), ("CL-17",),
+              "with nothing to cancel the request completes and is_canceled is false; "
+              "get_first_ctaid of it (undefined in PTX) is recorded"),
+        Probe("cluster/clc_per_thread", "cluster/clc_per_thread", (), ("CL-16",),
+              "four lanes executing try_cancel make four requests: 64 bytes complete the phase, "
+              "and the successful ones name different clusters that did not start"),
+        Probe("cluster/clc_order", "cluster/clc_order", (), ("CL-14", "CL-15"),
+              "every cluster either starts or is handed to exactly one running cluster; "
+              "the order of the coordinates handed out is recorded"),
+        Probe("cluster/clc_first_ctaid", "cluster/clc_first_ctaid", (), ("CL-21",),
+              "the coordinate returned is the canceled cluster's first CTA in grid coordinates, for cluster "
+              "shapes (2,1,1), (2,2,1), (1,2,2) and for a launch with no cluster shape"),
+        Probe("cluster/clc_failures", "cluster/clc_failures", (), ("CL-15",),
+              "examples/09_clc is right for any number of requests granted; how many CTAs start at each "
+              "grid size is recorded"),
+        Probe("cluster/clc_failed_response.again", "cluster/clc_failed_response", ("again",), ("CL-18",),
+              "three more requests after an observed failure complete and fail again (undefined in PTX)",
+              risk="hang", timeout=30),
+        Probe("cluster/clc_failed_response.again_grid", "cluster/clc_failed_response", ("again-grid",), ("CL-18",),
+              "on a large grid, one more request after the first failure a worker observes: "
+              "the launch's invariants still hold; how many such requests succeed is recorded",
+              risk="hang", timeout=30),
+    ]
 
 
 def _formats() -> list[Probe]:
@@ -180,6 +263,18 @@ def _formats() -> list[Probe]:
               "NaN, infinities, zeros and out-of-range inputs for the four formats", predict="numerics"),
         Probe("formats/tf32_modes", "formats/tf32_modes", (), ("NUM-07", "NUM-08"),
               "cvt.rn/.rz.tf32.f32 round the magnitude bits like .rna with their own tie rule; .rna as on Ampere"),
+        Probe("formats/ftz", "formats/ftz", (), ("NUM-09",),
+              ".ftz add, sub, mul, div, fma and sqrt around the subnormal range, as recorded on an RTX 3080 Ti "
+              "(validation/ampere/ftz_golden.txt; NaN results compared as NaNs)"),
+        Probe("formats/fma", "formats/fma", (), ("NUM-10",),
+              "fma and mad round the exact product-sum once, f32 and f64: 1000 cases in full and checksums "
+              "of 10^4 each"),
+        Probe("formats/fma.all", "formats/fma", ("all",), ("NUM-10",),
+              "none: all 2 x 10^4 fma cases in full, to locate a checksum of formats/fma that differs",
+              predict="none"),
+        Probe("formats/scalar_edges", "formats/scalar_edges", (), ("NUM-11", "NUM-12"),
+              "min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, "
+              "rem, mul.hi and shifts at theirs"),
     ]
 
 
@@ -187,10 +282,34 @@ def _device() -> list[Probe]:
     return [
         Probe("e2e/device_attributes", "e2e/device_attributes", (), ("RT-03",),
               "the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives"),
+        Probe("e2e/smem_limit", "e2e/smem_limit", (), ("RT-04",),
+              "a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory"),
+        Probe("e2e/elect", "e2e/elect", (), ("RT-05",),
+              "elect.sync elects the lowest lane of the member mask; every executing lane gets its id"),
+        Probe("e2e/elect.all", "e2e/elect", ("all",), ("RT-05",),
+              "lanes outside the member mask execute elect.sync too: the lowest lane of the mask is elected",
+              risk="fault"),
+        Probe("e2e/elect.partial", "e2e/elect", ("partial",), ("RT-05",),
+              "the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected",
+              risk="fault"),
+    ] + [
+        Probe(f"e2e/ampere_replay.{case}", "e2e/ampere_replay", (case,), ids,
+              f"as on an RTX 3080 Ti (validation/ampere/{golden}): {what}")
+        for case, ids, golden, what in (
+            ("shfl", ("RT-01",), "shfl_golden.txt", "shfl.sync in four modes over widths and distances"),
+            ("printf", ("RT-01",), "printf_golden.txt, lines in another order",
+             "device printf with a by-value struct and a local array"),
+            ("ldmatrix", ("RT-01",), "ldmatrix_golden.txt", "ldmatrix in six variants, and bfe"),
+            ("prmt", ("RT-01",), "prmt_golden.txt", "prmt.b32"),
+            ("cpasync", ("RT-01",), "cpasync_golden.txt", "cp.async with a source size"),
+            ("barrier_exit", ("RT-01",), "barrier_exit_hw.cu prints 'output ok'",
+             "__syncthreads() completes when some threads have exited"),
+            ("call", ("RT-02",), "call_golden.txt", "calls to device functions"),
+        )
     ]
 
 
-PROBES: list[Probe] = _device() + _tma() + _mbarrier() + _tmem() + _mma() + _cluster() + _formats()
+PROBES: list[Probe] = _device() + _tma() + _mbarrier() + _tmem() + _mma() + _cluster() + _clc() + _formats()
 BY_NAME = {probe.name: probe for probe in PROBES}
 assert len(BY_NAME) == len(PROBES), "duplicate probe names"
 
@@ -201,11 +320,60 @@ E2E = {
     "e2e/cutlass_tutorials.tutorial_03": ("RT-06",),
     "e2e/cutlass_tutorials.tutorial_04": ("RT-06",),
     "e2e/triton": ("RT-07",),
+    "e2e/unchanged_scripts.tirx": ("RT-09",),
+    "e2e/unchanged_scripts.cute_dsl": ("RT-09",),
     "e2e/book_hgemm": ("RT-08",),
 }
 
 
+def simulator_cell(probe: Probe, predicted) -> str:
+    """What the README says about a run in the simulator, from predicted/<name>.sim.txt."""
+    if probe.predict == "none":
+        return "not run (no prediction)"
+    if probe.predict == "numerics":
+        return "refused; predicted from `warplens.numerics`"
+    note = (predicted / (probe.name + ".sim.txt")).read_text().splitlines()
+    if note[0] == "status: ok":
+        import re
+        findings = re.search(r"(\d+) finding\(s\)", "\n".join(note[1:3]))
+        return "runs" + (f" ({findings[1]} finding(s))" if findings and findings[1] != "0" else "")
+    reason = next((line.removeprefix("warplens: ") for line in note[1:] if line.startswith("warplens: ")), note[0])
+    return "**refuses**: " + reason[:120].replace("|", "/")
+
+
+def tables() -> str:
+    """The per-area tables of README.md ("What each run tests"), in manifest order."""
+    from pathlib import Path
+    predicted = Path(__file__).resolve().parent / "predicted"
+    areas: dict[str, list[Probe]] = {}
+    for probe in PROBES:
+        areas.setdefault(probe.name.split("/")[0], []).append(probe)
+    text = []
+    for area, probes in areas.items():
+        text += [f"### `{area}/`", "",
+                 "| Run | Program and arguments | Matrix | Claim tested | In the simulator | On hardware may |",
+                 "| --- | --- | --- | --- | --- | --- |"]
+        for probe in probes:
+            command = " ".join([probe.program.split("/", 1)[1], *probe.args])
+            text.append(f"| `{probe.name.split('/', 1)[1]}` | `{command}` | {', '.join(probe.ids) or '-'} | "
+                        f"{probe.claim.replace('|', '/')} | {simulator_cell(probe, predicted)} | {probe.risk or '-'} |")
+        text.append("")
+    return "\n".join(text)
+
+
 if __name__ == "__main__":
+    import sys
+    if sys.argv[1:] == ["--tables"]:   # what belongs between the markers in README.md; a test compares
+        print(tables(), end="")
+        sys.exit(0)
+    if sys.argv[1:] == ["--update-readme"]:   # rewrite that part of README.md in place
+        from pathlib import Path
+        readme = Path(__file__).resolve().parent / "README.md"
+        text = readme.read_text()
+        start = text.index("\n\n", text.index("<!-- tables:")) + 2
+        end = text.index("<!-- end of tables -->")
+        readme.write_text(text[:start] + tables() + text[end:])
+        sys.exit(0)
     for probe in PROBES:
         flags = ", ".join(x for x in (probe.risk and f"may {probe.risk}",
                                       probe.predict != "sim" and f"prediction: {probe.predict}",

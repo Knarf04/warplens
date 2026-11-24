@@ -1,0 +1,3 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  _Z10prmt_probePKjS0_S0_Pji: 2 CTA(s), 332 warp-instructions

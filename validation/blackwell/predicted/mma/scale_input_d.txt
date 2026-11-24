@@ -1,0 +1,6 @@
+old accumulator 2^15 (m + 1), new product n; expected 2^(15 - s) (m + 1) + n
+no scale operand:  D[0][0] = 47000000, D[0][7] = 47000700, D[2][3] = 47c00180, D[127][7] = 4a80000e; 1024 of 1024 elements as expected
+scale-input-d  0:  D[0][0] = 47000000, D[0][7] = 47000700, D[2][3] = 47c00180, D[127][7] = 4a80000e; 1024 of 1024 elements as expected
+scale-input-d  1:  D[0][0] = 46800000, D[0][7] = 46800e00, D[2][3] = 47400300, D[127][7] = 4a00001c; 1024 of 1024 elements as expected
+scale-input-d  7:  D[0][0] = 43800000, D[0][7] = 43838000, D[2][3] = 4440c000, D[127][7] = 47000700; 1024 of 1024 elements as expected
+scale-input-d 15:  D[0][0] = 3f800000, D[0][7] = 41000000, D[2][3] = 40c00000, D[127][7] = 43070000; 1024 of 1024 elements as expected

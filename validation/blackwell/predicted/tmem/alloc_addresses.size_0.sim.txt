@@ -3,4 +3,5 @@ warplens: tcgen05.alloc of 0 columns; the count must be a power of two from 32 t
   at module0.ptx:387: tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%r12], %r11;
   in kernel `tmem_alloc_script`, CTA (0, 0, 0), warp 0
   lane 0 (thread (0, 0, 0)) and 31 more lane(s)
+KERNEL FAILED: an allocation of 0 columns: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
 warplens: the program launched no kernels

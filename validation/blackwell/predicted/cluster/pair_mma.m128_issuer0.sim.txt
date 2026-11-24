@@ -1,3 +1,3 @@
 status: ok
 warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
-  pair_mma: 2 CTA(s), 5061 warp-instructions
+  pair_mma: 2 CTA(s), 5069 warp-instructions

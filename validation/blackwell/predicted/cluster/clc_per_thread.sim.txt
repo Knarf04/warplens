@@ -1,0 +1,3 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  clc_per_thread: 2048 CTA(s) of which 4 canceled before starting, 36859 warp-instructions

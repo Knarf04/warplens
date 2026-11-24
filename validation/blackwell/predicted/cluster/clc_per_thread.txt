@@ -1,0 +1,9 @@
+lanes 0 to 3 of the first CTA each execute one try_cancel; one mbarrier expects 64 bytes:
+  phase completed 1
+  coordinates of the successful requests are pairwise distinct: yes
+  they are inside the grid: yes; they name clusters that did not start: yes
+info: 4 of 4 requests succeeded; 2044 of 2048 clusters started
+info: lane 0: is_canceled 1, coordinate (1, 0, 0), response words 00000001 00000000 00000000 c1000003
+info: lane 1: is_canceled 1, coordinate (2, 0, 0), response words 00000002 00000000 00000000 c1000005
+info: lane 2: is_canceled 1, coordinate (3, 0, 0), response words 00000003 00000000 00000000 c1000007
+info: lane 3: is_canceled 1, coordinate (4, 0, 0), response words 00000004 00000000 00000000 c1000009

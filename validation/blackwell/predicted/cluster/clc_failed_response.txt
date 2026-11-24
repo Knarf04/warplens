@@ -1,0 +1,6 @@
+one cluster of one CTA, one request:
+  phase completed 1
+  is_canceled 0
+info: get_first_ctaid.v4 of the failed response: 0 0 0, fourth element c1000002
+info: get_first_ctaid::x, ::y, ::z of the failed response: 0 0 0
+info: response words 00000000 00000000 00000000 c1000002

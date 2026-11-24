@@ -1,0 +1,197 @@
+status: ok
+warplens: 3 kernel launch(es) simulated on B200, 64 finding(s)
+  fresh_contents: 1 CTA(s), 589 warp-instructions
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 210: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r72}, [%r7];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 221: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r73}, [%r74];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 229: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r75}, [%r76];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 237: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r77}, [%r78];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 245: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r79}, [%r80];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 253: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r81}, [%r82];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 261: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r83}, [%r84];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 269: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r85}, [%r86];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 277: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r87}, [%r88];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 285: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r89}, [%r90];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 293: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r91}, [%r92];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 301: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r93}, [%r94];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 309: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r95}, [%r96];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 317: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r97}, [%r98];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 325: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r99}, [%r100];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 333: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r101}, [%r102];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 341: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r103}, [%r104];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 349: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r105}, [%r106];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 357: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r107}, [%r108];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 365: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r109}, [%r110];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 373: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r111}, [%r112];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 381: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r113}, [%r114];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 389: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r115}, [%r116];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 397: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r117}, [%r118];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 405: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r119}, [%r120];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 413: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r121}, [%r122];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 421: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r123}, [%r124];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 429: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r125}, [%r126];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 437: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r127}, [%r128];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 445: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r129}, [%r130];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 453: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r131}, [%r132];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 461: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r133}, [%r134];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+  fresh_contents: 1 CTA(s), 977 warp-instructions
+  fresh_contents: 1 CTA(s), 589 warp-instructions
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 210: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r72}, [%r7];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 221: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r73}, [%r74];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 229: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r75}, [%r76];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 237: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r77}, [%r78];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 245: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r79}, [%r80];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 253: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r81}, [%r82];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 261: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r83}, [%r84];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 269: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r85}, [%r86];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 277: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r87}, [%r88];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 285: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r89}, [%r90];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 293: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r91}, [%r92];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 301: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r93}, [%r94];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 309: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r95}, [%r96];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 317: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r97}, [%r98];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 325: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r99}, [%r100];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 333: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r101}, [%r102];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 341: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r103}, [%r104];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 349: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r105}, [%r106];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 357: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r107}, [%r108];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 365: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r109}, [%r110];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 373: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r111}, [%r112];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 381: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r113}, [%r114];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 389: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r115}, [%r116];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 397: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r117}, [%r118];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 405: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r119}, [%r120];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 413: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r121}, [%r122];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 421: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r123}, [%r124];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 429: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r125}, [%r126];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 437: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r127}, [%r128];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 445: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r129}, [%r130];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 453: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r131}, [%r132];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [tmem-uninitialized-read] read of tensor memory that was never written (4 times)
+      line 461: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r133}, [%r134];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31

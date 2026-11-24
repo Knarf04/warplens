@@ -1,0 +1,15 @@
+cluster of two CTAs, rank 0 requests without multicast:
+  rank 0: phase completed 1; response slot was written
+  rank 0: is_canceled 0
+info: rank 0 response words 00000000 00000000 00000000 c1000002
+  rank 1: phase completed 0; response slot still holds the sentinel
+info: rank 1 response words eeeeeeee eeeeeeee eeeeeeee eeeeeeee
+  both CTAs hold the same 16 bytes: no
+cluster of two CTAs, rank 0 requests with .multicast::cluster::all:
+  rank 0: phase completed 1; response slot was written
+  rank 0: is_canceled 0
+info: rank 0 response words 00000000 00000000 00000000 c1000002
+  rank 1: phase completed 1; response slot was written
+  rank 1: is_canceled 0
+info: rank 1 response words 00000000 00000000 00000000 c1000002
+  both CTAs hold the same 16 bytes: yes

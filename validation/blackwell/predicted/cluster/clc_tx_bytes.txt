@@ -1,0 +1,9 @@
+one CTA, expect_tx 16:
+  rank 0: phase completed 1
+two CTAs, multicast, expect_tx 16 in each:
+  rank 0: phase completed 1
+  rank 1: phase completed 1
+one CTA, expect_tx 8:
+  rank 0: phase completed 0
+one CTA, expect_tx 32:
+  rank 0: phase completed 0

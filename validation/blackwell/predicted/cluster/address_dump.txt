@@ -1,0 +1,24 @@
+info: rank 0: shared address 0000000000000000, generic address 0000000100000000
+info: rank 0: mapa to rank 0: u32 00000000, u64 0000000000000000
+info: rank 0: mapa to rank 1: u32 01000000, u64 0000000001000000
+info: rank 0: mapa to rank 2: u32 02000000, u64 0000000002000000
+info: rank 0: mapa to rank 3: u32 03000000, u64 0000000003000000
+rank 0: mapa to its own rank is the symbol's shared address: yes; each rank's address reads that rank's token (u32 and u64 forms): yes; u64 form equals u32 form: yes; four distinct addresses: yes; clearing bit 24 maps rank 1 to 0 and 3 to 2: yes
+info: rank 1: shared address 0000000001000000, generic address 0000000101000000
+info: rank 1: mapa to rank 0: u32 00000000, u64 0000000000000000
+info: rank 1: mapa to rank 1: u32 01000000, u64 0000000001000000
+info: rank 1: mapa to rank 2: u32 02000000, u64 0000000002000000
+info: rank 1: mapa to rank 3: u32 03000000, u64 0000000003000000
+rank 1: mapa to its own rank is the symbol's shared address: yes; each rank's address reads that rank's token (u32 and u64 forms): yes; u64 form equals u32 form: yes; four distinct addresses: yes; clearing bit 24 maps rank 1 to 0 and 3 to 2: yes
+info: rank 2: shared address 0000000002000000, generic address 0000000102000000
+info: rank 2: mapa to rank 0: u32 00000000, u64 0000000000000000
+info: rank 2: mapa to rank 1: u32 01000000, u64 0000000001000000
+info: rank 2: mapa to rank 2: u32 02000000, u64 0000000002000000
+info: rank 2: mapa to rank 3: u32 03000000, u64 0000000003000000
+rank 2: mapa to its own rank is the symbol's shared address: yes; each rank's address reads that rank's token (u32 and u64 forms): yes; u64 form equals u32 form: yes; four distinct addresses: yes; clearing bit 24 maps rank 1 to 0 and 3 to 2: yes
+info: rank 3: shared address 0000000003000000, generic address 0000000103000000
+info: rank 3: mapa to rank 0: u32 00000000, u64 0000000000000000
+info: rank 3: mapa to rank 1: u32 01000000, u64 0000000001000000
+info: rank 3: mapa to rank 2: u32 02000000, u64 0000000002000000
+info: rank 3: mapa to rank 3: u32 03000000, u64 0000000003000000
+rank 3: mapa to its own rank is the symbol's shared address: yes; each rank's address reads that rank's token (u32 and u64 forms): yes; u64 form equals u32 form: yes; four distinct addresses: yes; clearing bit 24 maps rank 1 to 0 and 3 to 2: yes

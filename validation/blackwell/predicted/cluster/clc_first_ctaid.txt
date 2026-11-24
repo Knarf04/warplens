@@ -1,0 +1,36 @@
+grid 16 x 16 x 8, cluster shape (2, 1, 1):
+  cluster origins: 1024
+  origins that either started or were handed to a running cluster, not both and not neither: 1024
+  successful requests beyond one per coordinate handed out: 0
+  coordinates returned although that cluster started: 0
+  coordinates returned that are not the first CTA of a cluster: 0
+  CTAs whose start disagrees with their cluster's first CTA: 0
+info: clusters started 1 of 1024, requests granted 1023
+info: clusters that started after some request had already failed: 0
+grid 16 x 16 x 8, cluster shape (2, 2, 1):
+  cluster origins: 512
+  origins that either started or were handed to a running cluster, not both and not neither: 512
+  successful requests beyond one per coordinate handed out: 0
+  coordinates returned although that cluster started: 0
+  coordinates returned that are not the first CTA of a cluster: 0
+  CTAs whose start disagrees with their cluster's first CTA: 0
+info: clusters started 1 of 512, requests granted 511
+info: clusters that started after some request had already failed: 0
+grid 16 x 16 x 8, cluster shape (1, 2, 2):
+  cluster origins: 512
+  origins that either started or were handed to a running cluster, not both and not neither: 512
+  successful requests beyond one per coordinate handed out: 0
+  coordinates returned although that cluster started: 0
+  coordinates returned that are not the first CTA of a cluster: 0
+  CTAs whose start disagrees with their cluster's first CTA: 0
+info: clusters started 1 of 512, requests granted 511
+info: clusters that started after some request had already failed: 0
+grid 16 x 16 x 8, launched with no cluster shape:
+  cluster origins: 2048
+  origins that either started or were handed to a running cluster, not both and not neither: 2048
+  successful requests beyond one per coordinate handed out: 0
+  coordinates returned although that cluster started: 0
+  coordinates returned that are not the first CTA of a cluster: 0
+  CTAs whose start disagrees with their cluster's first CTA: 0
+info: clusters started 1 of 2048, requests granted 2047
+info: clusters that started after some request had already failed: 0

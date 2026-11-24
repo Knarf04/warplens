@@ -1,0 +1,10 @@
+DEVICE bench=ncu_banks name=warplens_simulated_B200 cc=10.0 sm_count=148 total_mem_bytes=206158430208 free_mem_bytes=206158430208 bench_clock=0 sim=1 trials=1 scale=1 synthetic=0
+BENCH id=ncu_banks/linear/block=32x32 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=851.3333333333333 sim_instr=63488 sim_bound=latency sim_findings=0
+BENCH id=ncu_banks/padded/block=32x32 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=189.99999999999932 sim_instr=63488 sim_bound=issue_slots sim_findings=0
+BENCH id=ncu_banks/swizzled/block=32x32 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=211.33333333333235 sim_instr=71680 sim_bound=issue_slots sim_findings=0
+BENCH id=ncu_banks/linear/block=32x8 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=103.99999999999991 sim_instr=15872 sim_bound=latency sim_findings=0
+BENCH id=ncu_banks/padded/block=32x8 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=82.66666666666664 sim_instr=15872 sim_bound=latency sim_findings=0
+BENCH id=ncu_banks/swizzled/block=32x8 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=87.99999999999997 sim_instr=17920 sim_bound=latency sim_findings=0
+BENCH id=ncu_banks/linear/block=16x16 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=103.99999999999991 sim_instr=15872 sim_bound=latency sim_findings=0
+BENCH id=ncu_banks/padded/block=16x16 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=77.33333333333329 sim_instr=15872 sim_bound=latency sim_findings=0
+BENCH id=ncu_banks/swizzled/block=16x16 nctas=64 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=0 sim_ns=71.99999999999997 sim_instr=17920 sim_bound=latency sim_findings=0

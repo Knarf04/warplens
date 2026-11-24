@@ -1,0 +1,7 @@
+status: ok
+warplens: 5 kernel launch(es) simulated on B200, 0 finding(s)
+  mma_scale: 1 CTA(s), 2238 warp-instructions
+  mma_scale: 1 CTA(s), 2235 warp-instructions
+  mma_scale: 1 CTA(s), 2237 warp-instructions
+  mma_scale: 1 CTA(s), 2235 warp-instructions
+  mma_scale: 1 CTA(s), 2237 warp-instructions

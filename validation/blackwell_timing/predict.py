@@ -12,7 +12,8 @@ Writes into --out:
                 numbers for that launch appended: sim_ns (kernel time), sim_instr
                 (warp-instructions), sim_bound (the model's bottleneck verdict)
   meta.json     the config values used, and per benchmark whether the simulator ran it
-                (if not, why)
+                (if not, why). With --bench, the entries of the other benchmarks are kept
+                from the meta.json already there, if it was made the same way
   predictions.md  a table of ns per repetition per configuration
 
 --config runs with another timing config in place of warplens/configs/b200.yaml, e.g.
@@ -35,7 +36,8 @@ sys.path.insert(0, str(HERE))
 import fit  # noqa: E402
 
 BENCHES = ["launch", "alu_chain", "smem_wavefronts", "global_load", "gstream", "cp_async",
-           "mbar", "tma", "mma_rate", "tmem_access"]
+           "mbar", "tma", "mma_rate", "tmem_access", "clc_latency", "cluster_costs", "pipelined_gemm",
+           "ncu_banks"]
 # What the simulator cannot run, by design of the benchmark. Recorded in meta.json.
 NOT_SIMULATED = {
     "mma_rate/kind=i8": "warplens implements tcgen05.mma for kind::f16 and kind::tf32 only, and the "
@@ -117,7 +119,24 @@ def predict(out: Path, benches=None, config: Path | None = None, bin_dir: Path |
             print(f"{bench}: {status[bench]['status']}, {status[bench].get('launches', 0)} launch(es)"
                   + (f": {status[bench]['reason']}" if status[bench]["status"] != "ok" else ""), file=sys.stderr)
     values = fit.load_config_values(config or fit.DEFAULT_CONFIG)
-    meta = {"model": model, "config_file": Path(config).name if config else fit.DEFAULT_CONFIG.name,
+    # Which nvcc built the programs the simulator ran (bin/sim/toolkit.txt, from build.sh). The
+    # predicted instruction counts are those of its code; run_all.sh flags a GPU run built by another.
+    toolkit = bin_dir / "toolkit.txt"
+    nvcc_version = next((line.split("=", 1)[1] for line in (toolkit.read_text().splitlines() if toolkit.is_file() else [])
+                         if line.startswith("nvcc_version=")), "unknown")
+    # A run of some benchmarks (--bench) keeps what an earlier run recorded for the others,
+    # whose .out files are still in `out`, if that run used the same model, config and nvcc.
+    previous = out / "meta.json"
+    if previous.exists() and set(status) != set(BENCHES):
+        old = json.loads(previous.read_text())
+        if (old.get("config") == values and old.get("model") == model
+                and old.get("nvcc_version", nvcc_version) == nvcc_version):
+            kept = {bench: entry for bench, entry in old.get("benchmarks", {}).items()
+                    if bench not in status and (out / f"{bench}.out").exists()}
+            status = {bench: status.get(bench) or kept[bench] for bench in [*BENCHES, *status, *kept]
+                      if bench in status or bench in kept}
+    meta = {"model": model, "nvcc_version": nvcc_version,
+            "config_file": Path(config).name if config else fit.DEFAULT_CONFIG.name,
             "config": values, "active_sms": int(values["sm_count"]),
             "command": "warplens run --timing --model " + model + " bin/sim/<bench> --sim",
             "benchmarks": status, "not_simulated": NOT_SIMULATED}

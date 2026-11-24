@@ -1,0 +1,3 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  remote_arrive: 2 CTA(s), 24704 warp-instructions

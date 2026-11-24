@@ -1,0 +1,9 @@
+status: ok
+warplens: 7 kernel launch(es) simulated on B200, 0 finding(s)
+  tma_hints: 1 CTA(s), 74 warp-instructions
+  tma_hints: 1 CTA(s), 78 warp-instructions
+  tma_hints: 1 CTA(s), 78 warp-instructions
+  tma_hints: 1 CTA(s), 78 warp-instructions
+  tma_hints: 1 CTA(s), 77 warp-instructions
+  tma_hints: 1 CTA(s), 77 warp-instructions
+  tma_hints: 1 CTA(s), 72 warp-instructions

@@ -1,0 +1,7 @@
+mbarrier with 2 arrivals per phase; a and b are the tokens of its two arrivals
+phase 0: after the first arrival: test_wait(a) 0; after the second arrival: test_wait(a) 1, test_wait(b) 1
+info: phase 0 tokens a = 0000000000000000, b = 0000000000000000
+phase 1: after the first arrival: test_wait(a) 0, test_wait(a of phase 0) 1; after the second arrival: test_wait(a) 1, test_wait(b) 1, test_wait(a of phase 0, two phases old) 1
+info: phase 1 tokens a = 0000000000000001, b = 0000000000000001
+phase 2: after the first arrival: test_wait(a) 0, test_wait(a of phase 1) 1; after the second arrival: test_wait(a) 1, test_wait(b) 1, test_wait(a of phase 1, two phases old) 1
+info: phase 2 tokens a = 0000000000000002, b = 0000000000000002

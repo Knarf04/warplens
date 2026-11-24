@@ -1,0 +1,10 @@
+grid 64 x 32 x 1, clusters of one CTA; one more request after an observed failure:
+  cluster origins: 2048
+  origins that either started or were handed to a running cluster, not both and not neither: 2048
+  successful requests beyond one per coordinate handed out: 0
+  coordinates returned although that cluster started: 0
+  coordinates returned that are not the first CTA of a cluster: 0
+  CTAs whose start disagrees with their cluster's first CTA: 0
+info: clusters started 1 of 2048, requests granted 2047
+info: clusters that started after some request had already failed: 0
+info: requests issued after an observed failure: 1, of which succeeded: 0

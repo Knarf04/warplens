@@ -138,6 +138,7 @@ def placed_launches(monkeypatch):
 
 def test_each_launch_is_timed_with_the_active_sms_of_its_own_shape(placed_launches):
     launch, placed = placed_launches()
+    timed = []
     for shape, active, resident in [
         (dict(grid=1, block=32), 1, 1),
         (dict(grid=8, block=128, smem=96 * 1024), 8, 8),
@@ -147,6 +148,7 @@ def test_each_launch_is_timed_with_the_active_sms_of_its_own_shape(placed_launch
         (dict(grid=6, block=32, cluster=2), 6, 6),
     ]:
         stats = launch(timing=True, **shape)
+        timed.append(stats)  # kept alive: `placed` is keyed by id(), which a freed object's successor may reuse
         assert stats.timing.active_sms == active, shape
         assert "SMs assumed to share HBM" in stats.timing.summary() and f"; {active} SMs" in stats.timing.summary()
         record = placed[id(stats)]

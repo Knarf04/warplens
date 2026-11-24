@@ -475,7 +475,6 @@ finish() {  # finish EXIT_STATUS
     (( code == 0 )) && code=1
   fi
   say "stages: $(for s in "${STAGES[@]}"; do [[ $s == collect ]] || printf '%s=%s ' "$s" "${result[$s]:-not-reached}"; done)"
-  [[ "$ncu_state" == ok ]] || say "performance counters: $(ncu_counters)"
   # Written by validation/blackwell/run_rows.py when the capture of matrix row RT-11 was
   # required (a B200) and is not there; gone again once the row has been run to `ok`.
   if [[ -f "$RUN_DIR/out/blackwell/RT-11-NOT-CAPTURED.txt" ]]; then
@@ -483,6 +482,7 @@ finish() {  # finish EXIT_STATUS
     printf '%s\n' "$missing"; cat "$RUN_DIR/out/blackwell/RT-11-NOT-CAPTURED.txt"; printf '%s\n' "$missing"
     (( code == 0 )) && code=1
   fi
+  [[ "$ncu_state" == ok ]] || say "performance counters: $(ncu_counters)"
   case "$predictions_state" in
     comparable|comparable-native) ;;
     *) local bar; bar="$(printf '!%.0s' {1..100})"

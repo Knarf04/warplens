@@ -456,6 +456,7 @@ def skip_unless_traceable(text: str) -> None:
         pytest.skip("this machine does not let gdb trace a process")
 
 
+@pytest.mark.gpu
 def test_the_whole_capture_of_a_cute_dsl_launch_on_this_gpu(tmp_path):
     """e2e/cute_dsl_tma.py --script with the CuTe DSL's SAXPY, for real: module, PTX,
     allocations, the memory before and after. Held against what the frontend capture of the
@@ -511,6 +512,7 @@ def test_the_whole_capture_of_a_cute_dsl_launch_on_this_gpu(tmp_path):
     assert not (result == y).all()
 
 
+@pytest.mark.gpu
 def test_addresses_inside_128_byte_parameters_are_followed_on_this_gpu(tmp_path):
     """tests/data/launch_capture_descriptors.cu: three 128-byte, 64-byte-aligned structs by
     value. The address at offset 0 and the one at offset 3 are found; the packed one is not,
@@ -567,6 +569,7 @@ def test_addresses_inside_128_byte_parameters_are_followed_on_this_gpu(tmp_path)
     assert capture["problems"] == []
 
 
+@pytest.mark.gpu
 def test_a_cute_dsl_launch_over_pytorch_tensors_on_this_gpu(tmp_path):
     """tests/data/cute_dsl_torch_saxpy.py has the tutorial's host side (tensors from PyTorch's
     caching allocator, from_dlpack, a PyTorch reference computed on the GPU afterwards) around a

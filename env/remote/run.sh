@@ -2,11 +2,12 @@
 # The whole rental in one command: check the machine, install the env, build
 # and run both probe suites, pack one results archive.
 #
-#   env/remote/run.sh [--dry-run] [--keep-going] [--redo STAGE|all] [--skip STAGE]
+#   env/remote/run.sh [--dry-run] [--keep-going] [--redo STAGE|all] [--skip STAGE] [--collect-only]
 #                     [--toolkit auto|pinned|X.Y] [--no-ncu] [--price DOLLARS_PER_HOUR]
 #
 # Never asks anything. Safe to run again after an interruption or a failure:
 # stages that finished are skipped, the rest run, and the archive is rebuilt.
+# Ctrl-C stops the running stage, writes the archive and exits with status 130.
 #
 # Stages, in order, and what a failure does:
 #   preflight-quick  GPU identity, driver, disk          stops the run (not a B200: nothing to do)
@@ -23,6 +24,7 @@
 #   --keep-going   do not stop after a failed preflight (the archive records it)
 #   --redo STAGE   run STAGE again even if it finished (repeatable; `all` for every stage)
 #   --skip STAGE   leave STAGE out (repeatable), e.g. --skip selftest on a second rental
+#   --collect-only run nothing; write the archive from what earlier runs left
 #   --toolkit, --no-ncu   passed to setup.sh
 #   --price        hourly price for the cost estimate of --dry-run (default 8)
 #
@@ -47,7 +49,7 @@
 # WARPLENS_TIMING_RUN_ARGS replace those when set.
 #
 # Exit status: 0 everything ran and passed, 1 some stage failed (the archive
-# is still written), 3 the run stopped early, 2 usage.
+# is still written), 3 the run stopped early, 130 interrupted, 2 usage.
 set -uo pipefail
 # shellcheck source=env/remote/lib.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
@@ -59,6 +61,7 @@ if [[ "${1:-}" == --stage-body ]]; then   # internal, see stage_body below
 fi
 dry_run=0
 keep_going=0
+collect_only=0
 price=8
 redo=()
 skip=()
@@ -67,12 +70,13 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run) dry_run=1 ;;
     --keep-going) keep_going=1 ;;
+    --collect-only) collect_only=1 ;;
     --redo) redo+=("${2:?--redo needs a stage}"); shift ;;
     --skip) skip+=("${2:?--skip needs a stage}"); shift ;;
     --toolkit) setup_args+=(--toolkit "${2:?--toolkit needs a value}"); shift ;;
     --no-ncu) setup_args+=(--no-ncu) ;;
     --price) price="${2:?--price needs a number}"; shift ;;
-    -h|--help) sed -n '2,50p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,52p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -193,17 +197,30 @@ run_stage() {
   rm -f "$RUN_DIR/state/$stage.ok"
   start="$(utc_now)"; t0=$SECONDS
   say "$stage: started $start (limit $minutes min, log $RUN_DIR/logs/$stage.log)"
-  timeout --kill-after=30 "${minutes}m" "$@" > "$RUN_DIR/logs/$stage.log" 2>&1
+  # In the background, so that Ctrl-C reaches the trap while the stage runs.
+  timeout --kill-after=30 "${minutes}m" "$@" > "$RUN_DIR/logs/$stage.log" 2>&1 &
+  stage_pid=$!
+  wait "$stage_pid"
   rc=$?
+  if (( interrupted )); then      # the trap has told the stage to stop; let it
+    wait "$stage_pid" 2>/dev/null
+    rc=130
+  fi
+  stage_pid=""
   end="$(utc_now)"
   case "$rc" in
     0) status=ok; echo "$commit" > "$RUN_DIR/state/$stage.ok" ;;
     124|137) status=timeout ;;
+    130) status=interrupted ;;
     *) status=failed ;;
   esac
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$stage" "$status" "$rc" "$start" "$end" "$((SECONDS - t0))" >> "$RUN_DIR/stages.tsv"
   result[$stage]=$status
   say "$stage: $status after $((SECONDS - t0)) s"
+  if (( interrupted )); then
+    say "interrupted: packing what exists. Run env/remote/run.sh again to continue from $stage."
+    finish 130
+  fi
   if (( rc != 0 )); then
     failures=$((failures + 1))
     [[ "$status" == timeout ]] && say "$stage: stopped at its $minutes minute limit"
@@ -259,6 +276,15 @@ fi
 self=(bash "$REMOTE_DIR/run.sh" --stage-body)
 
 trap '' HUP   # a dropped ssh session must not end the run
+# Ctrl-C or a kill: stop the running stage, still write the archive, exit 130.
+stage_pid=""
+interrupted=0
+# shellcheck disable=SC2329  # called by the trap
+on_interrupt() {
+  interrupted=1
+  [[ -n "$stage_pid" ]] && kill -TERM "$stage_pid" 2>/dev/null
+}
+trap on_interrupt INT TERM
 mkdir -p "$RUN_DIR"/{state,logs,out} "$REMOTE_HOME/results"
 [[ -f "$RUN_DIR/state/first-start" ]] || utc_now > "$RUN_DIR/state/first-start"
 run_start="$(utc_now)"
@@ -337,6 +363,15 @@ finish() {  # finish EXIT_STATUS
 
 ptx_jit=unknown
 ncu_state=unavailable
+if (( collect_only )); then
+  # The status each stage had when it last ran, from the history.
+  for stage in "${STAGES[@]}"; do
+    last="$(awk -F'\t' -v s="$stage" '$1 == s {status = $2} END {print status}' "$RUN_DIR/stages.tsv")"
+    [[ -n "$last" ]] && result[$stage]="$last"
+  done
+  say "collect only: packing $RUN_DIR as it is"
+  finish 0
+fi
 say "checkout $REPO_DIR at ${commit:0:12}; home $REMOTE_HOME; started $run_start"
 
 # 1. Is this the right machine? Needs nothing installed.

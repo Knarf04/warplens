@@ -13,8 +13,10 @@ import importlib.util
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tarfile
+import time
 from pathlib import Path
 
 import numpy as np
@@ -70,7 +72,8 @@ def test_shellcheck_is_clean_where_it_is_installed():
     shellcheck = shutil.which("shellcheck")
     if shellcheck is None:      # not on the development machine or in CI's image by default
         return
-    done = subprocess.run([shellcheck, "-x", *(f"env/remote/{name}" for name in SCRIPTS)],
+    # Warnings and errors; the notes below that level differ from one shellcheck release to the next.
+    done = subprocess.run([shellcheck, "-x", "--severity=warning", *(f"env/remote/{name}" for name in SCRIPTS)],
                           capture_output=True, text=True, cwd=REPO)
     assert done.returncode == 0, done.stdout
 
@@ -457,6 +460,38 @@ def test_run_ends_a_stage_at_its_time_limit(checkout, tmp_path):
     assert done.returncode == 1
     assert "build-blackwell: timeout" in done.stdout
     assert "run-blackwell: skipped" in done.stdout and "run-timing: ok" in done.stdout
+
+
+def test_an_interrupted_run_stops_its_stage_and_still_packs(checkout, tmp_path):
+    root, env, args = checkout
+    started = tmp_path / "started"
+    suite(root, "blackwell", f'touch "{started}"\nsleep 300 & echo $! > "{tmp_path}/pid"\nwait\n', "echo never\n")
+    suite(root, "blackwell_timing", "echo built\n", f'touch "{tmp_path}/timing-ran"\n')
+    process = subprocess.Popen(["bash", str(root / "env/remote/run.sh"), *args], env={**os.environ, **env},
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    for _ in range(200):
+        if started.exists() and (tmp_path / "pid").exists():
+            break
+        time.sleep(0.05)
+    process.send_signal(signal.SIGINT)
+    output, _ = process.communicate(timeout=60)
+    assert process.returncode == 130, output
+    assert "build-blackwell: interrupted" in output and "archive:" in output
+    assert not (tmp_path / "timing-ran").exists()           # nothing after the interrupted stage ran
+    sleeper = int((tmp_path / "pid").read_text())
+    for _ in range(100):                                    # the stage's own children are gone
+        if not Path(f"/proc/{sleeper}").exists():
+            break
+        time.sleep(0.05)
+    assert not Path(f"/proc/{sleeper}").exists()
+    files = members(archive_of(tmp_path / "home"))
+    assert "build-blackwell\tinterrupted\t130" in files["stages.tsv"].decode()
+
+    # Packing again later changes nothing but the archive; the manifest keeps the last statuses.
+    again = bash(root / "env/remote/run.sh", "--collect-only", env=env)
+    assert again.returncode == 0 and "archive:" in again.stdout
+    manifest = members(archive_of(tmp_path / "home"))["manifest.txt"].decode()
+    assert "stage_build_blackwell=interrupted" in manifest
 
 
 def test_run_stops_at_a_failed_quick_preflight_but_still_writes_an_archive(checkout, tmp_path):

@@ -336,7 +336,7 @@ echo "$run_start $commit" >> "$RUN_DIR/state/attempts"
 [[ -f "$RUN_DIR/stages.tsv" ]] || printf 'stage\tstatus\texit\tstart\tend\tseconds\n' > "$RUN_DIR/stages.tsv"
 
 collect() {
-  local archive sums name first
+  local archive sums name first source_failed=0
   {
     echo "# warplens remote run manifest, written $(utc_now)"
     echo "warplens_commit=$commit"
@@ -373,6 +373,14 @@ collect() {
     cp -r "$REMOTE_HOME/resolved" "$RUN_DIR/resolved" || return 1
   fi
   cp "$PINS_FILE" "$RUN_DIR/pins.env" || return 1
+  # Preserve the implementation itself: a commit SHA alone is not an offline oracle.
+  rm -f "$RUN_DIR/SOURCE-SNAPSHOT-FAILED.txt"
+  if ! python3 "$REPO_DIR/env/remote/freeze_source.py" --repo "$REPO_DIR" --out "$RUN_DIR/source" \
+       > "$RUN_DIR/source-snapshot.log" 2>&1; then
+    source_failed=1
+    echo "The frozen source snapshot is incomplete; see source-snapshot.log. This run is not a complete capture." \
+      > "$RUN_DIR/SOURCE-SNAPSHOT-FAILED.txt"
+  fi
   timeout --kill-after=5 15 nvidia-smi > "$RUN_DIR/nvidia-smi.txt" 2>&1 || true
   timeout --kill-after=5 15 nvidia-smi -q > "$RUN_DIR/nvidia-smi-q.txt" 2>&1 || true
   # Impossible to miss when the archive is unpacked: a file named for what it says.
@@ -412,6 +420,7 @@ collect() {
   say "sha256:   $(cut -d' ' -f1 "$sums")"
   say "fetch it from your own machine with:"
   say "  scp '<user>@<host>:$archive*' .  &&  sha256sum -c $name.tar.gz.sha256"
+  return "$source_failed"
 }
 
 finish() {  # finish EXIT_STATUS

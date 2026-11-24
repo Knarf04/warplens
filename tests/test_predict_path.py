@@ -29,6 +29,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SUITE = ROOT / "validation" / "blackwell"
 COMMITTED = SUITE / "predicted"
 CUTLASS_BIN = ROOT / "examples" / "03_cutlass_mma" / "bin"
+# run_e2e.py builds its capturing copies of the tutorials from this clone (build.sh makes it).
+CUTLASS_CLONE = ROOT / "examples" / "03_cutlass_mma" / ".cutlass"
 BOOK = os.environ.get("WARPLENS_BOOK", "")
 HAVE_BOOK = bool(BOOK) and (Path(BOOK) / "chapter_gemm_basics" / "index.md").is_file()
 sys.path.insert(0, str(SUITE))
@@ -103,7 +105,19 @@ def run(tmp_path_factory):
 
 def test_the_script_runs_to_the_end_and_records_every_run(run):
     done, predicted, out, statuses = run
-    assert done.returncode == 0, done.stdout[-3000:] + done.stderr[-3000:]
+    # The collection is complete only with every end-to-end program: a step that cannot run
+    # here (no clone of the book, no CUTLASS clone) is recorded as skipped and fails the run.
+    absent = set()
+    if not CUTLASS_CLONE.is_dir():
+        absent |= set(TUTORIALS)
+    if not (HAVE_BOOK and have("tvm_tirx")):
+        absent.add("e2e/book_hgemm")
+    not_ok = {name for name in manifest.E2E if statuses.get(name) != "ok"}
+    if all(have(module) for module in ("triton", "tvm_tirx", "cutlass", "cuda.bindings")):
+        assert not_ok == absent, {name: statuses.get(name) for name in not_ok ^ absent}
+    assert all(statuses[name].startswith("skipped (") for name in absent)
+    assert done.returncode == (1 if not_ok else 0), done.stdout[-3000:] + done.stderr[-3000:]
+    assert ("end-to-end runner: ok" in done.stdout) == (not not_ok)
     assert "build: ok" in done.stdout
     assert set(statuses) == {probe.name for probe in manifest.PROBES} | set(manifest.E2E)
     assert not [name for name, status in statuses.items() if status.startswith(("not built", "timeout", "signal"))]
@@ -163,8 +177,8 @@ def test_compare_accepts_the_simulators_own_run(run):
 
 
 def test_cutlass_tutorials_are_predicted(run):
-    if not all((CUTLASS_BIN / Path(name).name.split(".")[1]).exists() for name in TUTORIALS):
-        pytest.skip("the CUTLASS programs are not built (examples/03_cutlass_mma/build.sh --programs)")
+    if not CUTLASS_CLONE.is_dir():
+        pytest.skip("no CUTLASS clone (examples/03_cutlass_mma/build.sh --programs fetches and builds it)")
     _, predicted, _, statuses = run
     for name in TUTORIALS:
         assert statuses[name] == "ok", name
@@ -207,7 +221,8 @@ def test_the_gpu_steps_that_use_tvm_get_the_cuda_runtime_on_their_library_path(t
         sys.path.remove(str(SUITE / "e2e"))
     text = (SUITE / "e2e" / "run_e2e.py").read_text()
     assert 'uses_tvm = ("e2e/unchanged_scripts.tirx", "e2e/book_hgemm")' in text
-    assert "env=tvm_env if name in uses_tvm else env" in text
+    assert "step_env = dict(tvm_env if name in uses_tvm else env)" in text
+    assert "env=step_env" in text
     prefix = tmp_path / "env"
     (prefix / "lib").mkdir(parents=True)
     monkeypatch.setattr(sys, "prefix", str(prefix))
@@ -278,7 +293,8 @@ def test_without_a_clone_the_book_step_says_skipped(tmp_path):
     """The end-to-end driver alone, with nothing to run: every step is recorded as skipped
     with its reason, never left out."""
     done = subprocess.run([sys.executable, str(SUITE / "e2e" / "run_e2e.py"), "--mode", "sim", "--out", str(tmp_path),
-                           "--cutlass-bin", str(tmp_path / "none"), "--book", str(tmp_path / "no-book")],
+                           "--cutlass-bin", str(tmp_path / "none"), "--cutlass-source", str(tmp_path / "none"),
+                           "--book", str(tmp_path / "no-book")],
                           capture_output=True, text=True, timeout=600,
                           env={**os.environ, "PYTHONPATH": str(ROOT), "CUDA_VISIBLE_DEVICES": "", "WARPLENS_BOOK": ""})
     assert done.returncode == 1, done.stderr  # the tutorials are not built: an incomplete collection, said so

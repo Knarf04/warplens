@@ -177,3 +177,15 @@ else:
         assert checks["ptx-jit"] == "WARN"
         assert checks.get("e2e-ptx") == ("FAIL" if e2e else None)
         assert done.returncode == int(e2e), done.stdout + done.stderr
+
+
+def test_failed_source_snapshot_still_preserves_raw_results(checkout, tmp_path):
+    root, env, args = checkout
+    ready_suites(root, tmp_path)
+    (root / "env/remote/freeze_source.py").write_text('raise RuntimeError("snapshot test failure")\n')
+    done = bash(root / "env/remote/run.sh", *args, env=env)
+    assert done.returncode == 1
+    files = members(archive_of(tmp_path / "home"))
+    assert "SOURCE-SNAPSHOT-FAILED.txt" in files
+    assert b"snapshot test failure" in files["source-snapshot.log"]
+    assert "logs/run-blackwell.log" in files

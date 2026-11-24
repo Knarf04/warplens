@@ -9,11 +9,18 @@ DSL itself does underneath: device memory from the CUDA driver, through the DSL'
 passed to the kernel as pointers. The driver calls reach the simulator under `warplens run`.
 """
 
+import os
+
 import numpy as np
 import cutlass
 import cutlass.cute as cute
 from cutlass.base_dsl.runtime import cuda as gpu
 from cutlass.cute.runtime import make_ptr
+
+
+def capturing():
+    return bool(os.environ.get("WARPLENS_CAPTURE_DIR"))
+
 
 N, BLOCK = 256, 64
 
@@ -40,11 +47,27 @@ a, b = rng.random(N, dtype=np.float32), rng.random(N, dtype=np.float32)
 x, y = gpu.allocate(a.nbytes), gpu.allocate(b.nbytes)
 gpu.memcpy_h2d(a.ctypes.data, x, a.nbytes)
 gpu.memcpy_h2d(b.ctypes.data, y, b.nbytes)
-host(2.5, make_ptr(cutlass.Float32, int(x), cute.AddressSpace.gmem),
-     make_ptr(cutlass.Float32, int(y), cute.AddressSpace.gmem))
+arguments = (2.5, make_ptr(cutlass.Float32, int(x), cute.AddressSpace.gmem),
+             make_ptr(cutlass.Float32, int(y), cute.AddressSpace.gmem))
+if capturing():
+    # --keep-ptx also writes the PTX to a file: in the working directory, unless a directory
+    # is named. `warplens run` names one (CUTE_DSL_DUMP_DIR) and reads the kernel from it.
+    options = "--keep-ptx"
+    if not os.environ.get("CUTE_DSL_DUMP_DIR"):
+        dump = os.path.join(os.environ["WARPLENS_CAPTURE_DIR"], "cute_dsl_dump")
+        os.makedirs(dump, exist_ok=True)
+        options += f" --dump-dir={dump}"
+    compiled = cute.compile(host, *arguments, options=options)
+    compiled(*arguments)
+else:
+    host(*arguments)
 out = np.empty_like(b)
 gpu.memcpy_d2h(out.ctypes.data, y, out.nbytes)
 gpu.deallocate(x)
 gpu.deallocate(y)
+if capturing():
+    from validation.blackwell.frontend_capture import cute_saxpy_case
+    cute_saxpy_case(compiled, scalar=2.5, grid=(N // BLOCK, 1, 1), block=(BLOCK, 1, 1),
+                    inputs={"x": a, "y": b}, output=out)
 np.testing.assert_allclose(out, np.float32(2.5) * a + b, rtol=1e-6)
 print(f"saxpy over {N} elements: matches NumPy")

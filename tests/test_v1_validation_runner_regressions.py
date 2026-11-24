@@ -217,9 +217,10 @@ def test_numeric_observations_do_not_assert_rounding_or_success(
         tmp_path, monkeypatch, capsys, gpu, prediction, exit_code, verdict):
     compare = load("compare_numeric_validation", PROBES / "compare.py")
     from types import SimpleNamespace
-    probe = SimpleNamespace(name="numeric", risk="", predict="sim", compare="ulp", ids=(), claim="observation")
+    probe = SimpleNamespace(name="numeric", program="numeric", risk="", predict="sim", compare="ulp", ids=(), claim="observation")
     monkeypatch.setattr(compare, "PROBES", [probe])
     monkeypatch.setattr(compare, "E2E", [])
+    monkeypatch.setattr(compare, "validate_probe_archive", lambda *args: [])
     out, pred = tmp_path / "results", tmp_path / "predicted"
     out.mkdir()
     pred.mkdir()
@@ -243,6 +244,7 @@ def test_probe_collector_archives_infrastructure_failure_and_expected_hang(tmp_p
     monkeypatch.setattr(runner, "HERE", suite)
     probe = SimpleNamespace(name="probe", program="probe", predict="sim", args=(), risk="hang")
     monkeypatch.setattr(runner, "PROBES", [probe])
+    monkeypatch.setattr(runner, "archive_probes", lambda *args, **kwargs: [])
     monkeypatch.setattr(runner, "run_probe", lambda *args: ("timeout", 0, b"", b""))
     out = tmp_path / "results"
     monkeypatch.setattr(sys, "argv", ["run_all.py", "--mode", "sim", "--no-build", "--no-e2e", "--out", str(out)])
@@ -258,6 +260,7 @@ def test_e2e_runner_failure_is_reported_after_archive(tmp_path, monkeypatch):
     (suite / "manifest.py").write_text("# fixture manifest\n")
     monkeypatch.setattr(runner, "HERE", suite)
     monkeypatch.setattr(runner, "PROBES", [])
+    monkeypatch.setattr(runner, "archive_probes", lambda *args, **kwargs: [])
     monkeypatch.setattr(runner, "run_process", lambda *args: ("exit 1", 0, b"runner failed", b""))
     out = tmp_path / "results"
     monkeypatch.setattr(sys, "argv", ["run_all.py", "--mode", "sim", "--no-build", "--out", str(out)])

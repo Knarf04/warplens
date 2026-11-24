@@ -7,11 +7,12 @@
 Each step runs in its own process under a timeout; its output goes to DIR/e2e/<step>.stdout
 and .stderr, and one line per step is appended to DIR/status.tsv. run_all.py calls this.
 
-  cutlass_tutorials   examples/03_cutlass_mma/bin/tutorial_01 .. _04, built from unmodified
-                      CUTLASS sources by `examples/03_cutlass_mma/build.sh --programs` (run
-                      here if the programs are missing; needs nvcc and network access).
-                      The same binaries run on the GPU and under `warplens run`.
-                      --cutlass-bin DIR uses programs built elsewhere.
+  cutlass_tutorials   host-instrumented copies of the four pinned CUTLASS tutorials;
+                      capture_cutlass.py preserves the kernels and dumps full tensors/ABI.
+                      --cutlass-source CLONE supplies the source; the default example's
+                      build.sh acquires its pinned clone if its programs are absent.
+                      Exact capture executables, sources and embedded PTX are archived.
+                      The same capture binaries run on the GPU and under `warplens run`.
   triton              GPU: e2e/triton_gpu.py (PyTorch tensors, Triton's CUDA driver), run by
                       the interpreter WARPLENS_TORCH_PYTHON names (the PyTorch env that
                       env/remote/setup.sh makes; env/remote/run.sh sets the variable), or by
@@ -48,6 +49,8 @@ REPO = HERE.parents[2]
 CUTLASS = REPO / "examples" / "03_cutlass_mma"
 sys.path.insert(0, str(HERE.parent))
 from probe_process import forward_interrupts, run_process  # noqa: E402
+from e2e_checks import EXPECTED_CASES, completion_errors
+from capture import validate_capture_tree  # noqa: E402
 
 
 def cudart_directory() -> str:
@@ -77,10 +80,11 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--book", default=os.environ.get("WARPLENS_BOOK", ""))
     parser.add_argument("--cutlass-bin", default=os.environ.get("CUTLASS_BIN", str(CUTLASS / "bin")))
+    parser.add_argument("--cutlass-source", default=str(CUTLASS / ".cutlass"))
     parser.add_argument("--predicted")
     parser.add_argument("--timeout-scale", type=float, default=1.0)
     args = parser.parse_args()
-    out = Path(args.out)
+    out = Path(args.out).resolve()
     (out / "e2e").mkdir(parents=True, exist_ok=True)
     sim = args.mode == "sim"
     env = dict(os.environ)
@@ -98,16 +102,23 @@ def main() -> int:
     uses_tvm = ("e2e/unchanged_scripts.tirx", "e2e/book_hgemm")
 
     steps: list[tuple[str, list[str] | None, str]] = []  # (name, command or None, why not)
-    bin_dir = Path(args.cutlass_bin)
+    bin_dir = Path(args.cutlass_bin).resolve()
     if not all((bin_dir / f"tutorial_0{n}").exists() for n in range(1, 5)) and bin_dir == CUTLASS / "bin":
         status, seconds, stdout, stderr = run_process([str(CUTLASS / "build.sh"), "--programs"], 3600)
         infrastructure_failures += status != "ok"
         (out / "e2e" / "cutlass_build.log").write_bytes(stdout + stderr)
         print(f"e2e: build the CUTLASS tutorials: {status} ({seconds:.0f} s)", flush=True)
+    capture_build = out / "e2e" / "cutlass_capture_build"
+    capture_tool = HERE / "capture_cutlass.py"
+    build_command = [sys.executable, str(capture_tool), "build", "--cutlass", str(Path(args.cutlass_source).resolve()),
+                     "--out", str(capture_build)]
+    build_status, _, build_stdout, build_stderr = run_process(build_command, 3600, env=env, cwd=REPO)
+    (out / "e2e" / "cutlass_capture_build.log").write_bytes(build_stdout + build_stderr)
+    infrastructure_failures += build_status != "ok"
     for n in range(1, 5):
-        program = bin_dir / f"tutorial_0{n}"
+        program = capture_build / "bin" / f"tutorial_0{n}"
         name = f"e2e/cutlass_tutorials.tutorial_0{n}"
-        if not program.exists():
+        if build_status != "ok" or not program.exists():
             infrastructure_failures += 1
             steps.append((name, None, f"{program} is not built"))
         else:
@@ -120,7 +131,7 @@ def main() -> int:
     for name, path in (("tirx", REPO / "examples" / "07_tirx" / "run.py"),
                        ("cute_dsl", REPO / "examples" / "06_cute_dsl" / "saxpy.py")):
         steps.append((f"e2e/unchanged_scripts.{name}", (warplens_run if sim else []) + [sys.executable, str(path)], ""))
-    book = Path(args.book) if args.book else None
+    book = Path(args.book).resolve() if args.book else None
     if book is None or not (book / "chapter_gemm_basics" / "index.md").is_file():
         steps.append(("e2e/book_hgemm", None, "no clone of the book given (--book or WARPLENS_BOOK)"))
     else:
@@ -131,16 +142,45 @@ def main() -> int:
     if not status_file.exists():
         status_file.write_text("name\tstatus\tseconds\tcommand\n")
     for name, command, why in steps:
+        capture_dir = out / "captures" / name.removeprefix("e2e/")
+        if capture_dir.exists():
+            shutil.rmtree(capture_dir)  # a rerun cannot pass using a previous run's fixtures
+        step_env = dict(tvm_env if name in uses_tvm else env)
+        step_env["WARPLENS_CAPTURE_DIR"] = str(capture_dir)
+        step_env["WARPLENS_CAPTURE_MODE"] = args.mode
+        tutorial = int(name[-1]) if name.startswith("e2e/cutlass_tutorials.") else None
+        if tutorial is not None:
+            raw_dir = out / "e2e" / f"cutlass_raw_0{tutorial}"
+            if raw_dir.exists():
+                shutil.rmtree(raw_dir)
+            raw_dir.mkdir(parents=True)
+            step_env["WARPLENS_CAPTURE_RAW_DIR"] = str(raw_dir)
         if command is None:
             status, seconds, stdout, stderr = f"skipped ({why})", 0.0, b"", b""
         else:
-            status, seconds, stdout, stderr = run_process(command, limit, env=tvm_env if name in uses_tvm else env,
+            status, seconds, stdout, stderr = run_process(command, limit, env=step_env,
                                                           cwd=REPO)
-            infrastructure_failures += status.startswith("not run")
             if status == "exit 2" and stdout.startswith(b"SKIPPED:"):
                 # The program found that it cannot run here (no PyTorch, no GPU) and said why.
                 reason = stdout.decode(errors="replace").splitlines()[0][len("SKIPPED:"):].strip()
                 status = f"skipped ({reason[:200]})"
+        if status == "ok" and tutorial is not None:
+            finalize = [sys.executable, str(capture_tool), "finalize", "--raw", str(raw_dir),
+                        "--build", str(capture_build), "--tutorial", str(tutorial),
+                        "--out", str(capture_dir), "--mode", args.mode]
+            finalized, _, final_stdout, final_stderr = run_process(finalize, 120, env=step_env, cwd=REPO)
+            (out / "e2e" / f"cutlass_finalize_0{tutorial}.log").write_bytes(final_stdout + final_stderr)
+            if finalized != "ok":
+                status = "capture-failed"
+                stderr += b"\nCUTLASS capture finalization failed\n" + final_stderr
+        errors = completion_errors(name, status, stdout.decode(errors="replace"))
+        if status == "ok":
+            errors.extend(validate_capture_tree(capture_dir, EXPECTED_CASES[name]))
+        if errors:
+            infrastructure_failures += 1
+            if status == "ok":
+                status = "verification-failed"
+            stderr += ("\ncollection: " + "; ".join(errors) + "\n").encode()
         (out / (name + ".stdout")).write_bytes(stdout)
         (out / (name + ".stderr")).write_bytes(stderr)
         shown = " ".join(command) if command else "-"

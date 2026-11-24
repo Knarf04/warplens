@@ -366,6 +366,12 @@ def checkout(tmp_path):
     `env` in place of the env runner: the stages run with whatever is on PATH."""
     root = tmp_path / "repo"
     shutil.copytree(REMOTE, root / "env" / "remote")
+    # Collection now freezes the actual tracked source used by the rental.
+    subprocess.run(["git", "init", str(root)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(root), "-c", "user.name=fixture", "-c",
+                    "user.email=fixture@example.invalid", "commit", "-m", "fixture"],
+                   check=True, capture_output=True)
     env = {"WARPLENS_REMOTE_HOME": str(tmp_path / "home"), "WARPLENS_ENV_RUN": "env",
            "WARPLENS_RUN_MINUTES": "1"}
     # Skip what needs a GPU or installs things; the stage runner is what is under test.

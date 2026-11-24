@@ -196,8 +196,9 @@ def test_options_reach_the_server_and_the_program(empty_shims, servers, tmp_path
     told = json.loads(capfd.readouterr().out)
     report = told.pop("report")
     assert not Path(report).exists()  # removed once the program has ended
+    package = Path(cli.__file__).resolve().parent.parent  # the checkout, or site-packages when installed
     assert told == {"model": "B300", "timing": False, "timing_config": str(small), "active_sms": 4,
-                    "clc_limit": 3, "package": str(ROOT)}
+                    "clc_limit": 3, "package": str(package)}
 
 
 def test_without_the_options_a_launch_is_what_it_was(empty_shims, servers):
@@ -275,12 +276,15 @@ def test_the_start_up_hook_installs_the_triton_driver_when_triton_is_imported(tm
     (tmp_path / "package" / "warplens" / "cli.py").write_text(
         "def install_triton_driver():\n    import sys\n    print('driver installed', 'triton' in sys.modules)\n")
     hook = Path(cli.__file__).resolve().parent / "shim" / "python"
-    code = "import sys\nprint('started')\nimport triton\nprint(sys.path.count(sys.argv[1]))"
+    # -S, and the hook imported by hand as `site` would: without site-packages, a warplens that
+    # is installed there (not editable) cannot be found before the stand-in, which the hook
+    # puts last on the path.
+    code = "import sitecustomize, sys\nprint('started')\nimport triton\nprint(sys.path.count(sys.argv[1]))"
 
     def child(**env):
         env = {**{k: v for k, v in os.environ.items() if not k.startswith("WARPLENS_")},
                "PYTHONPATH": f"{hook}{os.pathsep}{tmp_path}", **env}
-        done = subprocess.run([sys.executable, "-c", code, str(tmp_path / "package")], capture_output=True,
+        done = subprocess.run([sys.executable, "-S", "-c", code, str(tmp_path / "package")], capture_output=True,
                               text=True, timeout=120, env=env, cwd=tmp_path)
         assert done.returncode == 0, done.stderr
         return done

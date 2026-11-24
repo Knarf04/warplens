@@ -272,3 +272,33 @@ def test_min_max_and_float_to_integer_match_real_gpu(sim):
             problems.append(f"{name}: {len(wrong)} of {n} differ, e.g. " + "; ".join(
                 f"{rows[i, 0]:x} {rows[i, 1]:x} -> gpu {expect[i]:x}, sim {got[i]:x}" for i in wrong[:4]))
     assert not problems, "\n".join(problems)
+
+
+def test_lanes_rejoin_where_they_do_on_a_real_gpu(sim):
+    """reconvergence_golden.txt is validation/ampere/reconvergence_golden.py on an RTX 3080 Ti:
+    `if (tid == 0) shared = 7;` and a join that reads the word, in four layouts of the lanes'
+    paths to the join, with and without `bar.sync` there, with all or half of the lanes
+    reaching it. Each line is a kernel's name and out[0..63]. On the GPU every lane that
+    passes the join reads 7 in every layout: lane 0 arrives with the others, not after them."""
+    import importlib.util
+    import warplens
+    spec = importlib.util.spec_from_file_location("reconvergence_golden", AMPERE / "reconvergence_golden.py")
+    golden = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(golden)
+    expect = {name: list(map(int, values)) for name, *values in
+              map(str.split, (AMPERE / "reconvergence_golden.txt").read_text().splitlines())}
+    kernels = golden.kernels()
+    assert sorted(kernels) == sorted(expect) and len(kernels) == 20
+    problems = []
+    for name, body in kernels.items():
+        out = sim.from_numpy(np.full(64, 99, dtype=np.uint32))
+        stats = sim.launch(warplens.parse_ptx(golden.HEADER + body, name=name + ".ptx"), "k",
+                           grid=1, block=32, args=[out])
+        if out.numpy().tolist() != expect[name]:
+            problems.append(f"{name}: {out.numpy().tolist()}")
+        # A barrier that half of the warp goes around is reported; nothing else is.
+        divergent = "_half_" in name and name.endswith("_bar")
+        kinds = sorted({f.kind for f in stats.findings})
+        if kinds != (["barrier-in-divergent-code"] if divergent else []):
+            problems.append(f"{name}: findings {kinds}")
+    assert not problems, problems

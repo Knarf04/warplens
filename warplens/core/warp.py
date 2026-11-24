@@ -263,6 +263,48 @@ class Warp:
             if self.blocked is None or not self.blocked.retry:
                 top.pc = pc + 1
         stack.settle()
+        entries = stack.entries
+        if len(entries) > 1 and entries[-2].rpc == entries[-1].rpc:
+            self._regroup()
+
+    def _regroup(self) -> None:
+        """Bring lanes together that reach one instruction by different paths before the
+        point where their branch is known to rejoin.
+
+        A branch's sides rejoin at its immediate post-dominator, but they can meet earlier:
+        in `if (a) {...; goto join;} if (b) return; join: ...` the post-dominator is the
+        return, and every lane that does not return passes `join` first. A GPU runs the
+        lanes that have met as one group from there (ptxas places the warp's
+        synchronization point at `join`; validation/ampere/reconvergence_golden.py), which a
+        barrier or any other warp-wide instruction at `join` relies on.
+
+        The entries on top of the stack that rejoin at the same pc are sides of such
+        branches. Of these, an entry that can still reach where the top one is, and that the
+        top one cannot reach, runs first; when it arrives, the two become one entry. Entries
+        on a common cycle keep their order, so loops run as before."""
+        entries = self.stack.entries
+        top = entries[-1]
+        rpc = top.rpc
+        if top.frame is not None:
+            return
+        first = len(entries) - 1
+        while first > 0 and entries[first - 1].rpc == rpc and entries[first - 1].frame is None:
+            first -= 1
+        behind = self.program.behind
+        while True:
+            later = None
+            for i in range(len(entries) - 2, first - 1, -1):
+                other = entries[i]
+                if other.pc == top.pc:
+                    top.mask = top.mask | other.mask
+                    del entries[i]
+                elif later is None and behind(other.pc, top.pc):
+                    later = other
+            if later is None:
+                return
+            entries.remove(later)
+            entries.append(later)
+            top = later
 
     def _where(self, ins, active: np.ndarray, err: ExecutionError) -> str:
         lanes = err.lanes if isinstance(err, MemoryFault) and err.lanes else \

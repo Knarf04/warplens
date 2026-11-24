@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..errors import UnsupportedError
-from ..frontend.cfg import reconvergence_points
+from ..frontend.cfg import block_reachability, build_cfg, reconvergence_points
 from ..frontend.inline import inline_calls
 from ..frontend.ir import Function, Module
 from ..units import barrier as _barrier  # noqa: F401  (these imports register handlers)
@@ -51,6 +51,7 @@ class Program:
         self.targets = [fn.labels[i.operands[0].name] if i.opcode == "bra" else -1
                         for i in fn.instrs]
         self.reconv = reconvergence_points(fn)
+        self._reach: tuple[list[int], list[int]] | None = None  # see `behind`
 
         # Per-thread local memory: variables in declaration order.
         self.local_symbols: dict[str, int] = {}
@@ -96,6 +97,20 @@ class Program:
             if v.size is None:
                 self.symbols[v.name] = self.smem_dynamic_base
         self.uses_dynamic_smem = any(v.size is None for v in variables)
+
+    def behind(self, a: int, b: int) -> bool:
+        """Whether lanes at pc `a` are strictly behind lanes at pc `b`: control can flow from
+        `a` to `b` and not from `b` back to `a`. Lanes that are behind can still arrive where
+        the others are, and the others cannot come to them, so the warp runs them first
+        (core/warp.py, `_regroup`). Two pcs on one cycle are not behind each other."""
+        if self._reach is None:
+            cfg = build_cfg(self.fn)
+            self._reach = ([*cfg.block_of, cfg.exit], block_reachability(cfg))
+        block_of, reach = self._reach
+        block_a, block_b = block_of[a], block_of[b]
+        forward = (block_a == block_b and a < b) or bool(reach[block_a] >> block_b & 1)
+        back = (block_a == block_b and b < a) or bool(reach[block_b] >> block_a & 1)
+        return forward and not back
 
     def param_blob(self, params: dict[str, bytes]) -> bytes:
         """All parameters of one launch laid out in parameter space."""

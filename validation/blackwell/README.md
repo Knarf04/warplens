@@ -480,22 +480,38 @@ Those marked "fixed since" were fixed on other branches.
     13.5), and with it the PTX of every TIRx kernel. PyTorch therefore lives in a venv of
     its own (`env/remote/pins.env`).
 
-16. **Lanes of a warp that reach the same instruction by different paths are not always
-    brought together, and `bar.sync` then lets some through.** In two layouts of
+16. **Lanes of a warp that reach the same instruction by different paths were not always
+    brought together, and `bar.sync` then let some through** (fixed since, on branch
+    `work/reconvergence`). In two layouts of
     `if (tid == 0) shared = 7; __syncthreads(); out[tid] = shared;` lanes 1 to 31 read the
-    word before lane 0 has written it, with no finding: when the other lanes' block ends in
-    a conditional branch that none of them takes before falling into the join, and when
-    that block sits at the end of the function and branches back. Reproduction, four
-    kernels of twenty lines: `findings/reconvergence.py` (32 of 32 lanes right in the two
-    layouts nvcc 13.5 emits, 1 of 32 in the two that nvcc 13.0 emits). It was found by
-    building the probes with nvcc 13.0.88: 15 runs that share
+    word before lane 0 had written it: when the other lanes' block ends in a conditional
+    branch that none of them takes before falling into the join, and when that block sits
+    at the end of the function and branches back. The only sign was a
+    `barrier-in-divergent-code` finding (and `smem-uninitialized-read`) on a program that
+    has no barrier in divergent code. Reproduction, four kernels of twenty lines:
+    `findings/reconvergence.py` (32 of 32 lanes right in the two layouts nvcc 13.5 emits,
+    1 of 32 in the two that nvcc 13.0 emits; now 32 in all four). It was found by building
+    the probes with nvcc 13.0.88: 15 runs that share
     `if (tid == 0) {...} if (warp == 0) tmem_alloc(...)` were refused ("tcgen05.alloc ...
     requires all 32 lanes of the warp to execute together; only 31 participate") and
     `cluster/clc_per_thread` issued requests before its mbarrier was initialized. The
-    programs were correct; the predictions depended on the compiler. The probes now have a
-    `__syncthreads()` between the two tests (`tests/test_rental_harness.py` checks that),
-    and with it nvcc 13.0.88 and nvcc 13.5.37 give byte-identical predictions for all 98
-    predicted runs. The simulator is unchanged.
+    programs were correct; the predictions depended on the compiler.
+
+    The cause: the sides of a branch were only joined at its immediate post-dominator, and
+    in both layouts that is past the join (the second branch can go around it). The
+    RTX 3080 Ti joins them at the join in every layout, with and without the barrier, 100
+    launches of 100 (`validation/ampere/reconvergence_golden.py`, 20 kernels; ptxas puts
+    the warp's `BSYNC` there). The warp now does the same: of the diverged groups that
+    rejoin at one place, a group that can still reach where another is runs first, and
+    groups at the same instruction become one (`warplens/core/warp.py`, `_regroup`). Where
+    half of the lanes do take the second branch, the GPU still gives the other half the
+    written word, and the simulator agrees and reports `barrier-in-divergent-code` for the
+    lanes that met there. No committed prediction changed.
+
+    The probes still have the `__syncthreads()` between the two tests that was put in as a
+    workaround (`tests/test_rental_harness.py` checks that); the simulator no longer needs
+    it, and it stays because the predictions were generated with it. With it nvcc 13.0.88
+    and nvcc 13.5.37 give byte-identical predictions for all 98 predicted runs.
 
 ## Adding a probe
 

@@ -44,8 +44,8 @@ Do these at home; none needs the B200.
       must pass with nothing skipped but the PyTorch test.
       `e2e/driver_call_trace.tirx` is `failed` there for as long as that machine's driver
       is older than the toolkit: it refuses NVRTC's PTX, traced or not.
-- [ ] The toolkit policy of section 2 is read, and the owner has confirmed or changed the
-      budget for a second rental (section 5).
+- [ ] The toolkit policy of section 2 is read, and so is the budget (section 5): 2 hours
+      for this rental, 4 more in reserve for a second rental.
 - [ ] The image is checked against "Before paying" in section 2: counters, ptrace, driver,
       network, disk.
 - [ ] Write down the commit: `git rev-parse HEAD`. The archive's manifest must show the same.
@@ -566,24 +566,22 @@ the providers, and prices move).
 
 ### A second rental (plan step F24)
 
-> **PROPOSED DEFAULT, AWAITING THE OWNER'S CONFIRMATION.** Nobody has approved these
-> numbers. They are derived from the table above and section 4, and stand until the
-> owner confirms or replaces them; the first rental does not depend on them.
-
-**Proposal: one second rental of at most 2 hours and at most $16, so at most 4 hours and
-$32 for both.**
+**Decided by the owner on 2026-11-24: 6 GPU-hours on a single B200 in all. 2 hours for the
+first rental, the other 4 held in reserve for what comes after it.**
 
 | | Hours | At $8/h | From |
 | --- | --- | --- | --- |
-| The second run, everything works | 0.4 to 1.6 | $3 to $13 | section 4 without `selftest`: 24 to 96 minutes (to 81 when the driver takes the pinned toolkit) |
-| **Ceiling for the second rental** | **2** | **$16** | the first rental's budget line: it is the same run with one stage left out, and providers bill whole hours |
-| **Ceiling for both rentals** | **4** | **$32** | 2 + 2 |
+| **First rental** | **2** | **$16** | the budget line of the table above |
+| A second run, everything works | 0.4 to 1.6 | $3 to $13 | section 4 without `selftest`: 24 to 96 minutes (to 81 when the driver takes the pinned toolkit) |
+| **Reserve, for later rentals** | **4** | **$32** | 6 - 2: two more runs at the first rental's budget line, or one with time to look at it |
+| **Ceiling for everything** | **6** | **$48** | the owner's number |
 
-- The dollar ceiling holds if the price is not $8: at more than $8 per GPU-hour the
-  hours shrink, not the ceiling grows ($16 buys 80 minutes at $12/h, which covers a
-  rerun of the probe suite alone but not everything).
-- An 8-GPU node (about $130 for two hours) is outside this proposal for either rental:
-  it needs the owner's explicit yes each time.
+- The budget is in GPU-hours; the dollars are those hours at the assumed $8. At another
+  price the hours stand and the owner is told what they cost before the clock starts.
+- The first rental stops at 2 hours whatever the reserve is: what the reserve is for is a
+  run after a fix, not a longer first run.
+- An 8-GPU node (about $130 for two hours) is outside this budget for any rental: it
+  spends eight GPU-hours an hour and needs the owner's explicit yes each time.
 - What stops a rental at its ceiling is section 8: Ctrl-C packs what exists.
 
 What triggers the second rental. Any one of these, and only after the fix is committed,
@@ -617,8 +615,8 @@ env/remote/run.sh --skip selftest --skip build-timing --skip run-timing   # prob
 WARPLENS_BLACKWELL_RUN_ARGS="--only tma/*" env/remote/run.sh --skip selftest --skip build-timing --skip run-timing   # one family; no end-to-end, no rows
 ```
 
-If the second rental also ends with open mismatches, the budget is spent: a third is a
-new decision for the owner, not a default.
+A third rental comes out of the same reserve, for the same reasons. When the 6 hours are
+spent with mismatches still open, more is a new decision for the owner, not a default.
 
 ## 6. Getting results back (E22)
 

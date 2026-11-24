@@ -401,7 +401,7 @@ nothing Blackwell-specific has run on a GPU.
 | C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 119 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 27 runs also match the 3080 Ti. Every matrix row outside timing has a run. NUM-05, RT-10 and RT-11 are not probes: `run_rows.py` runs them at the end of a GPU run (ptxas asked for a UE4M3 conversion; the driver calls of TIRx and the CuTe DSL logged under gdb; the kernel parameters of a CuTe DSL TMA kernel saved, its tensor maps among them). On the 3080 Ti the first two run and the third is skipped for want of `sm_100`. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
 | C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema (`clc_latency_ns` included), predictions committed, each launch timed with the active SMs its shape implies; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
 | E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. The toolkit policy for an older driver is decided and built into `run.sh` (below). Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
-| F24 | `env/remote/RUNBOOK.md`, section 5 | **proposed, awaiting the owner's confirmation**: one second rental of at most 2 hours and $16 (the first rental's own budget line at $8 per GPU-hour; 4 hours and $32 for both), only when a fix changes a prediction hardware must confirm, when probes tested nothing, when the tensor maps of RT-11 were not captured, or when `ncu` could not read counters. An 8-GPU node needs an explicit yes |
+| F24 | `env/remote/RUNBOOK.md`, section 5 | **decided by the owner (2026-11-24)**: 6 GPU-hours on a single B200 in all, 2 for the first rental and 4 in reserve. The reserve is for a second rental (same run, `--skip selftest`), only when a fix changes a prediction hardware must confirm, when probes tested nothing, when the tensor maps of RT-11 were not captured, or when `ncu` could not read counters. An 8-GPU node needs an explicit yes |
 
 To settle before renting:
 
@@ -429,8 +429,8 @@ To settle before renting:
   12.x driver there is no PyTorch for it and the step is skipped.
   `setup.sh` installs it; the book is the one thing to fetch by hand
   (`env/remote/RUNBOOK.md`, section 3).
-- The budget for a second rental (F24) is a proposal until the owner confirms
-  it (`env/remote/RUNBOOK.md`, section 5).
+- The budget (F24) is decided: 6 GPU-hours on one B200, 2 for the first rental
+  and 4 in reserve (`env/remote/RUNBOOK.md`, section 5).
 
 Found by this work in the simulator, and fixed since unless marked open:
 

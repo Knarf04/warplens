@@ -305,6 +305,8 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
     operation.work = {"flops": 2.0 * m_dim * n_dim * k_dim, "kind": kind,
                       "shape": f"{m_dim}x{n_dim}x{k_dim}"}
     w.tcgen_issued.append(operation)
+    key = (w.program.fn.name, ins.line, m_dim, n_dim, pair, d_lane)  # for the TMEM view
+    cta.smem_report.mmas[key] = cta.smem_report.mmas.get(key, 0) + 1
 
     def land():
         if kind == "tf32":

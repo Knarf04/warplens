@@ -28,7 +28,11 @@ def _links(config, keys) -> str:
                      for k in keys)
 
 
-def _timeline_svg(report) -> str:
+def timeline_svg(report) -> str:
+    """The timeline of a timed launch as a standalone SVG: one row per warp and engine of the
+    first CTA, with what each was doing when. `report` is `LaunchStats.timing`. Returns an
+    empty string when the launch recorded nothing with a duration. `render_html` embeds the
+    same picture."""
     slices = [s for s in report.slices if s.end > s.start]
     if not slices:
         return ""
@@ -70,6 +74,7 @@ def _timeline_svg(report) -> str:
 
 
 def render_html(report, title: str = "warplens timing report") -> str:
+    """The whole report of a timed launch (`LaunchStats.timing`) as one HTML page."""
     cfg = report.config
     r = report.roofline()
     timing_keys = tuple(sorted(TIMING_PARAMS))
@@ -129,7 +134,7 @@ window, excluding kernel setup and epilogue time. FLOPs and TMA bytes come from 
 the memory ceiling treats all those bytes as HBM traffic. For mixed MMA kinds, the compute ceiling
 uses their FLOP-weighted service times. Listed timing parameters can affect the scheduled duration;
 parameters for unused operations do not contribute.</p>
-<h2>Timeline</h2>{_timeline_svg(report)}
+<h2>Timeline</h2>{timeline_svg(report)}
 <p class="note">Overlapping asynchronous operation lifetimes use extra display lanes; these are
 not additional hardware engines. Their bars include completion latency, not only resource busy time.</p>
 <h2>Configuration and sources</h2>
@@ -139,5 +144,6 @@ not additional hardware engines. Their bars include completion latency, not only
 
 
 def write_html(report, path, title: str = "warplens timing report") -> None:
+    """Write `render_html(report, title)` to `path`."""
     with open(path, "w") as f:
         f.write(render_html(report, title))

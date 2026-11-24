@@ -16,8 +16,8 @@ products inside one MMA are accumulated.
 | Integer arithmetic | wraps; division truncates toward zero; shifts clamp at the register width | by test, from the PTX rules |
 | `add`, `sub`, `mul`, `div`, `sqrt` on floats | IEEE round-to-nearest-even, as NumPy does them | NumPy |
 | `fma`, floating `mad` | exact product and sum with integer significands, rounded once | against exact rational arithmetic, and against libc `fma` by the reviewer |
-| `min`, `max` | a NaN operand yields the other; `min(+0, -0)` is `-0`, `max` is `+0` | on a GPU |
-| float to integer | saturates; NaN gives 0, or the sign-bit pattern when the source is f64 or the result is 64-bit | on a GPU |
+| `min`, `max` | a NaN operand yields the other; `min(+0, -0)` is `-0`, `max` is `+0`. Two NaNs give `0x7fffffff` for f32, and the second operand made quiet for f64 | on a GPU, bit for bit: `validation/ampere/minmax_cvt_golden.txt` (f32 and f64) |
+| float to integer | saturates; NaN gives 0, or the sign-bit pattern when the source is f64 or the result is 64-bit | on a GPU, bit for bit: the same file (f32 and f64 to s32, u32, s64, u64, all four rounding modes) |
 | `cvt.rna.tf32.f32` | see below | on a GPU, bit for bit |
 | `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | see below | against exact rational arithmetic only |
 

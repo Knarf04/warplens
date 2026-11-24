@@ -16,7 +16,19 @@ warplens = "warplens.cli:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# The frontends. Each floor is the version the test suite runs against (env/remote/pins.env);
+# nothing older has been tried.
 triton = ["triton>=3.9"]
+# TIRx compiles through NVRTC, which it reaches through cuda-bindings. Both are built for
+# CUDA 13; an NVRTC that knows sm_100a must also be installed (see docs/guide.md).
+tirx = ["apache-tvm-tirx>=0.1.0", "cuda-bindings>=13.5"]
+cute-dsl = ["nvidia-cutlass-dsl>=4.8.1"]
+# notebooks/book_tour.ipynb: Jupyter to open it, nbclient and ipykernel to execute it from a
+# script (as tests/test_guide.py does), and TIRx, which the book's kernels are written in.
+# These floors are release lines, not tested minimums: the notebook was executed with
+# notebook 7.6.5, nbclient 0.11.0, nbformat 5.11.1 and ipykernel 7.4.0.
+jupyter = ["notebook>=7", "nbclient>=0.10", "nbformat>=5", "ipykernel>=6", "warplens[tirx]"]
+all = ["warplens[dev,triton,tirx,cute-dsl,jupyter]"]
 
 [tool.setuptools.packages.find]
 include = ["warplens*"]

@@ -438,6 +438,14 @@ def _min_max(w, ins, mask):
         negative = (np.signbit(x) | np.signbit(y)) if ins.opcode == "min" else \
             (np.signbit(x) & np.signbit(y))
         result[both_zero] = np.copysign(np.zeros_like(x), np.where(negative, -1, 1))[both_zero]
+        both_nan = np.isnan(x) & np.isnan(y)
+        if both_nan.any():
+            # Recorded on an RTX 3080 Ti (validation/ampere/minmax_cvt_golden.txt): f32 gives
+            # PTX's canonical NaN 0x7fffffff; f64 gives the second operand, made quiet.
+            if ty == "f32":
+                result.view(np.uint32)[both_nan] = 0x7FFF_FFFF
+            elif ty == "f64":
+                result.view(np.uint64)[both_nan] = (y.view(np.uint64) | np.uint64(1 << 51))[both_nan]
     else:
         fn = np.minimum if ins.opcode == "min" else np.maximum
         result = fn(x, y)

@@ -3,12 +3,14 @@ what the simulator knows about each kernel launch.
 
 `warplens run program` starts the program with its CUDA runtime replaced and executes the
 runtime calls it makes in the simulator. It prints a summary and exits, so the launch
-statistics, findings and timing reports are gone when it returns. `simulate()` here does the
-same job from inside the notebook process, with the same parts (`warplens.cli` for the
-environment of the child process, `warplens.host.shim_server.ShimServer` for its calls), and
-returns those objects. The program still runs in a child process: the notebook's own process
-never loads TVM or a CUDA runtime, and a crash in a kernel's host code cannot take the
-notebook down.
+statistics, findings and timing reports are gone when it returns. `warplens.run_program` does
+the same job from inside the notebook process and returns those objects, and is what
+`run_book_kernel()` here uses. The program still runs in a child process: the notebook's own
+process never loads TVM or a CUDA runtime, and a crash in a kernel's host code cannot take
+the notebook down.
+
+Only warplens's public API is used: `warplens.run_program` and what it returns
+(`ProgramRun`, `ProgramLaunch`, `LaunchStats`).
 
 Nothing in this file comes from the book. `run_book_kernel()` executes the kernel definitions
 found in the reader's clone, through `examples/08_book/run.py`.
@@ -17,17 +19,11 @@ found in the reader's clone, through `examples/08_book/run.py`.
 from __future__ import annotations
 
 import collections
-import os
-import socket
-import subprocess
 import sys
 import tempfile
-import time
-from dataclasses import dataclass, field
 from pathlib import Path
 
-from warplens import cli
-from warplens.host.shim_server import ShimServer
+from warplens import ProgramLaunch as Launch, ProgramRun as Run, run_program
 
 REPOSITORY = Path(__file__).resolve().parent.parent
 RUNNER = REPOSITORY / "examples" / "08_book" / "run.py"
@@ -45,90 +41,6 @@ runner["run"](version, runner["kernels"](book)[version], tvm_tirx.cuda(0), *size
 """
 
 
-@dataclass
-class Launch:
-    """One kernel launch as the simulator saw it."""
-    kernel: str
-    module: object  # the parsed PTX, a warplens.frontend.ir.Module
-    grid: tuple
-    block: tuple
-    cluster: tuple | None
-    smem: int  # dynamic shared memory requested, bytes
-    stats: object  # warplens.LaunchStats
-
-    @property
-    def instructions(self) -> list:
-        """The kernel's PTX instructions, in program order."""
-        return self.module.functions[self.kernel].instrs
-
-
-@dataclass
-class Run:
-    returncode: int
-    stdout: str
-    stderr: str
-    seconds: float
-    launches: list[Launch] = field(default_factory=list)
-
-    @property
-    def launch(self) -> Launch:
-        """The only launch of a program that made exactly one."""
-        if len(self.launches) != 1:
-            raise RuntimeError(f"the program made {len(self.launches)} launches, not one\n"
-                               f"{self.stdout[-2000:]}{self.stderr[-2000:]}")
-        return self.launches[0]
-
-
-def simulate(command, *, model: str = "B200", timing=False, active_sms=None, trace=None,
-             env=None) -> Run:
-    """Run `command` (a list, as for subprocess) with its GPU work done by the simulator.
-
-    `timing` (True or a `GpuConfig`), `active_sms` and `trace` are passed to every
-    `Device.launch` the program causes; see `docs/guide.md` for what they do.
-    """
-    try:
-        shims = cli.shim_libraries()  # built on first use; needs a C compiler and CUDA headers
-    except SystemExit as stop:
-        raise RuntimeError(str(stop.code)) from None
-    ours, theirs = socket.socketpair()
-    child_env = dict(os.environ, **(env or {}), WARPLENS_SHIM_FD=str(theirs.fileno()), WARPLENS_MODEL=model)
-    with tempfile.TemporaryDirectory(prefix="warplens_notebook_") as scratch:
-        kept = cli.frontend_environment(child_env, model, shims, Path(scratch))
-        server = ShimServer(model, kept_ptx=kept)
-        launches: list[Launch] = []
-        device_launch = server.device.launch
-
-        def launch(module, entry, **options):  # every launch the program makes passes through here
-            if timing:
-                options.update(timing=timing, active_sms=active_sms)
-            stats = device_launch(module, entry, trace=trace, **options)
-            launches.append(Launch(entry, module, options["grid"], options["block"],
-                                   options.get("cluster"), options.get("smem", 0), stats))
-            return stats
-
-        server.device.launch = launch
-        child_env["LD_LIBRARY_PATH"] = f"{shims}:{child_env.get('LD_LIBRARY_PATH', '')}".rstrip(":")
-        preload = [str(p) for p in sorted(shims.glob("libcudart.so.*")) + [shims / "libcuda.so.1"]]
-        child_env["LD_PRELOAD"] = " ".join(preload + child_env.get("LD_PRELOAD", "").split())
-        start = time.perf_counter()
-        # Output goes to files, not pipes: this process is busy serving the child and would
-        # not drain a pipe.
-        with open(Path(scratch, "stdout"), "w+") as out, open(Path(scratch, "stderr"), "w+") as err:
-            child = subprocess.Popen([str(c) for c in command], env=child_env, pass_fds=[theirs.fileno()],
-                                     stdout=out, stderr=err, stdin=subprocess.DEVNULL)
-            try:
-                theirs.close()
-                server.serve(ours)  # returns when the child closes its end
-                code = child.wait()
-            finally:
-                ours.close()
-                if child.poll() is None:
-                    child.kill()
-                    child.wait()
-            out.seek(0), err.seek(0)
-            return Run(code, out.read(), err.read(), time.perf_counter() - start, launches)
-
-
 def run_book_kernel(book, version: str, size=None, **options) -> Run:
     """Compile `hgemm_<version>` from the clone at `book` and run it in the simulator, on an
     M x N x K problem (`size`; the runner's default when omitted). Raises if the kernel fails
@@ -136,7 +48,7 @@ def run_book_kernel(book, version: str, size=None, **options) -> Run:
     with tempfile.TemporaryDirectory(prefix="warplens_notebook_") as scratch:
         script = Path(scratch, "child.py")
         script.write_text(CHILD)
-        done = simulate([sys.executable, script, RUNNER, book, version, *(size or ())], **options)
+        done = run_program([sys.executable, script, RUNNER, book, version, *(size or ())], **options)
     if done.returncode or "matches NumPy" not in done.stdout:
         raise RuntimeError(f"hgemm_{version} did not run:\n{done.stdout[-3000:]}\n{done.stderr[-3000:]}")
     return done
@@ -292,14 +204,6 @@ def changes(before: Launch, after: Launch) -> str:
     lines += ["and that are gone:"]
     lines += [f"  - {name} ({old[name]})" for name in sorted(old) if name not in new] or ["  (none)"]
     return "\n".join(lines)
-
-
-def timeline_svg(report) -> str:
-    """The timeline of a timed launch's first CTA, as warplens's HTML report draws it."""
-    from warplens.viz.html_report import render_html
-    page = render_html(report)
-    start, end = page.find("<svg"), page.find("</svg>")
-    return page[start:end + len("</svg>")] if start >= 0 else ""
 
 
 def show_svg(svg: str, fallback: str = "") -> None:

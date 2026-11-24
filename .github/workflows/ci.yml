@@ -14,8 +14,8 @@ jobs:
       matrix:
         python: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       # No CUDA needed: tests run the .ptx files checked in under examples/.
@@ -27,8 +27,8 @@ jobs:
     env:
       CUDA_VISIBLE_DEVICES: ""
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev,triton]"
@@ -47,13 +47,13 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
-      - uses: actions/checkout@v4
-      - uses: mamba-org/setup-micromamba@v2
+      - uses: actions/checkout@v7
+      - uses: mamba-org/setup-micromamba@v3
         with:
           environment-file: env/environment.yml
           cache-environment: true
       - run: env/check.sh
-      - run: pip install -e ".[dev,triton]" nvidia-cutlass-dsl apache-tvm-tirx cuda-bindings
+      - run: pip install -e ".[all]"
       - name: Build the CUTLASS tutorials (PTX and host programs)
         run: examples/03_cutlass_mma/build.sh --programs
       - name: Build the shim libraries

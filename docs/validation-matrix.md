@@ -209,7 +209,7 @@ E8M0 rule, and the PTX `cvt` forms for these formats where the assembler for
 | NUM-08 | `cvt.rna.tf32.f32` on Blackwell gives what it gave on Ampere | `warplens/units/floating.py:to_tf32`; `docs/numerics.md` (TF32), `validation/README.md`; `tests/test_tf32.py::test_cvt_rna_tf32_matches_real_gpu_bit_for_bit` | `ampere` `validation/ampere/tf32_golden.txt`, 715 inputs, bit for bit | `validation/blackwell/formats/tf32_modes`: rerun `validation/ampere/tf32_golden.cu` | Identical to the Ampere golden file | **bit-exact** |
 | NUM-09 | `.ftz` on f32 `add`, `sub`, `mul`, `div`, `fma`, `sqrt` flushes subnormal inputs, and results that are tiny after rounding: `0x00800000 * 0x3f7fffff` is zero, `0x00800001 * 0x3f7ffffe` is the smallest normal number | `warplens/units/alu.py:_float_result`, `warplens/units/alu.py:_fused_is_tiny`; `docs/coverage.md`, `validation/README.md`; `tests/test_hardware_golden.py::test_flush_to_zero_arithmetic_matches_real_gpu` | `ampere` `validation/ampere/ftz_golden.txt`, 7075 cases | `validation/blackwell/formats/ftz`: rerun `validation/ampere/ftz_golden.cu` | Identical to the Ampere golden file | **bit-exact**. A difference would mean tininess detection changed between architectures, and fast-math code (TIRx) is affected |
 | NUM-10 | `fma` and floating `mad` compute the exact product and sum and round once, for f32 and f64 | `warplens/units/floating.py:fused_multiply_add`, `warplens/units/alu.py:_fma`; `docs/numerics.md` (Scalar instructions) | `assumption` about the GPU: checked against exact rational arithmetic and libc only | `validation/blackwell/formats/fma`: 10^4 seeded cases per type weighted toward rounding midpoints, cancellation, subnormal results and overflow | The simulator's bits | **bit-exact** |
-| NUM-11 | `min` / `max` with one NaN operand give the other; `min(+0, -0)` is `-0` and `max` is `+0`. Float to integer saturates; NaN gives 0, or the sign-bit pattern when the source is f64 or the result is 64-bit | `warplens/units/alu.py:_min_max`, `warplens/units/alu.py:_cvt`; `docs/numerics.md` (Scalar instructions); `tests/test_alu.py::test_min_max_signed_zero_order`, `tests/test_alu.py::test_cvt_nan_integer_result_depends_on_types` | `assumption`. `docs/numerics.md` says "on a GPU", but no golden file, probe source or `validation/README.md` row records it (see Discrepancies) | `validation/blackwell/formats/scalar_edges`: both instructions over all pairs of {+-0, +-1, +-infinity, quiet NaN, signalling NaN}, f32 and f64; `cvt` to s32, u32, s64, u64 with all four rounding modes over NaN, +-infinity and values at and around each limit | The simulator's bits | **bit-exact**. This probe also runs on the 3080 Ti, which would turn the row into an `ampere` one |
+| NUM-11 | `min` / `max` with one NaN operand give the other; `min(+0, -0)` is `-0` and `max` is `+0`; two NaNs give `0x7fffffff` for f32 and the second operand made quiet for f64. Float to integer saturates; NaN gives 0, or the sign-bit pattern when the source is f64 or the result is 64-bit | `warplens/units/alu.py:_min_max`, `warplens/units/alu.py:_cvt`; `docs/numerics.md` (Scalar instructions); `tests/test_alu.py::test_min_max_signed_zero_order`, `tests/test_alu.py::test_cvt_nan_integer_result_depends_on_types`, `tests/test_hardware_golden.py::test_min_max_and_float_to_integer_match_real_gpu` | `ampere` `validation/ampere/minmax_cvt_golden.txt`, 15844 cases | `validation/blackwell/formats/scalar_edges`: rerun `validation/ampere/minmax_cvt_golden.cu`: both instructions over all pairs of {+-0, +-1, +-infinity, quiet NaN, signalling NaN}, f32 and f64; `cvt` to s32, u32, s64, u64 with all four rounding modes over NaN, +-infinity and values at and around each limit | Identical to the Ampere golden file | **bit-exact**. The result for two NaNs is the part most likely to differ between architectures |
 | NUM-12 | Integer rules: arithmetic wraps, division truncates toward zero, shifts clamp at the register width | `warplens/units/alu.py:_div_rem`, `warplens/units/alu.py:_shift`; `docs/numerics.md` (Scalar instructions: "by test, from the PTX rules") | `ptx-manual`; no section is cited | `validation/blackwell/formats/scalar_edges`: `div`, `rem`, `shl`, `shr`, `mul.hi` over the limits of s32, u32, s64, u64, shift amounts 0, 31, 32, 63, 64, 2^31, division of the minimum by -1 and by zero | The simulator's bits; no prediction for division by zero, which is recorded | **bit-exact** except division by zero |
 
 ## Launch and runtime (`RT-nn`)
@@ -267,49 +267,41 @@ repetitions, reporting the median and spread. Predictions use the B200 config:
 Between documents and code, found while tracing each row. The code is taken
 as the claim in every case.
 
-1. **Largest tensor dimension.** `docs/m2.md` says "the maximum tensor
-   dimension is 2^31, following CUDA 13.5". The code allows 2^32
-   (`warplens/host/tensor_map.py:MAX_DIM`), and
-   `tests/test_m2_tensor_map_regressions.py::test_tensor_map_dimension_limit_round_trips`
-   pins 2^32. TMA-11 probes the limit.
+1. *(Resolved: `docs/m2.md` said the largest tensor dimension is 2^31; it now
+   says 2^32, as `warplens/host/tensor_map.py:MAX_DIM` does.)* TMA-11 probes
+   the limit.
 2. *(Resolved: a launch accepted 228 KB of shared memory per CTA while the
    shim reported an opt-in maximum of 227 KB. Both are 227 KB now; RT-04
    still probes it.)*
-3. **`docs/coverage.md` contradicts itself and the code.** Its Instructions
-   table says TMA has "no multicast" and tcgen05 has "no `cta_group::2`"; its
-   Clusters table lists both as supported, and the code implements them
-   (`warplens/units/tma.py:_load_targets`, `warplens/units/tcgen05.py:_mma`).
-   The Clusters table also says multicast is "not on raw `cp.async.bulk`", but
-   the raw form accepts it and
-   `tests/test_m5_tma_regressions.py::test_multicast_reports_to_each_destination_barrier`
-   runs it.
-4. **Module docstring of `warplens/units/tcgen05.py`** says "`cta_group::1`
-   only" and describes only K-major operands. The same file implements
-   `cta_group::2` and MN-major half-precision operands
-   (`warplens/units/tcgen05.py:_operand_bytes`).
-5. **Checked "on a GPU" with no record.** `docs/numerics.md` marks `min`,
-   `max` and float-to-integer conversion as checked on a GPU. There is no
-   golden file or probe source for them in `validation/ampere/`, no row in
-   `validation/README.md`, and no test that reads one. NUM-11 treats them as
-   unmeasured.
-6. **`prmt` is missing from `validation/README.md`.** The golden file
-   `validation/ampere/prmt_golden.txt` exists and
-   `tests/test_hardware_golden.py::test_prmt_matches_real_gpu` uses it, but
-   the README's table has no row for it.
-7. **`tcgen05.wait` cost.** `docs/m4.md` lists "TMEM loads and stores, and
-   `tcgen05.wait`, have a fixed cost". The code adds `tmem_access_clk` only to
-   `ld` and `st` (`warplens/timing/model.py:Timeline.charge`); a wait costs
-   the one issue clock every instruction costs. TIM-19 states the code's
+3. *(Resolved: the Instructions table of `docs/coverage.md` said TMA has "no
+   multicast" and tcgen05 has "no `cta_group::2`", and its Clusters table said
+   multicast is "not on raw `cp.async.bulk`". Both tables now say what the
+   code does: multicast on tensor loads and raw bulk loads, and
+   `cta_group::2`.)*
+4. *(Resolved: the module docstring of `warplens/units/tcgen05.py` said
+   "`cta_group::1` only" and described only K-major operands; it now covers
+   `cta_group::2` and MN-major half-precision operands.)*
+5. *(Resolved: `docs/numerics.md` marked `min`, `max` and float-to-integer
+   conversion as checked on a GPU with no record. They have now been run on
+   the RTX 3080 Ti: `validation/ampere/minmax_cvt_golden.txt`, read by
+   `tests/test_hardware_golden.py::test_min_max_and_float_to_integer_match_real_gpu`.
+   Every conversion matched. `min` / `max` of two NaNs did not, and
+   `warplens/units/alu.py:_min_max` was changed to give what the GPU gives.
+   NUM-11 is now an `ampere` row.)*
+6. *(Resolved: `validation/README.md` had no row for `prmt`; it has one now,
+   and `validation/ampere/build.sh` builds the program that records it.)*
+7. *(Resolved: `docs/m4.md` said `tcgen05.wait` has a fixed cost; it now says
+   only TMEM loads and stores do, as
+   `warplens/timing/model.py:Timeline.charge` does.)* TIM-19 states the code's
    behaviour.
 8. *(Resolved: `PLAN.md` said two of the book's GEMM kernels run; it now
    says all nine.)*
-9. **Stale "Not implemented" lists.** `docs/m2.md` lists `.multicast::cluster`
-   and `docs/m3.md` lists `cta_group::2`, multicast commit and MN-major
-   operands as not implemented. Later milestones added them. These write-ups
-   are per milestone and may be meant as history; if so, they should say so.
-10. **`docs/m3.md`, Design:** "reads A (M x K) and B (N x K) from shared
-    memory in K-major layout". MN-major half precision has been supported
-    since M6 (`docs/coverage.md`, `docs/m6.md`).
+9. *(Resolved: the "Not implemented" lists of `docs/m2.md` and `docs/m3.md`
+   named `.multicast::cluster`, `cta_group::2`, multicast commit and MN-major
+   operands. Each list now says which of its entries a later milestone
+   added.)*
+10. *(Resolved: the Design section of `docs/m3.md` described only K-major
+    operands; it now mentions MN-major half precision, added in M6.)*
 11. *(Resolved: `PLAN.md` step A4 now records `clusterlaunchcontrol` as
     implemented.)* Nothing in `docs/clc.md` was found to contradict the code.
 

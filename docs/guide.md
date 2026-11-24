@@ -428,7 +428,7 @@ starts, with exit status 2. This is what the program's calls become:
 | `kernel<<<grid, block, smem>>>(args)`, `cudaLaunchKernelExC`, `cuLaunchKernel[Ex]` | a launch, with the cluster shape if one is given |
 | `cuTensorMapEncodeTiled` | a warplens tensor map, validated like the real call |
 | `printf` in a kernel | printed by the program, in order with its own output |
-| device queries | a simulated B200: compute capability 10.0, 148 SMs (10.3 for `--model B300`) |
+| device queries | a simulated B200: compute capability 10.0, 148 SMs (10.3 and 160 SMs for `--model B300`) |
 | `cuModuleLoadData`, `cudaLibraryLoadData` and the lookups that follow | the PTX is parsed; a module of machine code is refused unless the compiler kept its PTX (5.5) |
 | streams, events, `cudaMallocHost` | accepted; everything is synchronous and an elapsed time is zero |
 
@@ -1097,7 +1097,8 @@ and 4 stages in three scenarios. [m4.md](m4.md) describes the model.
 
 - **What the program is told.** Under `warplens run` a B200 reports compute
   capability 10.0 and a B300 reports 10.3, so TIRx compiles for `sm_100a` or
-  `sm_103a`, and the CuTe DSL is pointed at the same. Both report 148 SMs.
+  `sm_103a`, and the CuTe DSL is pointed at the same. A B200 reports 148 SMs
+  and a B300 160, the `sm_count` of its timing configuration.
   The Triton driver compiles for `sm_100a` for both models.
 - **Which timing configuration is loaded**: `warplens/configs/b200.yaml` or
   `b300.yaml`.
@@ -1124,7 +1125,6 @@ timing model: one SM's share of the HBM bandwidth (with the default
 **timing results for the two models differ by that much and no more**. Every
 other entry is the B200 value, marked "assumed equal to B200, uncalibrated".
 Nothing in it was measured on a B300, and the file says so entry by entry.
-(The device query above still answers 148 SMs for both models.)
 
 ## 8. Limits
 
@@ -1155,8 +1155,8 @@ PTX is [coverage.md](coverage.md); anything not in it raises
   (no bf16, integer, FP8/FP6/FP4 or block-scaled MMAs), MN-major TF32
   operands, float16 accumulators, sparsity, the `16x32bx2` transfer shape,
   `.pack`/`.unpack`, `tcgen05.cp`, `tcgen05.shift`, `.exclusive` allocation,
-  partial commits. `warplens.numerics` models the FP8/FP4 formats on the host
-  only.
+  partial commits. The FP8/FP4 formats exist as `cvt` conversions and in
+  `warplens.numerics`, not as MMA kinds.
 
 **Semantics that are approximations**
 

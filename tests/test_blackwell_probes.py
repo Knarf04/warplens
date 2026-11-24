@@ -29,7 +29,7 @@ import manifest  # noqa: E402
 import predict_small_formats  # noqa: E402
 
 SIMULATED = [p for p in manifest.PROBES if p.predict == "sim"]
-NUMERICS = [p for p in manifest.PROBES if p.predict == "numerics"]
+SMALL_FORMATS = [p for p in manifest.PROBES if p.program == "formats/small_formats"]
 
 
 def test_manifest_and_predictions_agree():
@@ -47,9 +47,13 @@ def test_manifest_and_predictions_agree():
     assert sources == {p.program for p in manifest.PROBES}, "a probe source that the manifest never runs"
 
 
-@pytest.mark.parametrize("probe", NUMERICS, ids=lambda p: p.name)
+@pytest.mark.parametrize("probe", SMALL_FORMATS, ids=lambda p: p.name)
 def test_small_format_predictions_are_what_numerics_says(probe):
-    assert (PREDICTED / (probe.name + ".txt")).read_text() == predict_small_formats.predict(*probe.args)
+    """The prediction is the probe's output under `warplens run` (the `cvt` instructions);
+    predict_small_formats.py computes the same lines from the warplens.numerics tables."""
+    assert len(SMALL_FORMATS) == 4
+    compared = lambda text: [line for line in text.splitlines() if not line.startswith("info:")]  # as compare.py does
+    assert compared((PREDICTED / (probe.name + ".txt")).read_text()) == compared(predict_small_formats.predict(*probe.args))
 
 
 def test_predicted_rna_column_is_what_the_rtx_3080_ti_gave():

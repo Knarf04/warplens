@@ -1,5 +1,5 @@
 status: ok
-warplens: 3 kernel launch(es) simulated on B200, 0 finding(s)
-  smem_touch: 1 CTA(s), 14 warp-instructions
-  smem_touch: 1 CTA(s), 14 warp-instructions
+warplens: kernel `smem_touch` needs 232464 bytes of shared memory per CTA (0 static + 232464 dynamic); the limit is 232448
+warplens: kernel `smem_touch` needs 233472 bytes of shared memory per CTA (0 static + 233472 dynamic); the limit is 232448
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
   smem_touch: 1 CTA(s), 14 warp-instructions

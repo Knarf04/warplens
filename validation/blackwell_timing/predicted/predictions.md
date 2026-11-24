@@ -11,11 +11,11 @@
 | alu_chain/warps=8 | 5 | 30 | issue_slots |
 | alu_chain/warps=16 | 10 | 60 | issue_slots |
 | alu_chain/warps=32 | 20 | 120 | issue_slots |
-| clc_latency/fail/plain/ctas=1 | 11 | 16.5 | latency |
-| clc_latency/fail/plain/ctas=2 | 12.3333 | 25.75 | latency |
-| clc_latency/fail/multicast/ctas=2 | 13 | 34 | latency |
-| clc_latency/succeed/plain/ctas=1 | 22 | 30 | latency |
-| clc_latency/succeed/multicast/ctas=2 | 24 | 62 | latency |
+| clc_latency/fail/plain/ctas=1 | 108.333 | 17.5 | latency |
+| clc_latency/fail/plain/ctas=2 | 109.667 | 26.75 | latency |
+| clc_latency/fail/multicast/ctas=2 | 109.667 | 35 | latency |
+| clc_latency/succeed/plain/ctas=1 | 120 | 31 | latency |
+| clc_latency/succeed/multicast/ctas=2 | 121.333 | 63 | latency |
 | cluster_costs/load/multicast/ctas=1 | 193.667 | 20.5 | latency |
 | cluster_costs/load/multicast/ctas=2 | 193.667 | 36 | latency |
 | cluster_costs/load/multicast/ctas=4 | 193.667 | 67 | latency |
@@ -26,7 +26,7 @@
 | cluster_costs/mma/pair/m=256/n=256/batch=4 | 659.605 | 33 | latency |
 | cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 | 95.9589 | 36 | Tensor_Core |
 | cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 | 337.902 | 66 | Tensor_Core |
-| cp_async/warm | 122.132 | 8.75 | latency |
+| cp_async/warm | 106.5 | 8.75 | latency |
 | cp_async/cold | 122.132 | 8.75 | latency |
 | global_load/load_chain/footprint=l1 | 24.1667 | 6.25 | latency |
 | global_load/store/footprint=l1 | 3.66667 | 5.5 | latency |

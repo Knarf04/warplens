@@ -57,7 +57,7 @@ def suite(tmp_path):
     refuses and whose bin-native/ holds one that prints the committed prediction."""
     root = tmp_path / "validation" / "blackwell"
     root.mkdir(parents=True)
-    for name in ("manifest.py", "run_all.py", "compare.py"):
+    for name in ("manifest.py", "run_all.py", "compare.py", "probe_process.py"):
         shutil.copy(SUITE / name, root / name)
     shutil.copytree(SUITE / "predicted", root / "predicted")
     script(root / "bin" / "mbarrier" / "script", f"printf '%s' '{LAUNCH_FAILED}'\nexit 4\n")
@@ -260,7 +260,7 @@ def test_a_fallback_toolkit_is_flagged_everywhere(suite):
     assert compared.stdout.count("BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE") == 2  # before and after
     assert verdict(compared.stdout, "mbarrier/phase_parity") == "identical"
     strict = compare(suite, "--require-same-toolkit")
-    assert strict.returncode == 2 and "identical" not in strict.stdout
+    assert strict.returncode == 3 and "identical" not in strict.stdout  # 2 is "unverified differences only"
     # Predictions made again with that very nvcc (any machine can do it) are comparable:
     # compare.py judges by the predictions it is given, not by what the run recorded.
     again = suite / "predicted-13.0"

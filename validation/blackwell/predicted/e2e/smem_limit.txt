@@ -1,4 +1,6 @@
 info: sharedMemPerBlockOptin 232448, sharedMemPerMultiprocessor 233472
 232448 bytes (227 KiB + 0): opt-in accepted; launched; first byte 5a, last byte a5
-232464 bytes (227 KiB + 16): opt-in accepted; launched; first byte 5a, last byte a5
-233472 bytes (227 KiB + 1024): opt-in accepted; launched; first byte 5a, last byte a5
+232464 bytes (227 KiB + 16): opt-in accepted; launch refused
+info: 232464 bytes (227 KiB + 16): the launch returned cudaErrorLaunchFailure
+233472 bytes (227 KiB + 1024): opt-in accepted; launch refused
+info: 233472 bytes (227 KiB + 1024): the launch returned cudaErrorLaunchFailure

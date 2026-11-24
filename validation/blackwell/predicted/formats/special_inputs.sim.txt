@@ -1,6 +1,6 @@
-prediction: written by formats/predict_small_formats.py from warplens.numerics
-the probe itself under `warplens run`: exit 3
-warplens: unsupported instruction `cvt.rn.satfinite.e4m3x2.f32` (expected cvt[.round].dtype.atype)
-  line 114: {cvt.rn.satfinite.e4m3x2.f32 %rs18, %r17, %r2;}
-KERNEL FAILED: convert: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
-warplens: the program launched no kernels
+status: ok
+warplens: 4 kernel launch(es) simulated on B200, 0 finding(s)
+  convert: 1 CTA(s), 126 warp-instructions
+  convert: 1 CTA(s), 130 warp-instructions
+  convert: 1 CTA(s), 128 warp-instructions
+  convert: 1 CTA(s), 161 warp-instructions

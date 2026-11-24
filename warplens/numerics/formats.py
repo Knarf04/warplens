@@ -67,8 +67,11 @@ class FloatFormat:
 
     @property
     def nan_code(self) -> int | None:
-        nans = np.flatnonzero(np.isnan(self.table))
-        return int(nans[0]) if len(nans) else None
+        """The code a NaN encodes to: all ones below the sign bit, as cuda_fp8.h and the `cvt`
+        instructions give (0x7f for E4M3 and E5M2, 0xff for the unsigned formats)."""
+        positive = self.table[:len(self.table) // 2] if self.signed else self.table
+        nans = np.flatnonzero(np.isnan(positive))
+        return int(nans[-1]) if len(nans) else None
 
     def decode(self, codes) -> np.ndarray:
         codes = np.asarray(codes)

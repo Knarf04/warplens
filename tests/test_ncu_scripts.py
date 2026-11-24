@@ -186,21 +186,22 @@ def test_ampere_script_dry_run(work):
 
 def test_the_recorded_table_is_parsed_and_compared_with_the_simulator():
     """compare_ncu.py on a real `ncu --csv` table: the thousands separators, the "n/a" rows,
-    the text before the header. The counters agree with the simulator except the total
-    wavefronts, which are 4160 higher on the 3080 Ti in every layout (matrix row TIM-17)."""
+    the text before the header. The counters agree with the simulator, the total wavefronts
+    included: `stats.smem.ncu_wavefronts` adds the 4160 that ncu counts beyond the shared
+    accesses on the 3080 Ti (two per warp, one per CTA per barrier; matrix row TIM-17)."""
     import sys
     done = subprocess.run([sys.executable, str(AMPERE / "compare_ncu.py"), str(RECORDED), "64"], capture_output=True,
                           text=True, env={**os.environ, "PYTHONPATH": str(ROOT)})
-    assert done.returncode == 1, done.stdout + done.stderr   # 3 counters differ, by design of the record
+    assert done.returncode == 0, done.stdout + done.stderr
     text = done.stdout
     assert text.count("grid 64, block 32x32") == 3
     row = lambda kernel, metric: next(l.split() for l in text.split(kernel)[1].splitlines() if l.strip().startswith(metric))
     assert row("transpose_linear", "l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum")[1:] == ["63488", "63488", "="]
     assert row("transpose_linear", "smsp__inst_executed_op_shared_ld.sum")[1:] == ["2048", "2048", "="]
-    assert row("transpose_linear", "l1tex__data_pipe_lsu_wavefronts_mem_shared.sum")[1:] == ["71744", "67584", "+4160"]
-    assert row("transpose_swizzled", "l1tex__data_pipe_lsu_wavefronts_mem_shared.sum")[1:] == ["8256", "4096", "+4160"]
+    assert row("transpose_linear", "l1tex__data_pipe_lsu_wavefronts_mem_shared.sum")[1:] == ["71744", "71744", "="]
+    assert row("transpose_swizzled", "l1tex__data_pipe_lsu_wavefronts_mem_shared.sum")[1:] == ["8256", "8256", "="]
     assert row("transpose_padded", "l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum")[1] == "n/a"
-    assert text.rstrip().endswith("3 counter(s) differ")
+    assert text.rstrip().endswith("all counters match")
 
 
 def test_a_table_with_ncu_chatter_before_it_and_no_table_at_all(tmp_path):
@@ -210,7 +211,7 @@ def test_a_table_with_ncu_chatter_before_it_and_no_table_at_all(tmp_path):
                        "==PROF== Disconnected from process 1\n" + RECORDED.read_text())
     done = subprocess.run([sys.executable, str(AMPERE / "compare_ncu.py"), str(chatter), "64"], capture_output=True,
                           text=True, env={**os.environ, "PYTHONPATH": str(ROOT)})
-    assert done.stdout.rstrip().endswith("3 counter(s) differ")
+    assert done.stdout.rstrip().endswith("all counters match")
     denied = subprocess.run([sys.executable, str(AMPERE / "compare_ncu.py"), str(FIXTURE / "permission_denied.txt"), "64"],
                             capture_output=True, text=True, env={**os.environ, "PYTHONPATH": str(ROOT)})
     assert denied.returncode != 0 and "no ncu CSV table found" in denied.stderr and "ERR_NVGPUCTRPERM" in denied.stderr

@@ -257,7 +257,9 @@ elif ! env_installed; then
 else
   pass env "${WARPLENS_ENV_RUN:-$ENV_PREFIX}"
   if (( with_e2e )); then
-    if out="$(env_run timeout --kill-after=5 60 python "$REMOTE_DIR/check_env.py" e2e "$book" 2>&1)"; then
+    # PyTorch lives in an env of its own (lib.sh, install_torch_env); without one, the env's Python.
+    e2e_py="$(torch_python)"; [[ -x "$e2e_py" ]] || e2e_py=python
+    if out="$(env_run timeout --kill-after=5 60 "$e2e_py" "$REMOTE_DIR/check_env.py" e2e "$book" 2>&1)"; then
       pass native-e2e "CUDA PyTorch, Triton and the book clone are available"
     else
       fail native-e2e "native end-to-end prerequisites are missing: $(tr '\n' ' ' <<<"$out")"

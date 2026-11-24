@@ -20,8 +20,8 @@ This is the set an `sm_100a` / `sm_103a` build emits. The values come from the t
 implementation of the same functions in the CUDA headers, and has not been compared with a GPU:
 
   * encoding a NaN gives 0x7f for E4M3 and E5M2 whatever its sign, and +6 (0x7) for E2M1,
-    which has no NaN. (`warplens.numerics` encodes a NaN as E5M2's first NaN code, 0x7d, and
-    refuses one for E2M1; it also refuses negative values for UE8M0.)
+    which has no NaN. (`warplens.numerics` gives the same NaN code and
+    refuses a NaN for E2M1; it also refuses negative values for UE8M0.)
   * decoding a NaN code gives 0x7fff, in half precision and in bfloat16;
   * UE8M0 ignores the sign of its input. `.rz` gives the exponent field of the input, so zero
     and everything below 2^-126 become code 0 (2^-127); `.rp` gives the next code up unless

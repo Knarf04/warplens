@@ -126,6 +126,7 @@ e4m3 code 7c -> half 5e00
 e4m3 code 7d -> half 5e80
 e4m3 code 7e -> half 5f00
 e4m3 code 7f -> nan
+info: e4m3 code 7f decodes to the NaN pattern 7fff
 e4m3 code 80 -> half 8000
 e4m3 code 81 -> half 9800
 e4m3 code 82 -> half 9c00
@@ -254,6 +255,7 @@ e4m3 code fc -> half de00
 e4m3 code fd -> half de80
 e4m3 code fe -> half df00
 e4m3 code ff -> nan
+info: e4m3 code ff decodes to the NaN pattern 7fff
 e5m2 code 00 -> half 0000
 e5m2 code 01 -> half 0100
 e5m2 code 02 -> half 0200
@@ -380,8 +382,11 @@ e5m2 code 7a -> half 7a00
 e5m2 code 7b -> half 7b00
 e5m2 code 7c -> half 7c00
 e5m2 code 7d -> nan
+info: e5m2 code 7d decodes to the NaN pattern 7fff
 e5m2 code 7e -> nan
+info: e5m2 code 7e decodes to the NaN pattern 7fff
 e5m2 code 7f -> nan
+info: e5m2 code 7f decodes to the NaN pattern 7fff
 e5m2 code 80 -> half 8000
 e5m2 code 81 -> half 8100
 e5m2 code 82 -> half 8200
@@ -508,8 +513,11 @@ e5m2 code fa -> half fa00
 e5m2 code fb -> half fb00
 e5m2 code fc -> half fc00
 e5m2 code fd -> nan
+info: e5m2 code fd decodes to the NaN pattern 7fff
 e5m2 code fe -> nan
+info: e5m2 code fe decodes to the NaN pattern 7fff
 e5m2 code ff -> nan
+info: e5m2 code ff decodes to the NaN pattern 7fff
 e4m3 367fffff:00 36800000:00 36800001:00 3683ffff:00 36840000:00 36840001:00 3687ffff:00 36880000:00
 e4m3 36880001:00 368bffff:00 368c0000:00 368c0001:00 368fffff:00 36900000:00 36900001:00 3693ffff:00
 e4m3 36940000:00 36940001:00 3697ffff:00 36980000:00 36980001:00 369bffff:00 369c0000:00 369c0001:00

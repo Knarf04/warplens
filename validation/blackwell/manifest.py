@@ -28,7 +28,7 @@ class Probe:
     risk: str = ""
     # Where the prediction comes from:
     #   "sim"        the program's standard output under `warplens run`
-    #   "numerics"   formats/predict_small_formats.py (the simulator cannot run the kernel)
+    #   "numerics"   formats/predict_small_formats.py (for a kernel the simulator cannot run; none now)
     #   "none"       no prediction: the output is new information
     predict: str = "sim"
     # How compare.py judges a difference: "exact", or "ulp" (float32 hex words may differ;
@@ -252,15 +252,13 @@ def _clc() -> list[Probe]:
 def _formats() -> list[Probe]:
     return [
         Probe("formats/fp8_codes", "formats/small_formats", ("fp8",), ("NUM-01", "NUM-02"),
-              "E4M3 and E5M2: every code decodes as modeled; encoding rounds to nearest even and saturates",
-              predict="numerics"),
+              "E4M3 and E5M2: every code decodes as modeled; encoding rounds to nearest even and saturates"),
         Probe("formats/fp4_codes", "formats/small_formats", ("fp4",), ("NUM-03",),
-              "E2M1: 16 codes; ties to even, saturating at 6", predict="numerics"),
+              "E2M1: 16 codes; ties to even, saturating at 6"),
         Probe("formats/e8m0_ties", "formats/small_formats", ("e8m0",), ("NUM-04",),
-              "UE8M0: code c is 2^(c - 127); a midpoint between two powers of two goes to the larger",
-              predict="numerics"),
+              "UE8M0: code c is 2^(c - 127); a midpoint between two powers of two goes to the larger"),
         Probe("formats/special_inputs", "formats/small_formats", ("special",), ("NUM-06",),
-              "NaN, infinities, zeros and out-of-range inputs for the four formats", predict="numerics"),
+              "NaN, infinities, zeros and out-of-range inputs for the four formats"),
         Probe("formats/tf32_modes", "formats/tf32_modes", (), ("NUM-07", "NUM-08"),
               "cvt.rn/.rz.tf32.f32 round the magnitude bits like .rna with their own tie rule; .rna as on Ampere"),
         Probe("formats/ftz", "formats/ftz", (), ("NUM-09",),

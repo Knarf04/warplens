@@ -7,7 +7,7 @@ e4m3 42c80000:6c c2c80000:ec 3e800000:28 be800000:a8 3e75c28f:27 be75c28f:a7 3a8
 e4m3 2edbe6ff:00 aedbe6ff:80 0da24260:00 8da24260:80 7149f2ca:7e f149f2ca:fe 7f61b1e6:7e ff61b1e6:fe
 e4m3 3f800000:38 bf800000:b8 3f000000:30 bf000000:b0 3f400000:34 bf400000:b4
 e5m2 00000000:00 80000000:80 00000001:00 80000001:80 007fffff:00 00800000:00 7f7fffff:7b ff7fffff:fb
-e5m2 7f800000:7b ff800000:fb 7fc00000:7d ffc00000:7d 7f800001:7d ffa12345:7d 501502f9:7b d01502f9:fb
+e5m2 7f800000:7b ff800000:fb 7fc00000:7f ffc00000:7f 7f800001:7f ffa12345:7f 501502f9:7b d01502f9:fb
 e5m2 43e00000:5f c3e00000:df 43e80000:5f c3e80000:df 43eff333:5f c3eff333:df 43f00000:60 c3f00000:e0
 e5m2 44000000:60 c4000000:e0 47600000:7b c7600000:fb 47700000:7b c7700000:fb 47800000:7b c7800000:fb
 e5m2 40c00000:46 c0c00000:c6 40dccccd:47 c0dccccd:c7 40e00000:47 c0e00000:c7 41000000:48 c1000000:c8
@@ -16,6 +16,10 @@ e5m2 2edbe6ff:00 aedbe6ff:80 0da24260:00 8da24260:80 7149f2ca:7b f149f2ca:fb 7f6
 e5m2 3f800000:3c bf800000:bc 3f000000:38 bf000000:b8 3f400000:3a bf400000:ba
 e2m1 00000000:00 80000000:08 00000001:00 80000001:08 007fffff:00 00800000:00 7f7fffff:07 ff7fffff:0f
 e2m1 7f800000:07 ff800000:0f
+info: e2m1  7fc00000:07 (warplens.numerics rejects this input)
+info: e2m1  ffc00000:07 (warplens.numerics rejects this input)
+info: e2m1  7f800001:07 (warplens.numerics rejects this input)
+info: e2m1  ffa12345:07 (warplens.numerics rejects this input)
 e2m1 501502f9:07 d01502f9:0f 43e00000:07 c3e00000:0f 43e80000:07 c3e80000:0f 43eff333:07 c3eff333:0f
 e2m1 43f00000:07 c3f00000:0f 44000000:07 c4000000:0f 47600000:07 c7600000:0f 47700000:07 c7700000:0f
 e2m1 47800000:07 c7800000:0f 40c00000:07 c0c00000:0f 40dccccd:07 c0dccccd:0f 40e00000:07 c0e00000:0f
@@ -23,29 +27,56 @@ e2m1 41000000:07 c1000000:0f 42c80000:07 c2c80000:0f 3e800000:00 be800000:08 3e7
 e2m1 3a83126f:00 ba83126f:08 2edbe6ff:00 aedbe6ff:08 0da24260:00 8da24260:08 7149f2ca:07 f149f2ca:0f
 e2m1 7f61b1e6:07 ff61b1e6:0f 3f800000:02 bf800000:0a 3f000000:01 bf000000:09 3f400000:02 bf400000:0a
 ue8m0 00000000:00 80000000:00 00000001:00
+info: ue8m0  80000001:00 (warplens.numerics rejects this input)
 ue8m0 007fffff:01 00800000:01 7f7fffff:fe
+info: ue8m0  ff7fffff:fe (warplens.numerics rejects this input)
 ue8m0 7f800000:fe
+info: ue8m0  ff800000:fe (warplens.numerics rejects this input)
 ue8m0 7fc00000:ff ffc00000:ff 7f800001:ff ffa12345:ff 501502f9:a0
+info: ue8m0  d01502f9:a0 (warplens.numerics rejects this input)
 ue8m0 43e00000:88
+info: ue8m0  c3e00000:88 (warplens.numerics rejects this input)
 ue8m0 43e80000:88
+info: ue8m0  c3e80000:88 (warplens.numerics rejects this input)
 ue8m0 43eff333:88
+info: ue8m0  c3eff333:88 (warplens.numerics rejects this input)
 ue8m0 43f00000:88
+info: ue8m0  c3f00000:88 (warplens.numerics rejects this input)
 ue8m0 44000000:88
+info: ue8m0  c4000000:88 (warplens.numerics rejects this input)
 ue8m0 47600000:8f
+info: ue8m0  c7600000:8f (warplens.numerics rejects this input)
 ue8m0 47700000:8f
+info: ue8m0  c7700000:8f (warplens.numerics rejects this input)
 ue8m0 47800000:8f
+info: ue8m0  c7800000:8f (warplens.numerics rejects this input)
 ue8m0 40c00000:82
+info: ue8m0  c0c00000:82 (warplens.numerics rejects this input)
 ue8m0 40dccccd:82
+info: ue8m0  c0dccccd:82 (warplens.numerics rejects this input)
 ue8m0 40e00000:82
+info: ue8m0  c0e00000:82 (warplens.numerics rejects this input)
 ue8m0 41000000:82
+info: ue8m0  c1000000:82 (warplens.numerics rejects this input)
 ue8m0 42c80000:86
+info: ue8m0  c2c80000:86 (warplens.numerics rejects this input)
 ue8m0 3e800000:7d
+info: ue8m0  be800000:7d (warplens.numerics rejects this input)
 ue8m0 3e75c28f:7d
+info: ue8m0  be75c28f:7d (warplens.numerics rejects this input)
 ue8m0 3a83126f:75
+info: ue8m0  ba83126f:75 (warplens.numerics rejects this input)
 ue8m0 2edbe6ff:5e
+info: ue8m0  aedbe6ff:5e (warplens.numerics rejects this input)
 ue8m0 0da24260:1b
+info: ue8m0  8da24260:1b (warplens.numerics rejects this input)
 ue8m0 7149f2ca:e3
+info: ue8m0  f149f2ca:e3 (warplens.numerics rejects this input)
 ue8m0 7f61b1e6:fe
+info: ue8m0  ff61b1e6:fe (warplens.numerics rejects this input)
 ue8m0 3f800000:7f
+info: ue8m0  bf800000:7f (warplens.numerics rejects this input)
 ue8m0 3f000000:7e
+info: ue8m0  bf000000:7e (warplens.numerics rejects this input)
 ue8m0 3f400000:7f
+info: ue8m0  bf400000:7f (warplens.numerics rejects this input)

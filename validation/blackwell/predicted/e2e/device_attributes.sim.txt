@@ -1,2 +1,3 @@
 status: ok
+warplens: building the shim libraries (first run)
 warplens: the program launched no kernels

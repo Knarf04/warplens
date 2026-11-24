@@ -394,12 +394,14 @@ To settle before renting:
   `validation/blackwell/e2e/triton_gpu.py` ran whole on the 3080 Ti. With a
   12.x driver there is no PyTorch for it and the step is skipped.
 
-Found by this work in the simulator and not yet fixed:
+Found by this work in the simulator, and fixed since unless marked open:
 
 - `bar.warp.sync` (`__syncwarp()`), `.volatile` loads and stores, and
-  `%clock64` are not supported; ordinary CUDA C++ emits the first two.
-- The FP8 and FP4 `cvt` forms of `cuda_fp8.h` and `cuda_fp4.h` are not
-  implemented, although the formats are (`warplens.numerics`).
+  `%clock64` were not supported. Fixed: all three run; `bar.warp.sync` across
+  divergent paths is reported as a finding, not modeled.
+- The FP8 and FP4 `cvt` forms of `cuda_fp8.h` and `cuda_fp4.h` were not
+  implemented. Fixed for the forms an `sm_100a` build emits; the small-format
+  probes are now predicted by running them.
 - After more arrivals than an mbarrier's count, the pending count stayed
   negative and every later arrival completed a phase. Fixed: the surplus
   completes as many phases as it covers.
@@ -411,9 +413,18 @@ Found by this work in the simulator and not yet fixed:
   timing equalled B200; utilization was averaged over CTAs that do no work.
   Fixed: all three use the L2 record, B300 has its own config (160 SMs), and
   utilization is over CTAs that did work.
-- `warplens run script.py` without `python` takes the Triton path and fails
-  confusingly for a TIRx or CuTe DSL script. `clc_limit` is not reachable from
-  `warplens run`.
+- `warplens run script.py` without `python` took the Triton path and failed
+  confusingly for a TIRx or CuTe DSL script, and `clc_limit`, the active SM
+  count and the timing config were not reachable from `warplens run`. Fixed:
+  a `.py` runs under the shim; `--clc-limit`, `--active-sms`, `--timing-config`.
+- The device query answered 148 SMs for a B300 and `warplens.numerics` encoded
+  an E5M2 NaN as 0x7d where the `cvt` instructions give 0x7f. Fixed: 160 SMs,
+  and 0x7f in both.
+- Open: lanes pass `bar.sync` before lane 0 arrives in two control-flow
+  layouts nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`);
+  a stale mbarrier token tests true where the 3080 Ti gives false; `atom` is
+  not implemented (`validation/blackwell/README.md`, "Found while writing the
+  probes").
 - Documents that contradict the code are listed in
   `docs/validation-matrix.md`, "Discrepancies found".
 

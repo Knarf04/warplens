@@ -1,11 +1,11 @@
 DEVICE bench=clc_latency name=warplens_simulated_B200 cc=10.0 sm_count=148 total_mem_bytes=206158430208 free_mem_bytes=206158430208 bench_clock=0 sim=1 trials=1 scale=1 synthetic=0
-BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=206.6666666666659 sim_instr=310 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=382.6666666666688 sim_instr=574 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=227.99999999999892 sim_instr=500 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=425.33333333333667 sim_instr=912 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=238.66666666666544 sim_instr=632 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=446.6666666666706 sim_instr=1176 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/succeed/plain/ctas=1 nctas=1 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=392.6666666666691 sim_instr=538 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/succeed/plain/ctas=1 nctas=1 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=744.6666666666592 sim_instr=1018 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/succeed/multicast/ctas=2 nctas=2 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=426.66666666667004 sim_instr=1107 sim_bound=latency sim_findings=0
-BENCH id=clc_latency/succeed/multicast/ctas=2 nctas=2 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=810.6666666666555 sim_instr=2099 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=1764.0000000000048 sim_instr=326 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=3497.333333333312 sim_instr=606 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=1785.3333333333387 sim_instr=516 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=3539.9999999999764 sim_instr=944 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=1785.3333333333387 sim_instr=648 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=3539.9999999999764 sim_instr=1208 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/succeed/plain/ctas=1 nctas=1 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=2058.6666666666792 sim_instr=555 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/succeed/plain/ctas=1 nctas=1 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=3978.6666666666065 sim_instr=1051 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/succeed/multicast/ctas=2 nctas=2 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=16 sim_ns=2081.3333333333453 sim_instr=1124 sim_bound=latency sim_findings=0
+BENCH id=clc_latency/succeed/multicast/ctas=2 nctas=2 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=32 sim_ns=4022.666666666601 sim_instr=2132 sim_bound=latency sim_findings=0

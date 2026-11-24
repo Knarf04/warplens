@@ -223,7 +223,7 @@ run is isolated for that reason.
 | `lane_window.1` | `lane_window 1` | TM-03 | lane field 1: a 32x32b transfer running past the warp's window is refused | **refuses**: unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer spanning the local 32-row tensor-memory wind | fault |
 | `lane_window.48` | `lane_window 48` | TM-03 | lane field 48: a 32x32b transfer running past the warp's window is refused | **refuses**: unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer spanning the local 32-row tensor-memory wind | fault |
 | `layout_f` | `layout_f` | TM-04, TM-01 | M = 128: row m on lane m. M = 64: row m on lane 32 (m / 16) + m % 16 + a, a = 0 or 16 | runs | - |
-| `layout_f.64_8` | `layout_f 64 8` | TM-04 | M = 64 with lane offset 8, neither of Layout F's two positions: refused | refused | fault |
+| `layout_f.64_8` | `layout_f 64 8` | TM-04 | M = 64 with lane offset 8, neither of Layout F's two positions: refused | **refuses**: tcgen05.mma result with M=64 at lane 8; the lane of the destination must be 0 or 16 | fault |
 | `transfer_shapes` | `transfer_shapes` | TM-05 | thread and register to (lane, column) for 32x32b, 16x64b, 16x128b, 16x256b, load and store | runs | - |
 | `repeat_counts` | `repeat_counts` | TM-06, TM-05 | every power-of-two repeat count up to 128 registers per thread exists (the build assembles them) and loads the cells the mapping names | runs | - |
 | `fresh_contents` | `fresh_contents` | TM-13 | tensor memory that was never written reads as zero, in a first launch and after a launch that wrote it | runs (64 finding(s)) | - |
@@ -282,10 +282,10 @@ run is isolated for that reason.
 
 | Run | Program and arguments | Matrix | Claim tested | In the simulator | On hardware may |
 | --- | --- | --- | --- | --- | --- |
-| `fp8_codes` | `small_formats fp8` | NUM-01, NUM-02 | E4M3 and E5M2: every code decodes as modeled; encoding rounds to nearest even and saturates | refused; predicted from `warplens.numerics` | - |
-| `fp4_codes` | `small_formats fp4` | NUM-03 | E2M1: 16 codes; ties to even, saturating at 6 | refused; predicted from `warplens.numerics` | - |
-| `e8m0_ties` | `small_formats e8m0` | NUM-04 | UE8M0: code c is 2^(c - 127); a midpoint between two powers of two goes to the larger | refused; predicted from `warplens.numerics` | - |
-| `special_inputs` | `small_formats special` | NUM-06 | NaN, infinities, zeros and out-of-range inputs for the four formats | refused; predicted from `warplens.numerics` | - |
+| `fp8_codes` | `small_formats fp8` | NUM-01, NUM-02 | E4M3 and E5M2: every code decodes as modeled; encoding rounds to nearest even and saturates | runs | - |
+| `fp4_codes` | `small_formats fp4` | NUM-03 | E2M1: 16 codes; ties to even, saturating at 6 | runs | - |
+| `e8m0_ties` | `small_formats e8m0` | NUM-04 | UE8M0: code c is 2^(c - 127); a midpoint between two powers of two goes to the larger | runs | - |
+| `special_inputs` | `small_formats special` | NUM-06 | NaN, infinities, zeros and out-of-range inputs for the four formats | runs | - |
 | `tf32_modes` | `tf32_modes` | NUM-07, NUM-08 | cvt.rn/.rz.tf32.f32 round the magnitude bits like .rna with their own tie rule; .rna as on Ampere | runs | - |
 | `ftz` | `ftz` | NUM-09 | .ftz add, sub, mul, div, fma and sqrt around the subnormal range, as recorded on an RTX 3080 Ti (validation/ampere/ftz_golden.txt; NaN results compared as NaNs) | runs | - |
 | `fma` | `fma` | NUM-10 | fma and mad round the exact product-sum once, f32 and f64: 1000 cases in full and checksums of 10^4 each | runs | - |
@@ -409,21 +409,20 @@ with a count (which `sm_86` rejects without `.noComplete`) into single arrivals.
 ## Found while writing the probes
 
 Simulator gaps and oddities. None was fixed here; this suite does not touch the simulator.
+Those marked "fixed since" were fixed on other branches.
 
-1. **`__syncwarp()` does not run.** nvcc emits `bar.warp.sync -1;`, and the simulator stops
-   with `unsupported instruction 'bar.warp.sync'`. Reproduction: a kernel whose body is
-   `__syncwarp();`. `tmem/alloc.cu` uses `__syncthreads()` in a one-warp block instead.
-2. **`volatile` shared memory does not run.** A store to `__shared__ volatile uint32_t x`
-   compiles to `st.volatile.shared.b32`, refused as `unsupported instruction
-   'st.volatile.shared.b32' (modifier .volatile)`. Reproduction:
-   `__shared__ volatile unsigned x; x = 1;`. `cluster/barrier.cu` spins with an inline
-   `add.u32` instead.
-3. **The small-format conversion instructions are not implemented**
+1. **`__syncwarp()` did not run** (fixed since). nvcc emits `bar.warp.sync -1;`, which the
+   simulator refused as an unsupported instruction. It runs now; `tmem/alloc.cu` still uses
+   `__syncthreads()` in a one-warp block.
+2. **`volatile` shared memory did not run** (fixed since). A store to
+   `__shared__ volatile uint32_t x` compiles to `st.volatile.shared.b32`, which was refused.
+   It runs now; `cluster/barrier.cu` still spins with an inline `add.u32`.
+3. **The small-format conversion instructions were not implemented** (fixed since)
    (`cvt.rn.satfinite.e4m3x2.f32`, `cvt.rn.f16x2.e2m1x2`, ... as `cuda_fp8.h` and
-   `cuda_fp4.h` emit them). `docs/numerics.md` says the formats are host-side only; the
-   consequence here is that `formats/small_formats` cannot be predicted by running it, so
-   its predictions come from `formats/predict_small_formats.py`, a second implementation of
-   the probe's input generation that has to be kept in step by hand.
+   `cuda_fp4.h` emit them). `formats/small_formats` is now predicted by running it, like
+   every other probe. `formats/predict_small_formats.py`, which computes the same lines from
+   the `warplens.numerics` tables, is kept as a second implementation that a test compares
+   with the predictions.
 4. **Over-arrival did not carry the way its finding says** (fixed since, on branch
    `work/sim-bugs`). With one arrival expected, an `arrive` with count 5 completed one phase
    and left the pending count at -3; every later single arrival then completed one more

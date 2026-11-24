@@ -90,7 +90,7 @@ if (( ! dry )); then
   [[ -x "$BIN/launch" ]] || finish "ncu not run: $BIN/launch is not built"
 
   # 1. Can counters be read? One empty kernel, one counter.
-  "$NCU" --csv --metrics smsp__inst_executed.sum "$BIN/launch" --trials 1 --only ctas=1 \
+  timeout --kill-after=10 60 "$NCU" --csv --metrics smsp__inst_executed.sum "$BIN/launch" --trials 1 --only ctas=1 \
     > "$OUT/probe.csv" 2> "$OUT/probe.err"
   code=$?
   if grep -q "ERR_NVGPUCTRPERM" "$OUT/probe.csv" "$OUT/probe.err"; then
@@ -101,7 +101,7 @@ if (( ! dry )); then
   fi
   echo "ncu can read counters; profiling" >&2
   # The counters this device lists, for the retry in profile().
-  "$NCU" --query-metrics > "$OUT/metrics_table.txt" 2>&1 || true
+  timeout --kill-after=10 60 "$NCU" --query-metrics > "$OUT/metrics_table.txt" 2>&1 || true
 else
   echo "dry-run: $NCU --csv --metrics smsp__inst_executed.sum $BIN/launch --trials 1 --only ctas=1   # can counters be read? $([[ -x "$BIN/launch" ]] && echo built || echo NOT BUILT)"
 fi

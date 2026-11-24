@@ -511,7 +511,7 @@ int warplens_device_attribute(int attribute) {
     case cudaDevAttrMaxSharedMemoryPerMultiprocessor: return 228 * 1024;
     case cudaDevAttrMaxRegistersPerBlock: case cudaDevAttrMaxRegistersPerMultiprocessor: return 65536;
     case cudaDevAttrWarpSize: return 32;
-    case cudaDevAttrMultiProcessorCount: return 148;
+    case cudaDevAttrMultiProcessorCount: return is_b300() ? 160 : 148;  /* sm_count of configs/b200.yaml, b300.yaml */
     case cudaDevAttrMaxBlocksPerMultiprocessor: return 32;
     case cudaDevAttrComputeCapabilityMajor: return 10;
     case cudaDevAttrComputeCapabilityMinor: return is_b300() ? 3 : 0;

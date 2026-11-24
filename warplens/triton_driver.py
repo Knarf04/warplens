@@ -73,7 +73,7 @@ class _Utils:
         pass
 
     def get_device_properties(self, device):
-        return {"max_shared_mem": MAX_SMEM_BYTES, "max_num_regs": 65536, "multiprocessor_count": 148,
+        return {"max_shared_mem": MAX_SMEM_BYTES, "max_num_regs": 65536, "multiprocessor_count": 160 if self.driver.device.model == "B300" else 148,
                 "warpSize": 32, "sm_clock_rate": 1500000, "mem_clock_rate": 0, "mem_bus_width": 0}
 
 

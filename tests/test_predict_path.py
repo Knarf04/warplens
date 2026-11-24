@@ -225,7 +225,7 @@ def test_without_a_clone_the_book_step_says_skipped(tmp_path):
                            "--cutlass-bin", str(tmp_path / "none"), "--book", str(tmp_path / "no-book")],
                           capture_output=True, text=True, timeout=600,
                           env={**os.environ, "PYTHONPATH": str(ROOT), "CUDA_VISIBLE_DEVICES": "", "WARPLENS_BOOK": ""})
-    assert done.returncode == 0, done.stderr
+    assert done.returncode == 1, done.stderr  # the tutorials are not built: an incomplete collection, said so
     statuses = dict(line.split("\t")[:2] for line in (tmp_path / "status.tsv").read_text().splitlines()[1:])
     assert statuses["e2e/book_hgemm"] == "skipped (no clone of the book given (--book or WARPLENS_BOOK))"
     assert all(statuses[name].startswith("skipped (") and "is not built" in statuses[name] for name in TUTORIALS)

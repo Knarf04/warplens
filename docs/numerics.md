@@ -20,6 +20,9 @@ products inside one MMA are accumulated.
 | `fma`, floating `mad` | exact product and sum with integer significands, rounded once | against exact rational arithmetic, and against libc `fma` by the reviewer |
 | `min`, `max` | a NaN operand yields the other; `min(+0, -0)` is `-0`, `max` is `+0`. Two NaNs give `0x7fffffff` for f32, and the second operand made quiet for f64 | on a GPU, bit for bit: `validation/ampere/minmax_cvt_golden.txt` (f32 and f64) |
 | float to integer | saturates; NaN gives 0, or the sign-bit pattern when the source is f64 or the result is 64-bit | on a GPU, bit for bit: the same file (f32 and f64 to s32, u32, s64, u64, all four rounding modes) |
+| `cvt` between f16, f32 and f64 | IEEE round-to-nearest-even, as NumPy does it; NaNs as below | on a GPU, bit for bit, around the subnormal range of each type: `validation/ampere/cvt_ftz_golden.txt` |
+| `cvt.{rni,rzi,rmi,rpi}.f32.f32`, `.f64.f64` (`rintf`, `truncf`, `floorf`, `ceilf`) | NumPy's `rint`, `trunc`, `floor`, `ceil`; NaNs as arithmetic gives them | on a GPU, bit for bit: the same file |
+| `cvt` with `.ftz` | see "Flush to zero" below | on a GPU, bit for bit: the same file, 8120 cases with the two rows above |
 | `cvt.rna.tf32.f32` | see below | on a GPU, bit for bit |
 | `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | see below | against exact rational arithmetic only |
 
@@ -32,9 +35,10 @@ the complete operand-selection and quieting policy measured below. In particular
 says a NaN passes through unchanged; the recorded Ampere results quiet signalling
 NaNs. The table records this model's empirical policy, not a blanket PTX guarantee.
 The simulator returns what an RTX 3080 Ti returned (`validation/ampere/nan_golden.txt`,
-`validation/ampere/ftz_golden.txt`, `validation/ampere/minmax_cvt_golden.txt`;
-`tests/test_hardware_golden.py`), implemented in
-`warplens/units/alu.py:_gpu_nans` and `warplens/units/alu.py:_converted_nans`:
+`validation/ampere/ftz_golden.txt`, `validation/ampere/minmax_cvt_golden.txt`,
+`validation/ampere/cvt_ftz_golden.txt`; `tests/test_hardware_golden.py`), implemented in
+`warplens/units/alu.py:_gpu_nans`, `warplens/units/alu.py:_converted_nans` and
+`warplens/units/alu.py:_float_to_float`:
 
 | Result | NaN |
 | --- | --- |
@@ -46,19 +50,48 @@ The simulator returns what an RTX 3080 Ti returned (`validation/ampere/nan_golde
 | f64, `neg` and `abs` of a NaN | the operand made quiet; the sign is not changed |
 | `cvt` between f16 and f32 | `0x7fff` and `0x7fffffff` |
 | `cvt` to or from f64 | the sign kept, the quiet bit set, the payload's leading bits kept (shifted to the new width) |
+| `cvt.ftz.f64.f32` | `0x7fffffffe0000000` for every NaN: under `.ftz` an f32 NaN source first becomes `0x7fffffff`, and that is converted. `cvt.rn.ftz.f32.f64` is as without `.ftz` |
+| `cvt.f32.f32`; `cvt.ftz.f32.f32` | the bits, unchanged; `0x7fffffff` |
+| `cvt.{rni,rzi,rmi,rpi}` to the same floating type | f32: `0x7fffffff`. f64: the operand made quiet, sign and payload kept |
 | `mov` | the bits, unchanged |
 
 Not measured: NaNs of `div.full`, `div.approx` and `sqrt.approx` (in the
 simulator they share the code of `div.rn` and `sqrt.rn` and so give
 `0x7fffffff` as well), rounding modes other than `.rn` (not implemented), and
-f16 arithmetic. `cvt` with `.ftz` is recorded in the golden file and not
-implemented. A NaN that the tensor core or
+f16 arithmetic. A NaN that the tensor core or
 TMA's NaN fill produces is a separate claim (TMA-05). All of this is Ampere
 observations. The scalar probes compare NaN classification and non-NaN values
 bit for bit; `validation/blackwell/formats/ampere_replay` reruns the Ampere
 programs on the B200 and compares the NaN bits too (NUM-11, NUM-13), so a
 Blackwell payload policy that differs from Ampere's shows as a difference. The
 Ampere golden tests pin the empirical policy without requiring it of Blackwell.
+
+### Flush to zero
+
+`.ftz` is about f32 only (the PTX manual: "subnormal inputs and results to
+sign-preserving zero"). What counts as subnormal was measured on the RTX 3080 Ti
+(`validation/ampere/ftz_golden.txt` for arithmetic,
+`validation/ampere/cvt_ftz_golden.txt` for `cvt`):
+
+- A subnormal f32 **source** is a zero of its sign. `cvt.rpi.ftz.f32.f32` and
+  `cvt.rpi.ftz.s32.f32` of the smallest positive subnormal give 0, where the forms
+  without `.ftz` give 1; `cvt.ftz.f64.f32` gives a zero.
+- An f32 **result** is a zero of its sign when it is tiny after rounding: when the
+  exact result, rounded to 24 bits as if the exponent had no lower limit, is still
+  below 2^-126. `cvt.rn.ftz.f32.f64` gives zero for every magnitude below
+  2^-126 (1 - 2^-25) (`0x380ffffff0000000`), although without `.ftz` the values
+  from 2^-126 (1 - 2^-24) on round to the smallest normal number. The same rule
+  as for `mul`, `div` and `fma`.
+- Subnormal **f16** values are left alone, as the source of `cvt.ftz.f32.f16` and
+  as the result of `cvt.rn.ftz.f16.f32`.
+- ptxas takes `.ftz` on `cvt` only when the source or the result is f32
+  ("Modifier '.ftz' does not apply to this type of convert operation"), and the
+  simulator refuses the other forms too. `.ftz` with an integer source was not
+  measured and is refused.
+
+Compilers emit these forms under fast-math: `cvt.ftz.f64.f32` and
+`cvt.rn.ftz.f32.f64` for casts, `cvt.rzi.ftz.s32.f32` for `(int)x`,
+`cvt.rmi.ftz.f32.f32` for `floorf`.
 
 ### Integer zero divisors
 

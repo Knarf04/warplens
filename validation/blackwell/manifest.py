@@ -287,12 +287,11 @@ def _formats() -> list[Probe]:
               "as on an RTX 3080 Ti (validation/ampere/bitfield_golden.txt): bfi.b32, bfi.b64 and "
               "shf.{l,r}.{wrap,clamp}.b32 over positions and lengths up to and past the register width"),
         Probe("formats/ampere_replay.nan", "formats/ampere_replay", ("nan",), ("NUM-13",),
-              "as on an RTX 3080 Ti (validation/ampere/nan_golden.txt without its 44 cvt.ftz lines): the bits "
-              "of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt, f32 and f64"),
-        Probe("formats/ampere_replay.nan_cvt_ftz", "formats/ampere_replay", ("nan_cvt_ftz",), ("NUM-13",),
-              "none: cvt.ftz.f64.f32 and cvt.rn.ftz.f32.f64 of NaNs, which the simulator does not implement; "
-              "the 44 lines are to be read against the same lines of validation/ampere/nan_golden.txt",
-              predict="none"),
+              "as on an RTX 3080 Ti (validation/ampere/nan_golden.txt): the bits of every NaN result of add, "
+              "sub, mul, div, fma, sqrt, neg, abs, mov and cvt (with .ftz too), f32 and f64"),
+        Probe("formats/ampere_replay.cvt_ftz", "formats/ampere_replay", ("cvt_ftz",), ("NUM-09",),
+              "as on an RTX 3080 Ti (validation/ampere/cvt_ftz_golden.txt): cvt with .ftz between f16, f32 and "
+              "f64, to the integer types and to an integer in f32, over the subnormal range of source and result"),
     ]
 
 

@@ -694,6 +694,15 @@ def _cvt(w, ins, mask):
         raise unsupported(ins, "predicates cannot be converted")
     d, a = _operands(ins, 2)
     x = w.read(a, aty)
+    ftz = "ftz" in extra
+    if ftz:
+        # ptxas: "Modifier '.ftz' does not apply to this type of convert operation" unless the
+        # source or the result is f32. With an integer source it was not measured.
+        if da.kind != "f" or "f32" not in (dty, aty) or extra.count("ftz") > 1:
+            raise unsupported(ins, ".ftz needs a floating-point source, and .f32 as source or result")
+        extra.remove("ftz")
+        if aty == "f32":
+            x = _flush(x)  # a subnormal source is a zero of its sign
     if da.kind == "f" and dd.kind in "iu":
         if len(extra) != 1 or extra[0] not in _FLOAT_TO_INT:
             raise unsupported(ins, "float-to-int needs one of .rni/.rzi/.rmi/.rpi")
@@ -712,12 +721,43 @@ def _cvt(w, ins, mask):
         out[low] = info.min
         w.write(d, out, mask)
         return
+    if da.kind == "f" and dd.kind == "f":
+        w.write(d, _float_to_float(ins, x, dty, aty, extra, ftz), mask)
+        return
     if extra and not (dd.kind == "f" and set(extra) <= _ROUND_NEAREST):
         raise unsupported(ins, f"modifier .{extra[0]}")
-    result = x.astype(dd)
-    if da.kind == "f" and dd.kind == "f":
-        result = _converted_nans(x, result)
-    w.write(d, result, mask)
+    w.write(d, x.astype(dd), mask)
+
+
+def _float_to_float(ins: Instr, x: np.ndarray, dty: str, aty: str, extra, ftz: bool) -> np.ndarray:
+    """`cvt` between floating types, as an RTX 3080 Ti does it (validation/ampere/
+    cvt_ftz_golden.txt and nan_golden.txt). `x` is the source, already flushed under `.ftz`.
+
+    * `cvt.{rni,rzi,rmi,rpi}.T.T` rounds to an integer in the same type (rint, trunc, floor,
+      ceil); its NaNs are those of arithmetic (`_gpu_nans`).
+    * `cvt[.rn].T.U` converts, rounding to nearest even; NaNs as in `_converted_nans`. With
+      the same type on both sides it copies the bits, NaNs included.
+    * `.ftz` (the source or the result is f32): a subnormal f32 source counts as a zero of its
+      sign. An f32 result that is tiny after rounding (see `_float_result`) is a zero of its
+      sign: of f64 to f32, everything below 2^-126 (1 - 2^-25) in magnitude. An f32 NaN source
+      counts as 0x7fffffff, so `cvt.ftz.f64.f32` gives 0x7fffffffe0000000 for every NaN and
+      `cvt.ftz.f32.f32` gives 0x7fffffff. Subnormal f16 values, as source or result, are
+      left alone: `.ftz` is about f32 only."""
+    dd = NP_TYPES[dty]
+    if len(extra) == 1 and extra[0] in _FLOAT_TO_INT:
+        if dty != aty:
+            raise unsupported(ins, "rounding to an integer needs the same floating type on both sides")
+        with np.errstate(all="ignore"):
+            return _gpu_nans(_FLOAT_TO_INT[extra[0]](x), x)
+    if not set(extra) <= _ROUND_NEAREST:
+        raise unsupported(ins, f"modifier .{extra[0]}")
+    if ftz and aty == "f32":
+        x = _gpu_nans(x)
+    with np.errstate(all="ignore"):
+        result = x.astype(dd)
+    if ftz and dty == "f32" and aty == "f64":
+        result = _flush(result, np.abs(x) < _TINY)
+    return _converted_nans(x, result)
 
 
 _FLOAT_LAYOUT = {2: (np.uint16, 10), 4: (np.uint32, 23), 8: (np.uint64, 52)}  # (bits, fraction width)

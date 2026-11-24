@@ -484,11 +484,37 @@ def test_nan_results_match_real_gpu(sim):
     operand position and over every invalid operation. Compared bit for bit: an f32 NaN
     result is 0x7fffffff whatever went in; an f64 one is a NaN operand made quiet (which one
     depends on the instruction) or 0xfff8000000000000 for an invalid operation.
-    `cvt` with `.ftz` is recorded but not implemented by the simulator."""
-    problems, counts = _golden_instruction_mismatches(
-        sim, AMPERE / "nan_golden.txt", 3, skip=("cvt.ftz.f64.f32", "cvt.rn.ftz.f32.f64"))
+    `cvt.ftz.f64.f32` gives 0x7fffffffe0000000 for every NaN."""
+    problems, counts = _golden_instruction_mismatches(sim, AMPERE / "nan_golden.txt", 3)
     assert len(counts) == 38 and sum(counts.values()) == 14270
+    assert counts["cvt.ftz.f64.f32"] == counts["cvt.rn.ftz.f32.f64"] == 22
     assert not problems, "\n".join(problems)
+
+
+def test_cvt_with_ftz_matches_real_gpu(sim):
+    """cvt_ftz_golden.txt is bin/cvt_ftz_golden on an RTX 3080 Ti: `cvt` with `.ftz` between
+    f16, f32 and f64, from f32 to the integer types and to an integer in f32 (what fast-math
+    emits for casts, floorf and the like), each next to the form without `.ftz`, over the
+    subnormal range of the source and of the result. Each line is "instruction a result".
+    Compared bit for bit, NaN results included."""
+    path = AMPERE / "cvt_ftz_golden.txt"
+    problems, counts = _golden_instruction_mismatches(sim, path, 1)
+    assert len(counts) == 40 and sum(counts.values()) == 8120
+    assert sum(".ftz." in name for name in counts) == 25
+    assert not problems, "\n".join(problems)
+    # What the recording says. An f32 result is flushed when it is tiny after rounding: below
+    # 2^-126 (1 - 2^-25), although from 2^-126 (1 - 2^-24) on it rounds to the smallest normal
+    # number. f16 subnormals are not flushed, as source or as result.
+    case = {(name, int(a, 16)): int(r, 16) for name, a, r in map(str.split, path.read_text().splitlines())}
+    assert case["cvt.rn.f32.f64", 0x380FFFFFEFFFFFFF] == 0x00800000
+    assert case["cvt.rn.ftz.f32.f64", 0x380FFFFFEFFFFFFF] == 0
+    assert case["cvt.rn.ftz.f32.f64", 0x380FFFFFF0000000] == 0x00800000
+    assert case["cvt.rn.ftz.f32.f64", 0xB800000000000000] == 0x80000000
+    assert case["cvt.ftz.f64.f32", 0x807FFFFF] == 0x8000000000000000
+    assert case["cvt.rn.ftz.f16.f32", 0x33000001] == 1 and case["cvt.ftz.f32.f16", 0x0001] == 0x33800000
+    assert case["cvt.rpi.f32.f32", 0x00000001] == 0x3F800000 and case["cvt.rpi.ftz.f32.f32", 0x00000001] == 0
+    assert case["cvt.rmi.ftz.s32.f32", 0x807FFFFF] == 0 and case["cvt.rmi.ftz.s32.f32", 0x80800000] == 0xFFFFFFFF
+    assert case["cvt.ftz.f32.f32", 0xFFC12345] == 0x7FFFFFFF and case["cvt.f32.f32", 0xFFC12345] == 0xFFC12345
 
 
 def test_integer_division_matches_real_gpu(sim):

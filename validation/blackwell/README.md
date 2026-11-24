@@ -162,8 +162,8 @@ run is isolated for that reason.
 | --- | --- | --- | --- | --- | --- |
 | `device_attributes` | `device_attributes` | RT-03 | the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives | runs | - |
 | `smem_limit` | `smem_limit` | RT-04 | a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory | runs | - |
-| `smem_optin` | `smem_optin` | RT-13 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
-| `smem_static` | `smem_static` | RT-13 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
+| `smem_optin` | `smem_optin` | RT-15 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
+| `smem_static` | `smem_static` | RT-15 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
 | `elect` | `elect` | RT-05 | elect.sync elects the lowest lane of the member mask; every executing lane gets its id | runs | - |
 | `elect.all` | `elect all` | RT-05 | lanes outside the member mask execute elect.sync too: the lowest lane of the mask is elected | runs | fault |
 | `elect.partial` | `elect partial` | RT-05 | the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected | runs | fault |
@@ -299,8 +299,9 @@ run is isolated for that reason.
 | `scalar_edges` | `scalar_edges` | NUM-11, NUM-12 | min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, rem, mul.hi and shifts at theirs | runs (8 finding(s)) | - |
 | `ampere_replay.minmax_cvt` | `ampere_replay minmax_cvt` | NUM-11 | as on an RTX 3080 Ti (validation/ampere/minmax_cvt_golden.txt): min/max over zeros, infinities and NaNs, and cvt to s32, u32, s64, u64 in four rounding modes, with the bits of NaN results | runs | - |
 | `ampere_replay.intdiv` | `ampere_replay intdiv` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/intdiv_golden.txt): div and rem on 16, 32 and 64 bits; by zero (unspecified in PTX) both give all ones, the minimum over -1 gives the minimum and 0 | runs (12 finding(s)) | - |
-| `ampere_replay.nan` | `ampere_replay nan` | NUM-13 | as on an RTX 3080 Ti (validation/ampere/nan_golden.txt without its 44 cvt.ftz lines): the bits of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt, f32 and f64 | runs | - |
-| `ampere_replay.nan_cvt_ftz` | `ampere_replay nan_cvt_ftz` | NUM-13 | none: cvt.ftz.f64.f32 and cvt.rn.ftz.f32.f64 of NaNs, which the simulator does not implement; the 44 lines are to be read against the same lines of validation/ampere/nan_golden.txt | not run (no prediction) | - |
+| `ampere_replay.bitfield` | `ampere_replay bitfield` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/bitfield_golden.txt): bfi.b32, bfi.b64 and shf.{l,r}.{wrap,clamp}.b32 over positions and lengths up to and past the register width | runs | - |
+| `ampere_replay.nan` | `ampere_replay nan` | NUM-13 | as on an RTX 3080 Ti (validation/ampere/nan_golden.txt): the bits of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt (with .ftz too), f32 and f64 | runs | - |
+| `ampere_replay.cvt_ftz` | `ampere_replay cvt_ftz` | NUM-09 | as on an RTX 3080 Ti (validation/ampere/cvt_ftz_golden.txt): cvt with .ftz between f16, f32 and f64, to the integer types and to an integer in f32, over the subnormal range of source and result | runs | - |
 <!-- end of tables -->
 
 ### End to end (`e2e/run_e2e.py`)
@@ -397,7 +398,8 @@ Ampere, on a compared line and not an `info:` one.
 | `mbarrier_token_golden.txt` | `mbarrier/ampere_token` | MB-03 | all, the answers for stale and made-up tokens included |
 | `minmax_cvt_golden.txt` | `formats/ampere_replay.minmax_cvt` | NUM-11 | all, NaN results as bits |
 | `intdiv_golden.txt` | `formats/ampere_replay.intdiv` | NUM-12 | all, division by zero included |
-| `nan_golden.txt` | `formats/ampere_replay.nan` | NUM-13 | 14226 of 14270. The other 44 (`cvt.ftz.f64.f32`, `cvt.rn.ftz.f32.f64`) are `formats/ampere_replay.nan_cvt_ftz`, which has no prediction: finding 17 |
+| `nan_golden.txt` | `formats/ampere_replay.nan` | NUM-13 | all, the 44 lines of `cvt.ftz.f64.f32` and `cvt.rn.ftz.f32.f64` included (finding 17) |
+| `cvt_ftz_golden.txt` | `formats/ampere_replay.cvt_ftz` | NUM-09 | all, NaN results as bits |
 | `ftz_golden.txt` | `formats/ftz` | NUM-09 | all, but a NaN result as the word `nan` (its bits are the f32 pattern `formats/ampere_replay.nan` compares) |
 | `tf32_golden.txt` | `formats/tf32_modes` | NUM-08 | all, as the `.rna` column beside `.rn` and `.rz` (the inputs are written out again in that probe; `tests/test_blackwell_probes.py` holds the column to the golden file) |
 
@@ -601,17 +603,18 @@ Those marked "fixed since" were fixed on other branches.
     still needed when paths meet inside a control-flow cycle, which the early
     grouping policy deliberately leaves alone.
 
-17. **`cvt` with `.ftz` is not implemented** (known: `docs/numerics.md`, "NaN bit patterns"), and the
-    simulator refuses such a kernel at its launch, before any of it runs.
-    `validation/ampere/nan_golden.cu` had `cvt.ftz.f64.f32` and
-    `cvt.rn.ftz.f32.f64` in the same kernel as everything else, so the rerun of the whole
-    program was refused: `warplens: unsupported instruction 'cvt.rn.ftz.f32.f64' (modifier
-    .rn)`, `KERNEL FAILED`. Reproduction: `warplens run bin/formats/ampere_replay
-    nan_cvt_ftz`. The two instructions are now in a kernel of their own in that program
-    (its output on the 3080 Ti is unchanged), which `formats/ampere_replay.nan_cvt_ftz` runs
-    without a prediction; the other 14226 lines are predicted and compared. On the 3080 Ti
-    `cvt.ftz.f64.f32` of a NaN gives `0x7fffffffe0000000` and of a subnormal a zero of its sign; the 44
-    lines are in `validation/ampere/nan_golden.txt`.
+17. **`cvt` with `.ftz` was not implemented** (fixed), and the simulator refused such a kernel
+    at its launch, before any of it ran: the rerun of `validation/ampere/nan_golden.cu`, which
+    has `cvt.ftz.f64.f32` and `cvt.rn.ftz.f32.f64`, ended with `warplens: unsupported
+    instruction 'cvt.rn.ftz.f32.f64' (modifier .rn)`, `KERNEL FAILED`. For a while the two
+    instructions were a run of their own without a prediction
+    (`formats/ampere_replay.nan_cvt_ftz`). The simulator now implements `cvt` with `.ftz` as
+    the 3080 Ti does it (`warplens/units/alu.py:_float_to_float`,
+    `validation/ampere/cvt_ftz_golden.txt`, 8120 lines; `docs/numerics.md`), the 44 lines are
+    back in `formats/ampere_replay.nan`, whose prediction is the whole golden file, and
+    `formats/ampere_replay.cvt_ftz` reruns the new golden program. The same change added
+    `cvt.{rni,rzi,rmi,rpi}.f32.f32` and `.f64.f64` (`floorf`, `ceil`, ...), which the
+    simulator also refused.
 
 ## Adding a probe
 

@@ -180,6 +180,42 @@ def test_cvt_integer_widths(sim):
     assert run_lanes(sim, "cvt.rn.f32.s32 %d, %a0;", ["s32"], "f32", [a]).tolist() == [-1.0, float(np.float32(0x1234ABCD)), 300.0]
 
 
+def test_cvt_ftz_flushes_f32_subnormals_only(sim):
+    """The rules measured on an RTX 3080 Ti (validation/ampere/cvt_ftz_golden.txt, which
+    tests/test_hardware_golden.py compares in full)."""
+    tiny = np.array([1, 0x807FFFFF, 0x00800000, 0x3FC00000], dtype=np.uint32).view(np.float32)
+    assert run_lanes(sim, "cvt.ftz.f64.f32 %d, %a0;", ["f32"], "f64", [tiny]).view(np.uint64).tolist() == \
+        [0, 1 << 63, 0x3810000000000000, 0x3FF8000000000000]
+    assert run_lanes(sim, "cvt.rpi.ftz.s32.f32 %d, %a0;", ["f32"], "s32", [tiny]).tolist() == [0, 0, 1, 2]
+    assert run_lanes(sim, "cvt.rpi.s32.f32 %d, %a0;", ["f32"], "s32", [tiny]).tolist() == [1, 0, 1, 2]
+    assert run_lanes(sim, "cvt.rmi.ftz.f32.f32 %d, %a0;", ["f32"], "f32", [tiny]).view(np.uint32).tolist() == \
+        [0, 1 << 31, 0, 0x3F800000]
+    # A result is flushed when it is tiny after rounding: below 2^-126 (1 - 2^-25).
+    small = np.array([0x380FFFFFEFFFFFFF, 0x380FFFFFF0000000, 0xB800000000000000], dtype=np.uint64).view(np.float64)
+    assert run_lanes(sim, "cvt.rn.ftz.f32.f64 %d, %a0;", ["f64"], "f32", [small]).view(np.uint32).tolist() == \
+        [0, 0x00800000, 1 << 31]
+    assert run_lanes(sim, "cvt.rn.f32.f64 %d, %a0;", ["f64"], "f32", [small]).view(np.uint32).tolist() == \
+        [0x00800000, 0x00800000, 0x80400000]
+    # f16 subnormals are not f32 subnormals.
+    half = np.array([1, 0x83FF], dtype=np.uint16)
+    assert run_lanes(sim, "cvt.ftz.f32.f16 %d, %a0;", ["b16"], "f32", [half]).view(np.uint32).tolist() == \
+        [0x33800000, 0xB87FC000]
+
+
+@pytest.mark.parametrize("instr, types, why", [
+    ("cvt.rn.ftz.f16.f64", ("f64", "b16"), r"\.ftz needs"),  # ptxas refuses these three as well
+    ("cvt.ftz.f64.f16", ("b16", "f64"), r"\.ftz needs"),
+    ("cvt.rzi.ftz.s32.f64", ("f64", "s32"), r"\.ftz needs"),
+    ("cvt.rn.ftz.f32.s32", ("s32", "f32"), r"\.ftz needs"),  # not measured
+    ("cvt.rmi.f64.f32", ("f32", "f64"), "same floating type"),
+    ("cvt.rz.f32.f64", ("f64", "f32"), r"modifier \.rz"),
+])
+def test_cvt_forms_that_are_refused(sim, instr, types, why):
+    source, result = types
+    with pytest.raises(warplens.UnsupportedError, match=why):
+        run_lanes(sim, f"{instr} %d, %a0;", [source], result, [np.zeros(1, dtype=np.dtype(f"u{int(source[1:]) // 8}"))])
+
+
 @pytest.mark.parametrize("cmp, expect", [
     ("lt", [1, 0, 0, 0]), ("ge", [0, 1, 1, 0]), ("eq", [0, 1, 0, 0]),
     ("ne", [1, 0, 1, 0]), ("neu", [1, 0, 1, 1]), ("ltu", [1, 0, 0, 1]),

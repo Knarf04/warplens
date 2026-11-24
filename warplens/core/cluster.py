@@ -24,6 +24,7 @@ class Cluster:
         self.owed: dict[int, set] = {}  # knowledge for warps whose round completed before they waited
         self.launch = None  # core.launch_queue.LaunchQueue of the launch this cluster belongs to
         self.cancel_requests: list = []  # its clusterlaunchcontrol.try_cancel requests
+        self.cancels_granted = 0  # how many of them canceled a cluster
 
     def add(self, cta) -> None:
         cta.cluster, cta.rank = self, len(self.ctas)

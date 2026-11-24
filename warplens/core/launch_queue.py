@@ -44,11 +44,11 @@ class LaunchQueue:
     def try_cancel(self, cluster, warp, ins, lane: int) -> CancelRequest:
         """Cancel the next pending cluster on behalf of `cluster`, if one is left and the
         cluster has not used up its grants."""
-        granted = sum(r.canceled for r in cluster.cancel_requests)
         first = None
-        if self.pending and (self.limit is None or granted < self.limit):
+        if self.pending and (self.limit is None or cluster.cancels_granted < self.limit):
             qx, qy, qz = self.pending.popleft()
             first = (qx * self.shape[0], qy * self.shape[1], qz * self.shape[2])
+            cluster.cancels_granted += 1
             self.canceled += 1
         request = CancelRequest(len(self.requests) + 1, first, warp, ins, lane)
         self.requests[request.serial] = request

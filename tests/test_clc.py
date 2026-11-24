@@ -14,7 +14,7 @@ import pytest
 
 import warplens
 
-from conftest import HEADER
+from conftest import EXAMPLES, HEADER
 
 TRY_CANCEL = "clusterlaunchcontrol.try_cancel.async.shared::cta.mbarrier::complete_tx::bytes.b128"
 QUERY = "clusterlaunchcontrol.query_cancel"
@@ -456,6 +456,30 @@ def test_b128_misuse_is_rejected(sim, instruction, error):
     body = f".shared .align 16 .b8 smem[64];\n.reg .b64 %lo; .reg .b128 %q;\n{instruction}\nret;"
     with pytest.raises(error):
         sim.launch(module(body), "k", grid=1, block=1, args=[0])
+
+
+# -- compiled code ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("limit, workers, canceled", [
+    (None, [0, 1] * 6, 10),
+    (2, [0, 1] * 3 + [6, 7] * 3, 8),
+    (0, list(range(12)), 0),
+])
+def test_example_from_nvcc_with_two_cta_clusters(sim, limit, workers, canceled):
+    data = np.random.default_rng(0).standard_normal(12 * 64).astype(np.float32)
+    out, worker = sim.zeros(12 * 64, "f32"), sim.zeros(12, "u32")
+    stats = sim.launch(EXAMPLES / "09_clc" / "clc.ptx", "scale_tiles", grid=12, block=64, cluster=2,
+                       args=[sim.from_numpy(data), out, worker, 3.0], clc_limit=limit)
+    np.testing.assert_array_equal(out.numpy(), np.float32(3.0) * data)
+    assert worker.numpy().tolist() == workers
+    assert stats.canceled_ctas == canceled and stats.findings == []
+
+
+def test_run_summary_says_how_many_ctas_were_canceled(sim, capsys):
+    from warplens import cli
+    stats = sim.launch(module(WORKER), "k", grid=6, block=1, args=[sim.zeros((6, 2), "u32")])
+    cli.summary([("k", stats)], "B200")
+    assert "k: 6 CTA(s) of which 5 canceled before starting, " in capsys.readouterr().err
 
 
 # -- the toolchain's opinion of these kernels ---------------------------------------------------

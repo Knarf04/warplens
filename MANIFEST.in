@@ -1,0 +1,46 @@
+# What goes into the sdist besides the package (pyproject.toml lists the package's own data
+# files, and those are what a wheel carries). The sdist is the whole checked-in tree, so that
+# the test suite runs from an unpacked sdist: the tests read examples/, validation/, docs/,
+# notebooks/, env/, tools/ and .github/.
+#
+# tests/test_packaging.py compares the sdist with `git ls-files`: a tracked file missing from
+# it, or an untracked file in it, fails there. Add a new top-level directory here.
+include CHANGELOG.md PLAN.md RELEASING.md MANIFEST.in .gitignore
+graft .github
+graft docs
+graft env
+graft examples
+graft notebooks
+graft tests
+graft tools
+graft validation
+# The .gitignore files inside the package (those of the other directories come with `graft`).
+recursive-include warplens .gitignore
+
+# Build outputs and downloads that a working tree holds and git ignores. These mirror the
+# .gitignore files; `graft` would otherwise ship them.
+global-exclude *.py[cod]
+prune **/__pycache__
+prune **/.pytest_cache
+prune **/.ipynb_checkpoints
+# warplens/shim/.gitignore: a manual build of the shim libraries.
+prune warplens/shim/lib
+# examples/03_cutlass_mma/.gitignore: the CUTLASS clone and what build.sh makes from it.
+prune examples/03_cutlass_mma/.cutlass
+prune examples/03_cutlass_mma/bin
+exclude examples/03_cutlass_mma/*.ptx
+# validation/ampere/.gitignore
+prune validation/ampere/bin
+exclude validation/ampere/ncu_*.csv
+exclude validation/ampere/ncu_metrics_available.txt
+exclude validation/ampere/wavefront_probe_ncu.csv
+exclude validation/ampere/wavefront_probe_configs.csv
+# validation/blackwell/.gitignore
+prune validation/blackwell/bin
+prune validation/blackwell/bin-native
+prune validation/blackwell/bin-ampere
+prune validation/blackwell/results
+exclude validation/blackwell/*.tar.gz
+# validation/blackwell_timing/.gitignore (results_dryrun_3080ti.tar.gz is checked in and stays)
+prune validation/blackwell_timing/bin
+prune validation/blackwell_timing/results*

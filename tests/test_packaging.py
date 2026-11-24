@@ -7,7 +7,7 @@ Three kinds of test, named for what they need:
     checkout;
   - `build` (the `dev` extra; skipped without it): the wheel and the sdist are built from this
     tree, and their file lists and metadata are read;
-  - `build` and git: the sdist is the checked-in tree, no less and no more.
+  - `build` and git: the sdist is the checked-in tree, and holds nothing that git ignores.
 
 Building takes setuptools: the one already installed when it is new enough for
 pyproject.toml, and otherwise one that `build` downloads into an environment of its own.
@@ -57,26 +57,35 @@ def source_version() -> str:
     return version
 
 
-def files_git_does_not_ignore() -> set[str] | None:
-    """The files of the checkout, tracked or new, as paths from ROOT. None where ROOT is not
-    the top of a git checkout (an unpacked sdist) or there is no git."""
+def checkout_files() -> tuple[set[str], set[str]] | None:
+    """(tracked, new): the files git has, and the files it neither has nor ignores, as paths
+    from ROOT. A tracked file must be shipped; a new one may be (a test not yet added is, the
+    pytest.log that CI writes into the checkout is not). None where ROOT is not the top of a
+    git checkout (an unpacked sdist) or there is no git."""
     if not shutil.which("git") or not (ROOT / ".git").exists():
         return None
-    done = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
-                          capture_output=True, text=True)
-    if done.returncode:
-        return None
-    return {name for name in done.stdout.split("\0") if name and (ROOT / name).is_file()}
+    listed = []
+    for which in (["--cached"], ["--others", "--exclude-standard"]):
+        done = subprocess.run(["git", "-C", str(ROOT), "ls-files", "-z", *which], capture_output=True, text=True)
+        if done.returncode:
+            return None
+        listed.append({name for name in done.stdout.split("\0") if name and (ROOT / name).is_file()})
+    return listed[0], listed[1]
 
 
-def package_source_files() -> set[str]:
-    """What the wheel has to hold: every file under warplens/ that is not a build output."""
-    listed = files_git_does_not_ignore()
+def package_source_files() -> tuple[set[str], set[str]]:
+    """(what the wheel has to hold, what it may also hold): every file under warplens/ that
+    is not a build output; without git, every file there but those known to be built."""
+    def of_the_package(names):
+        return {name for name in names if name.startswith("warplens/") and Path(name).name != ".gitignore"}
+
+    listed = checkout_files()
     if listed is None:
-        listed = {path.relative_to(ROOT).as_posix() for path in (ROOT / "warplens").rglob("*")
-                  if path.is_file() and "__pycache__" not in path.parts
-                  and (ROOT / "warplens" / "shim" / "lib") not in path.parents}
-    return {name for name in listed if name.startswith("warplens/") and Path(name).name != ".gitignore"}
+        found = {path.relative_to(ROOT).as_posix() for path in (ROOT / "warplens").rglob("*")
+                 if path.is_file() and "__pycache__" not in path.parts
+                 and (ROOT / "warplens" / "shim" / "lib") not in path.parents}
+        return of_the_package(found), set()
+    return of_the_package(listed[0]), of_the_package(listed[1])
 
 
 # -- the imported package ------------------------------------------------------------------------
@@ -163,13 +172,13 @@ def test_the_wheel_holds_every_file_of_the_package(built):
     with zipfile.ZipFile(built[0]) as wheel:
         names = set(wheel.namelist())
     assert not [name for name in RUNTIME_FILES if f"warplens/{name}" not in names]
-    source = package_source_files()
+    source, new = package_source_files()
     assert len(source) > len(RUNTIME_FILES)
     missing = sorted(source - names)
     assert not missing, f"not in the wheel (add them to package-data in pyproject.toml): {missing}"
     # And nothing else: no tests or examples in site-packages, no build output of this machine.
     info = f"warplens-{source_version()}.dist-info/"
-    extra = sorted(name for name in names - source if not name.startswith(info))
+    extra = sorted(name for name in names - source - new if not name.startswith(info))
     assert not extra, f"in the wheel but not in the source tree: {extra}"
 
 
@@ -202,9 +211,10 @@ def test_the_wheel_says_what_it_is(built):
 def test_the_sdist_is_the_checked_in_tree(built):
     """The suite runs from an unpacked sdist only if all of it is there (MANIFEST.in), and a
     build output or a download of this machine must not be shipped in it."""
-    expected = files_git_does_not_ignore()
-    if expected is None:
+    listed = checkout_files()
+    if listed is None:
         pytest.skip("not a git checkout: nothing to compare the sdist with")
+    tracked, new = listed
     top = f"warplens-{source_version()}/"
     with tarfile.open(built[1]) as sdist:
         members = [member.name for member in sdist.getmembers() if member.isfile()]
@@ -212,7 +222,7 @@ def test_the_sdist_is_the_checked_in_tree(built):
     names = {name[len(top):] for name in members}
     generated = {name for name in names
                  if name in ("PKG-INFO", "setup.cfg") or name.startswith("warplens.egg-info/")}
-    missing = sorted(expected - names)
+    missing = sorted(tracked - names)
     assert not missing, f"not in the sdist (see MANIFEST.in): {missing}"
-    extra = sorted(names - expected - generated)
+    extra = sorted(names - tracked - new - generated)
     assert not extra, f"in the sdist but ignored by git (see MANIFEST.in): {extra}"

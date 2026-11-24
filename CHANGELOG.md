@@ -1,0 +1,34 @@
+# Changelog
+
+What changed in each release of warplens, newest first. A release is a version on PyPI and
+the `v<version>` tag it was built from; `RELEASING.md` is how one is made. The section for the
+version in `warplens/__init__.py` must exist (`tests/test_packaging.py` checks), so the
+heading is written when the version is bumped, and the date when the tag is.
+
+## 0.0.1 (not released)
+
+The version the repository has carried since its first commit. `PLAN.md` reserves it for a
+placeholder upload that claims the PyPI name; no upload has been made.
+
+What the tree holds at this version (milestones M0 to M6 of `PLAN.md`; the user guide is
+`docs/guide.md`, and what is and is not modeled is in `docs/coverage.md`):
+
+- A PTX parser and a SIMT executor for kernels compiled for `sm_100a` and `sm_103a`, with
+  global and shared memory, named barriers and a bank-conflict report.
+- TMA and tensor maps, mbarriers, `tcgen05` and tensor memory, clusters, distributed shared
+  memory and cluster launch control, with checkers for misuse of these protocols.
+- An approximate, uncalibrated timing model with B200 and B300 parameter files, a Perfetto
+  trace and an HTML report.
+- `warplens run`: compiled CUDA programs through `libcudart`/`libcuda` shim libraries that
+  are compiled on first use, and Triton, TIRx and CuTe DSL scripts.
+- Validation programs and the simulator's predictions for them (`validation/`). Nothing
+  Blackwell-specific has been run on Blackwell hardware.
+
+Packaging, done ahead of the first upload:
+
+- The wheel and the sdist are built and installed in CI (the `dist` job), and the suite runs
+  against each in place of the checkout. `tests/test_packaging.py` builds both and checks
+  their file lists.
+- The sdist is the whole checked-in tree (`MANIFEST.in`), so the tests run from it.
+- The version is written once, in `warplens/__init__.py`.
+- Project metadata: classifiers, URLs, keywords, the license file.

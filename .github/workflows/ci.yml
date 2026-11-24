@@ -31,6 +31,75 @@ jobs:
         shell: bash {0}
         run: .github/report_pytest_failure.sh
 
+  # What a user installs, instead of the checkout the other jobs run: the sdist and the wheel
+  # are built as for a release (RELEASING.md), one of them is installed into a clean
+  # environment, and the core suite runs against it. `pip install -e` cannot show a data file
+  # that the wheel lacks or a path that reaches out of the package into the repository.
+  dist:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Installing the sdist has pip build a wheel of its own from it.
+        artifact: [wheel, sdist]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Build the sdist, and the wheel from it
+        run: |
+          python -m venv "$RUNNER_TEMP/build-env"
+          "$RUNNER_TEMP/build-env/bin/pip" install build twine
+          "$RUNNER_TEMP/build-env/bin/python" -m build --outdir "$RUNNER_TEMP/dist"
+          "$RUNNER_TEMP/build-env/bin/twine" check --strict "$RUNNER_TEMP"/dist/*
+          ls -l "$RUNNER_TEMP/dist"
+      # pytest alone, not the dev extra: without `build`, tests/test_packaging.py checks the
+      # installed files and leaves building to the `test` and `full` jobs.
+      - name: Install the ${{ matrix.artifact }} into a clean environment
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          case "${{ matrix.artifact }}" in
+            wheel) file="$(ls "$RUNNER_TEMP"/dist/*.whl)" ;;
+            sdist) file="$(ls "$RUNNER_TEMP"/dist/*.tar.gz)" ;;
+          esac
+          "$RUNNER_TEMP/venv/bin/pip" install "$file" pytest
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+      # The tests name files of the package as <checkout>/warplens/...: give them the installed
+      # ones, so that nothing below can read the package from the checkout.
+      - name: Put the installed package in place of the checkout's
+        run: |
+          rm -rf warplens
+          installed="$(cd "$RUNNER_TEMP" && python -c 'import pathlib, warplens; print(pathlib.Path(warplens.__file__).parent)')"
+          case "$installed" in
+            "$RUNNER_TEMP"/venv/lib/*/site-packages/warplens) ln -s "$installed" warplens ;;
+            *) echo "::error title=dist::warplens was imported from $installed, not from the environment"; exit 1 ;;
+          esac
+      - name: Smoke test, outside the checkout (the command, the version, three examples)
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -o pipefail
+          warplens --help
+          warplens run --help
+          python - <<'EOF'
+          import importlib.metadata, warplens
+          print("warplens", warplens.__version__, "from", warplens.__file__)
+          assert importlib.metadata.version("warplens") == warplens.__version__
+          EOF
+          python "$GITHUB_WORKSPACE/examples/00_vecadd/run.py" | tee vecadd.out
+          grep -q "matches NumPy: True" vecadd.out
+          python "$GITHUB_WORKSPACE/examples/02_tma_copy/run.py" | tee tma_copy.out
+          grep -q "output correct" tma_copy.out
+          python "$GITHUB_WORKSPACE/examples/04_pipelined_gemm/run.py"
+      - name: Run the suite against the installed package
+        run: |
+          set -o pipefail
+          pytest -q -rs 2>&1 | tee pytest.log
+      - name: Report the pytest failure
+        if: failure()
+        shell: bash {0}
+        run: .github/report_pytest_failure.sh
+
   triton:
     runs-on: ubuntu-latest
     env:

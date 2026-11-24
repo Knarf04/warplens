@@ -1,21 +1,53 @@
 [build-system]
-requires = ["setuptools>=68"]
+# 77 is the first setuptools that takes the license as an SPDX expression (PEP 639).
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "warplens"
-version = "0.0.1"
+# The version is `__version__` in warplens/__init__.py and nowhere else (RELEASING.md).
+dynamic = ["version"]
 description = "Understand a Blackwell GPU by watching it run, on your CPU."
 readme = "README.md"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
+# The suite runs on 3.11, 3.12 and 3.13 (.github/workflows/ci.yml).
 requires-python = ">=3.11"
+keywords = ["gpu", "cuda", "ptx", "simulator", "blackwell", "nvidia"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    # The simulator is Python and NumPy. `warplens run` is Linux only: it preloads shim
+    # libraries it compiles with the system C compiler, and locks their cache with fcntl.
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Education",
+    "Topic :: Software Development :: Debuggers",
+    "Topic :: System :: Emulators",
+    "Topic :: System :: Hardware",
+]
 dependencies = ["numpy>=1.26", "pyyaml>=6"]
+
+[project.urls]
+Homepage = "https://github.com/Knarf04/warplens"
+Repository = "https://github.com/Knarf04/warplens"
+Documentation = "https://github.com/Knarf04/warplens/blob/main/docs/guide.md"
+Issues = "https://github.com/Knarf04/warplens/issues"
+Changelog = "https://github.com/Knarf04/warplens/blob/main/CHANGELOG.md"
 
 [project.scripts]
 warplens = "warplens.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+# pytest for the suite; build for tests/test_packaging.py, which builds the wheel and the
+# sdist and reads their file lists (it is skipped without it).
+dev = ["pytest>=8", "build>=1"]
 # The frontends. Each floor is the version the test suite runs against (env/remote/pins.env);
 # nothing older has been tried.
 triton = ["triton>=3.9"]
@@ -30,11 +62,27 @@ cute-dsl = ["nvidia-cutlass-dsl>=4.8.1"]
 jupyter = ["notebook>=7", "nbclient>=0.10", "nbformat>=5", "ipykernel>=6", "warplens[tirx]"]
 all = ["warplens[dev,triton,tirx,cute-dsl,jupyter]"]
 
+[tool.setuptools.dynamic]
+# Read from the source without importing the package, so building needs no NumPy.
+version = {attr = "warplens.__version__"}
+
+[tool.setuptools]
+# The wheel takes the data files listed under package-data and no others. Left on, this would
+# also take what MANIFEST.in puts into the sdist under warplens/ (a .gitignore).
+include-package-data = false
+
 [tool.setuptools.packages.find]
 include = ["warplens*"]
 
+# Files the installed package reads or runs through paths next to its modules. An editable
+# install hides a missing one; tests/test_packaging.py compares the built wheel with the tree.
 [tool.setuptools.package-data]
+# The machine models (warplens/timing/config.py).
 "warplens.configs" = ["*.yaml"]
+# The shim sources and build scripts `warplens run` compiles on first use (warplens/cli.py).
+# shim/python/sitecustomize.py, which it puts on the PYTHONPATH of the programs it starts, is
+# in a directory without an __init__.py: it is packaged because the search above takes
+# namespace packages, and it is named here so that it does not depend on that.
 "warplens.shim" = ["*.c", "*.h", "*.sh", "python/*.py"]
 
 [tool.pytest.ini_options]

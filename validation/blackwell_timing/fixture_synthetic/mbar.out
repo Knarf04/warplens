@@ -1,0 +1,9 @@
+DEVICE bench=mbar name=SYNTHETIC_not_measured cc=10.0 sm_count=148 total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 trials=2 scale=1 synthetic=1
+BENCH id=mbar/arrive_wait/threads=1 reps=16000 trial=0 event_ns=57911.579 wall_ns=62911.579 clk=72032 check=0
+BENCH id=mbar/arrive_wait/threads=1 reps=32000 trial=0 event_ns=95806.316 wall_ns=100806.316 clk=144032 check=0
+BENCH id=mbar/arrive_wait/threads=1 reps=16000 trial=1 event_ns=57998.472 wall_ns=62998.472 clk=72032 check=0
+BENCH id=mbar/arrive_wait/threads=1 reps=32000 trial=1 event_ns=95886.974 wall_ns=100886.974 clk=144032 check=0
+BENCH id=mbar/arrive_wait/threads=32 reps=16000 trial=0 event_ns=57911.579 wall_ns=62911.579 clk=72032 check=0
+BENCH id=mbar/arrive_wait/threads=32 reps=32000 trial=0 event_ns=95806.316 wall_ns=100806.316 clk=144032 check=0
+BENCH id=mbar/arrive_wait/threads=32 reps=16000 trial=1 event_ns=57944.031 wall_ns=62944.031 clk=72032 check=0
+BENCH id=mbar/arrive_wait/threads=32 reps=32000 trial=1 event_ns=95981.277 wall_ns=100981.277 clk=144032 check=0

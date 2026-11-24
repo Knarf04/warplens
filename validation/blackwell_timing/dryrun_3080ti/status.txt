@@ -1,0 +1,8 @@
+launch: exit=0 seconds=1 lines=402 ok
+alu_chain: exit=0 seconds=4 lines=77 ok
+smem_wavefronts: exit=0 seconds=13 lines=220 ok
+global_load: exit=0 seconds=7 lines=66 ok
+gstream: exit=0 seconds=1 lines=11 ok
+cp_async: exit=0 seconds=1 lines=22 ok
+ncu: ncu not run: no permission to read GPU performance counters (ERR_NVGPUCTRPERM); needs root or NVreg_RestrictProfilingToAdminUsers=0
+fit: ok, see results_dryrun_3080ti/fit/report.md

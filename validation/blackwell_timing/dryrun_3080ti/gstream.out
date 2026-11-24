@@ -1,0 +1,12 @@
+DEVICE bench=gstream name=NVIDIA_GeForce_RTX_3080_Ti_Laptop_GPU cc=8.6 sm_count=58 total_mem_bytes=16758472704 free_mem_bytes=16423976960 bench_clock=1 sim=0 trials=5 scale=1 synthetic=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=-1 event_ns=6727584 wall_ns=6739839 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=0 event_ns=6786784 wall_ns=6793212 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=0 event_ns=13499872 wall_ns=13508737 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=1 event_ns=6712128 wall_ns=6719030 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=1 event_ns=13450624 wall_ns=13457882 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=2 event_ns=6714656 wall_ns=6720831 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=2 event_ns=13473472 wall_ns=13480967 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=3 event_ns=6698272 wall_ns=6703869 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=3 event_ns=13474816 wall_ns=13482480 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=4 event_ns=6793856 wall_ns=6804092 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=4 event_ns=13387872 wall_ns=13396212 clk=0 check=0

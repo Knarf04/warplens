@@ -1,0 +1,13 @@
+DEVICE bench=global_load name=warplens_simulated_B200 cc=10.0 sm_count=148 total_mem_bytes=206158430208 free_mem_bytes=206158430208 bench_clock=0 sim=1 trials=1 scale=1 synthetic=0
+BENCH id=global_load/load_chain/footprint=l1 footprint_bytes=16384 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=3584 sim_ns=798.6666666666644 sim_instr=238 sim_bound=latency sim_findings=0
+BENCH id=global_load/load_chain/footprint=l1 footprint_bytes=16384 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=3072 sim_ns=1572.000000000008 sim_instr=438 sim_bound=latency sim_findings=0
+BENCH id=global_load/store/footprint=l1 footprint_bytes=16384 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=3584 sim_ns=141.33333333333348 sim_instr=212 sim_bound=latency sim_findings=0
+BENCH id=global_load/store/footprint=l1 footprint_bytes=16384 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=3072 sim_ns=258.66666666666526 sim_instr=388 sim_bound=latency sim_findings=0
+BENCH id=global_load/load_chain/footprint=l2 footprint_bytes=65536 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=11776 sim_ns=798.6666666666644 sim_instr=238 sim_bound=latency sim_findings=0
+BENCH id=global_load/load_chain/footprint=l2 footprint_bytes=65536 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=7168 sim_ns=1572.000000000008 sim_instr=438 sim_bound=latency sim_findings=0
+BENCH id=global_load/store/footprint=l2 footprint_bytes=65536 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=11776 sim_ns=141.33333333333348 sim_instr=212 sim_bound=latency sim_findings=0
+BENCH id=global_load/store/footprint=l2 footprint_bytes=65536 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=7168 sim_ns=258.66666666666526 sim_instr=388 sim_bound=latency sim_findings=0
+BENCH id=global_load/load_chain/footprint=dram footprint_bytes=262144 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=28160 sim_ns=798.6666666666644 sim_instr=238 sim_bound=latency sim_findings=0
+BENCH id=global_load/load_chain/footprint=dram footprint_bytes=262144 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=56320 sim_ns=1572.000000000008 sim_instr=438 sim_bound=latency sim_findings=0
+BENCH id=global_load/store/footprint=dram footprint_bytes=262144 reps=32 trial=0 event_ns=0 wall_ns=0 clk=0 check=28160 sim_ns=141.33333333333348 sim_instr=212 sim_bound=latency sim_findings=0
+BENCH id=global_load/store/footprint=dram footprint_bytes=262144 reps=64 trial=0 event_ns=0 wall_ns=0 clk=0 check=56320 sim_ns=258.66666666666526 sim_instr=388 sim_bound=latency sim_findings=0

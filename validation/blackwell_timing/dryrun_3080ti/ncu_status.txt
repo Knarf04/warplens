@@ -1,0 +1,1 @@
+ncu not run: no permission to read GPU performance counters (ERR_NVGPUCTRPERM); needs root or NVreg_RestrictProfilingToAdminUsers=0

@@ -1,0 +1,23 @@
+DEVICE bench=cp_async name=NVIDIA_GeForce_RTX_3080_Ti_Laptop_GPU cc=8.6 sm_count=58 total_mem_bytes=16758472704 free_mem_bytes=16423976960 bench_clock=1 sim=0 trials=5 scale=1 synthetic=0
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=200000 trial=-1 event_ns=27241535 wall_ns=27255477 clk=50741304 check=200001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=200000 trial=0 event_ns=26734688 wall_ns=26745125 clk=50831076 check=200001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=400000 trial=0 event_ns=53382847 wall_ns=53393934 clk=101673420 check=400001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=200000 trial=1 event_ns=26972448 wall_ns=26984403 clk=51342781 check=200001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=400000 trial=1 event_ns=53651329 wall_ns=53665567 clk=102161359 check=400001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=200000 trial=2 event_ns=26695393 wall_ns=26703363 clk=50835386 check=200001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=400000 trial=2 event_ns=53375713 wall_ns=53384059 clk=101666000 check=400001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=200000 trial=3 event_ns=26692352 wall_ns=26699761 clk=50826680 check=200001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=400000 trial=3 event_ns=53373856 wall_ns=53382431 clk=101662176 check=400001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=200000 trial=4 event_ns=26694847 wall_ns=26702373 clk=50835623 check=200001
+BENCH id=cp_async/warm buffer_bytes=1073741824 reps=400000 trial=4 event_ns=53378178 wall_ns=53390406 clk=101671615 check=400001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=100000 trial=-1 event_ns=29787008 wall_ns=29799854 clk=56718312 check=100001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=100000 trial=0 event_ns=29817568 wall_ns=29829094 clk=56776125 check=100001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=200000 trial=0 event_ns=60490303 wall_ns=60502494 clk=115203582 check=200001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=100000 trial=1 event_ns=29803488 wall_ns=29813915 clk=56749898 check=100001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=200000 trial=1 event_ns=60476288 wall_ns=60492103 clk=115178667 check=200001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=100000 trial=2 event_ns=30703457 wall_ns=30713068 clk=58454256 check=100001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=200000 trial=2 event_ns=59598751 wall_ns=59610927 clk=113513971 check=200001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=100000 trial=3 event_ns=29784000 wall_ns=29794986 clk=56712274 check=100001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=200000 trial=3 event_ns=59588863 wall_ns=59601483 clk=113489134 check=200001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=100000 trial=4 event_ns=29818752 wall_ns=29829081 clk=56779281 check=100001
+BENCH id=cp_async/cold buffer_bytes=1073741824 reps=200000 trial=4 event_ns=60018623 wall_ns=60030540 clk=114309036 check=200001

@@ -1,0 +1,4 @@
+status: ok
+warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
+  clc_one_request: 2 CTA(s), 622068 warp-instructions
+  clc_one_request: 2 CTA(s), 210 warp-instructions

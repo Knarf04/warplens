@@ -1,0 +1,7 @@
+status: ok
+warplens: 2 kernel launch(es) simulated on B200, 1 finding(s)
+  barrier_exit: 1 CTA(s), 80 warp-instructions
+  barrier_exit: 1 CTA(s), 100 warp-instructions
+    [barrier-in-divergent-code] bar.sync reached by only 16 of the warp's 32 running lanes. CUDA only defines a barrier in conditional code when every thread takes the same path; here the whole warp is counted as arrived (4 times)
+      line 1125: bar.sync 0;
+      first in CTA (0, 0, 0), warp 0, lanes 0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30

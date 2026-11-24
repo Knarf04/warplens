@@ -1,0 +1,20 @@
+disable-output-lane {0x00000000, 0x00000000, 0x00000000, 0x00000000}
+  lanes that kept the sentinel: none
+  lanes that hold the result  : 0-127 (128 lanes)
+  lanes that hold neither     : none
+disable-output-lane {0x00000001, 0x00000000, 0x00000000, 0x00000000}
+  lanes that kept the sentinel: 0 (1 lanes)
+  lanes that hold the result  : 1-127 (127 lanes)
+  lanes that hold neither     : none
+disable-output-lane {0x00000000, 0x80000000, 0x00000000, 0x00000000}
+  lanes that kept the sentinel: 63 (1 lanes)
+  lanes that hold the result  : 0-62 64-127 (127 lanes)
+  lanes that hold neither     : none
+disable-output-lane {0x0000ffff, 0x00000000, 0x00000000, 0xffff0000}
+  lanes that kept the sentinel: 0-15 112-127 (32 lanes)
+  lanes that hold the result  : 16-111 (96 lanes)
+  lanes that hold neither     : none
+disable-output-lane {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff}
+  lanes that kept the sentinel: 0-127 (128 lanes)
+  lanes that hold the result  : none
+  lanes that hold neither     : none

@@ -11,7 +11,22 @@
 | alu_chain/warps=8 | 5 | 30 | issue_slots |
 | alu_chain/warps=16 | 10 | 60 | issue_slots |
 | alu_chain/warps=32 | 20 | 120 | issue_slots |
-| cp_async/warm | 106.5 | 8.75 | latency |
+| clc_latency/fail/plain/ctas=1 | 11 | 16.5 | latency |
+| clc_latency/fail/plain/ctas=2 | 12.3333 | 25.75 | latency |
+| clc_latency/fail/multicast/ctas=2 | 13 | 34 | latency |
+| clc_latency/succeed/plain/ctas=1 | 22 | 30 | latency |
+| clc_latency/succeed/multicast/ctas=2 | 24 | 62 | latency |
+| cluster_costs/load/multicast/ctas=1 | 193.667 | 20.5 | latency |
+| cluster_costs/load/multicast/ctas=2 | 193.667 | 36 | latency |
+| cluster_costs/load/multicast/ctas=4 | 193.667 | 67 | latency |
+| cluster_costs/load/separate/ctas=1 | 196.333 | 20.5 | latency |
+| cluster_costs/load/separate/ctas=2 | 196.333 | 41 | latency |
+| cluster_costs/load/separate/ctas=4 | 196.333 | 82 | latency |
+| cluster_costs/mma/pair/m=256/n=256/batch=1 | 176.385 | 18 | latency |
+| cluster_costs/mma/pair/m=256/n=256/batch=4 | 659.605 | 33 | latency |
+| cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 | 95.9589 | 36 | Tensor_Core |
+| cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 | 337.902 | 66 | Tensor_Core |
+| cp_async/warm | 122.132 | 8.75 | latency |
 | cp_async/cold | 122.132 | 8.75 | latency |
 | global_load/load_chain/footprint=l1 | 24.1667 | 6.25 | latency |
 | global_load/store/footprint=l1 | 3.66667 | 5.5 | latency |
@@ -80,6 +95,21 @@
 | mma_rate/kind=tf32/m=128/n=256/batch=2/ctas=allsm | 177.768 | 3848 | Tensor_Core |
 | mma_rate/kind=tf32/m=128/n=256/batch=4/ctas=allsm | 339.336 | 5180 | Tensor_Core |
 | mma_rate/kind=tf32/m=128/n=256/batch=8/ctas=allsm | 661.138 | 7548 | Tensor_Core |
+| ncu_banks/linear/block=32x32 (whole launch) | 851.333 | | latency |
+| ncu_banks/padded/block=32x32 (whole launch) | 190 | | issue_slots |
+| ncu_banks/swizzled/block=32x32 (whole launch) | 211.333 | | issue_slots |
+| ncu_banks/linear/block=32x8 (whole launch) | 104 | | latency |
+| ncu_banks/padded/block=32x8 (whole launch) | 82.6667 | | latency |
+| ncu_banks/swizzled/block=32x8 (whole launch) | 88 | | latency |
+| ncu_banks/linear/block=16x16 (whole launch) | 104 | | latency |
+| ncu_banks/padded/block=16x16 (whole launch) | 77.3333 | | latency |
+| ncu_banks/swizzled/block=16x16 (whole launch) | 72 | | latency |
+| pipelined_gemm/stages=1/ctas=8 | 1081.14 | 696 | latency |
+| pipelined_gemm/stages=2/ctas=8 | 878.35 | 696 | HBM |
+| pipelined_gemm/stages=4/ctas=8 | 878.35 | 696 | HBM |
+| pipelined_gemm/stages=1/ctas=allsm | 1081.14 | 12876 | latency |
+| pipelined_gemm/stages=2/ctas=allsm | 878.35 | 12876 | HBM |
+| pipelined_gemm/stages=4/ctas=allsm | 878.35 | 12876 | HBM |
 | smem_wavefronts/load_chain/conflict=1/warps=1 | 3.33333 | 4 | latency |
 | smem_wavefronts/load_chain/conflict=2/warps=1 | 4 | 4 | latency |
 | smem_wavefronts/load_chain/conflict=4/warps=1 | 5.33333 | 4 | latency |

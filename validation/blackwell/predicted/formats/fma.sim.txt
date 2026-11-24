@@ -1,0 +1,4 @@
+status: ok
+warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
+  fma_f32: 40 CTA(s), 9794 warp-instructions
+  fma_f64: 40 CTA(s), 9794 warp-instructions

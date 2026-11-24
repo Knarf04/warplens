@@ -3,4 +3,5 @@ warplens: tcgen05.dealloc of 32 columns at column 0 does not match an allocation
   at module0.ptx:373: tcgen05.dealloc.cta_group::1.sync.aligned.b32 %r96, %r97;
   in kernel `tmem_alloc_script`, CTA (0, 0, 0), warp 0
   lane 0 (thread (0, 0, 0)) and 31 more lane(s)
+KERNEL FAILED: allocate 64 columns, release them as 32: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
 warplens: the program launched no kernels

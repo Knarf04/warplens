@@ -1,0 +1,3 @@
+two arrivals per phase; rank 0 arrives once locally, rank 1 arrives once on rank 0's mbarrier
+rank 0 (the target):   phase completed before the remote arrival 0, after it 1
+rank 1 (the arriver):  its own mbarrier: phase completed before 0, after 0

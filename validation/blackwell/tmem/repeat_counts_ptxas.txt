@@ -1,0 +1,82 @@
+# ptxas: NVIDIA (R) Ptx optimizing assembler; Copyright (c) 2005-2026 NVIDIA Corporation; Built on Mon_Oct_12_19:25:48_PDT_2026
+tcgen05.ld 32x32b.x1   (  1 registers): ptxas accepts; warplens runs it
+tcgen05.ld 32x32b.x2   (  2 registers): ptxas accepts; warplens runs it
+tcgen05.ld 32x32b.x3   (  3 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 32x32b.x4   (  4 registers): ptxas accepts; warplens runs it
+tcgen05.ld 32x32b.x8   (  8 registers): ptxas accepts; warplens runs it
+tcgen05.ld 32x32b.x16  ( 16 registers): ptxas accepts; warplens runs it
+tcgen05.ld 32x32b.x32  ( 32 registers): ptxas accepts; warplens runs it
+tcgen05.ld 32x32b.x64  ( 64 registers): ptxas accepts; warplens runs it
+tcgen05.ld 32x32b.x128 (128 registers): ptxas accepts; warplens runs it
+tcgen05.ld 32x32b.x256 (256 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x64b.x1   (  1 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x64b.x2   (  2 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x64b.x3   (  3 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x64b.x4   (  4 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x64b.x8   (  8 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x64b.x16  ( 16 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x64b.x32  ( 32 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x64b.x64  ( 64 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x64b.x128 (128 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x64b.x256 (256 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x128b.x1   (  2 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x128b.x2   (  4 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x128b.x3   (  6 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x128b.x4   (  8 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x128b.x8   ( 16 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x128b.x16  ( 32 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x128b.x32  ( 64 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x128b.x64  (128 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x128b.x128 (256 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x128b.x256 (512 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x256b.x1   (  4 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x256b.x2   (  8 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x256b.x3   ( 12 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x256b.x4   ( 16 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x256b.x8   ( 32 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x256b.x16  ( 64 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x256b.x32  (128 registers): ptxas accepts; warplens runs it
+tcgen05.ld 16x256b.x64  (256 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x256b.x128 (512 registers): ptxas rejects; warplens refuses it
+tcgen05.ld 16x256b.x256 (1024 registers): ptxas rejects; warplens refuses it
+tcgen05.st 32x32b.x1   (  1 registers): ptxas accepts; warplens runs it
+tcgen05.st 32x32b.x2   (  2 registers): ptxas accepts; warplens runs it
+tcgen05.st 32x32b.x3   (  3 registers): ptxas rejects; warplens refuses it
+tcgen05.st 32x32b.x4   (  4 registers): ptxas accepts; warplens runs it
+tcgen05.st 32x32b.x8   (  8 registers): ptxas accepts; warplens runs it
+tcgen05.st 32x32b.x16  ( 16 registers): ptxas accepts; warplens runs it
+tcgen05.st 32x32b.x32  ( 32 registers): ptxas accepts; warplens runs it
+tcgen05.st 32x32b.x64  ( 64 registers): ptxas accepts; warplens runs it
+tcgen05.st 32x32b.x128 (128 registers): ptxas accepts; warplens runs it
+tcgen05.st 32x32b.x256 (256 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x64b.x1   (  1 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x64b.x2   (  2 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x64b.x3   (  3 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x64b.x4   (  4 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x64b.x8   (  8 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x64b.x16  ( 16 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x64b.x32  ( 32 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x64b.x64  ( 64 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x64b.x128 (128 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x64b.x256 (256 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x128b.x1   (  2 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x128b.x2   (  4 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x128b.x3   (  6 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x128b.x4   (  8 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x128b.x8   ( 16 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x128b.x16  ( 32 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x128b.x32  ( 64 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x128b.x64  (128 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x128b.x128 (256 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x128b.x256 (512 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x256b.x1   (  4 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x256b.x2   (  8 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x256b.x3   ( 12 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x256b.x4   ( 16 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x256b.x8   ( 32 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x256b.x16  ( 64 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x256b.x32  (128 registers): ptxas accepts; warplens runs it
+tcgen05.st 16x256b.x64  (256 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x256b.x128 (512 registers): ptxas rejects; warplens refuses it
+tcgen05.st 16x256b.x256 (1024 registers): ptxas rejects; warplens refuses it
+# pairs where ptxas and the claimed set disagree: 0

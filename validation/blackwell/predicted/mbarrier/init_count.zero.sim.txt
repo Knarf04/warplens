@@ -1,0 +1,7 @@
+status: exit 3
+warplens: mbarrier.init with an arrival count of 0; it must be 1 to 2^20-1
+  at module0.ptx:233: mbarrier.init.shared::cta.b64 [%r49], %r50;
+  in kernel `mbar_init_count`, CTA (0, 0, 0), warp 0
+  lane 0 (thread (0, 0, 0))
+KERNEL FAILED: init 0: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
+warplens: the program launched no kernels

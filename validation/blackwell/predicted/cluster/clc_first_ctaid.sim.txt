@@ -1,0 +1,6 @@
+status: ok
+warplens: 4 kernel launch(es) simulated on B200, 0 finding(s)
+  clc_worker: 2048 CTA(s) of which 2046 canceled before starting, 37945 warp-instructions
+  clc_worker: 2048 CTA(s) of which 2044 canceled before starting, 19053 warp-instructions
+  clc_worker: 2048 CTA(s) of which 2044 canceled before starting, 19053 warp-instructions
+  clc_worker: 2048 CTA(s) of which 2047 canceled before starting, 75807 warp-instructions

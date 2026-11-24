@@ -1,0 +1,6 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 1 finding(s)
+  clc_worker: 2048 CTA(s) of which 2047 canceled before starting, 75834 warp-instructions
+    [clc-try-cancel-after-failure] this CTA already saw a cancellation request fail (query_cancel.is_canceled was false); PTX leaves another try_cancel after that undefined. Here it fails again
+      line 1005: clusterlaunchcontrol.try_cancel.async.shared::cta.mbarrier::complete_tx::bytes.b128 [%r18], [%r16];
+      first in CTA (0, 0, 0), warp 0, lanes 0

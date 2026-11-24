@@ -139,6 +139,13 @@ extern "C" __global__ void mma_dump(const uint32_t* image, uint64_t desc_a, uint
         mbar_init(&bar, 1);
         mbar_init_fence();
     }
+    // Every thread meets here before the warp-wide instruction below. Without the barrier a
+    // compiler may merge the `tid == 0` test above into the `warp == 0` test (nvcc 13.0 does),
+    // and lane 0 then reaches the allocation by another path than lanes 1 to 31. That is
+    // legal PTX, but the simulator does not bring the lanes together again in that shape
+    // (validation/blackwell/README.md, finding 16), so the prediction would depend on the
+    // compiler.
+    __syncthreads();
     if (warp == 0) tmem_alloc(&tmem_base, alloc_cols);
     __syncthreads();
     uint32_t base = tmem_base;

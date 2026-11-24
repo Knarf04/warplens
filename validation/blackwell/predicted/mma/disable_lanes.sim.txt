@@ -1,0 +1,7 @@
+status: ok
+warplens: 5 kernel launch(es) simulated on B200, 0 finding(s)
+  mma_disable: 1 CTA(s), 2278 warp-instructions
+  mma_disable: 1 CTA(s), 2278 warp-instructions
+  mma_disable: 1 CTA(s), 2278 warp-instructions
+  mma_disable: 1 CTA(s), 2278 warp-instructions
+  mma_disable: 1 CTA(s), 2278 warp-instructions

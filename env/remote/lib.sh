@@ -10,9 +10,15 @@ REPO_DIR="$(cd "$REMOTE_DIR/../.." && pwd)"
 PINS_FILE="$REMOTE_DIR/pins.env"
 
 # Where everything that is not the checkout lives: micromamba, the env, the
-# package cache, state markers and results. Needs about 12 GB.
+# package cache, state markers and results. Needs about 18 GB (12 without the
+# PyTorch env).
 REMOTE_HOME="${WARPLENS_REMOTE_HOME:-$HOME/warplens-remote}"
 ENV_PREFIX="$REMOTE_HOME/env"
+# A venv on top of the env, holding PyTorch and nothing else (see pins.env).
+# WARPLENS_TORCH_PYTHON names another interpreter that has torch and triton.
+# shellcheck disable=SC2034  # used by the scripts that source this file
+TORCH_ENV="$REMOTE_HOME/torch-env"
+torch_python() { echo "${WARPLENS_TORCH_PYTHON:-$TORCH_ENV/bin/python}"; }
 MAMBA_BIN="$REMOTE_HOME/bin/micromamba"
 
 # Load pins.env into PIN_<KEY> variables. The file is parsed, not sourced: a
@@ -140,6 +146,59 @@ choose_toolkit() {
   fi
 }
 
+# The nvcc version the committed predictions were made with: the simulator ran PTX from
+# that compiler, so a GPU run of programs built by another one is not the same programs.
+# predictions_nvcc blackwell|timing -> X.Y.Z, or nothing when it is not recorded.
+predictions_nvcc() {
+  local file="$REPO_DIR/validation/blackwell/predicted/provenance.json"
+  [[ "${1:-blackwell}" == timing ]] && file="$REPO_DIR/validation/blackwell_timing/predicted/meta.json"
+  sed -n 's/.*"nvcc_version": *"\([0-9][0-9.]*\)".*/\1/p' "$file" 2>/dev/null | head -n 1
+}
+
+# toolkit_verdict INSTALLED_NVCC PREDICTIONS_NVCC DRIVER_CUDA -> "status|explanation".
+#
+# INSTALLED_NVCC is the version of the nvcc that will build the probes (X.Y.Z),
+# PREDICTIONS_NVCC what predictions_nvcc printed, DRIVER_CUDA the CUDA release
+# the driver supports (X.Y, or empty).
+#
+#   comparable       the same nvcc, and the driver takes its PTX
+#   comparable-native  the same nvcc, but the driver is older than it: its PTX
+#                    is refused, the machine-code builds (which the same nvcc
+#                    produces) run, and predictions still apply
+#   not-comparable   another nvcc builds the probes: the fallback toolkit
+#   unknown          a version is missing
+toolkit_verdict() {
+  local installed="$1" predicted="$2" driver="$3" release
+  if [[ -z "$installed" || "$installed" == MISSING || -z "$predicted" ]]; then
+    echo "unknown|TOOLKIT NOT RECORDED: installed nvcc '${installed:-?}', predictions made with nvcc '${predicted:-?}'; cannot tell whether the predictions are comparable"
+  elif [[ "$installed" != "$predicted" ]]; then
+    echo "not-comparable|BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE: the probes will be built by nvcc $installed, but the committed predictions are the simulator's run of PTX from nvcc $predicted. Every verdict then compares two different compilations; a difference may be the compiler's"
+  else
+    release="$(cut -d. -f1,2 <<<"$installed")"
+    if [[ -n "$driver" ]] && ! version_ge "$driver" "$release"; then
+      echo "comparable-native|nvcc $installed as for the predictions, but the driver supports only CUDA $driver: it refuses this toolkit's PTX, so the machine-code builds run (same compiler, same code; ptxas of the toolkit instead of the driver's)"
+    else
+      echo "comparable|nvcc $installed as for the predictions${driver:+, and the driver (CUDA $driver) takes its PTX}"
+    fi
+  fi
+}
+
+# choose_torch DRIVER_CUDA TORCH_CUDA -> "install|why" or "skip|why".
+# The pinned torch wheel carries the CUDA runtime of release TORCH_CUDA; a
+# driver of an older major release cannot load it (the same rule as for the
+# toolkit, above). Within the major release an older driver is fine: measured
+# with the CUDA 13.2 wheel on a driver that supports 13.0.
+choose_torch() {
+  local driver="$1" torch_cuda="$2"
+  if [[ -z "$driver" ]]; then
+    echo "install|no NVIDIA driver found, so nothing to match: installing as pinned"
+  elif [[ "${driver%%.*}" == "${torch_cuda%%.*}" ]] || version_ge "$driver" "$torch_cuda"; then
+    echo "install|the driver supports CUDA $driver, and the pinned PyTorch carries the CUDA $torch_cuda runtime"
+  else
+    echo "skip|the driver supports only CUDA $driver; the pinned PyTorch carries the CUDA $torch_cuda runtime, which a ${driver%%.*}.x driver cannot load, and no PyTorch release pairs the pinned Triton with CUDA ${driver%%.*}. The Triton-on-GPU step (validation/blackwell/e2e/triton_gpu.py) will be SKIPPED"
+  fi
+}
+
 # parse_ncu_output METRIC TEXT -> "ok|value", "permission|the error line" or "none|".
 # TEXT is what `ncu --csv --metrics METRIC program` printed. A counter was read
 # only if a CSV row carries METRIC with a number in its last column
@@ -193,6 +252,30 @@ env_run() {
   fi
   # PYTHONNOUSERSITE: packages in ~/.local are not part of the env.
   PYTHONNOUSERSITE=1 MAMBA_ROOT_PREFIX="$REMOTE_HOME/mamba" "$MAMBA_BIN" run -p "$ENV_PREFIX" "$@"
+}
+
+# install_torch_env BASE_CONSTRAINTS: make $TORCH_ENV, a venv of the env's Python that
+# sees the env's packages (Triton, NumPy), and install the pinned PyTorch into it with
+# every package it brings held to its TORCH_PIP_ pin. Needs load_pins. Returns non-zero
+# when the venv or the install fails; the caller decides what that means.
+install_torch_env() {
+  local base="$1" constraints="$REMOTE_HOME/state/torch-constraints.txt" pin name
+  mkdir -p "$REMOTE_HOME/state"
+  {
+    [[ -f "$base" ]] && cat "$base"
+    echo "triton==$PIN_TRITON"
+    echo "cuda-bindings==$PIN_CUDA_BINDINGS"
+    for pin in "${!PIN_TORCH_PIP_@}"; do     # PIN_TORCH_PIP_NVIDIA_CUBLAS constrains nvidia-cublas
+      name="${pin#PIN_TORCH_PIP_}"; name="${name,,}"
+      echo "${name//_/-}==${!pin}"
+    done
+  } > "$constraints"
+  rm -rf "$TORCH_ENV"
+  env_run python -m venv --system-site-packages "$TORCH_ENV" || return 1
+  # TMPDIR: pip unpacks 3 GB of wheels there; /tmp may be too small (it was, here).
+  mkdir -p "$REMOTE_HOME/tmp"
+  TMPDIR="$REMOTE_HOME/tmp" PYTHONNOUSERSITE=1 env_run "$TORCH_ENV/bin/python" -m pip install -q --no-input --disable-pip-version-check \
+    --no-cache-dir -c "$constraints" "torch==$PIN_TORCH" "triton==$PIN_TRITON"
 }
 
 env_installed() {

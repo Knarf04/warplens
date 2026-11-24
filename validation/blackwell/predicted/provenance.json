@@ -1,0 +1,4 @@
+{
+ "nvcc_version": "13.5.37",
+ "what": "the nvcc that built validation/blackwell/bin, whose PTX the simulator ran to produce these predictions; run_all.py and compare.py flag a GPU run built by another version"
+}

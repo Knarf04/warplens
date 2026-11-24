@@ -1,0 +1,6 @@
+  16 bytes: load with expect_tx 16: phase completed 1; shared words equal to the source 4 of 4; word after the range eeeeeeee
+            store back: global words equal to the source 4 of 4 (first 30000000, last 30000003); words changed after the range 0
+  64 bytes: load with expect_tx 64: phase completed 1; shared words equal to the source 16 of 16; word after the range eeeeeeee
+            store back: global words equal to the source 16 of 16 (first 30000000, last 3000000f); words changed after the range 0
+4096 bytes: load with expect_tx 4096: phase completed 1; shared words equal to the source 1024 of 1024; word after the range eeeeeeee
+            store back: global words equal to the source 1024 of 1024 (first 30000000, last 300003ff); words changed after the range 0

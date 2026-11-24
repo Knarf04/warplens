@@ -1,0 +1,5 @@
+status: ok
+warplens: 3 kernel launch(es) simulated on B200, 0 finding(s)
+  smem_touch: 1 CTA(s), 14 warp-instructions
+  smem_touch: 1 CTA(s), 14 warp-instructions
+  smem_touch: 1 CTA(s), 14 warp-instructions

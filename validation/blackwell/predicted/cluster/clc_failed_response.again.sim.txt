@@ -1,0 +1,18 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 5 finding(s)
+  clc_one_request: 1 CTA(s), 201 warp-instructions
+    [clc-ctaid-of-failed-cancel] get_first_ctaid of a request that did not cancel anything; PTX leaves the result undefined. Here it is zero. Predicate the instruction on is_canceled
+      line 475: clusterlaunchcontrol.query_cancel.get_first_ctaid.v4.b32.b128 {%r206, %r205, %r204, %r203}, r;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [clc-ctaid-of-failed-cancel] get_first_ctaid of a request that did not cancel anything; PTX leaves the result undefined. Here it is zero. Predicate the instruction on is_canceled
+      line 476: clusterlaunchcontrol.query_cancel.get_first_ctaid::x.b32.b128 %r202, r;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [clc-ctaid-of-failed-cancel] get_first_ctaid of a request that did not cancel anything; PTX leaves the result undefined. Here it is zero. Predicate the instruction on is_canceled
+      line 477: clusterlaunchcontrol.query_cancel.get_first_ctaid::y.b32.b128 %r201, r;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [clc-ctaid-of-failed-cancel] get_first_ctaid of a request that did not cancel anything; PTX leaves the result undefined. Here it is zero. Predicate the instruction on is_canceled
+      line 478: clusterlaunchcontrol.query_cancel.get_first_ctaid::z.b32.b128 %r200, r;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [clc-try-cancel-after-failure] this CTA already saw a cancellation request fail (query_cancel.is_canceled was false); PTX leaves another try_cancel after that undefined. Here it fails again (3 times)
+      line 567: clusterlaunchcontrol.try_cancel.async.shared::cta.mbarrier::complete_tx::bytes.b128 [%r126], [%r124];
+      first in CTA (0, 0, 0), warp 0, lanes 0

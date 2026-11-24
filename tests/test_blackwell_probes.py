@@ -118,3 +118,15 @@ def test_probes_the_simulator_refuses_say_so(simulated):
         assert (status == "ok") != ("KERNEL FAILED" in stdout), probe.name
         if not probe.risk:
             assert status == "ok", f"{probe.name} is not marked as risky but the simulator refuses it"
+
+
+def test_readme_tables_are_the_manifest():
+    """README.md lists every run with what the simulator does with it. The tables are written
+    by `python manifest.py --tables`, so they cannot drift from the manifest or from the
+    committed predictions."""
+    readme = (SUITE / "README.md").read_text()
+    start = readme.index("<!-- tables:")
+    start = readme.index("\n\n", start) + 2
+    end = readme.index("<!-- end of tables -->")
+    assert readme[start:end] == manifest.tables(), \
+        "run `python validation/blackwell/manifest.py --update-readme`"

@@ -1,5 +1,6 @@
 {
  "model": "B200",
+ "nvcc_version": "13.5.37",
  "config_file": "b200.yaml",
  "config": {
   "sm_count": 148.0,
@@ -60,6 +61,22 @@
   "tmem_access": {
    "status": "ok",
    "launches": 12
+  },
+  "clc_latency": {
+   "status": "ok",
+   "launches": 10
+  },
+  "cluster_costs": {
+   "status": "ok",
+   "launches": 20
+  },
+  "pipelined_gemm": {
+   "status": "ok",
+   "launches": 12
+  },
+  "ncu_banks": {
+   "status": "ok",
+   "launches": 9
   }
  },
  "not_simulated": {

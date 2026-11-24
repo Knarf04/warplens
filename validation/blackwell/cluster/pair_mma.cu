@@ -39,6 +39,7 @@ extern "C" __global__ void pair_mma(const uint32_t* image, uint64_t desc_a, uint
         mbar_init(&fin, 1);
         mbar_init_fence();
     }
+    __syncthreads();  // see mma_dump in ../tcgen05_common.h
     if (warp == 0)
         asm volatile("tcgen05.alloc.cta_group::2.sync.aligned.shared::cta.b32 [%0], %1;"
                      :: "r"(smem_addr(&tmem_base)), "r"(32) : "memory");

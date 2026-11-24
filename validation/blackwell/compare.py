@@ -13,19 +13,31 @@ verdict:
     informational   there is no prediction to hold it against: the probe has none, or the
                     simulator refuses the kernel and the GPU ran it
     kernel failed   the GPU faulted or rejected the kernel (the program reported it)
+    FAILED TO LAUNCH  the driver could not load the program's kernels (PTX it does not
+                    accept, no code for this GPU, ...). Nothing was tested. Never by design,
+                    and never counted as "the GPU refused the kernel"
+    HOST ERROR      a host-side CUDA call failed before or after the kernel. Nothing was
+                    tested, or the GPU was left unusable by an earlier fault
     timed out       killed by the timeout
     crashed         the program itself died, or could not be started
     not run         no result in the archive
 
 "(by design)" marks an outcome the manifest allows for that probe. Lines that start with
 "info:" carry machine-dependent values and are never compared. The exit status is 1 if any
-probe DIFFERS, crashed, was not run, or failed or timed out without that being by design.
+probe DIFFERS, failed to launch, had a host error, crashed, was not run, or failed or timed
+out without that being by design.
+
+If the programs were not built by the toolkit the predictions were made with
+(env/toolkit.txt in the results, written by run_all.py), a banner says so before and after
+the table: every verdict then compares two different compilations of the probe.
+--require-same-toolkit makes that an error (exit status 3, no table).
 Exit 2 means only unverified numeric differences remain; human assessment is needed.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import struct
 import sys
@@ -101,11 +113,49 @@ def read(path: Path) -> str:
     return path.read_text(errors="replace") if path.exists() else ""
 
 
+def launch_failed(status: str | None, text: str) -> bool:
+    return status == "launch-failed" or text.startswith("LAUNCH FAILED") or "\nLAUNCH FAILED" in text
+
+
+def host_error(status: str | None, text: str) -> bool:
+    return status == "host-error" or text.startswith("HOST ERROR") or "\nHOST ERROR" in text
+
+
+def toolkit_banner(results: Path, predicted: Path) -> str:
+    """"" when the programs of this run were built by the nvcc the predictions in `predicted`
+    were made with, else what to print. The run says what built it (env/toolkit.txt, from
+    run_all.py); the predictions say what they were made from (provenance.json). Comparing
+    the two here, not trusting the verdict recorded at run time, is what lets a run with a
+    fallback toolkit be held against predictions regenerated with that same toolkit."""
+    keys = dict(line.split("=", 1) for line in read(results / "env" / "toolkit.txt").splitlines() if "=" in line)
+    if not keys:
+        if not (results / "env").is_dir():
+            return ""  # a simulator run: it ran the very programs the predictions came from
+        return ("TOOLKIT NOT RECORDED: the results have no env/toolkit.txt, so it is not known whether the "
+                "programs were built by the toolkit the predictions were made with")
+    built = keys.get("built_nvcc_version", "unknown")
+    provenance = predicted / "provenance.json"
+    made_with = json.loads(provenance.read_text()).get("nvcc_version", "") if provenance.is_file() else ""
+    if keys.get("binaries") == "bin-ampere":
+        return keys.get("reason", "NOT THE PROGRAMS THE PREDICTIONS WERE MADE FROM: the Ampere dry-run build")
+    if built == "unknown" or not made_with:
+        return (f"TOOLKIT NOT RECORDED: programs built by nvcc {built}, predictions in {predicted} made with nvcc "
+                f"{made_with or 'unknown'}; cannot tell whether they are comparable")
+    if built != made_with:
+        return (f"BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE: the programs were built by nvcc {built}, "
+                f"the predictions in {predicted} are the simulator's run of PTX from nvcc {made_with}. A difference "
+                f"from a prediction may be the compiler's. Predictions for nvcc {built} can be made on any machine "
+                "(env/remote/RUNBOOK.md, \"Driver older than the toolkit\") and given with --predicted")
+    return ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("results")
     parser.add_argument("--predicted", default=str(HERE / "predicted"))
     parser.add_argument("--lines", type=int, default=3, help="differing lines to show per probe")
+    parser.add_argument("--require-same-toolkit", action="store_true",
+                        help="refuse to compare a run that was not built by the predictions' toolkit")
     args = parser.parse_args()
 
     results = Path(args.results)
@@ -126,6 +176,13 @@ def main() -> int:
         if len(fields) >= 2:
             statuses[fields[0]] = fields[1]
 
+    banner = toolkit_banner(results, predicted)
+    if banner:
+        bar = "!" * 100
+        print(f"{bar}\n{banner}\n{bar}\n")
+        if args.require_same_toolkit:
+            return 3
+
     rows, details, bad, unverified = [], [], 0, 0
     for probe in PROBES:
         status = statuses.get(probe.name)
@@ -136,10 +193,20 @@ def main() -> int:
         refused = bool(note) and note[0].startswith("status:") and note[0] != "status: ok"
         reason = next((l.removeprefix("warplens: ") for l in note[1:] if l.startswith("warplens: ")), "")
         design = " (by design)" if probe.risk else ""
-        gpu_failed = "KERNEL FAILED" in got_text or "HOST ERROR" in got_text
+        gpu_failed = "KERNEL FAILED" in got_text
+        error_line = next((l for l in got_text.splitlines() if l.startswith("info: error")), "")[6:]
 
         if status is None or status.startswith(("not built", "not run", "skipped")):
             verdict, detail = "not run", status or "no entry in status.tsv"
+            bad += 1
+        elif launch_failed(status, got_text):
+            # Before anything else: a program whose kernels the driver could not load says
+            # nothing about the claim, whatever the manifest allows this probe to do.
+            verdict, detail = "FAILED TO LAUNCH", error_line[:110]
+            bad += 1
+        elif host_error(status, got_text):
+            verdict = "HOST ERROR"
+            detail = next((l for l in got_text.splitlines() if l.startswith("HOST ERROR")), "")[12:110]
             bad += 1
         elif status == "timeout":
             verdict, detail = "timed out" + (design if probe.risk == "hang" else ""), ""
@@ -162,7 +229,7 @@ def main() -> int:
                 verdict, detail = "kernel failed" + design, "as predicted"
         elif gpu_failed:
             verdict = "kernel failed" + design
-            detail = next((l for l in got_text.splitlines() if l.startswith("info: error")), "")[6:]
+            detail = error_line
             bad += not probe.risk
             details += [f"{probe.name}: the GPU reported a failed kernel; outputs differ"] + \
                 first_differences(got, want, args.lines)
@@ -202,6 +269,12 @@ def main() -> int:
     for _, verdict, _ in rows:
         counts[verdict] = counts.get(verdict, 0) + 1
     print("\n" + ", ".join(f"{n} {v}" for v, n in sorted(counts.items(), key=lambda item: -item[1])))
+    if counts.get("FAILED TO LAUNCH"):
+        print(f"\n{counts['FAILED TO LAUNCH']} probe(s) FAILED TO LAUNCH: the driver could not load their kernels, "
+              "so they tested nothing.\nIf the error is cudaErrorUnsupportedPtxVersion the driver is older than the "
+              "toolkit: rerun with `run_all.py --binaries native` (see README, 'When probes do not launch').")
+    if banner:
+        print(f"\n{banner}")
     if details:
         print("\nDetails\n" + "\n".join(details))
     if scratch:

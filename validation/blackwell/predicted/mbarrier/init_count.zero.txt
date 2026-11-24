@@ -1,0 +1,3 @@
+script: init 0
+KERNEL FAILED: init 0
+info: error cudaErrorLaunchFailure

@@ -5,9 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
-
-#define CHECK(call) do { cudaError_t e = (call); if (e != cudaSuccess) { \
-    fprintf(stderr, "%s failed: %s\n", #call, cudaGetErrorString(e)); exit(1); } } while (0)
+#include "host_check.h"
 
 extern "C" __global__ void barrier_exit(int* out, int which) {
     __shared__ int box[128];
@@ -24,7 +22,7 @@ int main(int argc, char** argv) {
     CHECK(cudaMalloc(&d_out, sizeof(h_out)));
     CHECK(cudaMemset(d_out, 0, sizeof(h_out)));
     barrier_exit<<<1, 128>>>(d_out, which);
-    CHECK(cudaDeviceSynchronize());
+    CHECK_LAUNCH();
     CHECK(cudaMemcpy(h_out, d_out, sizeof(h_out), cudaMemcpyDeviceToHost));
     int wrong = 0;
     for (int t = 0; t < 128; ++t) {

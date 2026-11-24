@@ -1,0 +1,20 @@
+status: ok
+warplens: 9 kernel launch(es) simulated on B200, 3 finding(s)
+  kernel_kernel: 1 CTA(s), 5010 warp-instructions
+  kernel_kernel: 1 CTA(s), 5014 warp-instructions
+  kernel_kernel: 1 CTA(s), 5014 warp-instructions
+  kernel_kernel: 1 CTA(s), 1480 warp-instructions
+  kernel_kernel: 1 CTA(s), 1482 warp-instructions
+  kernel_kernel: 148 CTA(s), 18178 warp-instructions
+  kernel_kernel: 148 CTA(s), 48255 warp-instructions
+    [tmem-dealloc-repeated] tensor memory at column 0 (512 columns) was already released by an earlier tcgen05.dealloc; this one is ignored (148 times)
+      line 2009: tcgen05.dealloc.cta_group::1.sync.aligned.b32 %r275, %r276;
+      first in CTA (0, 0, 0), warp 4, lanes 0-31
+  kernel_kernel: 148 CTA(s), 67219 warp-instructions
+    [tmem-dealloc-repeated] tensor memory at column 0 (512 columns) was already released by an earlier tcgen05.dealloc; this one is ignored (148 times)
+      line 2876: tcgen05.dealloc.cta_group::2.sync.aligned.b32 %r498, %r499;
+      first in CTA (0, 0, 0), warp 4, lanes 0-31
+  kernel_kernel: 148 CTA(s), 102705 warp-instructions
+    [tmem-dealloc-repeated] tensor memory at column 0 (512 columns) was already released by an earlier tcgen05.dealloc; this one is ignored (296 times)
+      line 2988: tcgen05.dealloc.cta_group::2.sync.aligned.b32 %r534, %r535;
+      first in CTA (0, 0, 0), warp 8, lanes 0-31

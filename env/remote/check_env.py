@@ -4,6 +4,9 @@
     check_env.py versions        key=value for every package the launch paths need
     check_env.py nvrtc ARCH      compile a kernel with NVRTC for ARCH (e.g. sm_100a)
     check_env.py e2e             native Triton CUDA and book prerequisites (needs a GPU)
+    check_env.py torch           (run by the PyTorch env's interpreter) torch, the CUDA
+                                 release it was built for, the Triton it imports, whether
+                                 it sees a GPU; and torch_pip_<name> for what else is there
 
 versions and nvrtc need no GPU. Exit status 1 when a requested check fails.
 """
@@ -116,11 +119,42 @@ def e2e(book=None):
     return status
 
 
+def torch_report():
+    try:
+        import torch
+        import triton
+    except Exception as e:
+        print(f"torch=MISSING ({type(e).__name__}: {e})")
+        return 1
+    print(f"torch={importlib.metadata.version('torch')}")
+    print(f"torch_build={torch.__version__}")
+    print(f"torch_cuda_version={torch.version.cuda}")
+    print(f"torch_triton={triton.__version__}")
+    try:
+        available = torch.cuda.is_available()
+        print(f"torch_cuda_available={int(available)}")
+        if available:
+            major, minor = torch.cuda.get_device_capability(0)
+            print(f"torch_device={torch.cuda.get_device_name(0)}")
+            print(f"torch_device_cap={major}.{minor}")
+            # Was this build compiled for the device? 'sm_100' for a B200.
+            print(f"torch_arch_list={','.join(torch.cuda.get_arch_list())}")
+    except Exception as e:  # a driver the bundled runtime cannot use
+        print(f"torch_cuda_available=0 ({type(e).__name__}: {e})")
+    for dist in sorted(importlib.metadata.distributions(), key=lambda d: (d.metadata["Name"] or "").lower()):
+        name = re.sub(r"[-_.]+", "_", dist.metadata["Name"] or "").lower()
+        if name and name != "torch":
+            print(f"torch_pip_{name}={dist.version}")
+    return 0
+
+
 def main(argv):
     if len(argv) in (2, 3) and argv[1] == "e2e":
         return e2e(argv[2] if len(argv) == 3 else None)
     if len(argv) == 2 and argv[1] == "versions":
         return versions()
+    if len(argv) == 2 and argv[1] == "torch":
+        return torch_report()
     if len(argv) == 3 and argv[1] == "nvrtc":
         try:
             return nvrtc(argv[2])

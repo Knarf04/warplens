@@ -1,0 +1,5 @@
+status: ok
+<env>/lib/python3.12/site-packages/nvidia_cutlass_dsl/dsl_packages/cutlass/base_dsl/dsl.py:477: UserWarning: Cache is disabled as user wants to generate PTX/ASM.
+  warnings.warn(message, UserWarning)
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  kernel_cutlass_saxpy__tensorptrf32gmemo2561_tensorptrf32gmemo...: 4 CTA(s), 120 warp-instructions

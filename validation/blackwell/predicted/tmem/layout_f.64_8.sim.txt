@@ -1,6 +1,3 @@
-status: exit 3
-warplens: tcgen05.mma result with M=64 at lane 8; the lane of the destination must be 0 or 16
-  at module0.ptx:335: tcgen05.mma.cta_group::1.kind::f16 [%r60], %rd18, %rd19, %r61, p;
-  in kernel `mma_dump`, CTA (0, 0, 0), warp 0
-  lane 0 (thread (0, 0, 0))
-warplens: the program launched no kernels
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  mma_dump: 1 CTA(s), 2612 warp-instructions

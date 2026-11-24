@@ -1,0 +1,6 @@
+status: ok
+warplens: 4 kernel launch(es) simulated on B200, 0 finding(s)
+  elect: 1 CTA(s), 20 warp-instructions
+  elect: 1 CTA(s), 20 warp-instructions
+  elect: 1 CTA(s), 20 warp-instructions
+  elect: 1 CTA(s), 20 warp-instructions

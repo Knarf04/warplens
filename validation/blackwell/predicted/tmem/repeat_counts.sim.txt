@@ -1,0 +1,31 @@
+status: ok
+warplens: 29 kernel launch(es) simulated on B200, 0 finding(s)
+  repeat_counts: 1 CTA(s), 3269 warp-instructions
+  repeat_counts: 1 CTA(s), 3285 warp-instructions
+  repeat_counts: 1 CTA(s), 3309 warp-instructions
+  repeat_counts: 1 CTA(s), 3333 warp-instructions
+  repeat_counts: 1 CTA(s), 3405 warp-instructions
+  repeat_counts: 1 CTA(s), 3525 warp-instructions
+  repeat_counts: 1 CTA(s), 3789 warp-instructions
+  repeat_counts: 1 CTA(s), 4285 warp-instructions
+  repeat_counts: 1 CTA(s), 3277 warp-instructions
+  repeat_counts: 1 CTA(s), 3293 warp-instructions
+  repeat_counts: 1 CTA(s), 3301 warp-instructions
+  repeat_counts: 1 CTA(s), 3341 warp-instructions
+  repeat_counts: 1 CTA(s), 3397 warp-instructions
+  repeat_counts: 1 CTA(s), 3533 warp-instructions
+  repeat_counts: 1 CTA(s), 3773 warp-instructions
+  repeat_counts: 1 CTA(s), 4293 warp-instructions
+  repeat_counts: 1 CTA(s), 3293 warp-instructions
+  repeat_counts: 1 CTA(s), 3301 warp-instructions
+  repeat_counts: 1 CTA(s), 3341 warp-instructions
+  repeat_counts: 1 CTA(s), 3397 warp-instructions
+  repeat_counts: 1 CTA(s), 3533 warp-instructions
+  repeat_counts: 1 CTA(s), 3781 warp-instructions
+  repeat_counts: 1 CTA(s), 4301 warp-instructions
+  repeat_counts: 1 CTA(s), 3301 warp-instructions
+  repeat_counts: 1 CTA(s), 3341 warp-instructions
+  repeat_counts: 1 CTA(s), 3397 warp-instructions
+  repeat_counts: 1 CTA(s), 3533 warp-instructions
+  repeat_counts: 1 CTA(s), 3777 warp-instructions
+  repeat_counts: 1 CTA(s), 4301 warp-instructions

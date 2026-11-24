@@ -3,4 +3,5 @@ warplens: CTA rank 4 does not exist in a cluster of 4 CTA(s)
   at module0.ptx:86: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes.multicast::cluster [%r8], [%rd3, {%r10}], [%r9], %rs1;
   in kernel `multicast`, CTA (0, 0, 0), warp 0
   lane 0 (thread (0, 0, 0))
+KERNEL FAILED: multicast: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
 warplens: the program launched no kernels

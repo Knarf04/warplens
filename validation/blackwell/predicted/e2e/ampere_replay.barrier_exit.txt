@@ -1,0 +1,2 @@
+case 0: completed, output ok
+case 1: completed, output ok

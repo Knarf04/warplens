@@ -1,0 +1,12 @@
+grid 64 x 32 x 1, clusters of one CTA:
+  cluster origins: 2048
+  origins that either started or were handed to a running cluster, not both and not neither: 2048
+  successful requests beyond one per coordinate handed out: 0
+  coordinates returned although that cluster started: 0
+  coordinates returned that are not the first CTA of a cluster: 0
+  CTAs whose start disagrees with their cluster's first CTA: 0
+info: clusters started 1 of 2048, requests granted 2047
+info: clusters that started after some request had already failed: 0
+info: the cluster at (0, 0) took over 2047 cluster(s); the first 2047 of them came in launch order
+info: its first coordinates, as linear indices: 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+info: first clusters that started, as linear indices: 0

@@ -1,0 +1,3 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  saxpy_kernel: 4 CTA(s), 159 warp-instructions

@@ -239,19 +239,78 @@ __host__ __device__ inline uint64_t mma_smem_desc(uint32_t start, uint32_t lbo, 
         }                                                                                  \
     } while (0)
 
+// Errors that say the driver never had a kernel to run: it could not compile or load what
+// this program carries (PTX newer than the driver, no code for this GPU, no JIT compiler),
+// or there is no usable device. They say nothing about the behaviour a probe tests, so they
+// must never be read as "the GPU refused the kernel". The first launch of a program is
+// where they appear, because the runtime loads the module then.
+static inline bool probe_is_load_error(cudaError_t error) {
+    switch (error) {
+        case cudaErrorUnsupportedPtxVersion:
+        case cudaErrorInvalidPtx:
+        case cudaErrorJitCompilerNotFound:
+        case cudaErrorJitCompilationDisabled:
+        case cudaErrorInvalidSource:
+        case cudaErrorInvalidKernelImage:
+        case cudaErrorNoKernelImageForDevice:
+        case cudaErrorInvalidDeviceFunction:
+        case cudaErrorSymbolNotFound:
+        case cudaErrorFileNotFound:
+        case cudaErrorSharedObjectSymbolNotFound:
+        case cudaErrorSharedObjectInitFailed:
+        case cudaErrorInsufficientDriver:
+        case cudaErrorCallRequiresNewerDriver:
+        case cudaErrorSystemDriverMismatch:
+        case cudaErrorCompatNotSupportedOnDevice:
+        case cudaErrorStubLibrary:
+        case cudaErrorInitializationError:
+        case cudaErrorNoDevice:
+        case cudaErrorInvalidDevice:
+        case cudaErrorDevicesUnavailable:
+            return true;
+        default:
+            return false;
+    }
+}
+
+// Exit statuses of a probe: 0 ran to the end; 2 HOST ERROR (a host-side CUDA call failed);
+// 3 KERNEL FAILED (the kernel started, or was refused for what it asked: the outcome of the
+// test); 4 LAUNCH FAILED (the program's kernels could not be loaded at all: no outcome).
+// run_all.py and compare.py tell these apart by the first word and by the status.
+static inline void probe_report_failure(const char* what, cudaError_t error, const char* where) {
+    if (probe_is_load_error(error)) {
+        printf("LAUNCH FAILED: %s\n", what);
+        printf("info: error %s %s: %s\n", cudaGetErrorName(error), where, cudaGetErrorString(error));
+        printf("info: the driver could not load this program's kernels, so nothing ran. With "
+               "cudaErrorUnsupportedPtxVersion the driver is older than the toolkit that wrote the PTX: "
+               "run the machine-code build (build.sh --native, run_all.py --binaries native)\n");
+        fflush(stdout);
+        fprintf(stderr, "LAUNCH FAILED: %s: %s (%s)\n", what, cudaGetErrorName(error), cudaGetErrorString(error));
+        exit(4);
+    }
+    printf("KERNEL FAILED: %s\n", what);
+    printf("info: error %s\n", cudaGetErrorName(error));
+    fflush(stdout);
+    // Where it was reported goes to stderr only, so that the committed predictions (stdout)
+    // do not depend on it: the simulator reports a refusal at the launch, a GPU a fault at
+    // the synchronize.
+    fprintf(stderr, "KERNEL FAILED: %s: %s %s (%s)\n", what, cudaGetErrorName(error), where,
+            cudaGetErrorString(error));
+    exit(3);
+}
+
 // Wait for the launch just made. On failure, say so on stdout and stop: nothing after a
 // fault can be trusted on a real GPU. The error name goes on an "info:" line because the
 // simulator reports every fault as cudaErrorLaunchFailure and a GPU distinguishes them.
+// Both the launch's own error (cudaGetLastError) and the one the kernel ended with
+// (cudaDeviceSynchronize, then cudaGetLastError again) are checked.
 static inline void probe_sync(const char* what) {
     cudaError_t at_launch = cudaGetLastError();
+    if (at_launch != cudaSuccess) probe_report_failure(what, at_launch, "at launch");
     cudaError_t at_sync = cudaDeviceSynchronize();
-    cudaError_t error = at_launch != cudaSuccess ? at_launch : at_sync;
-    if (error != cudaSuccess) {
-        printf("KERNEL FAILED: %s\n", what);
-        printf("info: error %s\n", cudaGetErrorName(error));
-        fflush(stdout);
-        exit(3);
-    }
+    if (at_sync != cudaSuccess) probe_report_failure(what, at_sync, "at synchronize");
+    cudaError_t after = cudaGetLastError();
+    if (after != cudaSuccess) probe_report_failure(what, after, "after synchronize");
 }
 
 template <class T> static T* dev_alloc(size_t count) {

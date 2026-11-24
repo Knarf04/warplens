@@ -548,3 +548,158 @@ def test_preflight_kernels_compile_where_nvcc_is_installed(tmp_path):
         done = subprocess.run([nvcc, "-arch=sm_100a", "-cubin", str(REMOTE / "kernels" / source),
                                "-o", str(tmp_path / (source + ".cubin"))], capture_output=True, text=True)
         assert done.returncode == 0, done.stderr
+
+
+# ---------------------------------------------------------------------------------------------
+# Driver, toolkit, and the toolkit the predictions were made with
+# ---------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("installed,predicted,driver,status,words", [
+    ("13.5.37", "13.5.37", "13.5", "comparable", "takes its PTX"),
+    ("13.5.37", "13.5.37", "14.0", "comparable", ""),
+    ("13.5.37", "13.5.37", "", "comparable", ""),                        # no driver (CI)
+    ("13.5.37", "13.5.37", "13.0", "comparable-native", "refuses this toolkit's PTX"),   # --toolkit pinned
+    ("13.0.48", "13.5.37", "13.0", "not-comparable", "BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE"),
+    ("12.8.93", "13.5.37", "12.8", "not-comparable", "nvcc 12.8.93"),
+    ("13.5.38", "13.5.37", "13.5", "not-comparable", "nvcc 13.5.38"),    # a patch release is another compiler
+    ("", "13.5.37", "13.5", "unknown", "TOOLKIT NOT RECORDED"),
+    ("MISSING", "13.5.37", "13.5", "unknown", "TOOLKIT NOT RECORDED"),
+    ("13.5.37", "", "13.5", "unknown", "TOOLKIT NOT RECORDED"),
+])
+def test_toolkit_verdict(installed, predicted, driver, status, words):
+    got, _, why = lib("toolkit_verdict", installed, predicted, driver).partition("|")
+    assert got == status and words in why
+
+
+def test_the_predictions_toolkit_is_read_from_the_repository():
+    pins = read_pins()
+    assert lib("predictions_nvcc", "blackwell") == pins["CUDA_NVCC"]
+    assert lib("predictions_nvcc", "timing") == pins["CUDA_NVCC"]
+
+
+def test_setup_and_preflight_compare_the_three_versions():
+    setup = (REMOTE / "setup.sh").read_text()
+    for key in ("driver=", "driver_cuda=", "toolkit_installed=", "predictions_nvcc=", "predictions_comparable="):
+        assert f'echo "{key}' in setup, key
+    assert "toolkit_verdict" in setup and "toolkit_verdict" in (REMOTE / "preflight.sh").read_text()
+    assert " predictions " in (REMOTE / "preflight.sh").read_text()      # a named check, so run.sh can read it
+
+
+def versions_file(home: Path, state: str, why: str) -> None:
+    (home / "resolved").mkdir(parents=True)
+    (home / "resolved" / "versions.txt").write_text(
+        f"driver=570.86.15\ndriver_cuda=12.8\ncuda_nvcc=12.8.93\npredictions_nvcc=13.5.37\n"
+        f"predictions_comparable={state}\npredictions_comparable_why={why}\n")
+
+
+def test_run_carries_a_fallback_toolkit_into_the_archive(checkout, tmp_path):
+    root, env, args = checkout
+    suite(root, "blackwell", "echo built\n", 'echo "predictions=$WARPLENS_PREDICTIONS" > "$WARPLENS_RESULTS_DIR/p.txt"\n')
+    suite(root, "blackwell_timing", "echo built\n", "echo ran\n")
+    why = "BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE: the probes will be built by nvcc 12.8.93"
+    versions_file(tmp_path / "home", "not-comparable", why)
+    done = bash(root / "env/remote/run.sh", *args, env=env)
+    assert done.returncode == 0, done.stdout + done.stderr          # flagged, not failed
+    assert done.stdout.count(why) == 2                               # after setup, and as the last thing printed
+    assert done.stdout.rstrip().splitlines()[-1] == "!" * 100
+    files = members(archive_of(tmp_path / "home"))
+    assert files["PREDICTIONS-NOT-COMPARABLE.txt"].decode().startswith(why)
+    manifest = dict(line.split("=", 1) for line in files["manifest.txt"].decode().splitlines()
+                    if "=" in line and not line.startswith("#"))
+    assert manifest["predictions_comparable"] == "not-comparable" and manifest["predictions_comparable_why"] == why
+    assert manifest["driver_cuda"] == "12.8" and manifest["toolkit_installed"] == "12.8.93"
+    assert files["out/blackwell/p.txt"] == b"predictions=not-comparable\n"
+
+
+def test_strict_toolkit_stops_before_the_suites(checkout, tmp_path):
+    root, env, args = checkout
+    suite(root, "blackwell", "echo built\n", f'echo ran >> "{tmp_path}/ran"\n')
+    suite(root, "blackwell_timing", "echo built\n", "echo ran\n")
+    versions_file(tmp_path / "home", "not-comparable", "BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE: x")
+    done = bash(root / "env/remote/run.sh", *args, "--strict-toolkit", env=env)
+    assert done.returncode == 3 and "stopping (--strict-toolkit)" in done.stdout
+    assert not (tmp_path / "ran").exists()
+    assert "PREDICTIONS-NOT-COMPARABLE.txt" in members(archive_of(tmp_path / "home"))   # the archive is still written
+
+
+def test_run_with_the_predictions_toolkit_has_no_flag(checkout, tmp_path):
+    root, env, args = checkout
+    suite(root, "blackwell", "echo built\n", "echo ran\n")
+    suite(root, "blackwell_timing", "echo built\n", "echo ran\n")
+    for state in ("comparable", "comparable-native"):
+        shutil.rmtree(tmp_path / "home", ignore_errors=True)
+        versions_file(tmp_path / "home", state, "nvcc 13.5.37 as for the predictions")
+        done = bash(root / "env/remote/run.sh", *args, "--strict-toolkit", "--redo", "all", env=env)
+        assert done.returncode == 0, done.stdout + done.stderr
+        assert "NOT COMPARABLE" not in done.stdout and "!!!!" not in done.stdout
+        files = members(archive_of(tmp_path / "home"))
+        assert "PREDICTIONS-NOT-COMPARABLE.txt" not in files
+        assert f"predictions_comparable={state}\n" in files["manifest.txt"].decode()
+
+
+def test_run_without_a_record_of_the_toolkit_says_so(checkout, tmp_path):
+    """setup was skipped and left no versions.txt: unknown is flagged like a mismatch."""
+    root, env, args = checkout
+    suite(root, "blackwell", "echo built\n", "echo ran\n")
+    suite(root, "blackwell_timing", "echo built\n", "echo ran\n")
+    done = bash(root / "env/remote/run.sh", *args, env=env)
+    assert "TOOLKIT NOT RECORDED" in done.stdout
+    assert "PREDICTIONS-NOT-COMPARABLE.txt" in members(archive_of(tmp_path / "home"))
+
+
+# ---------------------------------------------------------------------------------------------
+# PyTorch (for the Triton-on-GPU step)
+# ---------------------------------------------------------------------------------------------
+
+def test_torch_is_pinned_with_everything_it_brings():
+    pins = read_pins()
+    assert {"TORCH", "TORCH_CUDA_VERSION"} <= set(pins)
+    brought = {key for key in pins if key.startswith("TORCH_PIP_")}
+    assert {"TORCH_PIP_CUDA_TOOLKIT", "TORCH_PIP_NVIDIA_CUDA_RUNTIME", "TORCH_PIP_NVIDIA_CUDA_NVRTC",
+            "TORCH_PIP_NVIDIA_CUDNN_CU13", "TORCH_PIP_SYMPY", "TORCH_PIP_NETWORKX"} <= brought
+    # The CUDA wheels torch requires are of the release TORCH_CUDA_VERSION names, and of the
+    # same major release as the toolkit, or the pinned cuda-bindings would not load with them.
+    assert pins["TORCH_PIP_CUDA_TOOLKIT"].startswith(pins["TORCH_CUDA_VERSION"] + ".")
+    assert pins["TORCH_PIP_NVIDIA_CUDA_RUNTIME"].startswith(pins["TORCH_CUDA_VERSION"] + ".")
+    assert pins["TORCH_CUDA_VERSION"].split(".")[0] == pins["CUDA_VERSION"].split(".")[0]
+    setup = (REMOTE / "setup.sh").read_text() + (REMOTE / "lib.sh").read_text()
+    for use in ('"torch==$PIN_TORCH"', '"triton==$PIN_TRITON"', "${!PIN_TORCH_PIP_@}", "$PIN_TORCH_CUDA_VERSION",
+                "--system-site-packages"):
+        assert use in setup, use
+
+
+def test_torch_is_not_installed_into_the_main_env():
+    """With the CUDA 13.2 wheels in the env, cuda-bindings loads NVRTC 13.2 instead of the
+    toolkit's (measured). So torch goes into its own venv, and setup.sh checks NVRTC."""
+    setup = (REMOTE / "setup.sh").read_text()
+    main_install = setup[setup.index('"triton==$PIN_TRITON" "nvidia-cutlass-dsl=='):setup.index("5b. PyTorch")]
+    assert "torch==" not in main_install
+    assert "install_torch_env" in setup and 'nvrtc_loaded" == "$toolkit"' in setup
+    lib_text = (REMOTE / "lib.sh").read_text()
+    assert 'TORCH_ENV="$REMOTE_HOME/torch-env"' in lib_text
+    assert 'env_run python -m venv --system-site-packages "$TORCH_ENV"' in lib_text
+    # pip unpacks gigabytes under TMPDIR; /tmp was too small on the development machine.
+    assert 'TMPDIR="$REMOTE_HOME/tmp"' in lib_text and 'export TMPDIR="$REMOTE_HOME/tmp"' in setup
+
+
+@pytest.mark.parametrize("driver,action", [
+    ("13.5", "install"), ("13.2", "install"), ("14.0", "install"),
+    ("13.0", "install"),      # measured: the CUDA 13.2 wheel on the development machine's driver
+    ("", "install"),
+    ("12.9", "skip"), ("12.8", "skip"),
+])
+def test_torch_follows_the_driver(driver, action):
+    got, _, why = lib("choose_torch", driver, "13.2").partition("|")
+    assert got == action and why
+    if action == "skip":
+        assert "SKIPPED" in why and "12.x driver cannot load" in why
+
+
+def test_check_env_reports_a_missing_torch():
+    """Run by an interpreter without torch, `check_env.py torch` says MISSING and fails;
+    preflight turns that into a warning."""
+    probe = subprocess.run(["python3", "-c", "import torch"], capture_output=True)
+    if probe.returncode == 0:
+        pytest.skip("python3 has torch")
+    done = subprocess.run(["python3", str(REMOTE / "check_env.py"), "torch"], capture_output=True, text=True)
+    assert done.returncode == 1 and done.stdout.startswith("torch=MISSING (")

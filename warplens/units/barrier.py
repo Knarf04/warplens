@@ -6,7 +6,7 @@ import numpy as np
 
 from ..core.cta import NUM_BARRIERS, WARP_SIZE
 from ..errors import ExecutionError
-from .alu import op, unsupported
+from .alu import membermask_check, op, unsupported
 
 
 def _uniform(w, ins, operand, mask, what: str) -> int:
@@ -41,10 +41,33 @@ def _cluster_barrier(w, ins, mask):
         w.cta.cluster.barrier_wait(w, ins)
 
 
+def _warp_sync(w, ins, mask):
+    """bar.warp.sync membermask (`__syncwarp()`): the threads of the warp named by the mask
+    wait for each other, which orders their memory accesses before and after it.
+
+    The lanes of a warp that execute an instruction here execute it together, and everything
+    they did earlier has already happened, so there is nothing to wait for. What is not
+    modeled is a rendezvous between lanes on different divergent paths: those run one path
+    after the other, as for `shfl.sync`, and that case is reported."""
+    if len(ins.operands) != 1:
+        raise unsupported(ins, "expected `bar.warp.sync membermask`")
+    if not mask.any():
+        return
+    _, _, mismatch = membermask_check(w, ins.operands[0], mask)
+    if mismatch.any():
+        w.cta.findings.add(
+            "warp-sync-membermask-mismatch",
+            "bar.warp.sync caller is absent from its member mask, or a non-exited member is "
+            "not executing it with the same member mask; lanes on separate divergent paths "
+            "do not wait for each other here", w, ins, np.flatnonzero(mismatch))
+
+
 @op("bar", "barrier")
 def _bar(w, ins, mask):
     if ins.opcode == "barrier" and ins.mods[:1] == ("cluster",):
         return _cluster_barrier(w, ins, mask)
+    if ins.opcode == "bar" and ins.mods == ("warp", "sync"):
+        return _warp_sync(w, ins, mask)
     mods = tuple(m for m in ins.mods if m != "cta")
     if ins.opcode == "barrier" and mods in (("sync", "aligned"), ("arrive", "aligned")):
         mods = mods[:1]  # explicit spelling of the alignment implicit in `bar`

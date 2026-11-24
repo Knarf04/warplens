@@ -18,6 +18,7 @@ class Cluster:
         self.ctas: list = []  # in rank order: x fastest, then y, then z
         self.async_ops: dict = {}  # shared by the CTAs, so operation ids are unique in the cluster
         self.warps: list = []
+        self.clock = 0  # the engine's round counter, for %clock64 in untimed runs
         self.arrived: list = []  # warps that arrived at the cluster barrier in this round
         self.waiting: list = []
         self.knowledge: set[int] = set()  # only knowledge released at arrival

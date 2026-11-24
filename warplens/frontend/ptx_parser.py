@@ -37,6 +37,7 @@ SPECIAL_REGISTERS = {
     "laneid": False, "warpid": False, "nwarpid": False,
     "clusterid": True, "nclusterid": True, "cluster_ctaid": True, "cluster_nctaid": True,
     "cluster_ctarank": False, "cluster_nctarank": False, "is_explicit_cluster": False,
+    "clock": False, "clock_hi": False, "clock64": False,  # see core.warp.Warp.clock
 }
 
 _LINKAGE = {".visible", ".weak", ".extern", ".common"}

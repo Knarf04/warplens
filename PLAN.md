@@ -476,6 +476,12 @@ Found by this work in the simulator, and fixed since unless marked open:
   the conversions to an integer in f32 and f64 (`floorf`); the 44 such lines
   of `nan_golden.txt` are predicted and compared with the rest, and the new
   golden is rerun as `formats/ampere_replay.cvt_ftz`.
+- Done: `vote` (`__all_sync`, `__any_sync`, `__uni_sync`, `__ballot_sync`, and
+  the forms without `.sync`), with a golden from the 3080 Ti and a rerun on
+  the B200 (`e2e/ampere_replay.vote`, RT-16). `vote.sync` waits for the lanes
+  of its mask, as the GPU does. Open: `shfl.sync`, `bar.warp.sync` and
+  `elect.sync` do not wait in the simulator, and what the GPU does when their
+  masks name lanes that are elsewhere was not measured.
 - Open: the launch-error recordings
   (`launch_errors_3080ti.txt`, `driver_errors_3080ti.txt`) are at Ampere's own
   limits and are not rerun verbatim; RT-04 and RT-12 cover them.

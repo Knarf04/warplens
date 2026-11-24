@@ -327,6 +327,9 @@ def _device() -> list[Probe]:
             ("cpasync", ("RT-01",), "cpasync_golden.txt", "cp.async with a source size"),
             ("barrier_exit", ("RT-01",), "barrier_exit_hw.cu prints 'output ok'",
              "__syncthreads() completes when some threads have exited"),
+            ("vote", ("RT-16",), "vote_golden.txt",
+             "vote.sync all, any, uni and ballot in full and partial warps, with lanes that returned or are "
+             "on another branch, and member masks that name lanes which do not vote"),
             ("call", ("RT-02",), "call_golden.txt", "calls to device functions"),
             ("callforms", ("RT-02",), "callforms_golden.txt",
              "structs passed and returned by value, calls through function pointers, recursion"),

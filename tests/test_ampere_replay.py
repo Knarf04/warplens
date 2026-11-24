@@ -49,6 +49,7 @@ REPLAYED = {
     "cpasync_golden.txt": ("e2e/ampere_replay.cpasync", "cpasync_golden.cu", _whole, _whole),
     "call_golden.txt": ("e2e/ampere_replay.call", "call_golden.cu", _whole, _whole),
     "callforms_golden.txt": ("e2e/ampere_replay.callforms", "callforms_golden.cu", _whole, _whole),
+    "vote_golden.txt": ("e2e/ampere_replay.vote", "vote_golden.cu", _whole, _whole),
     "atom_golden.txt": ("e2e/ampere_atom", "atom_golden.cu", _whole, _whole),
     "reconvergence_golden.txt": ("e2e/ampere_reconvergence", "reconvergence_kernels.h", _whole, _whole),
     "mbarrier_token_golden.txt": ("mbarrier/ampere_token", "mbarrier_token_golden.cu", _whole, _whole),
@@ -61,6 +62,8 @@ REPLAYED = {
 }
 # Golden files a run covers in another way, and where that is checked.
 OTHERWISE = {
+    "vote_legacy_golden.txt": "vote without .sync: ptxas refuses it for sm_70 and newer, so nothing built for "
+                              "sm_100a can hold it; tests/test_hardware_golden.py::test_vote_matches_real_gpu",
     "tf32_golden.txt": "formats/tf32_modes prints the same inputs with the .rn and .rz columns beside .rna; "
                        "tests/test_blackwell_probes.py::test_predicted_rna_column_is_what_the_rtx_3080_ti_gave",
 }

@@ -50,7 +50,14 @@ gpu.memcpy_h2d(b.ctypes.data, y, b.nbytes)
 arguments = (2.5, make_ptr(cutlass.Float32, int(x), cute.AddressSpace.gmem),
              make_ptr(cutlass.Float32, int(y), cute.AddressSpace.gmem))
 if capturing():
-    compiled = cute.compile(host, *arguments, options="--keep-ptx")
+    # --keep-ptx also writes the PTX to a file: in the working directory, unless a directory
+    # is named. `warplens run` names one (CUTE_DSL_DUMP_DIR) and reads the kernel from it.
+    options = "--keep-ptx"
+    if not os.environ.get("CUTE_DSL_DUMP_DIR"):
+        dump = os.path.join(os.environ["WARPLENS_CAPTURE_DIR"], "cute_dsl_dump")
+        os.makedirs(dump, exist_ok=True)
+        options += f" --dump-dir={dump}"
+    compiled = cute.compile(host, *arguments, options=options)
     compiled(*arguments)
 else:
     host(*arguments)

@@ -422,9 +422,10 @@ Found by this work in the simulator, and fixed since unless marked open:
   and 0x7f in both.
 - Lanes passed `bar.sync` before lane 0 arrived in two control-flow layouts
   nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`). Fixed:
-  warp-synchronizing instructions rendezvous pending SIMT paths before
-  counting the warp as arrived; unsynchronized code has no implicit ordering
-  guarantee.
+  the merged implementation groups paths that meet early, matching the recorded
+  Ampere cases; warp-synchronizing instructions also rendezvous pending paths
+  before counting the warp as arrived, including joins inside cycles.
+  Unsynchronized code has no portable implicit ordering guarantee.
 - State tokens older than the immediately preceding mbarrier phase are invalid
   PTX use. They now report `mbarrier-invalid-token` and grant no synchronization
   credit. The simulator's true and the 3080 Ti's false result are informational.

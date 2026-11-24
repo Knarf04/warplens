@@ -499,6 +499,15 @@ Those marked "fixed since" were fixed on other branches.
     unsupported. The probes retain their explicit synchronization between setup
     and allocation, keeping the generated predictions easy to compare.
 
+    The implementation's early grouping policy (`core/warp.py:_regroup`) also
+    joins paths that meet before their static postdominator. This matches the
+    recorded RTX 3080 Ti runs in `validation/ampere/reconvergence_golden.py`:
+    all four layouts read the expected word even without the barrier. That
+    observation is specific to those compiled programs; it does not make
+    unsynchronized communication portable. The explicit rendezvous above is
+    still needed when paths meet inside a control-flow cycle, which the early
+    grouping policy deliberately leaves alone.
+
 ## Adding a probe
 
 Write `<area>/<name>.cu` including `../common.h`; print inputs beside outputs; isolate one

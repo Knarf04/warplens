@@ -418,12 +418,10 @@ def reconvergence():
     return module
 
 
-@pytest.mark.parametrize("shape", ["A", "B"])
-def test_lanes_reconverge_in_the_layouts_nvcc_13_5_emits(shape):
+@pytest.mark.parametrize("shape", ["A", "B", "C", "D"])
+def test_lanes_reconverge_in_the_layouts_nvcc_13_5_and_13_0_emit(shape):
+    """A and B are what nvcc 13.5 emits, C and D what nvcc 13.0 does. In C and D lanes 1 to 31
+    passed the join, and a `bar.sync` there, before lane 0 arrived, until the warp learned to
+    bring lanes together that meet before their branch's post-dominator (core/warp.py)."""
     assert reconvergence().lanes_reading_seven(shape, barrier=True) == 32
     assert reconvergence().lanes_reading_seven(shape, barrier=False) == 32
-
-
-@pytest.mark.parametrize("shape", ["C", "D"])
-def test_lanes_reconverge_in_the_layouts_nvcc_13_0_emits(shape):
-    assert reconvergence().lanes_reading_seven(shape, barrier=True) == 32

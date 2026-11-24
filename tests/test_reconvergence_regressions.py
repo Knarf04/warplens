@@ -244,3 +244,46 @@ def test_guard_false_lanes_exit_before_partial_arrival_is_counted(sim, barrier):
     # interpreter can let the remaining threads exit and finish the barrier.
     assert [f.kind for f in stats.findings] == ([] if barrier == "barrier.sync" else
                                               ["barrier-in-divergent-code"])
+
+
+@pytest.mark.parametrize("timing", [False, True])
+def test_cyclic_early_join_still_requires_explicit_barrier_rendezvous(sim, timing):
+    # CFG regrouping deliberately leaves paths in the same cycle in their old
+    # order. It must not replace the barrier's rendezvous: without it lanes1–31
+    # run both iterations before lane0 ever initializes the shared word.
+    mod = kernel("""
+        .reg .pred %p, %q; .reg .b32 %tid, %i, %v;
+        .reg .b64 %out, %off; .shared .align 4 .u32 cell;
+        mov.u32 %tid, %tid.x;
+        mov.u32 %i, 0;
+      LOOP:
+        setp.ne.u32 %p, %tid, 0;
+        @%p bra ELSE;
+        st.shared.u32 [cell], 7;
+        bra JOIN;
+      ELSE:
+        setp.gt.u32 %q, %tid, 31;
+        @%q bra END;
+      JOIN:
+        bar.sync 0;
+        ld.shared.u32 %v, [cell];
+        ld.param.u64 %out, [out];
+        mul.wide.u32 %off, %tid, 4;
+        add.u64 %out, %out, %off;
+        st.global.u32 [%out], %v;
+        add.u32 %i, %i, 1;
+        setp.lt.u32 %q, %i, 2;
+        @%q bra LOOP;
+      END:
+        ret;
+    """, ".param .u64 out")
+    out = sim.empty(32, "u32")
+    arrivals = []
+    def record(w, pc, ins, mask):
+        if ins.name == "bar.sync":
+            arrivals.append(int(mask.sum()))
+    stats = sim.launch(mod, "k", grid=1, block=32, args=[out], timing=timing,
+                       trace=record, max_steps=200)
+    assert out.numpy().tolist() == [7] * 32
+    assert arrivals == [32, 32]
+    assert not stats.findings

@@ -1,29 +1,31 @@
-"""Regression reproducer for warp rendezvous beyond a static reconvergence point.
+"""Regression reproducer for joins beyond a static reconvergence point.
 
     PYTHONPATH=<repo> python validation/blackwell/findings/reconvergence.py
 
 Each kernel is `if (tid == 0) shared = 7;` followed by code every lane reaches,
 using four layouts of the same control flow. With bar.sync all 32 lanes must
 read 7. Without synchronization, PTX does not guarantee this communication;
-the simulator's deterministic scheduling order is not a hardware prediction.
+the recorded RTX 3080 Ti kernels nevertheless produce 32 correct lanes in all
+four layouts (validation/ampere/reconvergence_golden.py).
 
 A  the join is the branch target (how nvcc 13.5 lays this out)
 B  the then-side jumps to the join; other lanes fall into it from their own block
 C  as B, but that block ends in a conditional branch no lane actually takes
 D  the other lanes' block is at the end and branches backward to the join
 
-Before the rental-gap fix, C and D produced only 1 correct lane even with
-bar.sync: their static immediate postdominator lies beyond the barrier, and
-part of the warp was incorrectly counted as a whole-warp arrival. This also
-rejected tcgen05.alloc.sync.aligned in compiler-merged control flow.
+Originally C and D produced only 1 correct lane even with bar.sync: their
+static immediate postdominator lies beyond the barrier, and part of the warp
+was incorrectly counted as a whole-warp arrival. This also rejected
+tcgen05.alloc.sync.aligned in compiler-merged control flow.
 
-The executor now collects pending paths at named CTA barriers and tcgen05
-.sync.aligned operations before executing them. All four synchronized cases
-produce 32 correct lanes. Ordinary unsynchronized instructions keep the
-static reconvergence schedule; C and D without a barrier still produce 1.
-Tests cover forward/backward joins, multiple warps, bar.arrive, exited lanes,
-repeated phases, and timed execution. Divergent rendezvous at different
-instruction addresses or across recursive activations remains unsupported.
+The executor now regroups acyclic branch paths where they meet, matching the
+recorded Ampere results. Named CTA barriers and tcgen05 .sync.aligned operations
+also explicitly collect pending paths before executing, including joins on a
+loop where ordinary regrouping keeps the existing path order. All eight cases
+here produce 32 correct lanes. Tests also cover multiple warps, bar.arrive,
+exited lanes, repeated phases, recursion and timed execution. Divergent
+rendezvous at different instruction addresses or across recursive activations
+remains unsupported; unsynchronized communication has no general guarantee.
 """
 import numpy as np
 import warplens

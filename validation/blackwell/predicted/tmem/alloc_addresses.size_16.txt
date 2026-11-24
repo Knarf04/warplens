@@ -1,0 +1,3 @@
+script: an allocation of 16 columns
+KERNEL FAILED: an allocation of 16 columns
+info: error cudaErrorLaunchFailure

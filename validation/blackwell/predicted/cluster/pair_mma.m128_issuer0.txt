@@ -1,0 +1,260 @@
+cta_group::2 MMA, M = 128, N = 16, issued by the CTA of rank 0; D[m][n] = 256 m + n
+tcgen05.alloc.cta_group::2 returned 00000000 in rank 0 and 00000000 in rank 1
+CTA rank 0: for each lane, the row and the result columns found in TMEM columns 0-15
+  lane   0: row   0, columns  0- 7 in TMEM columns 0-7
+  lane   1: row   1, columns  0- 7 in TMEM columns 0-7
+  lane   2: row   2, columns  0- 7 in TMEM columns 0-7
+  lane   3: row   3, columns  0- 7 in TMEM columns 0-7
+  lane   4: row   4, columns  0- 7 in TMEM columns 0-7
+  lane   5: row   5, columns  0- 7 in TMEM columns 0-7
+  lane   6: row   6, columns  0- 7 in TMEM columns 0-7
+  lane   7: row   7, columns  0- 7 in TMEM columns 0-7
+  lane   8: row   8, columns  0- 7 in TMEM columns 0-7
+  lane   9: row   9, columns  0- 7 in TMEM columns 0-7
+  lane  10: row  10, columns  0- 7 in TMEM columns 0-7
+  lane  11: row  11, columns  0- 7 in TMEM columns 0-7
+  lane  12: row  12, columns  0- 7 in TMEM columns 0-7
+  lane  13: row  13, columns  0- 7 in TMEM columns 0-7
+  lane  14: row  14, columns  0- 7 in TMEM columns 0-7
+  lane  15: row  15, columns  0- 7 in TMEM columns 0-7
+  lane  16: row  16, columns  0- 7 in TMEM columns 0-7
+  lane  17: row  17, columns  0- 7 in TMEM columns 0-7
+  lane  18: row  18, columns  0- 7 in TMEM columns 0-7
+  lane  19: row  19, columns  0- 7 in TMEM columns 0-7
+  lane  20: row  20, columns  0- 7 in TMEM columns 0-7
+  lane  21: row  21, columns  0- 7 in TMEM columns 0-7
+  lane  22: row  22, columns  0- 7 in TMEM columns 0-7
+  lane  23: row  23, columns  0- 7 in TMEM columns 0-7
+  lane  24: row  24, columns  0- 7 in TMEM columns 0-7
+  lane  25: row  25, columns  0- 7 in TMEM columns 0-7
+  lane  26: row  26, columns  0- 7 in TMEM columns 0-7
+  lane  27: row  27, columns  0- 7 in TMEM columns 0-7
+  lane  28: row  28, columns  0- 7 in TMEM columns 0-7
+  lane  29: row  29, columns  0- 7 in TMEM columns 0-7
+  lane  30: row  30, columns  0- 7 in TMEM columns 0-7
+  lane  31: row  31, columns  0- 7 in TMEM columns 0-7
+  lane  32: row  32, columns  0- 7 in TMEM columns 0-7
+  lane  33: row  33, columns  0- 7 in TMEM columns 0-7
+  lane  34: row  34, columns  0- 7 in TMEM columns 0-7
+  lane  35: row  35, columns  0- 7 in TMEM columns 0-7
+  lane  36: row  36, columns  0- 7 in TMEM columns 0-7
+  lane  37: row  37, columns  0- 7 in TMEM columns 0-7
+  lane  38: row  38, columns  0- 7 in TMEM columns 0-7
+  lane  39: row  39, columns  0- 7 in TMEM columns 0-7
+  lane  40: row  40, columns  0- 7 in TMEM columns 0-7
+  lane  41: row  41, columns  0- 7 in TMEM columns 0-7
+  lane  42: row  42, columns  0- 7 in TMEM columns 0-7
+  lane  43: row  43, columns  0- 7 in TMEM columns 0-7
+  lane  44: row  44, columns  0- 7 in TMEM columns 0-7
+  lane  45: row  45, columns  0- 7 in TMEM columns 0-7
+  lane  46: row  46, columns  0- 7 in TMEM columns 0-7
+  lane  47: row  47, columns  0- 7 in TMEM columns 0-7
+  lane  48: row  48, columns  0- 7 in TMEM columns 0-7
+  lane  49: row  49, columns  0- 7 in TMEM columns 0-7
+  lane  50: row  50, columns  0- 7 in TMEM columns 0-7
+  lane  51: row  51, columns  0- 7 in TMEM columns 0-7
+  lane  52: row  52, columns  0- 7 in TMEM columns 0-7
+  lane  53: row  53, columns  0- 7 in TMEM columns 0-7
+  lane  54: row  54, columns  0- 7 in TMEM columns 0-7
+  lane  55: row  55, columns  0- 7 in TMEM columns 0-7
+  lane  56: row  56, columns  0- 7 in TMEM columns 0-7
+  lane  57: row  57, columns  0- 7 in TMEM columns 0-7
+  lane  58: row  58, columns  0- 7 in TMEM columns 0-7
+  lane  59: row  59, columns  0- 7 in TMEM columns 0-7
+  lane  60: row  60, columns  0- 7 in TMEM columns 0-7
+  lane  61: row  61, columns  0- 7 in TMEM columns 0-7
+  lane  62: row  62, columns  0- 7 in TMEM columns 0-7
+  lane  63: row  63, columns  0- 7 in TMEM columns 0-7
+  lane  64: row   0, columns  8-15 in TMEM columns 0-7
+  lane  65: row   1, columns  8-15 in TMEM columns 0-7
+  lane  66: row   2, columns  8-15 in TMEM columns 0-7
+  lane  67: row   3, columns  8-15 in TMEM columns 0-7
+  lane  68: row   4, columns  8-15 in TMEM columns 0-7
+  lane  69: row   5, columns  8-15 in TMEM columns 0-7
+  lane  70: row   6, columns  8-15 in TMEM columns 0-7
+  lane  71: row   7, columns  8-15 in TMEM columns 0-7
+  lane  72: row   8, columns  8-15 in TMEM columns 0-7
+  lane  73: row   9, columns  8-15 in TMEM columns 0-7
+  lane  74: row  10, columns  8-15 in TMEM columns 0-7
+  lane  75: row  11, columns  8-15 in TMEM columns 0-7
+  lane  76: row  12, columns  8-15 in TMEM columns 0-7
+  lane  77: row  13, columns  8-15 in TMEM columns 0-7
+  lane  78: row  14, columns  8-15 in TMEM columns 0-7
+  lane  79: row  15, columns  8-15 in TMEM columns 0-7
+  lane  80: row  16, columns  8-15 in TMEM columns 0-7
+  lane  81: row  17, columns  8-15 in TMEM columns 0-7
+  lane  82: row  18, columns  8-15 in TMEM columns 0-7
+  lane  83: row  19, columns  8-15 in TMEM columns 0-7
+  lane  84: row  20, columns  8-15 in TMEM columns 0-7
+  lane  85: row  21, columns  8-15 in TMEM columns 0-7
+  lane  86: row  22, columns  8-15 in TMEM columns 0-7
+  lane  87: row  23, columns  8-15 in TMEM columns 0-7
+  lane  88: row  24, columns  8-15 in TMEM columns 0-7
+  lane  89: row  25, columns  8-15 in TMEM columns 0-7
+  lane  90: row  26, columns  8-15 in TMEM columns 0-7
+  lane  91: row  27, columns  8-15 in TMEM columns 0-7
+  lane  92: row  28, columns  8-15 in TMEM columns 0-7
+  lane  93: row  29, columns  8-15 in TMEM columns 0-7
+  lane  94: row  30, columns  8-15 in TMEM columns 0-7
+  lane  95: row  31, columns  8-15 in TMEM columns 0-7
+  lane  96: row  32, columns  8-15 in TMEM columns 0-7
+  lane  97: row  33, columns  8-15 in TMEM columns 0-7
+  lane  98: row  34, columns  8-15 in TMEM columns 0-7
+  lane  99: row  35, columns  8-15 in TMEM columns 0-7
+  lane 100: row  36, columns  8-15 in TMEM columns 0-7
+  lane 101: row  37, columns  8-15 in TMEM columns 0-7
+  lane 102: row  38, columns  8-15 in TMEM columns 0-7
+  lane 103: row  39, columns  8-15 in TMEM columns 0-7
+  lane 104: row  40, columns  8-15 in TMEM columns 0-7
+  lane 105: row  41, columns  8-15 in TMEM columns 0-7
+  lane 106: row  42, columns  8-15 in TMEM columns 0-7
+  lane 107: row  43, columns  8-15 in TMEM columns 0-7
+  lane 108: row  44, columns  8-15 in TMEM columns 0-7
+  lane 109: row  45, columns  8-15 in TMEM columns 0-7
+  lane 110: row  46, columns  8-15 in TMEM columns 0-7
+  lane 111: row  47, columns  8-15 in TMEM columns 0-7
+  lane 112: row  48, columns  8-15 in TMEM columns 0-7
+  lane 113: row  49, columns  8-15 in TMEM columns 0-7
+  lane 114: row  50, columns  8-15 in TMEM columns 0-7
+  lane 115: row  51, columns  8-15 in TMEM columns 0-7
+  lane 116: row  52, columns  8-15 in TMEM columns 0-7
+  lane 117: row  53, columns  8-15 in TMEM columns 0-7
+  lane 118: row  54, columns  8-15 in TMEM columns 0-7
+  lane 119: row  55, columns  8-15 in TMEM columns 0-7
+  lane 120: row  56, columns  8-15 in TMEM columns 0-7
+  lane 121: row  57, columns  8-15 in TMEM columns 0-7
+  lane 122: row  58, columns  8-15 in TMEM columns 0-7
+  lane 123: row  59, columns  8-15 in TMEM columns 0-7
+  lane 124: row  60, columns  8-15 in TMEM columns 0-7
+  lane 125: row  61, columns  8-15 in TMEM columns 0-7
+  lane 126: row  62, columns  8-15 in TMEM columns 0-7
+  lane 127: row  63, columns  8-15 in TMEM columns 0-7
+CTA rank 1: for each lane, the row and the result columns found in TMEM columns 0-15
+  lane   0: row  64, columns  0- 7 in TMEM columns 0-7
+  lane   1: row  65, columns  0- 7 in TMEM columns 0-7
+  lane   2: row  66, columns  0- 7 in TMEM columns 0-7
+  lane   3: row  67, columns  0- 7 in TMEM columns 0-7
+  lane   4: row  68, columns  0- 7 in TMEM columns 0-7
+  lane   5: row  69, columns  0- 7 in TMEM columns 0-7
+  lane   6: row  70, columns  0- 7 in TMEM columns 0-7
+  lane   7: row  71, columns  0- 7 in TMEM columns 0-7
+  lane   8: row  72, columns  0- 7 in TMEM columns 0-7
+  lane   9: row  73, columns  0- 7 in TMEM columns 0-7
+  lane  10: row  74, columns  0- 7 in TMEM columns 0-7
+  lane  11: row  75, columns  0- 7 in TMEM columns 0-7
+  lane  12: row  76, columns  0- 7 in TMEM columns 0-7
+  lane  13: row  77, columns  0- 7 in TMEM columns 0-7
+  lane  14: row  78, columns  0- 7 in TMEM columns 0-7
+  lane  15: row  79, columns  0- 7 in TMEM columns 0-7
+  lane  16: row  80, columns  0- 7 in TMEM columns 0-7
+  lane  17: row  81, columns  0- 7 in TMEM columns 0-7
+  lane  18: row  82, columns  0- 7 in TMEM columns 0-7
+  lane  19: row  83, columns  0- 7 in TMEM columns 0-7
+  lane  20: row  84, columns  0- 7 in TMEM columns 0-7
+  lane  21: row  85, columns  0- 7 in TMEM columns 0-7
+  lane  22: row  86, columns  0- 7 in TMEM columns 0-7
+  lane  23: row  87, columns  0- 7 in TMEM columns 0-7
+  lane  24: row  88, columns  0- 7 in TMEM columns 0-7
+  lane  25: row  89, columns  0- 7 in TMEM columns 0-7
+  lane  26: row  90, columns  0- 7 in TMEM columns 0-7
+  lane  27: row  91, columns  0- 7 in TMEM columns 0-7
+  lane  28: row  92, columns  0- 7 in TMEM columns 0-7
+  lane  29: row  93, columns  0- 7 in TMEM columns 0-7
+  lane  30: row  94, columns  0- 7 in TMEM columns 0-7
+  lane  31: row  95, columns  0- 7 in TMEM columns 0-7
+  lane  32: row  96, columns  0- 7 in TMEM columns 0-7
+  lane  33: row  97, columns  0- 7 in TMEM columns 0-7
+  lane  34: row  98, columns  0- 7 in TMEM columns 0-7
+  lane  35: row  99, columns  0- 7 in TMEM columns 0-7
+  lane  36: row 100, columns  0- 7 in TMEM columns 0-7
+  lane  37: row 101, columns  0- 7 in TMEM columns 0-7
+  lane  38: row 102, columns  0- 7 in TMEM columns 0-7
+  lane  39: row 103, columns  0- 7 in TMEM columns 0-7
+  lane  40: row 104, columns  0- 7 in TMEM columns 0-7
+  lane  41: row 105, columns  0- 7 in TMEM columns 0-7
+  lane  42: row 106, columns  0- 7 in TMEM columns 0-7
+  lane  43: row 107, columns  0- 7 in TMEM columns 0-7
+  lane  44: row 108, columns  0- 7 in TMEM columns 0-7
+  lane  45: row 109, columns  0- 7 in TMEM columns 0-7
+  lane  46: row 110, columns  0- 7 in TMEM columns 0-7
+  lane  47: row 111, columns  0- 7 in TMEM columns 0-7
+  lane  48: row 112, columns  0- 7 in TMEM columns 0-7
+  lane  49: row 113, columns  0- 7 in TMEM columns 0-7
+  lane  50: row 114, columns  0- 7 in TMEM columns 0-7
+  lane  51: row 115, columns  0- 7 in TMEM columns 0-7
+  lane  52: row 116, columns  0- 7 in TMEM columns 0-7
+  lane  53: row 117, columns  0- 7 in TMEM columns 0-7
+  lane  54: row 118, columns  0- 7 in TMEM columns 0-7
+  lane  55: row 119, columns  0- 7 in TMEM columns 0-7
+  lane  56: row 120, columns  0- 7 in TMEM columns 0-7
+  lane  57: row 121, columns  0- 7 in TMEM columns 0-7
+  lane  58: row 122, columns  0- 7 in TMEM columns 0-7
+  lane  59: row 123, columns  0- 7 in TMEM columns 0-7
+  lane  60: row 124, columns  0- 7 in TMEM columns 0-7
+  lane  61: row 125, columns  0- 7 in TMEM columns 0-7
+  lane  62: row 126, columns  0- 7 in TMEM columns 0-7
+  lane  63: row 127, columns  0- 7 in TMEM columns 0-7
+  lane  64: row  64, columns  8-15 in TMEM columns 0-7
+  lane  65: row  65, columns  8-15 in TMEM columns 0-7
+  lane  66: row  66, columns  8-15 in TMEM columns 0-7
+  lane  67: row  67, columns  8-15 in TMEM columns 0-7
+  lane  68: row  68, columns  8-15 in TMEM columns 0-7
+  lane  69: row  69, columns  8-15 in TMEM columns 0-7
+  lane  70: row  70, columns  8-15 in TMEM columns 0-7
+  lane  71: row  71, columns  8-15 in TMEM columns 0-7
+  lane  72: row  72, columns  8-15 in TMEM columns 0-7
+  lane  73: row  73, columns  8-15 in TMEM columns 0-7
+  lane  74: row  74, columns  8-15 in TMEM columns 0-7
+  lane  75: row  75, columns  8-15 in TMEM columns 0-7
+  lane  76: row  76, columns  8-15 in TMEM columns 0-7
+  lane  77: row  77, columns  8-15 in TMEM columns 0-7
+  lane  78: row  78, columns  8-15 in TMEM columns 0-7
+  lane  79: row  79, columns  8-15 in TMEM columns 0-7
+  lane  80: row  80, columns  8-15 in TMEM columns 0-7
+  lane  81: row  81, columns  8-15 in TMEM columns 0-7
+  lane  82: row  82, columns  8-15 in TMEM columns 0-7
+  lane  83: row  83, columns  8-15 in TMEM columns 0-7
+  lane  84: row  84, columns  8-15 in TMEM columns 0-7
+  lane  85: row  85, columns  8-15 in TMEM columns 0-7
+  lane  86: row  86, columns  8-15 in TMEM columns 0-7
+  lane  87: row  87, columns  8-15 in TMEM columns 0-7
+  lane  88: row  88, columns  8-15 in TMEM columns 0-7
+  lane  89: row  89, columns  8-15 in TMEM columns 0-7
+  lane  90: row  90, columns  8-15 in TMEM columns 0-7
+  lane  91: row  91, columns  8-15 in TMEM columns 0-7
+  lane  92: row  92, columns  8-15 in TMEM columns 0-7
+  lane  93: row  93, columns  8-15 in TMEM columns 0-7
+  lane  94: row  94, columns  8-15 in TMEM columns 0-7
+  lane  95: row  95, columns  8-15 in TMEM columns 0-7
+  lane  96: row  96, columns  8-15 in TMEM columns 0-7
+  lane  97: row  97, columns  8-15 in TMEM columns 0-7
+  lane  98: row  98, columns  8-15 in TMEM columns 0-7
+  lane  99: row  99, columns  8-15 in TMEM columns 0-7
+  lane 100: row 100, columns  8-15 in TMEM columns 0-7
+  lane 101: row 101, columns  8-15 in TMEM columns 0-7
+  lane 102: row 102, columns  8-15 in TMEM columns 0-7
+  lane 103: row 103, columns  8-15 in TMEM columns 0-7
+  lane 104: row 104, columns  8-15 in TMEM columns 0-7
+  lane 105: row 105, columns  8-15 in TMEM columns 0-7
+  lane 106: row 106, columns  8-15 in TMEM columns 0-7
+  lane 107: row 107, columns  8-15 in TMEM columns 0-7
+  lane 108: row 108, columns  8-15 in TMEM columns 0-7
+  lane 109: row 109, columns  8-15 in TMEM columns 0-7
+  lane 110: row 110, columns  8-15 in TMEM columns 0-7
+  lane 111: row 111, columns  8-15 in TMEM columns 0-7
+  lane 112: row 112, columns  8-15 in TMEM columns 0-7
+  lane 113: row 113, columns  8-15 in TMEM columns 0-7
+  lane 114: row 114, columns  8-15 in TMEM columns 0-7
+  lane 115: row 115, columns  8-15 in TMEM columns 0-7
+  lane 116: row 116, columns  8-15 in TMEM columns 0-7
+  lane 117: row 117, columns  8-15 in TMEM columns 0-7
+  lane 118: row 118, columns  8-15 in TMEM columns 0-7
+  lane 119: row 119, columns  8-15 in TMEM columns 0-7
+  lane 120: row 120, columns  8-15 in TMEM columns 0-7
+  lane 121: row 121, columns  8-15 in TMEM columns 0-7
+  lane 122: row 122, columns  8-15 in TMEM columns 0-7
+  lane 123: row 123, columns  8-15 in TMEM columns 0-7
+  lane 124: row 124, columns  8-15 in TMEM columns 0-7
+  lane 125: row 125, columns  8-15 in TMEM columns 0-7
+  lane 126: row 126, columns  8-15 in TMEM columns 0-7
+  lane 127: row 127, columns  8-15 in TMEM columns 0-7

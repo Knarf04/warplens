@@ -1,0 +1,6 @@
+status: exit 3
+warplens: tcgen05.alloc of 64 columns increases the previous allocation size of 32 columns
+  at module0.ptx:169: tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%r6], %r5;
+  in kernel `tmem_alloc_script`, CTA (0, 0, 0), warp 0
+  lane 0 (thread (0, 0, 0)) and 31 more lane(s)
+warplens: the program launched no kernels

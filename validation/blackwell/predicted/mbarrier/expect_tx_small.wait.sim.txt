@@ -1,0 +1,5 @@
+status: exit 3
+warplens: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them
+  warp 0 waits at line 431: mbarrier.try_wait.parity.shared::cta.b64 P1, [%r7], %r1;
+    mbarrier at shared offset 1024 is in phase 0, still needs 0 arrival(s) and -128 byte(s) of TMA data; 128 completion byte(s) have not been accounted for by expect_tx (expect_tx too small or missing?)
+warplens: the program launched no kernels

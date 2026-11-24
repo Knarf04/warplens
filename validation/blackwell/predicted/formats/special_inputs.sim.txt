@@ -1,0 +1,5 @@
+prediction: written by formats/predict_small_formats.py from warplens.numerics
+the probe itself under `warplens run`: exit 3
+warplens: unsupported instruction `cvt.rn.satfinite.e4m3x2.f32` (expected cvt[.round].dtype.atype)
+  line 114: {cvt.rn.satfinite.e4m3x2.f32 %rs18, %r17, %r2;}
+warplens: the program launched no kernels

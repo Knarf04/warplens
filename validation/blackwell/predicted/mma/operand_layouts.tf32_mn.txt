@@ -1,0 +1,4 @@
+kind::tf32, M = 128, N = 64, K = 8, swizzle 128B, A MN-major, B K-major
+  descriptors (relative to the operand buffer): A 4000408000400000, B 4000404000010400, instruction 08108910
+KERNEL FAILED: mma_dump
+info: error cudaErrorLaunchFailure

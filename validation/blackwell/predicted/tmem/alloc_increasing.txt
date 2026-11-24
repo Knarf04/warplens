@@ -1,0 +1,3 @@
+script: 32 columns, then 64 (a larger allocation after a smaller one)
+KERNEL FAILED: 32 columns, then 64 (a larger allocation after a smaller one)
+info: error cudaErrorLaunchFailure

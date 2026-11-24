@@ -1,0 +1,3 @@
+innermost coordinate 1 (4 bytes, not a multiple of 16):
+KERNEL FAILED: tma_dump
+info: error cudaErrorLaunchFailure

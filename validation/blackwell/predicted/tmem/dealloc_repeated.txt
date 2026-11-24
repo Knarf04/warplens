@@ -1,0 +1,7 @@
+script: release the same allocation twice
+  step  0  alloc   32 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  1  dealloc allocation 0: executed
+  step  2  dealloc allocation 0: executed
+script: a fresh launch afterwards
+  step  0  alloc  512 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  1  dealloc allocation 0: executed

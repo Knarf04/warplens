@@ -1,0 +1,30 @@
+status: ok
+warplens: 28 kernel launch(es) simulated on B200, 0 finding(s)
+  transfer_shapes: 1 CTA(s), 729 warp-instructions
+  transfer_shapes: 1 CTA(s), 1065 warp-instructions
+  transfer_shapes: 1 CTA(s), 753 warp-instructions
+  transfer_shapes: 1 CTA(s), 1093 warp-instructions
+  transfer_shapes: 1 CTA(s), 729 warp-instructions
+  transfer_shapes: 1 CTA(s), 1065 warp-instructions
+  transfer_shapes: 1 CTA(s), 729 warp-instructions
+  transfer_shapes: 1 CTA(s), 1065 warp-instructions
+  transfer_shapes: 1 CTA(s), 761 warp-instructions
+  transfer_shapes: 1 CTA(s), 1077 warp-instructions
+  transfer_shapes: 1 CTA(s), 761 warp-instructions
+  transfer_shapes: 1 CTA(s), 1077 warp-instructions
+  transfer_shapes: 1 CTA(s), 725 warp-instructions
+  transfer_shapes: 1 CTA(s), 1069 warp-instructions
+  transfer_shapes: 1 CTA(s), 725 warp-instructions
+  transfer_shapes: 1 CTA(s), 1069 warp-instructions
+  transfer_shapes: 1 CTA(s), 753 warp-instructions
+  transfer_shapes: 1 CTA(s), 1089 warp-instructions
+  transfer_shapes: 1 CTA(s), 753 warp-instructions
+  transfer_shapes: 1 CTA(s), 1089 warp-instructions
+  transfer_shapes: 1 CTA(s), 713 warp-instructions
+  transfer_shapes: 1 CTA(s), 1077 warp-instructions
+  transfer_shapes: 1 CTA(s), 713 warp-instructions
+  transfer_shapes: 1 CTA(s), 1077 warp-instructions
+  transfer_shapes: 1 CTA(s), 741 warp-instructions
+  transfer_shapes: 1 CTA(s), 1101 warp-instructions
+  transfer_shapes: 1 CTA(s), 741 warp-instructions
+  transfer_shapes: 1 CTA(s), 1101 warp-instructions

@@ -14,6 +14,11 @@
 //   * arrivals beyond the pending count carry into the next phase (case `over`).
 //
 //   script [basic|count|tx|negative|over]      default: basic, count and tx
+//
+// mbarrier.init, arrive and test_wait exist since Ampere (sm_80); expect_tx and complete_tx
+// do not, nor does arrive with a count. Built with -DPROBE_AMPERE (build.sh --ampere), which
+// turns `arrive n` into n single arrivals, the cases basic and count run on an Ampere GPU;
+// that is how they were checked on the development machine.
 #include "../common.h"
 
 enum Op { INIT = 1, ARRIVE = 2, EXPECT = 3, COMPLETE = 4, ARRIVE_EXPECT = 5 };
@@ -25,10 +30,16 @@ extern "C" __global__ void mbar_script(const int* ops, const int* args, int n, i
         uint32_t a = (uint32_t)args[i];
         switch (ops[i]) {
             case INIT: mbar_init(&bar, a); mbar_init_fence(); break;
+#ifdef PROBE_AMPERE  // no arrive with a count before sm_90: arrive that many times
+            case ARRIVE:
+                for (uint32_t j = 0; j < a; ++j) mbar_arrive(&bar);
+                break;
+#else
             case ARRIVE: mbar_arrive_n(&bar, a); break;
             case EXPECT: mbar_expect_tx(&bar, a); break;
             case COMPLETE: mbar_complete_tx(&bar, a); break;
             case ARRIVE_EXPECT: mbar_arrive_expect_tx(&bar, a); break;
+#endif
         }
         results[2 * i] = (int)mbar_test(&bar, 0);
         results[2 * i + 1] = (int)mbar_test(&bar, 1);

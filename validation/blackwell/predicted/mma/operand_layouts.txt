@@ -1,0 +1,72 @@
+kind::f16, M = 128, N = 64, K = 16, swizzle none, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 0000400800800000, B 0000400800400400, instruction 08100010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 32B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A c000401000010000, B c000401000010400, instruction 08100010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 64B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 8000402000010000, B 8000402000010400, instruction 08100010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 128B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 4000404000010000, B 4000404000010400, instruction 08100010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::tf32, M = 128, N = 64, K = 8, swizzle none, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 0000400800800000, B 0000400800400400, instruction 08100910
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::tf32, M = 128, N = 64, K = 8, swizzle 32B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A c000401000010000, B c000401000010400, instruction 08100910
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::tf32, M = 128, N = 64, K = 8, swizzle 64B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 8000402000010000, B 8000402000010400, instruction 08100910
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::tf32, M = 128, N = 64, K = 8, swizzle 128B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 4000404000010000, B 4000404000010400, instruction 08100910
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 64, N = 64, K = 16, swizzle none, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 0000400800400000, B 0000400800400400, instruction 04100010
+  elements equal to A B^T bit for bit: 4096 of 4096
+kind::f16, M = 64, N = 64, K = 16, swizzle 32B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A c000401000010000, B c000401000010400, instruction 04100010
+  elements equal to A B^T bit for bit: 4096 of 4096
+kind::f16, M = 64, N = 64, K = 16, swizzle 64B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 8000402000010000, B 8000402000010400, instruction 04100010
+  elements equal to A B^T bit for bit: 4096 of 4096
+kind::f16, M = 64, N = 64, K = 16, swizzle 128B, A K-major, B K-major
+  descriptors (relative to the operand buffer): A 4000404000010000, B 4000404000010400, instruction 04100010
+  elements equal to A B^T bit for bit: 4096 of 4096
+kind::f16, M = 128, N = 64, K = 16, swizzle none, A MN-major, B K-major
+  descriptors (relative to the operand buffer): A 0000400800800000, B 0000400800400400, instruction 08108010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle none, A K-major, B MN-major
+  descriptors (relative to the operand buffer): A 0000400800800000, B 0000400800400400, instruction 08110010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle none, A MN-major, B MN-major
+  descriptors (relative to the operand buffer): A 0000400800800000, B 0000400800400400, instruction 08118010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 32B, A MN-major, B K-major
+  descriptors (relative to the operand buffer): A c000408000100000, B c000401000010400, instruction 08108010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 32B, A K-major, B MN-major
+  descriptors (relative to the operand buffer): A c000401000010000, B c000404000100400, instruction 08110010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 32B, A MN-major, B MN-major
+  descriptors (relative to the operand buffer): A c000408000100000, B c000404000100400, instruction 08118010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 64B, A MN-major, B K-major
+  descriptors (relative to the operand buffer): A 8000408000200000, B 8000402000010400, instruction 08108010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 64B, A K-major, B MN-major
+  descriptors (relative to the operand buffer): A 8000402000010000, B 8000404000200400, instruction 08110010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 64B, A MN-major, B MN-major
+  descriptors (relative to the operand buffer): A 8000408000200000, B 8000404000200400, instruction 08118010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 128B, A MN-major, B K-major
+  descriptors (relative to the operand buffer): A 4000408000400000, B 4000404000010400, instruction 08108010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 128B, A K-major, B MN-major
+  descriptors (relative to the operand buffer): A 4000404000010000, B 4000404000400400, instruction 08110010
+  elements equal to A B^T bit for bit: 8192 of 8192
+kind::f16, M = 128, N = 64, K = 16, swizzle 128B, A MN-major, B MN-major
+  descriptors (relative to the operand buffer): A 4000408000400000, B 4000404000400400, instruction 08118010
+  elements equal to A B^T bit for bit: 8192 of 8192

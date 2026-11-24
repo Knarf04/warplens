@@ -1,0 +1,6 @@
+status: ok
+warplens: 4 kernel launch(es) simulated on B200, 0 finding(s)
+  tmem_alloc_script: 1 CTA(s), 297 warp-instructions
+  tmem_alloc_script: 1 CTA(s), 297 warp-instructions
+  tmem_alloc_script: 1 CTA(s), 297 warp-instructions
+  tmem_alloc_script: 1 CTA(s), 101 warp-instructions

@@ -1,0 +1,60 @@
+swizzle none, box 16 rows x 128 bytes = 2048 bytes (128 chunks), destination = buffer + 1024 + 0
+  buffer address % 1024 = 0; phase completed 1
+info: shared address of the buffer 0x0
+  buffer row (128 bytes each): source chunk found in each of its eight 16-byte chunks
+  row  8 (bytes 1024..):   0   1   2   3   4   5   6   7
+  row  9 (bytes 1152..):   8   9  10  11  12  13  14  15
+  row 10 (bytes 1280..):  16  17  18  19  20  21  22  23
+  row 11 (bytes 1408..):  24  25  26  27  28  29  30  31
+  row 12 (bytes 1536..):  32  33  34  35  36  37  38  39
+  row 13 (bytes 1664..):  40  41  42  43  44  45  46  47
+  row 14 (bytes 1792..):  48  49  50  51  52  53  54  55
+  row 15 (bytes 1920..):  56  57  58  59  60  61  62  63
+  row 16 (bytes 2048..):  64  65  66  67  68  69  70  71
+  row 17 (bytes 2176..):  72  73  74  75  76  77  78  79
+  row 18 (bytes 2304..):  80  81  82  83  84  85  86  87
+  row 19 (bytes 2432..):  88  89  90  91  92  93  94  95
+  row 20 (bytes 2560..):  96  97  98  99 100 101 102 103
+  row 21 (bytes 2688..): 104 105 106 107 108 109 110 111
+  row 22 (bytes 2816..): 112 113 114 115 116 117 118 119
+  row 23 (bytes 2944..): 120 121 122 123 124 125 126 127
+swizzle 32B, box 16 rows x 32 bytes = 512 bytes (32 chunks), destination = buffer + 1024 + 0
+  buffer address % 1024 = 0; phase completed 1
+info: shared address of the buffer 0x0
+  buffer row (128 bytes each): source chunk found in each of its eight 16-byte chunks
+  row  8 (bytes 1024..):   0   1   2   3   4   5   6   7
+  row  9 (bytes 1152..):   9   8  11  10  13  12  15  14
+  row 10 (bytes 1280..):  16  17  18  19  20  21  22  23
+  row 11 (bytes 1408..):  25  24  27  26  29  28  31  30
+swizzle 64B, box 16 rows x 64 bytes = 1024 bytes (64 chunks), destination = buffer + 1024 + 0
+  buffer address % 1024 = 0; phase completed 1
+info: shared address of the buffer 0x0
+  buffer row (128 bytes each): source chunk found in each of its eight 16-byte chunks
+  row  8 (bytes 1024..):   0   1   2   3   4   5   6   7
+  row  9 (bytes 1152..):   9   8  11  10  13  12  15  14
+  row 10 (bytes 1280..):  18  19  16  17  22  23  20  21
+  row 11 (bytes 1408..):  27  26  25  24  31  30  29  28
+  row 12 (bytes 1536..):  32  33  34  35  36  37  38  39
+  row 13 (bytes 1664..):  41  40  43  42  45  44  47  46
+  row 14 (bytes 1792..):  50  51  48  49  54  55  52  53
+  row 15 (bytes 1920..):  59  58  57  56  63  62  61  60
+swizzle 128B, box 16 rows x 128 bytes = 2048 bytes (128 chunks), destination = buffer + 1024 + 0
+  buffer address % 1024 = 0; phase completed 1
+info: shared address of the buffer 0x0
+  buffer row (128 bytes each): source chunk found in each of its eight 16-byte chunks
+  row  8 (bytes 1024..):   0   1   2   3   4   5   6   7
+  row  9 (bytes 1152..):   9   8  11  10  13  12  15  14
+  row 10 (bytes 1280..):  18  19  16  17  22  23  20  21
+  row 11 (bytes 1408..):  27  26  25  24  31  30  29  28
+  row 12 (bytes 1536..):  36  37  38  39  32  33  34  35
+  row 13 (bytes 1664..):  45  44  47  46  41  40  43  42
+  row 14 (bytes 1792..):  54  55  52  53  50  51  48  49
+  row 15 (bytes 1920..):  63  62  61  60  59  58  57  56
+  row 16 (bytes 2048..):  64  65  66  67  68  69  70  71
+  row 17 (bytes 2176..):  73  72  75  74  77  76  79  78
+  row 18 (bytes 2304..):  82  83  80  81  86  87  84  85
+  row 19 (bytes 2432..):  91  90  89  88  95  94  93  92
+  row 20 (bytes 2560..): 100 101 102 103  96  97  98  99
+  row 21 (bytes 2688..): 109 108 111 110 105 104 107 106
+  row 22 (bytes 2816..): 118 119 116 117 114 115 112 113
+  row 23 (bytes 2944..): 127 126 125 124 123 122 121 120

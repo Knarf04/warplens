@@ -1,0 +1,15 @@
+status: ok
+warplens: 4 kernel launch(es) simulated on B200, 3 finding(s)
+  pair_accounting: 4 CTA(s), 329 warp-instructions
+  pair_accounting: 4 CTA(s), 367 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 105 writes; that load is still in flight (4 times)
+      line 514: ld.shared.u32 %r119, [%r120];
+      first in CTA (1, 0, 0), warp 0, lanes 0
+  pair_accounting: 4 CTA(s), 335 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 138 writes; that load has completed, but this warp never waited on its mbarrier (2 times)
+      line 514: ld.shared.u32 %r119, [%r120];
+      first in CTA (2, 0, 0), warp 0, lanes 0
+  pair_accounting: 4 CTA(s), 360307 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 119 writes; that load has completed, but this warp never waited on its mbarrier
+      line 514: ld.shared.u32 %r119, [%r120];
+      first in CTA (0, 0, 0), warp 0, lanes 0

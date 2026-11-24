@@ -1,0 +1,37 @@
+script: every size alone, largest first
+  step  0  alloc  512 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  1  dealloc allocation 0: executed
+  step  2  alloc  256 columns -> allocation 1 at address 00000000 (lane 0, column 0)
+  step  3  dealloc allocation 1: executed
+  step  4  alloc  128 columns -> allocation 2 at address 00000000 (lane 0, column 0)
+  step  5  dealloc allocation 2: executed
+  step  6  alloc   64 columns -> allocation 3 at address 00000000 (lane 0, column 0)
+  step  7  dealloc allocation 3: executed
+  step  8  alloc   32 columns -> allocation 4 at address 00000000 (lane 0, column 0)
+  step  9  dealloc allocation 4: executed
+script: sizes that do not increase, filling all 512 columns
+  step  0  alloc  256 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  1  alloc  128 columns -> allocation 1 at address 00000100 (lane 0, column 256)
+  step  2  alloc   64 columns -> allocation 2 at address 00000180 (lane 0, column 384)
+  step  3  alloc   32 columns -> allocation 3 at address 000001c0 (lane 0, column 448)
+  step  4  alloc   32 columns -> allocation 4 at address 000001e0 (lane 0, column 480)
+  step  5  dealloc allocation 4: executed
+  step  6  dealloc allocation 3: executed
+  step  7  dealloc allocation 2: executed
+  step  8  dealloc allocation 1: executed
+  step  9  dealloc allocation 0: executed
+script: equal sizes, a hole in the middle is reused
+  step  0  alloc   64 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  1  alloc   64 columns -> allocation 1 at address 00000040 (lane 0, column 64)
+  step  2  alloc   64 columns -> allocation 2 at address 00000080 (lane 0, column 128)
+  step  3  dealloc allocation 1: executed
+  step  4  alloc   64 columns -> allocation 3 at address 00000040 (lane 0, column 64)
+  step  5  alloc   32 columns -> allocation 4 at address 000000c0 (lane 0, column 192)
+  step  6  dealloc allocation 0: executed
+  step  7  dealloc allocation 2: executed
+  step  8  dealloc allocation 3: executed
+  step  9  dealloc allocation 4: executed
+script: allocate, relinquish the permit, then use and release as usual
+  step  0  alloc   32 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  1  relinquish_alloc_permit: executed
+  step  2  dealloc allocation 0: executed

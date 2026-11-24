@@ -1,0 +1,6 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 1 finding(s)
+  mma_dump: 1 CTA(s), 2445 warp-instructions
+    [mma-tf32-operand-not-converted] operand A of a kind::tf32 MMA holds float32 values with bits below TF32 precision (the low 13 fraction bits). warplens multiplies them as float32; hardware may not. Convert with cvt.rna.tf32.f32 first (2 times)
+      line 326: tcgen05.mma.cta_group::1.kind::tf32 [%r60], %rd18, %rd19, %r61, p;
+      first in CTA (0, 0, 0), warp 0, lanes 0

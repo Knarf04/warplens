@@ -1,0 +1,6 @@
+status: exit 3
+warplens: tcgen05.alloc of 16 columns; the count must be a power of two from 32 to 512
+  at module0.ptx:387: tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%r12], %r11;
+  in kernel `tmem_alloc_script`, CTA (0, 0, 0), warp 0
+  lane 0 (thread (0, 0, 0)) and 31 more lane(s)
+warplens: the program launched no kernels

@@ -1,0 +1,3 @@
+script: allocate 64 columns, release them as 32
+KERNEL FAILED: allocate 64 columns, release them as 32
+info: error cudaErrorLaunchFailure

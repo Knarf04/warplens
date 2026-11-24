@@ -1,0 +1,5 @@
+status: exit 3
+warplens: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them
+  warp 0 waits at line 169: tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%r6], %r5;
+    waiting for 32 tensor-memory columns to become available
+warplens: the program launched no kernels

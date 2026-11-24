@@ -3,6 +3,8 @@
 # written against 13.5); no GPU.
 #
 #   validation/blackwell/build.sh [--native] [--jobs N] [area/probe ...]
+#   validation/blackwell/build.sh --ampere      the few probes an Ampere GPU can run, for
+#                                               the local dry run (see README, "Dry run")
 #
 # For each <area>/<probe>.cu this produces
 #
@@ -15,22 +17,40 @@
 #   bin-native/<area>/<probe>   with --native: the program with sm_100a machine code, for a
 #                               machine whose driver is older than the compiler's PTX.
 #
-#   NVCC   compiler to use (default: nvcc on PATH; locally `conda run -n warplens ...`)
+#   bin-ampere/<area>/<probe>   with --ampere: built by $HW_NVCC for $HW_ARCH with
+#                               -DPROBE_AMPERE, which leaves out what needs sm_90 or newer.
+#
+#   NVCC      compiler to use (default: nvcc on PATH; locally `conda run -n warplens ...`)
+#   HW_NVCC   --ampere: nvcc of a full toolkit (default: /usr/local/cuda/bin/nvcc)
+#   HW_ARCH   --ampere: architecture of the local GPU (default: sm_86)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 NVCC="${NVCC:-nvcc}"
 native=0
+ampere=0
+# What an Ampere GPU can run: mbarrier.init / arrive / test_wait, and the host-only program.
+AMPERE_PROBES=(mbarrier/script e2e/device_attributes)
 jobs="$(nproc 2>/dev/null || echo 4)"
 probes=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --native) native=1 ;;
+    --ampere) ampere=1 ;;
     --jobs) jobs="$2"; shift ;;
-    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
     *) probes+=("${1%.cu}") ;;
   esac
   shift
 done
+if [[ "$ampere" == 1 ]]; then
+  HW_NVCC="${HW_NVCC:-/usr/local/cuda/bin/nvcc}"
+  for probe in "${AMPERE_PROBES[@]}"; do
+    mkdir -p "bin-ampere/$(dirname "$probe")"
+    "$HW_NVCC" -std=c++17 -O2 -w -arch="${HW_ARCH:-sm_86}" -DPROBE_AMPERE "$probe.cu" -o "bin-ampere/$probe"
+    echo "built bin-ampere/$probe"
+  done
+  exit 0
+fi
 if [[ ${#probes[@]} -eq 0 ]]; then
   for source in */*.cu; do probes+=("${source%.cu}"); done
 fi

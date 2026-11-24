@@ -45,11 +45,14 @@ __device__ __forceinline__ void mbar_init(uint64_t* bar, uint32_t arrivals) {
     asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;" :: "r"(smem_addr(bar)), "r"(arrivals) : "memory");
 }
 __device__ __forceinline__ void mbar_init_fence() {
+#ifndef PROBE_AMPERE  // sm_90 and newer; the Ampere build of mbarrier/script.cu does without
     asm volatile("fence.mbarrier_init.release.cluster;" ::: "memory");
+#endif
 }
 __device__ __forceinline__ void mbar_arrive(uint64_t* bar) {
     asm volatile("mbarrier.arrive.shared::cta.b64 _, [%0];" :: "r"(smem_addr(bar)) : "memory");
 }
+#ifndef PROBE_AMPERE  // everything from here to the matching #endif needs sm_90 or sm_100a
 __device__ __forceinline__ void mbar_arrive_n(uint64_t* bar, uint32_t count) {
     asm volatile("mbarrier.arrive.shared::cta.b64 _, [%0], %1;" :: "r"(smem_addr(bar)), "r"(count) : "memory");
 }
@@ -63,6 +66,7 @@ __device__ __forceinline__ void mbar_arrive_expect_tx(uint64_t* bar, uint32_t by
 __device__ __forceinline__ void mbar_complete_tx(uint64_t* bar, uint32_t bytes) {
     asm volatile("mbarrier.complete_tx.shared::cta.b64 [%0], %1;" :: "r"(smem_addr(bar)), "r"(bytes) : "memory");
 }
+#endif  // PROBE_AMPERE
 // Has the phase with this parity completed? Never blocks.
 __device__ __forceinline__ uint32_t mbar_test(uint64_t* bar, uint32_t parity) {
     uint32_t done;
@@ -91,6 +95,7 @@ __device__ __forceinline__ void mbar_wait(uint64_t* bar, uint32_t parity) {
                  "}" :: "r"(smem_addr(bar)), "r"(parity) : "memory");
 }
 
+#ifndef PROBE_AMPERE
 // ---- TMA ----
 #define TMA_LOAD_HEAD "cp.async.bulk.tensor."
 #define TMA_LOAD_TAIL "d.shared::cluster.global.mbarrier::complete_tx::bytes"
@@ -204,6 +209,8 @@ __device__ __forceinline__ void mma_commit(uint64_t* bar) {
                  :: "r"(smem_addr(bar)) : "memory");
 }
 
+#endif  // PROBE_AMPERE
+
 // Instruction descriptor for float32 accumulators (cute/arch/mma_sm100_desc.hpp):
 // c_format = F32 (1) at bits 4-5, a/b format at 7-9 / 10-12 (0 = F16, 2 = TF32),
 // a/b MN-major at 15 / 16, N / 8 at 17-22, M / 16 at 24-28.
@@ -264,6 +271,7 @@ template <class T> static void dev_fill(T* dev, size_t count, int byte) {
     HOST_CHECK(cudaMemset(dev, byte, count * sizeof(T)));
 }
 
+#ifndef PROBE_AMPERE  // tensor maps: nothing for a GPU without TMA
 typedef CUresult (*probe_encode_fn)(CUtensorMap*, CUtensorMapDataType, cuuint32_t, void*, const cuuint64_t*,
                                     const cuuint64_t*, const cuuint32_t*, const cuuint32_t*,
                                     CUtensorMapInterleave, CUtensorMapSwizzle, CUtensorMapL2promotion,
@@ -313,6 +321,8 @@ static inline CUtensorMap tensor_map(CUtensorMapDataType type, int elem_bytes, i
     }
     return map;
 }
+
+#endif  // PROBE_AMPERE
 
 static inline const char* swizzle_name(int s) {
     static const char* names[] = {"none", "32B", "64B", "128B"};

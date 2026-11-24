@@ -1,0 +1,3 @@
+script: relinquish the permit, then allocate
+KERNEL FAILED: relinquish the permit, then allocate
+info: error cudaErrorLaunchFailure

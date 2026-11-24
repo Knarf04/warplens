@@ -154,6 +154,8 @@ program's `KERNEL FAILED` output, and `compare.py` reports what the GPU did as
 the manifest allows on hardware **by design**: the behaviour is unknown or undefined, and the
 run is isolated for that reason.
 
+<!-- tables: written by `python manifest.py --tables`; tests/test_blackwell_probes.py compares -->
+
 ### `e2e/`
 
 | Run | Program and arguments | Matrix | Claim tested | In the simulator | On hardware may |

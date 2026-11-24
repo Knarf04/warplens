@@ -30,12 +30,14 @@ def phases_after(sim, expected, counts):
     body = f"mbarrier.init.shared::cta.b64 [%bar], {expected};\n"
     for k, count in enumerate(counts):
         body += (f"mbarrier.arrive.shared::cta.b64 _, [%bar], {count};\n"
-                 "mbarrier.arrive.expect_tx.shared::cta.b64 %tok, [%bar], 8;\n"  # %tok = phase now
+                 "mbarrier.arrive.expect_tx.shared::cta.b64 %tok, [%bar], 8;\n"  # low half: phase now
                  "mbarrier.complete_tx.shared::cta.b64 [%bar], 8;\n"
                  f"st.global.u64 [%o+{8 * k}], %tok;\n")
     out = sim.empty(len(counts), "u64")
     stats = sim.launch(mb_kernel(body), "k", grid=1, block=1, args=[out])
-    return out.numpy().tolist(), stats.findings
+    tokens = out.numpy().tolist()
+    assert all(t >> 63 == (t & 1) for t in tokens)  # bit 63 is the phase parity, as on a GPU
+    return [t & 0xFFFFFFFF for t in tokens], stats.findings
 
 
 def test_the_phase_token_helper_counts_phases(sim):

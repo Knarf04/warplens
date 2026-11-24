@@ -14,6 +14,27 @@
  * simulator enforces MAX_SMEM_BYTES of warplens/units/smem.py; the two must be equal. */
 #define WL_MAX_SMEM_BYTES (227 * 1024)
 
+/* Whether a function attribute may be set to `value`, as cudaFuncSetAttribute and
+ * cuFuncSetAttribute decide it (the two enumerations agree on these numbers): the maximum
+ * dynamic shared memory is 0 to WL_MAX_SMEM_BYTES and the preferred carveout -1 (default) to
+ * 100 percent. An RTX 3080 Ti refuses other values of the two, the attributes that can only be
+ * read (0 to 7) and numbers that name no attribute with cudaErrorInvalidValue /
+ * CUDA_ERROR_INVALID_VALUE (at its own opt-in maximum in place of ours). The cluster
+ * attributes (10 to 17: required cluster shape, non-portable sizes, scheduling policy, shared
+ * memory mode) are accepted unchecked, as before: the CuTe DSL sets them, and what a GPU
+ * with clusters says to each value was not measured. */
+static inline int wl_function_attribute_is_valid(int attribute, int value) {
+  if (attribute == 8) return value >= 0 && value <= WL_MAX_SMEM_BYTES; /* ...MaxDynamicSharedMemorySize */
+  if (attribute == 9) return value >= -1 && value <= 100;              /* ...PreferredSharedMemoryCarveout */
+  return attribute >= 10 && attribute <= 17;
+}
+
+/* Statuses of a WL_LAUNCH reply (the runtime's error numbers). The first three mean the
+ * launch was refused before the kernel ran; anything else is a kernel that failed. */
+#define WL_INVALID_VALUE 1           /* cudaErrorInvalidValue: shared memory over the limit */
+#define WL_INVALID_CONFIGURATION 9   /* cudaErrorInvalidConfiguration: block or grid dimensions */
+#define WL_INVALID_CLUSTER_SIZE 912  /* cudaErrorInvalidClusterSize */
+
 enum {
   WL_REGISTER_FATBIN = 1,   /* fat binary bytes                      -> uint32 module            */
   WL_REGISTER_FUNCTION = 2, /* uint32 module, name                   -> uint32 function, uint32 n, uint32 size[n] */

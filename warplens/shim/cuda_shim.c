@@ -125,6 +125,7 @@ CUresult cuGetErrorName(CUresult error, const char **pStr) {
     case CUDA_ERROR_INVALID_HANDLE: *pStr = "CUDA_ERROR_INVALID_HANDLE"; break;
     case CUDA_ERROR_NOT_FOUND: *pStr = "CUDA_ERROR_NOT_FOUND"; break;
     case CUDA_ERROR_LAUNCH_FAILED: *pStr = "CUDA_ERROR_LAUNCH_FAILED"; break;
+    case CUDA_ERROR_INVALID_CLUSTER_SIZE: *pStr = "CUDA_ERROR_INVALID_CLUSTER_SIZE"; break;
     case CUDA_ERROR_NOT_SUPPORTED: *pStr = "CUDA_ERROR_NOT_SUPPORTED"; break;
     default: *pStr = "CUDA_ERROR_UNKNOWN"; break;
   }
@@ -175,8 +176,8 @@ CUresult cuKernelGetAttribute(int *pi, CUfunction_attribute attrib, CUkernel ker
 }
 
 CUresult cuFuncSetAttribute(CUfunction function, CUfunction_attribute attrib, int value) {
-  (void)attrib; (void)value;  /* e.g. opting in to more shared memory: always allowed */
-  return function ? CUDA_SUCCESS : CUDA_ERROR_INVALID_HANDLE;
+  if (!function) return CUDA_ERROR_INVALID_HANDLE;
+  return wl_function_attribute_is_valid((int)attrib, value) ? CUDA_SUCCESS : CUDA_ERROR_INVALID_VALUE;
 }
 
 static CUresult launch(CUfunction function, const uint32_t grid[3], const uint32_t block[3],
@@ -186,7 +187,10 @@ static CUresult launch(CUfunction function, const uint32_t grid[3], const uint32
     fprintf(stderr, "warplens: kernel arguments packed into `extra` are not supported; pass kernelParams\n");
     return CUDA_ERROR_NOT_SUPPORTED;
   }
-  return (CUresult)warplens_launch(function, grid, block, cluster, shared, params);
+  int status = warplens_launch(function, grid, block, cluster, shared, params);
+  /* The driver has no "invalid configuration": a block or grid it refuses is an invalid value
+   * (measured on an RTX 3080 Ti; the runtime turns it into cudaErrorInvalidConfiguration). */
+  return status == WL_INVALID_CONFIGURATION ? CUDA_ERROR_INVALID_VALUE : (CUresult)status;
 }
 
 CUresult cuLaunchKernel(CUfunction f, unsigned int gridDimX, unsigned int gridDimY,

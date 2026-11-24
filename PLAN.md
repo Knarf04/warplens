@@ -437,8 +437,21 @@ Found by this work in the simulator, and fixed since unless marked open:
   other; the timing model charges an atom as a load and a store (assumed).
   The CLC probes still avoid atomics with single-writer words and no longer
   need to.
-- Open: a stale mbarrier token tests true where the 3080 Ti gives false
-  (`validation/blackwell/README.md`, "Found while writing the probes").
+- Four disagreements with the 3080 Ti, found by the probes. Fixed, each with
+  a golden file from that GPU (`validation/README.md`): an mbarrier token
+  carries only the parity of its phase, so a token two completions old tests
+  false again; a NaN result has the GPU's bits (`0x7fffffff` for f32, a
+  quieted operand or `0xfff8000000000000` for f64); integer division by zero
+  gives all ones; and a launch refused before the kernel runs has the
+  runtime's code for it (`cudaErrorInvalidValue`,
+  `cudaErrorInvalidConfiguration`, `cudaErrorInvalidClusterSize`) instead of
+  `cudaErrorLaunchFailure`, with `cudaFuncSetAttribute` refusing more than
+  227 KB. All measured on Ampere; MB-03, NUM-12, NUM-13, RT-04 and RT-12 keep
+  them as claims for the B200.
+- Open: the three new golden programs (`nan_golden`, `intdiv_golden`,
+  `mbarrier_token_golden`) are not yet among those `e2e/ampere_replay` reruns
+  on the B200; the shim does not require the shared-memory opt-in a GPU
+  requires above 48 KB.
 - Documents that contradict the code are listed in
   `docs/validation-matrix.md`, "Discrepancies found".
 

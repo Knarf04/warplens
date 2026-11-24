@@ -14,7 +14,7 @@ from ..core.engine import Engine
 from ..core.launch_queue import LaunchQueue
 from ..core.program import Program
 from ..core.warp import WARP_SIZE, Warp
-from ..errors import LaunchError
+from ..errors import CUDA_INVALID_CLUSTER_SIZE, CUDA_INVALID_CONFIGURATION, LaunchError
 from ..frontend.ir import NP_TYPES, Function
 from ..units.smem import MAX_SMEM_BYTES
 from ..units.smem_banks import SmemReport
@@ -50,7 +50,8 @@ class LaunchStats:
 def dim3(value, what: str) -> tuple[int, int, int]:
     dims = (value,) if isinstance(value, (int, np.integer)) else tuple(value)
     if not 1 <= len(dims) <= 3 or any(int(d) != d or d < 1 for d in dims):
-        raise LaunchError(f"{what} must be 1 to 3 positive integers, got {value!r}")
+        raise LaunchError(f"{what} must be 1 to 3 positive integers, got {value!r}",
+                          CUDA_INVALID_CLUSTER_SIZE if what == "cluster" else CUDA_INVALID_CONFIGURATION)
     return tuple(int(d) for d in dims) + (1,) * (3 - len(dims))
 
 
@@ -129,7 +130,8 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
     bx, by, bz = dim3(block, "block")
     threads = bx * by * bz
     if threads > MAX_THREADS_PER_BLOCK:
-        raise LaunchError(f"block {(bx, by, bz)} has {threads} threads; the limit is {MAX_THREADS_PER_BLOCK}")
+        raise LaunchError(f"block {(bx, by, bz)} has {threads} threads; the limit is {MAX_THREADS_PER_BLOCK}",
+                          CUDA_INVALID_CONFIGURATION)
     params = encode_args(program.fn, args, mem=mem)
     if int(smem) != smem or smem < 0:
         raise LaunchError(f"smem must be a non-negative byte count, got {smem!r}")
@@ -158,9 +160,10 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
     explicit_cluster = cluster is not None
     cluster = dim3(cluster, "cluster") if explicit_cluster else (1, 1, 1)
     if cluster[0] * cluster[1] * cluster[2] > MAX_CLUSTER_CTAS:
-        raise LaunchError(f"cluster {cluster} has more than {MAX_CLUSTER_CTAS} CTAs")
+        raise LaunchError(f"cluster {cluster} has more than {MAX_CLUSTER_CTAS} CTAs", CUDA_INVALID_CLUSTER_SIZE)
     if gx % cluster[0] or gy % cluster[1] or gz % cluster[2]:
-        raise LaunchError(f"grid {(gx, gy, gz)} is not a whole number of clusters of shape {cluster}")
+        raise LaunchError(f"grid {(gx, gy, gz)} is not a whole number of clusters of shape {cluster}",
+                          CUDA_INVALID_CLUSTER_SIZE)
     output: list[str] = []
     if timing is None:
         engine = Engine(max_steps)

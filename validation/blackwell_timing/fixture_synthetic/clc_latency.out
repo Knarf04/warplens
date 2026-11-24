@@ -1,0 +1,21 @@
+DEVICE bench=clc_latency name=SYNTHETIC_not_measured cc=10.0 sm_count=148 total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 trials=2 scale=1 synthetic=1
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=16000 trial=0 event_ns=2845287.368 wall_ns=2850287.368 clk=5368000 check=16000
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=32000 trial=0 event_ns=5670550.526 wall_ns=5675550.526 clk=10736000 check=32000
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=16000 trial=1 event_ns=2847355.479 wall_ns=2852355.479 clk=5368000 check=16000
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=32000 trial=1 event_ns=5678868.137 wall_ns=5683868.137 clk=10736000 check=32000
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=16000 trial=0 event_ns=2862129.474 wall_ns=2867129.474 clk=5400000 check=16000
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=32000 trial=0 event_ns=5704234.737 wall_ns=5709234.737 clk=10800000 check=32000
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=16000 trial=1 event_ns=2871929.136 wall_ns=2876929.136 clk=5400000 check=16000
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=32000 trial=1 event_ns=5713170.354 wall_ns=5718170.354 clk=10800000 check=32000
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=16000 trial=0 event_ns=2862129.474 wall_ns=2867129.474 clk=5400000 check=16000
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=32000 trial=0 event_ns=5704234.737 wall_ns=5709234.737 clk=10800000 check=32000
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=16000 trial=1 event_ns=2872588.510 wall_ns=2877588.510 clk=5400000 check=16000
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=32000 trial=1 event_ns=5722947.238 wall_ns=5727947.238 clk=10800000 check=32000
+BENCH id=clc_latency/succeed/plain/ctas=1 nctas=1 reps=16000 trial=0 event_ns=3007990.947 wall_ns=3012990.947 clk=5677155 check=16000
+BENCH id=clc_latency/succeed/plain/ctas=1 nctas=1 reps=32000 trial=0 event_ns=5995780.421 wall_ns=6000780.421 clk=11353955 check=32000
+BENCH id=clc_latency/succeed/plain/ctas=1 nctas=1 reps=16000 trial=1 event_ns=3015747.772 wall_ns=3020747.772 clk=5677155 check=16000
+BENCH id=clc_latency/succeed/plain/ctas=1 nctas=1 reps=32000 trial=1 event_ns=6016384.912 wall_ns=6021384.912 clk=11353955 check=32000
+BENCH id=clc_latency/succeed/multicast/ctas=2 nctas=2 reps=16000 trial=0 event_ns=3024834.105 wall_ns=3029834.105 clk=5709157 check=16000
+BENCH id=clc_latency/succeed/multicast/ctas=2 nctas=2 reps=32000 trial=0 event_ns=6029465.684 wall_ns=6034465.684 clk=11417957 check=32000
+BENCH id=clc_latency/succeed/multicast/ctas=2 nctas=2 reps=16000 trial=1 event_ns=3034617.845 wall_ns=3039617.845 clk=5709157 check=16000
+BENCH id=clc_latency/succeed/multicast/ctas=2 nctas=2 reps=32000 trial=1 event_ns=6045643.166 wall_ns=6050643.166 clk=11417957 check=32000

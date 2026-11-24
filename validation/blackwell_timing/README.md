@@ -124,7 +124,7 @@ loop, whose other instructions the simulator counted (`predicted/`).
 | `tma` | `tma_latency_ns`, `tma_bytes_per_clk`, `l2_bandwidth_per_sm_gb_s`; cross-check of `hbm_bandwidth_tb_s` | Round trip T of one copy against tile bytes (64 B to 32 KiB), straight-line fit. `tma_bytes_per_clk` = 1 / slope / `f`, from the faster of warm loads and stores. `l2_bandwidth_per_sm_gb_s` = 1 / slope of warm loads. `tma_latency_ns` = intercept of warm loads - the instruction time the simulator counts (delta on the intercept). Cold loads on 8, 37 and all SMs: CTAs x bytes / (T - fixed cost per copy) | TIM-04, TIM-05, TIM-06, TIM-07 |
 | `mma_rate` | `tensor_core_tflops_f16`, `tensor_core_tflops_tf32`, `mma_latency_clk` | Round trip of a batch of J MMAs + commit + wait, against J = 1, 2, 4, 8. TFLOPS = 2 M N K / slope x SM count / 1000 (M 128, N 256; the all-SM variant if present). `mma_latency_clk` = delta on the intercept (f16, M 128, N 256, one CTA). M = 64/128 x N = 32/128/256 x f16/tf32 are reported; `kind=i8` is hardware-only | TIM-10, TIM-11, TIM-12 |
 | `tmem_access` | `tmem_access_clk` | delta, from `ld/x1` (one `tcgen05.ld` + `wait::ld` per repetition). `st/x1`, `.x8` and the loops without a wait per access are reported | TIM-09, TIM-19 |
-| `clc_latency` | nothing yet: the model answers a `clusterlaunchcontrol.try_cancel` at the time it is issued | ns per request (arm, `try_cancel`, wait): `fail/*` in a launch of one cluster, where every request fails, with and without multicast; `succeed/*` on a grid of `reps` + 1 clusters. For `succeed/*` on hardware use `clk` / (`check` + 1), the first cluster's own ticks per request, not the slope: many clusters start at once there (see the file's comment). Measured minus predicted is the latency a new config entry would hold | TIM-20 |
+| `clc_latency` | `clc_latency_ns` | ns per request (arm, `try_cancel`, wait). `clc_latency_ns` = round trip of `fail/plain/ctas=1` (one cluster of one CTA, every request fails) - the instruction time the simulator counts for the same loop. The other four are reported with the latency each implies: `fail/plain/ctas=2` and `fail/multicast/ctas=2` from their slopes, `succeed/*` (a grid of `reps` + 1 clusters) from `clk` / (`check` + 1), the first cluster's own ticks per request, because many clusters start at once there and the slope is not a round trip. See "Cluster launch control latency" below | TIM-20 |
 | `cluster_costs` | nothing (two charging rules) | `load/multicast/ctas=N` against `load/separate/ctas=N` (N = 1, 2, 4), ns per repetition of a 16 KiB warm load to every CTA of a cluster: the model predicts the same. `mma/pair` (one `cta_group::2` MMA, M = 256) against `mma/single` (two CTAs, M = 128 each), slope against the batch size: the model predicts the pair takes twice as long per MMA, because only the issuing SM's Tensor Core is charged | TIM-15 |
 | `pipelined_gemm` | nothing; end-to-end check | ns per K tile of `examples/04_pipelined_gemm/gemm.cu` (included unchanged) with 1, 2 and 4 stages, on 8 CTAs and on one per SM; the result is checked. The ordering (2 stages no slower than 1, 4 no slower than 2) is what a calibrated model must keep | TIM-18 |
 | `ncu_banks` | nothing; input for the bank model's counters | the transpose of `examples/01_smem_transpose` with blocks of 32 x 32, 32 x 8 and 16 x 16 threads, grid 64, one launch per kernel, to be profiled under `ncu` and compared by `ncu_banks_compare.py` (below). Its launch times are reported and mean little | TIM-16, TIM-17 |
@@ -248,8 +248,10 @@ PYTHONPATH=<repo> python predict.py --out again --config results_x/fit/calibrate
 ```
 
 `predicted/<bench>.out` holds each launch's BENCH line with the simulator's
-numbers appended (`sim_ns`, `sim_instr`, `sim_bound`); `predictions.md` is the
-table; `meta.json` has the config used and what was not simulated. `--model B300`
+numbers appended (`sim_ns`, `sim_instr`, `sim_bound`, and the placement the
+launch was timed with: `sim_active_sms`, `sim_ctas_per_sm`, `sim_resident_ctas`);
+`predictions.md` is the table; `meta.json` has the config used, the active-SM
+assumption of every configuration and what was not simulated. `--model B300`
 selects the matching B300 config unless `--config` explicitly overrides it; the child
 process and recorded metadata use that same selection. Prediction subprocesses are
 bounded and cleaned up on SIGINT/SIGTERM, including detached native children.
@@ -261,7 +263,7 @@ reproduce the measurements, and the remaining ratios are what no parameter fixes
 
 | File | Content |
 | --- | --- |
-| `report.md` | (a) measured values, (b) derived parameters with formula and inputs, other measured quantities, (c) measured against predicted with the ratio |
+| `report.md` | (a) measured values, (b) derived parameters with formula and inputs, other measured quantities, (c) measured against predicted with the ratio and the SMs the prediction assumed active. "Problems in the results" lists failed benchmarks and where the run contradicts that assumption |
 | `measured.csv`, `comparison.csv` | (a) and (c) as tables |
 | `derived.yaml` | the parameters measured, in the schema of `warplens/configs/*.yaml` |
 | `calibrated.yaml` | `b200.yaml` with those entries replaced; `GpuConfig.load(path)` reads it, or copy it over `warplens/configs/b200.yaml` |
@@ -269,6 +271,133 @@ reproduce the measurements, and the remaining ratios are what no parameter fixes
 Results that did not come from compute capability 10.x, or that are synthetic, are
 labelled in every file, and their `source` starts with `assumption` so the
 simulator's reports never show them as measured.
+
+### Active SMs
+
+The model simulates each CTA alone on one SM and gives it 1/`active_sms` of the
+HBM bandwidth. `warplens run --active-sms N` sets one number for a whole program
+(default: every SM), and the benchmarks launch several shapes each, so
+`predict.py` sets it per launch, from the launch's shape
+(`warplens/timing/placement.py`, applied by `install_placement` in `predict.py`):
+
+- CTAs per SM = the smallest of 228 KB / shared memory per CTA (static plus
+  dynamic), 2048 threads / threads per CTA (whole warps), and 32 CTAs;
+- CTAs resident at once = min(grid, SM count x CTAs per SM), a whole number of
+  clusters;
+- active SMs = min(SM count, resident CTAs): CTAs are assumed to be spread, no SM
+  taking a second one while another has none, and a cluster's CTAs to be on
+  different SMs.
+
+With the spread rule the occupancy limit decides how many CTAs are resident, not
+how many SMs are active, except that only whole clusters start. It is recorded
+because the alternative rule (fill an SM before the next: `packed_sms`) depends
+on it.
+
+On a B200 (148 SMs), per benchmark:
+
+| Benchmark | Launch (hardware build) | CTAs per SM (limit) | Active SMs |
+| --- | --- | --- | --- |
+| `launch` | 1 CTA; one CTA per SM (`allsm`) | 32 | 1; 148 |
+| `alu_chain` | 1 CTA of 1 to 32 warps | 32 down to 2 (threads) | 1 |
+| `smem_wavefronts`, `global_load`, `cp_async`, `mbar`, `tmem_access` | 1 CTA of one warp (four in two `smem_wavefronts` configurations) | 32 (16 with four warps) | 1 |
+| `gstream` | 2^19 and 2^20 CTAs of 256 threads (8 and 16 with `--sim`) | 8 (threads) | 148 |
+| `tma` | 1 CTA; 8, 37 and 148 CTAs for the cold 16 KiB loads | 7 (shared memory) | 1; 8, 37, 148 |
+| `mma_rate` | 1 CTA; one per SM (`allsm`) | 7 (shared memory) | 1; 148 |
+| `clc_latency/fail/*` | one cluster of 1 or 2 CTAs | 32 | 1; 2 |
+| `clc_latency/succeed/*` | 10001 and 20001 clusters of 1 or 2 CTAs, 100 KB each (17 and 33 clusters with `--sim`) | 2 (shared memory): 296 CTAs resident | 148 |
+| `cluster_costs/load/*` | one cluster of 1, 2 or 4 CTAs | 14 (shared memory) | 1, 2, 4 |
+| `cluster_costs/mma/*` | 2 CTAs, as one cluster or as two | 7 (shared memory) | 2 |
+| `pipelined_gemm` | 8 CTAs; one per SM | 2 (shared memory, 96 KB each) | 8; 148 |
+| `ncu_banks` | 64 CTAs of 1024, 256 and 256 threads | 2, 8, 8 (threads) | 64 |
+
+The exact numbers of every configuration are in `predicted/predictions.md`
+(columns "SMs active (assumed)" and "CTAs per SM (limit)"), on every line of
+`predicted/<bench>.out`, and in `predicted/meta.json` under
+`benchmarks.<bench>.active_sms.<id>` with the launch shape, the limit that binds
+and a one-line derivation; `meta.json` `placement` has the rule and the per-SM
+limits. `tests/test_timing_placement.py` holds the table above against the
+committed predictions.
+
+Where the hardware build launches a larger grid than the simulator build
+(`gstream`, `clc_latency/succeed/*`), the assumption is made for the hardware
+grid (`HARDWARE_CLUSTERS` in `predict.py`), since that is the launch the
+prediction is compared with; `meta.json` has both grids.
+
+What it changes in the predictions: only what draws on HBM, since the Tensor
+Core rate is per SM whatever the launch. A cold 16 KiB TMA load is now predicted
+at 190 ns on one SM and on 8 (HBM offers each SM more than its TMA engine moves),
+251 ns on 37 and 690 ns on 148, where it was 690 ns for all four; the pipelined
+GEMM on 8 CTAs at 331 / 166 / 128 ns per K tile for 1 / 2 / 4 stages, where it
+was 1081 / 878 / 878 as on the whole device; `cp_async/cold` (one CTA) at 106.5 ns
+per group, the same as warm, where it was 122 ns. The one-CTA cold `tma` loads
+are likewise predicted like warm ones now. Twelve of the 153 configurations
+changed; no other prediction did. `predict.py --placement all-sms` makes the old
+predictions, to hold both against a measurement.
+
+Against a run, `fit.py`:
+
+- shows "SMs assumed" for every configuration in section (c) of `report.md` and
+  as `predicted_active_sms` in `comparison.csv`;
+- reports as problems: a device with another SM count than the predictions'
+  config; per-SM limits in the DEVICE line (`smem_per_sm_bytes`,
+  `max_threads_per_sm`, `max_blocks_per_sm`, from `cudaGetDeviceProperties`) that
+  differ from the ones the placement used; a configuration whose `nctas` on
+  hardware implies another number of active SMs than its prediction; predictions
+  made without the assumption.
+
+Nothing in a run measures the number of busy SMs directly: a kernel cannot read
+which SM it is on. What a B200 run does show is the consequence. Under the
+spread rule, cold loads on 8 CTAs move 8 times what one CTA moves; if the
+scheduler packed SMs instead (`packed_sms` in `meta.json`: 2 SMs for those 8
+CTAs, 4 for the GEMM's 8) and CTAs on one SM share its TMA engine, they move
+less. "cold TMA fetch rate, ctas=1 / 8 / 37 / allsm" in `report.md` are the
+numbers to compare. Not modeled, and stated in `placement.py`: registers as an
+occupancy limit, the shared memory the driver keeps for itself, GPC boundaries
+for clusters, and anything else running on the GPU.
+
+The limits of the timing model itself are unchanged: resident CTAs are still
+each simulated alone on an SM, also where the placement says an SM holds
+several (`clc_latency/succeed/*`, `gstream`), and a grid larger than the device
+holds is not run in waves.
+
+### Cluster launch control latency
+
+`docs/clc.md` and `warplens/timing/model.py` (kind `"clc"`) model a
+`clusterlaunchcontrol.try_cancel` as a request that uses none of the SM's
+resources and whose response lands `clc_latency_ns` after it is issued: one
+number for a request that succeeds or fails, with or without multicast. `fit.py`
+fits that one number:
+
+    clc_latency_ns = measured round trip - (predicted round trip - config clc_latency_ns) x f_config / f
+
+from `clc_latency/fail/plain/ctas=1`: the slope of launch time against requests,
+minus the time of the loop's other instructions (arm the mbarrier, issue, wait),
+which the simulator counted for the same loop and which is rescaled to the fitted
+clock `f`. This is the rule `tma_latency_ns` follows. Like that parameter it
+includes whatever the mbarrier wake-up costs on hardware beyond its instructions.
+
+- If `fail/plain/ctas=1` is missing or has no positive slope, `fail/plain/ctas=2`
+  and then `fail/multicast/ctas=2` are used, and the parameter's note says so
+  (their loop also has a cluster barrier per request).
+- Every form measured is listed under "Other measured quantities" as "CLC
+  request, ..." with its round trip and the latency it implies. For
+  `succeed/*` the round trip is `clk` / (`check` + 1) of the first cluster,
+  converted with the `%clock64` ticks per ns that `alu_chain` measures; it is
+  reported and never used for the parameter, because it rests on that conversion.
+- If another form implies a latency more than 20% from the fitted one, the note
+  of `clc_latency_ns` says "NOT ONE NUMBER" and names it: the model would then
+  need a latency per form, which it does not have.
+- If `clc_latency` is missing from the results, the parameter is left out of
+  `derived.yaml`, `calibrated.yaml` keeps the config's 100 ns assumption, and
+  `report.md` lists it under "Not derived". The same holds when the predictions
+  have no `clc_latency` configuration or were made with a config without the
+  entry; then the measured round trip is still reported. A round trip shorter
+  than the counted instructions gives 0, the model's lower limit, with a note.
+
+What only a B200 can settle: the value; whether failing and successful requests
+take the same time, and multicast the same as plain; and whether a successful
+request's latency depends on how many clusters are pending, which the benchmark
+does not vary.
 
 The simulator cannot run:
 
@@ -284,8 +413,9 @@ The simulator cannot run:
 `TRUTH`) and writes what the hardware build would have printed: times
 extrapolated to 1000 times the repetitions, a 20 us launch overhead and up to
 0.4% noise. `fit.py` on that directory, with the committed predictions of the
-unmodified config, returns `TRUTH` (exactly for the latencies and the clock,
-within 0.1% for the Tensor Core rates). `fixture_synthetic/` is a small committed
+unmodified config, returns `TRUTH` (exactly for the latencies, `clc_latency_ns`
+among them, and the clock, within 0.1% for the Tensor Core rates).
+`fixture_synthetic/` is a small committed
 copy used by `tests/test_timing_calibration.py`. Every file in it says SYNTHETIC.
 
 ### Dry run on the RTX 3080 Ti (Ampere, 2026-11-23)
@@ -303,7 +433,10 @@ rental (see "Problems" below).
 
 ## Model parameters and what calibrates them
 
-Every entry of `b200.yaml` has a benchmark. Three are weaker than the rest:
+Every entry of `b200.yaml` has a benchmark. Four are weaker than the rest:
+
+- `clc_latency_ns` is one number for five forms of the request, fitted from the
+  one that is cleanest to measure (a request that fails, alone in its launch).
 
 - `l2_bandwidth_per_sm_gb_s` is identifiable only if warm loads are slower than
   stores. The model charges a copy max(TMA engine time, memory time), so a slope
@@ -319,7 +452,7 @@ Not calibrated by any benchmark, and why:
 | What | Why |
 | --- | --- |
 | The number of issue slots (4) and the slot assignment `w % 4` | Hard-coded in `model.py`, not a config entry. `alu_chain/warps=N` measures the shape; there is nowhere to write the result |
-| `active_sms` | A launch argument, not a config entry; `warplens run` always uses the SM count. The cold `tma` variants on 1, 8, 37 and all SMs measure how the fetch rate really divides |
+| `active_sms` | A launch argument, not a config entry. `predict.py` derives it per launch from the launch's shape ("Active SMs" above); it is an assumption about the scheduler, not a fitted number. The cold `tma` variants on 1, 8, 37 and all SMs measure how the fetch rate really divides |
 | L2 line size (128 B), L2 capacity and eviction | The line size is a constant; capacity and eviction are not modeled |
 | The 85% "saturated" threshold | A reporting choice, not a property of the hardware |
 | Tensor Core rates for kinds other than f16 and tf32 | No parameter exists. `mma_rate/kind=i8` records the number |
@@ -327,7 +460,8 @@ Not calibrated by any benchmark, and why:
 | Global store cost, `tcgen05.wait` cost, mbarrier cost, launch overhead | No parameter exists; each is measured and reported |
 | A `cp.async` rate of its own | It borrows the TMA parameters (TIM-14) |
 | Everything in `b300.yaml` | No B300 |
-| Multicast and two-CTA MMA charging (TIM-15), the pipelined GEMM end to end (TIM-18), the latency of a cluster-launch-control request (TIM-20) | Measured by `cluster_costs`, `pipelined_gemm` and `clc_latency` and reported; `fit.py` derives no parameter from them, because the model has none for them. Their rows are in `measured.csv` and `comparison.csv` like every configuration's |
+| Multicast and two-CTA MMA charging (TIM-15), the pipelined GEMM end to end (TIM-18) | Measured by `cluster_costs` and `pipelined_gemm` and reported; `fit.py` derives no parameter from them, because the model has none for them. Their rows are in `measured.csv` and `comparison.csv` like every configuration's |
+| A latency per form of a cluster-launch-control request (TIM-20) | One `clc_latency_ns` for all, fitted from requests that fail; `fit.py` reports what each of the five forms implies |
 | `ncu` wavefront offset by block shape (TIM-17) | `ncu_banks` and `ncu_banks_compare.py`; needs `ncu` with permission to read counters |
 
 Also not covered from the matrix: TIM-09 asks for `.x16`, `.x128` and `16x256b`
@@ -335,14 +469,16 @@ transfers; only `32x32b.x1` and `.x8` are here.
 
 ## Problems found in the timing model
 
-Reported here; 2 and 3 have since been fixed in the model, the rest have not.
+Reported here; 1, 2, 3 and 13 have since been fixed, the rest have not.
 
-1. **`warplens run` cannot set `active_sms` or the config.** A single CTA is
+1. **`warplens run` could not set `active_sms` or the config.** A single CTA was
    charged HBM at 1/148 of the device bandwidth (28 GB/s), so a 32 KiB cold load
-   is predicted at 1276 ns against 275 ns warm, and 8 SMs loading cold are
-   predicted to move 8 x 28 GB/s. `predict.py --config` swaps the config by
-   replacing `warplens.timing.config.CONFIG_DIR`; a `--config` and `--active-sms`
-   option on `warplens run` would be the proper way.
+   was predicted at 1276 ns against 275 ns warm, and 8 SMs loading cold were
+   predicted to move 8 x 28 GB/s. `warplens run` has `--timing-config` and
+   `--active-sms` now, but one number per program; `predict.py` sets the active
+   SMs per launch ("Active SMs" above), and a cold load on one SM or on 8 is
+   predicted at the TMA engine's rate. `predict.py --config` still swaps the
+   config by replacing `warplens.timing.config.CONFIG_DIR`.
 2. **TMA stores were always charged to HBM**, at that same 1/active_sms share,
    never to L2. Fixed: a store's destination lines use the same L2 record as a
    load's source. The `tma/store` benchmark writes the same bytes every
@@ -350,7 +486,9 @@ Reported here; 2 and 3 have since been fixed in the model, the rest have not.
    274 ns, where it was 1274 ns.
 3. **`cp.async` likewise** had no line addresses, so warm and cold were both
    charged to HBM and predicted the same (122 ns per group). Fixed: `cp_async/warm`
-   is now predicted at 106.5 ns per group and `cp_async/cold` at 122 ns.
+   is now predicted at 106.5 ns per group, and `cp_async/cold` was at 122 ns while
+   every SM was assumed active. With the one active SM of its launch, the cold
+   source no longer limits it, and it is predicted at 106.5 ns too.
 4. **TMA engine rate and L2 rate are not separately identifiable** from copies,
    because of the max() above (see the lower bound).
 5. **One global-load latency.** On the 3080 Ti a dependent load took 44 ns from
@@ -375,9 +513,10 @@ Reported here; 2 and 3 have since been fixed in the model, the rest have not.
     by the simulator when this was written, so `clc_latency` does not sum over the clusters
     that start; it reports the first cluster's ticks and request count instead. The
     simulator runs `atom` now (branch `work/atom`); the kernel was left as it is.
-13. `warplens run --timing` cannot set `active_sms`, so the simulator's
-    `pipelined_gemm/*/ctas=8` rows are predicted as if all 148 SMs shared HBM; the
-    "8 SMs share HBM" row of `docs/m4.md` cannot be produced from a program.
+13. The simulator's `pipelined_gemm/*/ctas=8` rows were predicted as if all 148 SMs
+    shared HBM. Fixed in `predict.py`: they are predicted with 8 active SMs (331 /
+    166 / 128 ns per K tile), which is the "8 SMs share HBM" case of `docs/m4.md`
+    for the code nvcc 13.5 makes of the benchmark.
 
 Items 5 to 8 are Ampere observations. They may not hold on Blackwell; the same
 configurations run there.
@@ -392,7 +531,7 @@ configurations run there.
 | `run_all.sh`, `run_ncu.sh` | the unattended run; the counter run |
 | `fixture_ncu/` | recorded ncu output and a stand-in for ncu, for `tests/test_ncu_scripts.py` |
 | `ncu_banks_compare.py`, `ncu_banks.ptx` | the simulator's bank counters for `ncu_banks`, next to `ncu`'s; the PTX it simulates |
-| `predict.py`, `predicted/` | simulator predictions |
+| `predict.py`, `predicted/` | simulator predictions, each launch timed with the active SMs of its shape (`warplens/timing/placement.py`) |
 | `fit.py` | results directory to parameters |
 | `make_synthetic.py`, `fixture_synthetic/` | synthetic results for testing `fit.py` |
 | `dryrun_3080ti/` | raw outputs and report of the Ampere dry run |

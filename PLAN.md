@@ -398,8 +398,13 @@ nothing Blackwell-specific has run on a GPU.
 | Steps | Where | State |
 | --- | --- | --- |
 | B5, B6, F23 | `docs/validation-matrix.md` | one row per claim with its probe, prediction and pass criterion; a test keeps its citations valid |
+<<<<<<< HEAD
 | C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 117 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 22 runs also match the 3080 Ti. Every matrix row outside timing has a run except NUM-05, RT-10 and RT-11 (its README says why). Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
 | C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema, predictions committed; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
+=======
+| C7 to C13, D15 to D18 | `validation/blackwell/` | 55 probe programs, 109 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 22 runs also match the 3080 Ti. Every matrix row outside timing has a run except NUM-05, RT-10 and RT-11 (its README says why). Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
+| C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema (`clc_latency_ns` included), predictions committed, each launch timed with the active SMs its shape implies; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
+>>>>>>> work/timing-model
 | E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
 | F24 | | still to decide: the budget for a second rental |
 

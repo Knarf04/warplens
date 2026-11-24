@@ -1,9 +1,9 @@
 DEVICE bench=cp_async name=SYNTHETIC_not_measured cc=10.0 sm_count=148 total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 trials=2 scale=1 synthetic=1
-BENCH id=cp_async/warm buffer_bytes=262144 reps=8000 trial=0 event_ns=2166297.018 wall_ns=2171297.018 clk=4077964 check=0
-BENCH id=cp_async/warm buffer_bytes=262144 reps=16000 trial=0 event_ns=4312576.877 wall_ns=4317576.877 clk=8155896 check=0
-BENCH id=cp_async/warm buffer_bytes=262144 reps=8000 trial=1 event_ns=2168228.685 wall_ns=2173228.685 clk=4077964 check=0
-BENCH id=cp_async/warm buffer_bytes=262144 reps=16000 trial=1 event_ns=4325025.350 wall_ns=4330025.350 clk=8155896 check=0
-BENCH id=cp_async/cold buffer_bytes=262144 reps=8000 trial=0 event_ns=2166297.018 wall_ns=2171297.018 clk=4077964 check=0
-BENCH id=cp_async/cold buffer_bytes=262144 reps=16000 trial=0 event_ns=4312576.877 wall_ns=4317576.877 clk=8155896 check=0
-BENCH id=cp_async/cold buffer_bytes=262144 reps=8000 trial=1 event_ns=2169971.478 wall_ns=2174971.478 clk=4077964 check=0
-BENCH id=cp_async/cold buffer_bytes=262144 reps=16000 trial=1 event_ns=4315547.340 wall_ns=4320547.340 clk=8155896 check=0
+BENCH id=cp_async/warm buffer_bytes=262144 reps=8000 trial=0 event_ns=2000157.509 wall_ns=2005157.509 clk=3762299 check=0
+BENCH id=cp_async/warm buffer_bytes=262144 reps=16000 trial=0 event_ns=3980297.860 wall_ns=3985297.860 clk=7524566 check=0
+BENCH id=cp_async/warm buffer_bytes=262144 reps=8000 trial=1 event_ns=2001939.651 wall_ns=2006939.651 clk=3762299 check=0
+BENCH id=cp_async/warm buffer_bytes=262144 reps=16000 trial=1 event_ns=3991782.723 wall_ns=3996782.723 clk=7524566 check=0
+BENCH id=cp_async/cold buffer_bytes=262144 reps=8000 trial=0 event_ns=2000157.509 wall_ns=2005157.509 clk=3762299 check=0
+BENCH id=cp_async/cold buffer_bytes=262144 reps=16000 trial=0 event_ns=3980297.860 wall_ns=3985297.860 clk=7524566 check=0
+BENCH id=cp_async/cold buffer_bytes=262144 reps=8000 trial=1 event_ns=2003547.538 wall_ns=2008547.538 clk=3762299 check=0
+BENCH id=cp_async/cold buffer_bytes=262144 reps=16000 trial=1 event_ns=3983038.386 wall_ns=3988038.386 clk=7524566 check=0

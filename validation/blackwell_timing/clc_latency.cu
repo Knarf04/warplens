@@ -1,10 +1,12 @@
 // clc_latency: how long the launch takes to answer a clusterlaunchcontrol.try_cancel
 // (validation matrix TIM-20).
 //
-// Calibrates: no parameter yet. The model lands the response at the time the request is
-// issued (warplens/timing/model.py, kind "clc": "not known, so it is not modeled"), so the
-// prediction is the loop's instructions and nothing else. The measured round trip minus
-// that is the latency a config entry would hold.
+// Calibrates: `clc_latency_ns`. The model lands the response a fixed time after the request
+// is issued (warplens/timing/model.py, kind "clc"; docs/clc.md), the same for every form, so
+// the prediction is that latency plus the loop's instructions. fit.py takes the measured
+// round trip of clc_latency/fail/plain/ctas=1 minus the instruction time the simulator
+// counts for the same loop; the other four configurations are reported next to it, each
+// with the latency it implies, to show whether one number is enough.
 //
 // Method: thread 0 arms its mbarrier (arrive.expect_tx 16), issues try_cancel and waits for
 // the phase, over and over. Nothing decodes a response in the failing variants, so no
@@ -27,7 +29,8 @@
 // trips. Use the kernel's own numbers instead: `clk` is the %clock64 ticks the cluster at
 // (0, 0) spent in its request loop and `check` the number of requests it made that
 // succeeded; it made check + 1 requests in clk ticks. fit.py's ns-per-repetition for these
-// two ids is therefore meaningful for the prediction only.
+// two ids is therefore meaningful for the prediction only; for the measurement it reports
+// clk / (check + 1), converted to ns with the %clock64 tick rate that alu_chain measures.
 //
 // Blackwell only (simulator and sm_100a here).
 #include "blackwell.h"

@@ -77,6 +77,11 @@ cluster now running, and not canceled already.
   like a TMA load, and then completes the mbarrier. In a timed launch it lands
   `clc_latency_ns` after it was issued. How long a GPU takes to answer is not known: the
   100 ns in the config files is an uncalibrated placeholder, set equal to `tma_latency_ns`.
+  It is one number for every request: granted or refused, with or without multicast, and
+  however many clusters are pending. `validation/blackwell_timing/fit.py` fits it from the
+  `clc_latency` benchmark (the round trip of a request that fails, minus the instructions
+  of its loop) and reports what the other forms imply next to it; see that directory's
+  README, "Cluster launch control latency".
 - With every request granted, the first cluster takes over the whole grid: the outcome on
   a GPU that has room for one cluster. A GPU with room for all of them starts every
   cluster before any request is served, and every request fails. `launch(...,
@@ -159,4 +164,7 @@ That is what the manual calls undefined, so it is reported.
    (`clusterid * cluster shape`), also when the launch gave no cluster shape and each CTA
    is its own cluster.
 9. **Latency of a request**, for the timing model: `clc_latency_ns`, 100 ns, a placeholder
-   with nothing behind it.
+   with nothing behind it. Also assumed: that it is the same for a request that is granted
+   and one that is refused, and with and without multicast. `fit.py` replaces the value
+   from a B200 run and says "NOT ONE NUMBER" in the entry's note if the forms differ by
+   more than 20%.

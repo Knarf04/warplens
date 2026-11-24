@@ -26,7 +26,8 @@
 //                                  the host never reuses a region until the whole buffer
 //                                  (hardware: up to 16 GiB) has been walked. One SM's cold
 //                                  fetch rate. The model gives one SM 1/active_sms of the HBM
-//                                  bandwidth; `warplens run` fixes active_sms at sm_count.
+//                                  bandwidth; predict.py sets active_sms per launch to the SMs
+//                                  its CTAs are assumed to occupy (1 here; 8, 37, 148 below).
 //   tma/load/cold/bytes=16384/ctas=8, 37, allsm   that many CTAs, one per SM, each walking
 //                                  its own fresh memory (validation matrix TIM-07)
 //   tma/store/bytes=B/ctas=1       the same destination tile every time

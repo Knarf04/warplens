@@ -15,7 +15,8 @@ Writes into --out (default RESULTS_DIR/fit):
   calibrated.yaml       the config given by --config with those entries replaced; loads with
                         warplens.timing.config.GpuConfig.load(path)
   comparison.csv    (c) per configuration: measured, the simulator's prediction with the
-                        current config (from --predicted, written by predict.py), the ratio
+                        current config (from --predicted, written by predict.py), the ratio,
+                        and how many SMs the prediction assumed the launch keeps busy
   report.md             all of the above as text; also printed
 
 Everything is a slope. A configuration is launched with two repetition counts; "ns per
@@ -39,7 +40,7 @@ HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIG = HERE.parent.parent / "warplens" / "configs" / "b200.yaml"
 DEFAULT_PREDICTED = HERE / "predicted"
 NUMERIC = ("reps", "trial", "event_ns", "wall_ns", "clk", "check", "norm", "bytes", "m", "n", "k",
-           "batch", "nctas", "sim_ns", "sim_instr")
+           "batch", "nctas", "sim_ns", "sim_instr", "sim_active_sms", "sim_ctas_per_sm", "sim_resident_ctas")
 
 
 # -- reading ------------------------------------------------------------------------------
@@ -113,6 +114,12 @@ def summarize(rows: list[dict], key: str = "event_ns") -> dict[str, dict]:
                 "row": group[0]}
         times = [r[key] for r in group]
         info["launch_min_ns"], info["launch_median_ns"] = min(times), statistics.median(times)
+        # The kernel's own count, for the configurations whose launch time is not a number of
+        # round trips (clc_latency/succeed/*): `clk` is the %clock64 ticks the cluster at (0, 0)
+        # spent requesting and `check` how many of its requests succeeded, so it made check + 1.
+        own = [r["clk"] / (r["check"] + 1) for r in group if r.get("clk", 0) > 0 and r.get("check", -1) >= 0]
+        if own:
+            info["clk_per_request"], info["clk_per_request_median"] = min(own), statistics.median(own)
         if len(reps) >= 2:
             at = {x: [r[key] for r in group if r["reps"] == x] for x in reps}
             slope, intercept = linfit(reps, [min(at[x]) for x in reps])
@@ -158,8 +165,17 @@ TILE_BYTES = (64, 256, 1024, 4096, 16384, 32768)
 CONFLICTS = (1, 2, 4, 8, 16, 32)
 BATCHES = (1, 2, 4, 8)
 MMA_K = {"f16": 16, "tf32": 8, "i8": 32}
+# Cluster launch control. Requests that fail, in a launch of one cluster: the slope of launch
+# time against requests is one round trip. In order of preference for clc_latency_ns: the
+# first has nothing in its loop but the request; the other two add a cluster barrier.
+CLC_FAIL = ("clc_latency/fail/plain/ctas=1", "clc_latency/fail/plain/ctas=2", "clc_latency/fail/multicast/ctas=2")
+# Requests that succeed: on a GPU many clusters start at once, so only the kernel's own
+# count (clk_per_request) is a round trip, and it is in %clock64 ticks.
+CLC_SUCCEED = ("clc_latency/succeed/plain/ctas=1", "clc_latency/succeed/multicast/ctas=2")
+CLC_DISAGREE = 0.2  # another form's latency further than this from the fitted one is named in its note
 UNITS = {"sm_count": "SMs", "clock_ghz": "GHz", "hbm_capacity_gb": "GB", "hbm_bandwidth_tb_s": "TB/s",
-         "l2_bandwidth_per_sm_gb_s": "GB/s", "tma_latency_ns": "ns", "tma_bytes_per_clk": "bytes/clk",
+         "l2_bandwidth_per_sm_gb_s": "GB/s", "tma_latency_ns": "ns", "clc_latency_ns": "ns",
+         "tma_bytes_per_clk": "bytes/clk",
          "smem_wavefront_clk": "clk", "global_access_latency_clk": "clk", "tmem_access_clk": "clk",
          "tensor_core_tflops_f16": "TFLOPS", "tensor_core_tflops_tf32": "TFLOPS", "mma_latency_clk": "clk"}
 
@@ -212,9 +228,12 @@ def derive(meas: dict, pred: dict, cfg: dict, device: dict, stat: str = "min"):
     clock_note = (f"Clocks converted with the fitted clock_ghz = {f:.4g}." if f != f_cfg else
                   f"Clocks converted with the config's clock_ghz = {f_cfg:g} (no usable alu_chain clock fit).")
     ticks = meas.get("alu_chain/warps=1", {})
+    ticks_per_ns = None  # of %clock64, to turn a kernel's own tick count into time
     if ticks.get("clk_per_rep") and a:
         diag.append(("%clock64 ticks per ns", ticks["clk_per_rep"] / a, "ticks/ns",
                      "alu_chain/warps=1: clock64 slope / event-time slope. 0 means the build did not read the clock"))
+        if a > 0 and math.isfinite(ticks["clk_per_rep"] / a) and ticks["clk_per_rep"] > 0:
+            ticks_per_ns = ticks["clk_per_rep"] / a
 
     # smem_wavefront_clk: slope of ns per access against wavefronts per access.
     pts = series(meas, "smem_wavefronts/load_chain/conflict={}/warps=1", CONFLICTS, stat)
@@ -236,6 +255,67 @@ def derive(meas: dict, pred: dict, cfg: dict, device: dict, stat: str = "min"):
 
     fixed("global_access_latency_clk", "global_load/load_chain/footprint=l2", "one load per repetition")
     fixed("tmem_access_clk", "tmem_access/ld/x1", "one tcgen05.ld per repetition")
+
+    # clc_latency_ns. The model lands the response of a clusterlaunchcontrol.try_cancel a fixed
+    # time after the request is issued, the same for every form (docs/clc.md, timing/model.py
+    # kind "clc"). A request's round trip (arm the mbarrier, try_cancel, wait for the phase) is
+    # that latency plus the loop's instructions, which the simulator counted for the same loop:
+    #     latency = measured round trip - (predicted round trip - config latency)
+    # with the instruction time rescaled to the fitted clock, as for tma_latency_ns.
+    clc_measured = [i for i in (*CLC_FAIL, *CLC_SUCCEED) if i in meas]
+    clc_values = {}  # id -> (latency this form implies, measured round trip, instruction time)
+    if clc_measured and "clc_latency_ns" not in cfg:
+        diag.append(("clc_latency_ns", "not derived", "", "the config the predictions were made with has no "
+                     "clc_latency_ns entry, so the instruction time of a request cannot be separated"))
+        clc_measured = []
+    for ident in clc_measured:
+        label = f"CLC request, {ident[len('clc_latency/'):]}"
+        b = p(ident)
+        if ident in CLC_SUCCEED:
+            own = meas[ident].get("clk_per_request_median" if stat == "median" else "clk_per_request")
+            if own is None:
+                diag.append((label, "not derived", "", "no %clock64 ticks in its lines (clk = 0): the launch time of a "
+                             "grid of clusters is not a number of round trips, only the kernel's own count is"))
+                continue
+            if ticks_per_ns is None:
+                diag.append((label, "not derived", "", f"{own:.4g} %clock64 ticks per request, but no ticks per ns "
+                             "to convert them (alu_chain/warps=1 is missing or its clock did not run)"))
+                continue
+            a, how = own / ticks_per_ns, (f"{own:.4g} ticks per request of the first cluster (clk / (check + 1)) / "
+                                          f"{ticks_per_ns:.4g} ticks per ns")
+        else:
+            a, how = m(ident), "slope of launch time against requests"
+        if a is None or not math.isfinite(a) or a <= 0:
+            diag.append((label, "not derived", "", "no positive finite round trip was measured"))
+            continue
+        if b is None or not math.isfinite(b):
+            diag.append((label, a, "ns", how + "; round trip only: there is no prediction of this configuration "
+                         "to take the instruction time from"))
+            continue
+        overhead = (b - cfg["clc_latency_ns"]) * f_cfg / f
+        clc_values[ident] = (a - overhead, a, overhead)
+        diag.append((label, a, "ns", f"{how}; minus {overhead:.4g} ns of instructions the simulator counts for the "
+                     f"same loop = {a - overhead:.4g} ns of latency"))
+    chosen = next((i for i in CLC_FAIL if i in clc_values), None)
+    if chosen:
+        latency, a, overhead = clc_values[chosen]
+        note = ("One latency for every form of the request, as the model has. Includes whatever the mbarrier "
+                "wake-up costs on hardware beyond its instructions. " + clock_note)
+        if chosen != CLC_FAIL[0]:
+            note += (f" {CLC_FAIL[0]} was not usable; this loop also has a cluster barrier per request, which "
+                     "the model charges as instructions only.")
+        others = {i: v[0] for i, v in clc_values.items()
+                  if i != chosen and abs(v[0] - latency) > CLC_DISAGREE * max(abs(latency), 1.0)}
+        if others:
+            note += (" NOT ONE NUMBER on this device: " + ", ".join(f"{i} implies {v:.4g} ns" for i, v in others.items())
+                     + "; the model would need a latency per form.")
+        add("clc_latency_ns", latency,
+            f"measured {a:.4g} ns per request - {overhead:.4g} ns of instruction time the simulator counts for "
+            f"the same loop ({chosen}, requests that fail in a launch of one cluster)", note)
+    elif clc_measured:
+        diag.append(("clc_latency_ns", "not derived", "", "none of " + ", ".join(CLC_FAIL) + " has a usable "
+                     "measurement and prediction; the requests that succeed are reported, not fitted, because "
+                     "their round trip rests on the %clock64 tick rate"))
 
     # TMA: round trip against bytes.
     fits = {}
@@ -377,6 +457,48 @@ def fmt(x, digits=4) -> str:
     return f"{x:.{digits}g}"
 
 
+def placement_problems(device: dict, placement: dict, meas: dict, pred: dict) -> list[str]:
+    """Where the run contradicts the active-SM assumption its predictions were made with
+    (predict.py: meta.json `placement`, and sim_active_sms on every predicted launch)."""
+    out = []
+    if not placement:
+        if pred and any("sim_active_sms" not in info["row"] for info in pred.values()):
+            out.append("the predictions record no active-SM assumption (an older predict.py made them): every "
+                       "launch was timed as if all SMs were busy")
+        return out
+    sms = device.get("sm_count")
+    try:
+        sms = float(sms) if sms else None
+    except ValueError:
+        sms = None
+    if sms and placement.get("sm_count") and sms != placement["sm_count"]:
+        out.append(f"the device has {sms:.0f} SMs and the predictions place launches on {placement['sm_count']}: "
+                   "every configuration that fills the device was predicted for another number of active SMs")
+    for key, assumed in (placement.get("limits") or {}).items():
+        try:
+            reported = float(device.get(key) or 0)
+        except ValueError:
+            continue
+        if reported and reported != assumed:
+            out.append(f"the device reports {key} = {reported:.0f}; the predictions' active-SM assumption used "
+                       f"{assumed}: CTAs per SM, and with them the CTAs resident at once, were computed for other limits")
+    if sms and placement.get("mode") == "launch":
+        differ = []
+        for ident, info in meas.items():
+            row, predicted = info["row"], pred.get(ident, {}).get("row", {})
+            # `nctas` is the grid of the launch, except in clc_latency/succeed/*, where it is the cluster size.
+            if ident in CLC_SUCCEED or "nctas" not in row or "sim_active_sms" not in predicted:
+                continue
+            implied = min(row["nctas"], sms)
+            if implied != predicted["sim_active_sms"]:
+                differ.append(f"`{ident}` ({row['nctas']:.0f} CTAs launched, {implied:.0f} SMs; predicted for "
+                              f"{predicted['sim_active_sms']:.0f})")
+        if differ:
+            out.append(f"{len(differ)} configuration(s) were launched with a grid that keeps another number of SMs "
+                       "busy than their prediction assumed, e.g. " + ", ".join(differ[:3]))
+    return out
+
+
 def build_report(device, meas, pred, params, diag, cfg, problems, warnings, pred_status) -> str:
     out = ["# Timing calibration report", ""]
     out += [f"**WARNING: {w}**" for w in warnings] + ([""] if warnings else [])
@@ -408,8 +530,11 @@ def build_report(device, meas, pred, params, diag, cfg, problems, warnings, pred
     out += ["", "Other measured quantities:", "", "| quantity | value | unit | note |", "|---|---|---|---|"]
     out += [f"| {name} | {fmt(val, 5) if not isinstance(val, str) else val} | {unit} | {note} |" for name, val, unit, note in diag]
     out += ["", "## (c) Measured against the simulator's current prediction", "",
-            "Prediction: `warplens run --timing` on the same program (predict.py), ns per repetition.", "",
-            "| configuration | measured | predicted | measured / predicted |", "|---|---|---|---|"]
+            "Prediction: `warplens run --timing` on the same program (predict.py), ns per repetition. "
+            "\"SMs assumed\" is how many SMs the prediction took the launch to keep busy (they share HBM in "
+            "the model); it comes from the launch's shape, and nothing in a run measures it directly. What a "
+            "run can contradict is listed under \"Problems in the results\".", "",
+            "| configuration | measured | predicted | measured / predicted | SMs assumed |", "|---|---|---|---|---|"]
     for ident, info in meas.items():
         pi = pred.get(ident)
         if "ns_per_rep" in info:
@@ -424,7 +549,12 @@ def build_report(device, meas, pred, params, diag, cfg, problems, warnings, pred
             ratio = "n/a: the model predicts no cost"
         else:
             ratio = fmt(a / b)
-        out.append(f"| {ident}{unit} | {fmt(a)} | {fmt(b)} | {ratio} |")
+        assumed = (pi or {}).get("row", {}).get("sim_active_sms")
+        out.append(f"| {ident}{unit} | {fmt(a)} | {fmt(b)} | {ratio} | {'' if assumed is None else f'{assumed:.0f}'} |")
+    if any(i in meas for i in CLC_SUCCEED):
+        out += ["", "`clc_latency/succeed/*`: on a GPU many clusters start at once, so these two slopes are not "
+                "round trips and their ratios mean nothing; the kernel's own count is under \"Other measured "
+                "quantities\" (CLC request, succeed/...)."]
     absent = [i for i in pred if i not in meas]
     if absent:
         out += ["", f"{len(absent)} predicted configuration(s) have no measurement, e.g. " +
@@ -439,6 +569,13 @@ def load_config_values(path: Path) -> dict:
     import yaml
     raw = yaml.safe_load(Path(path).read_text())
     return {k: float(v["value"]) for k, v in raw.items() if isinstance(v, dict) and "value" in v}
+
+
+def load_placement(path: Path) -> dict:
+    """The active-SM assumption recorded with the predictions in `path`; {} if there is none."""
+    import json
+    meta = Path(path) / "meta.json"
+    return (json.loads(meta.read_text()).get("placement") or {}) if meta.exists() else {}
 
 
 def load_predicted(path: Path) -> tuple[dict, dict, dict]:
@@ -460,6 +597,7 @@ def run(results: Path, predicted: Path = DEFAULT_PREDICTED, config: Path = DEFAU
     if pred_cfg and any(abs(pred_cfg.get(k, v) - v) > 1e-12 * abs(v) for k, v in cfg.items()):
         problems.append(f"the predictions in {predicted} were made with a config that differs from {config}; "
                         "the derived parameters use the predictions' config")
+    problems += placement_problems(device, load_placement(predicted), meas, pred)
     cfg_used = {**cfg, **pred_cfg}
     params, diag = derive(meas, pred, cfg_used, device, stat)
     _, warnings = provenance(device, results.name)
@@ -478,12 +616,15 @@ def run(results: Path, predicted: Path = DEFAULT_PREDICTED, config: Path = DEFAU
         writer.writerows(meas.values())
     with (out / "comparison.csv").open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["id", "measured_ns_per_rep", "predicted_ns_per_rep", "measured_over_predicted"])
+        writer.writerow(["id", "measured_ns_per_rep", "predicted_ns_per_rep", "measured_over_predicted",
+                         "predicted_active_sms"])
         for ident, info in meas.items():
             a = info.get("ns_per_rep", info["launch_min_ns"])
             pi = pred.get(ident, {})
             b = pi.get("ns_per_rep", pi.get("launch_min_ns")) if "ns_per_rep" in info else pi.get("launch_min_ns")
-            writer.writerow([ident, a, "" if b is None else b, a / b if b and b > 0 else ""])
+            assumed = pi.get("row", {}).get("sim_active_sms")
+            writer.writerow([ident, a, "" if b is None else b, a / b if b and b > 0 else "",
+                             "" if assumed is None else int(assumed)])
     return {"device": device, "measured": meas, "predicted": pred, "params": {q["key"]: q for q in params},
             "diagnostics": diag, "report": report, "out": out, "problems": problems}
 

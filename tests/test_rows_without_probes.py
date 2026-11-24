@@ -1,6 +1,7 @@
 """The matrix rows that are not probes (NUM-05, RT-10, RT-11): validation/blackwell/run_rows.py
 and the scripts it runs. What needs a GPU is not run here; what must hold without one is:
-a step that cannot run says `skipped` with the reason, and nothing fails the run.
+a step that cannot run says `skipped` with the reason, and that fails the run only for
+RT-11 where its capture is required (tests/test_launch_capture.py has that side).
 """
 
 import importlib.util
@@ -91,9 +92,11 @@ def test_the_tracer_logs_nothing_for_a_program_without_cuda(tmp_path):
 
 def test_run_rows_records_skips_and_never_fails(tmp_path):
     """Without gdb every launching step is skipped with its reason; --no-e2e skips them
-    outright. Either way the runner exits 0 and writes one line per step."""
+    outright. Either way the runner exits 0 and writes one line per step. (`--rt11 optional`:
+    this test also runs in the self-test on the B200, where a skipped RT-11 is otherwise a
+    failure; tests/test_launch_capture.py.)"""
     out = tmp_path / "results"
-    done = run(SUITE / "run_rows.py", "--out", out, "--only", "e2e/*",
+    done = run(SUITE / "run_rows.py", "--out", out, "--only", "e2e/*", "--rt11", "optional",
                env={"WARPLENS_GDB": str(tmp_path / "no-gdb")})
     assert done.returncode == 0, done.stdout + done.stderr
     rows = [line.split("\t") for line in (out / "rows" / "status.tsv").read_text().splitlines()[1:]]
@@ -109,12 +112,15 @@ def test_run_rows_records_skips_and_never_fails(tmp_path):
 
 
 def test_run_all_runs_the_rows_only_on_a_whole_gpu_run():
-    """run_all.py calls run_rows.py in GPU mode, not for --only, and does not count its
-    status as a failure of the run."""
+    """run_all.py calls run_rows.py in GPU mode, not for --only. What a step ends as does not
+    fail the run: run_all.py reads no status of a row, only whether run_rows.py exited 0,
+    which it does unless the RT-11 capture is required and missing."""
     source = (SUITE / "run_all.py").read_text()
     block = source[source.index('if args.mode == "gpu" and not args.only:'):source.index('(out / "manifest.py")')]
     assert "run_rows.py" in block and "--no-e2e" in block
-    assert "infrastructure_failures" not in block
+    assert block.count("infrastructure_failures") == 1 and "status.tsv\")" not in block
+    rows = (SUITE / "run_rows.py").read_text()
+    assert rows.count("return 1") == 1 and "return rt11_verdict(" in rows       # the one way to fail
 
 
 def test_every_row_without_a_probe_is_scripted_and_documented():

@@ -442,6 +442,38 @@ def test_run_builds_runs_collects_and_resumes(checkout, tmp_path):
     assert third.returncode == 0 and (tmp_path / "blackwell-runs").read_text() == "ran\nran\n"
 
 
+def test_a_run_without_the_rt11_capture_fails_and_ends_by_saying_so(checkout, tmp_path):
+    """validation/blackwell/run_rows.py leaves RT-11-NOT-CAPTURED.txt in the suite's results
+    when the capture of matrix row RT-11 was required and is missing, and the suite exits 1.
+    run.sh: the stage failed, the file's text is the last thing before the exit, and the file
+    is in the archive. Once the capture has been made by hand (the file is gone), packing
+    again is clean."""
+    root, env, args = checkout
+    text = "MATRIX ROW RT-11 WAS NOT CAPTURED: e2e/cute_dsl_tma ended as: skipped (gdb not found)"
+    suite(root, "blackwell", "echo built\n",
+          f'echo "{text}" > "$WARPLENS_RESULTS_DIR/RT-11-NOT-CAPTURED.txt"\necho "probes ran"\nexit 1\n')
+    suite(root, "blackwell_timing", "echo built\n", "echo ran\n")
+    done = bash(root / "env/remote/run.sh", *args, env=env)
+    assert done.returncode == 1, done.stdout + done.stderr
+    assert "run-blackwell: failed" in done.stdout and "run-timing: ok" in done.stdout
+    # After the line of stage statuses, which is where a reader looks; only the toolkit's own
+    # flag (this stand-in checkout has no record of one) comes later.
+    lines = done.stdout.splitlines()
+    at = next(i for i, line in enumerate(lines) if "stages: " in line and "run-blackwell=failed" in line)
+    assert lines[at + 1:at + 4] == ["!" * 100, text, "!" * 100]
+    files = members(archive_of(tmp_path / "home"))
+    assert files["out/blackwell/RT-11-NOT-CAPTURED.txt"].decode() == text + "\n"
+
+    # Still there when the archive is packed again without running anything: still said, still a failure.
+    again = bash(root / "env/remote/run.sh", "--collect-only", env=env)
+    assert again.returncode == 1 and text in again.stdout
+    # Captured by hand since (run_rows.py removes the file when the row ends as `ok`).
+    (tmp_path / "home" / "run" / "out" / "blackwell" / "RT-11-NOT-CAPTURED.txt").unlink()
+    packed = bash(root / "env/remote/run.sh", "--collect-only", env=env)
+    assert packed.returncode == 0 and "NOT CAPTURED" not in packed.stdout
+    assert "out/blackwell/RT-11-NOT-CAPTURED.txt" not in members(archive_of(tmp_path / "home"))
+
+
 def test_run_says_which_suite_is_missing_and_goes_on(checkout, tmp_path):
     root, env, args = checkout
     suite(root, "blackwell", "echo built\n", 'echo fine > "$WARPLENS_RESULTS_DIR/probes.txt"\n')

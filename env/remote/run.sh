@@ -21,8 +21,10 @@
 #                    (setup.sh installed another nvcc than the committed predictions were
 #                    made with): the predictions are made again with the installed nvcc,
 #                    before anything runs on the GPU, into out/predicted-toolkit/ of the archive
-#   run-blackwell    validation/blackwell/run_all.sh     continues
-#   run-timing       validation/blackwell_timing/run_all.sh  continues
+#   run-blackwell    validation/blackwell/run_all.sh     continues. It fails, among other things,
+#                    when the capture of matrix row RT-11 (a CuTe DSL kernel with TMA) is
+#                    missing on a B200; the reason is then repeated as the run's last lines
+#   run-timing      validation/blackwell_timing/run_all.sh  continues
 #   collect          manifest, checksums, archive        always runs
 #
 #   --dry-run      print the plan and the time and cost estimate; touch nothing
@@ -430,6 +432,13 @@ finish() {  # finish EXIT_STATUS
     (( code == 0 )) && code=1
   fi
   say "stages: $(for s in "${STAGES[@]}"; do [[ $s == collect ]] || printf '%s=%s ' "$s" "${result[$s]:-not-reached}"; done)"
+  # Written by validation/blackwell/run_rows.py when the capture of matrix row RT-11 was
+  # required (a B200) and is not there; gone again once the row has been run to `ok`.
+  if [[ -f "$RUN_DIR/out/blackwell/RT-11-NOT-CAPTURED.txt" ]]; then
+    local missing; missing="$(printf '!%.0s' {1..100})"
+    printf '%s\n' "$missing"; cat "$RUN_DIR/out/blackwell/RT-11-NOT-CAPTURED.txt"; printf '%s\n' "$missing"
+    (( code == 0 )) && code=1
+  fi
   case "$predictions_state" in
     comparable|comparable-native) ;;
     *) local bar; bar="$(printf '!%.0s' {1..100})"

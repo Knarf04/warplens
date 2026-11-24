@@ -9,7 +9,8 @@ kernel launch? (matrix row RT-10; e2e/cute_dsl_tma.py uses it for RT-11)
     driver_call_trace.py --out out/cute_dsl -- python examples/06_cute_dsl/saxpy.py
 
 COMMAND runs on the GPU under gdb with e2e/gdb_driver_trace.py, which says what is written
-to DIR (calls.txt, summary.txt, launches.txt, launches.json, the raw parameter bytes).
+to DIR (calls.txt, summary.txt, launches.txt, launches.json, the raw parameter bytes), and
+what more it can save of a launch (the code, the memory; e2e/cute_dsl_tma.py asks for that).
 Needs gdb with Python support (Ubuntu's `gdb` package; WARPLENS_GDB names another one) and
 permission to trace a child process, which a normal user has. No root, no symbols.
 
@@ -54,19 +55,24 @@ def find_gdb() -> tuple[str, str]:
     return gdb, ""
 
 
-def trace(command: list[str], out: Path, timeout: float, env: dict | None = None) -> tuple[str, dict]:
+def trace(command: list[str], out: Path, timeout: float, env: dict | None = None,
+          capture: tuple[str, ...] = ()) -> tuple[str, dict]:
     """Run `command` under the tracer. Returns (status, facts): status is "ok", "skipped (why)"
-    or what went wrong; facts has "launches" (launches.json) and "calls" (distinct names)."""
+    or what went wrong; facts has "launches" (launches.json) and "calls" (distinct names).
+    `capture` names what else the tracer saves ("module", "memory": gdb_driver_trace.py)."""
     gdb, why = find_gdb()
     if not gdb:
         return f"skipped ({why})", {}
     out.mkdir(parents=True, exist_ok=True)
-    for stale in ("calls.txt", "summary.txt", "launches.txt", "launches.json", "exit.txt"):
+    for stale in ("calls.txt", "summary.txt", "launches.txt", "launches.json", "exit.txt", "capture.json",
+                  "capture.log"):
         (out / stale).unlink(missing_ok=True)
-    for stale in out.glob("launch*.param*.bin"):
+    for stale in [*out.glob("launch*.param*.bin"), *out.glob("module*.bin")]:
         stale.unlink()
+    shutil.rmtree(out / "mem", ignore_errors=True)
     run_env = dict(os.environ if env is None else env)
     run_env["WARPLENS_TRACE_DIR"] = str(out)
+    run_env["WARPLENS_TRACE_CAPTURE"] = ",".join(capture)
     status, _, stdout, stderr = run_process([gdb, "-q", "-batch", "-x", str(TRACER), "--args", *command],
                                             timeout, env=run_env)
     (out / "gdb.stdout").write_bytes(stdout)

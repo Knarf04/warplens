@@ -104,6 +104,10 @@ def render_html(report, title: str = "warplens timing report") -> str:
         cls = ' class="assumed"' if p.is_assumption else ""
         config_rows.append(f'<tr id="cfg-{p.key}"{cls}><td><code>{p.key}</code></td><td class="num">{p.value:g}</td>'
                            f'<td>{escape(p.unit)}</td><td>{source}</td><td class="note">{escape(p.note)}</td></tr>')
+    working = getattr(report, "working_ctas", report.ctas)
+    idle = "" if working >= report.ctas else (
+        f' Busy fractions and the pipeline window are averaged over the <span id="working-ctas">'
+        f'{working}</span> CTA(s) that did work; {report.ctas - working} did none and are left out.')
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>{escape(title)}</title><style>{_STYLE}</style></head><body>
 <h1>{escape(title)}</h1>
@@ -111,7 +115,7 @@ def render_html(report, title: str = "warplens timing report") -> str:
 goes under the stated parameters; it is not a measurement and has not been calibrated against hardware.
 Values marked * are model assumptions, including measurements borrowed from another GPU.</p>
 <h2>Verdict</h2><p><b>{escape(report.verdict)}</b></p>
-<p>{report.ctas} CTA(s) simulated, each alone on one SM.</p>
+<p>{report.ctas} CTA(s) simulated, each alone on one SM.{idle}</p>
 <h2>Resources</h2>
 <table><tr><th>Resource</th><th>Busy</th><th></th><th>Derived from</th></tr>{''.join(rows)}</table>
 <p class="note">Busy is the fraction of time the resource was working: for the TMA engine, HBM, L2 and

@@ -142,8 +142,11 @@ def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
     cta.schedule(operation, land)
 
 
-def _store(w, ins, lane: int, idx: np.ndarray, write_global) -> None:
-    """Issue an asynchronous read of shared bytes `idx`; `write_global(bytes)` delivers them."""
+def _store(w, ins, lane: int, idx: np.ndarray, write_global, dest=None,
+           global_bytes: int | None = None) -> None:
+    """Issue an asynchronous read of shared bytes `idx`; `write_global(bytes)` delivers them.
+    `dest` holds the global addresses written and `global_bytes` how many bytes reach
+    global memory; the timing model charges them to L2 or HBM as it does a load's source."""
     cta = w.cta
     smem = cta.smem
     if smem.has_uninitialized_bytes(idx):
@@ -157,7 +160,9 @@ def _store(w, ins, lane: int, idx: np.ndarray, write_global) -> None:
             "in between; TMA may read stale data", w, ins, [lane])
     _require_seen(w, ins, [lane], smem.async_writer[idx], "TMA store reads")
     operation = cta.new_async("store", w, ins, lane)
-    operation.work = {"bytes": len(idx)}
+    operation.work = {"bytes": len(idx),
+                      "global_bytes": len(idx) if global_bytes is None else global_bytes,
+                      "lines": None if dest is None else np.unique(dest >> np.uint64(7))}
     smem.async_reader[idx] = operation.id
     smem.async_active = True
     w.open_stores.append(operation)
@@ -274,7 +279,9 @@ def _cp_async(w, ins, mask) -> None:
         w.cp_open.setdefault(int(lane), []).append(operation)
     # Coalesce scheduling/timing into one event for this issued warp instruction,
     # avoiding an artificial per-lane multiplication of the transfer's startup cost.
-    operations[0].work = {"bytes": int(data.size), "global_bytes": int(reads.sum()), "lines": None}
+    # The global lines actually read, so the timing model can tell warm from cold.
+    operations[0].work = {"bytes": int(data.size), "global_bytes": int(reads.sum()),
+                          "lines": np.unique((source[:, None] + span[None, :])[reads] >> np.uint64(7))}
 
     def land():
         cta.smem.finish_async_write(idx.reshape(-1), data.reshape(-1), writer_warp=w.warp_id)
@@ -415,7 +422,8 @@ def _cp(w, ins, mask):
             def write_global(data, addrs=addrs, inside=inside, dt=dt):
                 w.mem.write(addrs[inside], np.ascontiguousarray(data).view(dt)[inside])
 
-            _store(w, ins, lane, idx, write_global)
+            _store(w, ins, lane, idx, write_global, dest=addrs[inside],
+                   global_bytes=int(inside.sum()) * info.elem_size)
         else:  # [global], [smem], size
             if len(ops) != 3 + hint:
                 raise unsupported(ins, "expected [dst], [src], size")
@@ -427,7 +435,8 @@ def _cp(w, ins, mask):
             def write_global(data, target=target, nbytes=nbytes):
                 w.mem.write(np.uint64(target) + np.arange(nbytes, dtype=np.uint64), data)
 
-            _store(w, ins, lane, idx, write_global)
+            _store(w, ins, lane, idx, write_global,
+                   dest=np.uint64(target) + np.arange(nbytes, dtype=np.uint64))
 
 
 def _raw_size(w, ins, operand, lane: int, *addresses: int) -> int:

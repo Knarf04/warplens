@@ -1,75 +1,95 @@
 # NVIDIA B300 (Blackwell Ultra), parameters of warplens's approximate timing model.
 #
-# NOTHING here has been measured on a B300. Entries are the B200 values unless marked.
-# Every entry has a `source`. "assumption" means the number is NOT public and was
-# chosen to be plausible; results that depend on it are illustrations, not predictions.
-# The paper cited as arXiv:2512.02189 is Jarmusch and Chandrasekaran,
-# "Microbenchmarking NVIDIA's Blackwell Architecture" (v3).
+# NOTHING here has been measured on a B300. Every entry is one of two kinds:
+#
+#   public difference   NVIDIA states a figure for Blackwell Ultra that differs from
+#                       the B200 one. The entry carries that figure, its source and url.
+#                       These are sm_count, hbm_capacity_gb and max_power_w.
+#   assumed equal       No public B300 figure exists. The entry is the B200 value and its
+#                       source starts with "assumption: assumed equal to B200,
+#                       uncalibrated". The report marks these with *.
+#
+# The NVIDIA source is the developer blog "Inside NVIDIA Blackwell Ultra: The Chip
+# Powering the AI Factory Era" (August 2025), whose Table 2 compares Hopper, Blackwell
+# and Blackwell Ultra. The paper cited as arXiv:2512.02189 is Jarmusch and
+# Chandrasekaran, "Microbenchmarking NVIDIA's Blackwell Architecture" (v3); it measured
+# a B200 only.
 name: B300
 
 sm_count:
-  value: 148
+  value: 160
   unit: SMs
-  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, section III-A"
-  url: https://arxiv.org/abs/2512.02189
+  source: "NVIDIA developer blog, Inside NVIDIA Blackwell Ultra: '160 Streaming Multiprocessors (SMs) organized into eight Graphics Processing Clusters (GPCs)'"
+  url: https://developer.nvidia.com/blog/inside-nvidia-blackwell-ultra-the-chip-powering-the-ai-factory-era
+  note: B200 has 148 (arXiv:2512.02189, section III-A). A stated design figure, not read from a B300. The model divides the device HBM bandwidth (by default) and the device Tensor Core rate by this count to get one SM's share.
 clock_ghz:
   value: 1.5
   unit: GHz
-  source: assumption
-  note: Assumed core clock; converts instruction, SMEM, TMEM and MMA latency costs and the TMA rate from clocks to nanoseconds.
+  source: "assumption: assumed equal to B200, uncalibrated"
+  note: Assumed core clock, not public for either GPU; converts instruction, SMEM, TMEM and MMA latency costs and the TMA rate from clocks to nanoseconds.
 hbm_capacity_gb:
   value: 288
   unit: GB
-  source: assumption
-  note: Publicly announced capacity for Blackwell Ultra; not checked against a primary source here.
+  source: "NVIDIA developer blog, Inside NVIDIA Blackwell Ultra, Table 2 (max HBM capacity: 288 GB HBM3E; Blackwell: 192 GB)"
+  url: https://developer.nvidia.com/blog/inside-nvidia-blackwell-ultra-the-chip-powering-the-ai-factory-era
+  note: Not used by the timing model.
+max_power_w:
+  value: 1400
+  unit: W
+  source: "NVIDIA developer blog, Inside NVIDIA Blackwell Ultra, Table 2 (max power, TGP: up to 1,400 W; Blackwell: up to 1,200 W)"
+  url: https://developer.nvidia.com/blog/inside-nvidia-blackwell-ultra-the-chip-powering-the-ai-factory-era
+  note: Not used by the timing model. What the extra power buys in clock or rate is not public, so no other entry is derived from it.
 hbm_bandwidth_tb_s:
   value: 4.141
   unit: TB/s
-  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, Table XIII (measured STREAM Triad; the stated peak is 8 TB/s)"
+  source: "assumption: assumed equal to B200, uncalibrated. B200 value from arXiv:2512.02189, Table XIII (measured STREAM Triad; the stated peak is 8 TB/s)"
   url: https://arxiv.org/abs/2512.02189
+  note: NVIDIA states the same peak, 8 TB/s, for Blackwell and Blackwell Ultra (Inside NVIDIA Blackwell Ultra, Table 2), so there is no public difference; no STREAM measurement on a B300 is public.
 l2_bandwidth_per_sm_gb_s:
   value: 400
   unit: GB/s
-  source: assumption
-  note: Rate at which one SM can pull data that is already in the L2 cache.
+  source: "assumption: assumed equal to B200, uncalibrated"
+  note: Rate at which one SM can pull data that is already in the L2 cache. An assumption for B200 as well.
 tma_latency_ns:
   value: 100
   unit: ns
-  source: assumption
-  note: Fixed delay from issuing a TMA copy to its completion, on top of the transfer itself.
+  source: "assumption: assumed equal to B200, uncalibrated"
+  note: Fixed delay from issuing a TMA copy to its completion, on top of the transfer itself. An assumption for B200 as well.
 tma_bytes_per_clk:
   value: 128
   unit: bytes/clk
-  source: assumption
-  note: Throughput of one SM's TMA engine; set equal to one shared-memory wavefront per clock.
+  source: "assumption: assumed equal to B200, uncalibrated"
+  note: Throughput of one SM's TMA engine; set equal to one shared-memory wavefront per clock. An assumption for B200 as well.
 smem_wavefront_clk:
   value: 1
   unit: clk
-  source: assumption
-  note: Cost of one shared-memory wavefront (see docs/m1.md for what a wavefront is).
+  source: "assumption: assumed equal to B200, uncalibrated"
+  note: Cost of one shared-memory wavefront (see docs/m1.md for what a wavefront is). An assumption for B200 as well.
 global_access_latency_clk:
   value: 30
   unit: clk
-  source: assumption
-  note: Time a warp waits for an ordinary global load. Stores are not waited for.
+  source: "assumption: assumed equal to B200, uncalibrated"
+  note: Time a warp waits for an ordinary global load. Stores are not waited for. An assumption for B200 as well.
 tmem_access_clk:
   value: 4
   unit: clk
-  source: assumption
-  note: Cost of one tcgen05.ld or tcgen05.st instruction.
+  source: "assumption: assumed equal to B200, uncalibrated"
+  note: Cost of one tcgen05.ld or tcgen05.st instruction. An assumption for B200 as well.
 tensor_core_tflops_f16:
   value: 1929.6
   unit: TFLOPS
-  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, Table VII (measured, whole GPU, FP16)"
+  source: "assumption: assumed equal to B200, uncalibrated. B200 value from arXiv:2512.02189, Table VII (measured, whole GPU, FP16)"
   url: https://arxiv.org/abs/2512.02189
+  note: No FP16 rate for B300 is public. This is the whole-GPU rate; with 160 SMs in place of 148, one SM's share is 148/160 of a B200 SM's. NVIDIA's Table 2 gives equal whole-GPU FP8 rates for Blackwell and Blackwell Ultra and a higher rate only for NVFP4, which the model does not have.
 tensor_core_tflops_tf32:
   value: 964.5
   unit: TFLOPS
-  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, Table VII (measured, whole GPU, TF32)"
+  source: "assumption: assumed equal to B200, uncalibrated. B200 value from arXiv:2512.02189, Table VII (measured, whole GPU, TF32)"
   url: https://arxiv.org/abs/2512.02189
+  note: No TF32 rate for B300 is public. Whole-GPU rate; see tensor_core_tflops_f16 for what the SM count does to one SM's share.
 mma_latency_clk:
   value: 11.3
   unit: clk
-  source: "assumption: B200 value, not measured on B300. arXiv:2512.02189, Table V (tcgen05.mma m128n128k16, dependency-chain latency)"
+  source: "assumption: assumed equal to B200, uncalibrated. B200 value from arXiv:2512.02189, Table V (tcgen05.mma m128n128k16, dependency-chain latency)"
   url: https://arxiv.org/abs/2512.02189
   note: Added once per MMA as pipeline latency. Applying this B200 FP16 m128n128k16 measurement to B300, other shapes and TF32 is a model assumption.

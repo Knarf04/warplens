@@ -21,6 +21,10 @@ NONNEGATIVE_PARAMS = frozenset({
     "tma_latency_ns", "global_access_latency_clk", "tmem_access_clk", "mma_latency_clk",
 })
 TIMING_PARAMS = POSITIVE_PARAMS | NONNEGATIVE_PARAMS
+# Public facts about the device that the model does not use. Optional in a config.
+INFORMATIONAL_PARAMS = frozenset({"hbm_capacity_gb", "max_power_w"})
+# How a config marks a value it borrows from B200 because none is public for its GPU.
+ASSUMED_EQUAL_TO_B200 = "assumption: assumed equal to B200, uncalibrated"
 
 
 def _number(key, value) -> float:
@@ -58,7 +62,7 @@ class GpuConfig:
         checked = {}
         for key, param in params.items():
             value = _number(key, param.value)
-            if key in POSITIVE_PARAMS | {"hbm_capacity_gb"} and value <= 0:
+            if key in POSITIVE_PARAMS | INFORMATIONAL_PARAMS and value <= 0:
                 raise LaunchError(f"timing config entry `{key}` must be positive")
             if key in NONNEGATIVE_PARAMS and value < 0:
                 raise LaunchError(f"timing config entry `{key}` must be nonnegative")

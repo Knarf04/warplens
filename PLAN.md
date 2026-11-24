@@ -396,9 +396,8 @@ Found by this work in the simulator and not yet fixed:
   and 16.
 - A launch accepts 228 KB of shared memory, and the shim reports an opt-in
   maximum of 227 KB.
-- Timing model: TMA stores and `cp.async` are always charged to HBM;
-  `warplens run` cannot set the number of active SMs or the config; B300
-  timing equals B200; utilization is averaged over CTAs that do no work.
+- Timing model:
+  `warplens run` cannot set the number of active SMs or the config.
 - `warplens run script.py` without `python` takes the Triton path and fails
   confusingly for a TIRx or CuTe DSL script. `clc_limit` is not reachable from
   `warplens run`.

@@ -3,6 +3,10 @@
 # Needs a C compiler and the CUDA toolkit headers (they are included, not copied).
 #
 #   warplens/shim/build.sh [include directory of the CUDA toolkit] [output directory]
+#
+# Next to the libraries goes warplens-shim.stamp, which records what they were built from.
+# `warplens run` compares it with the sources it finds (`shim_stamp` in warplens/cli.py) and
+# rebuilds or refuses libraries of other sources, so the two must compute the same numbers.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 include="${1:-}"
@@ -20,6 +24,11 @@ major="$((major / 1000))"
 cc="${CC:-cc}"
 out="${2:-$here/lib}"
 mkdir -p "$out"
+include="$(cd "$include" && pwd)"
+# A digest of files of one directory: of the lines `sha256sum` prints for them.
+digest() { (cd "$1" && shift && LC_ALL=C sha256sum -- "$@") | sha256sum | cut -d' ' -f1; }
+sources="$(digest "$here" $(cd "$here" && ls build.sh *.c *.h | LC_ALL=C sort))"
+headers="$(digest "$include" $(cd "$include" && ls cuda_runtime_api.h cuda.h 2>/dev/null | LC_ALL=C sort -r))"
 # Build the entire pair before replacing either existing library. A failed
 # driver compilation must not make the next run accept a partial build.
 stage="$(mktemp -d "$out/.build-XXXXXX")"
@@ -32,6 +41,10 @@ printf 'libcudart.so.%s { global: *; };\n' "$major" > "$stage/cudart.map"
 "$cc" -shared -fPIC -O2 -Wall -Wextra -I"$include" -I"$here" "$here/cuda_shim.c" \
   -Wl,-soname,libcuda.so.1 -L"$stage" -l:"libcudart.so.$major" -Wl,-rpath,'$ORIGIN' \
   -o "$stage/libcuda.so.1"
+printf 'sources %s\nheaders %s\ninclude %s\n' "$sources" "$headers" "$include" > "$stage/warplens-shim.stamp"
+# The stamp of the previous pair goes first and the new one arrives last: an interrupted
+# replacement leaves libraries without a stamp, which `warplens run` does not accept.
+rm -f "$out/warplens-shim.stamp"
 mv -f "$stage/libcudart.so.$major" "$stage/libcuda.so.1" "$out/"
 # libcuda depends on this runtime. Do not preload older runtime ABIs alongside
 # the new pair after rebuilding with a different CUDA toolkit.
@@ -40,4 +53,5 @@ for old in "$out"/libcudart.so.*; do
 done
 # No libcudart.so / libcuda.so links here: programs must link against the real libraries.
 rm -f "$out/libcudart.so" "$out/libcuda.so"
+mv -f "$stage/warplens-shim.stamp" "$out/"
 echo "built $out/libcudart.so.$major and $out/libcuda.so.1 (CUDA $major headers from $include)"

@@ -1,66 +1,93 @@
 # warplens
 
-Understand an NVIDIA Blackwell GPU by watching it run. No GPU required.
+Understand a Blackwell GPU by watching it run, on your CPU.
 
-warplens takes real GPU kernel code compiled to PTX for datacenter Blackwell
-(`sm_100a`) and executes it on the CPU, with no GPU anywhere in the loop.
+warplens executes GPU kernels on the CPU. It takes PTX, the assembly that
+`nvcc`, Triton, TIRx and the CuTe DSL all produce, compiled for datacenter
+Blackwell (`sm_100a`), and runs it under a model of a B200 or B300: warps,
+shared memory, TMA, mbarriers, the `tcgen05` tensor core, tensor memory and
+clusters. No GPU is involved at any point. A run gives you
 
-> **Status: early.** Milestones M0 to M6 are done: CUDA
-> kernels using global and shared memory, barriers, warp shuffles, TMA,
-> mbarriers and the Blackwell tensor core (tcgen05) run and match NumPy,
-> including CUTLASS's first four Blackwell tutorials, unmodified, the last two
-> on clusters of 16 CTAs with TMA multicast and a two-SM MMA. `warplens run`
-> executes compiled CUDA programs and Triton scripts. There is a
-> shared-memory bank-conflict report and checkers for races and for misuse of
-> the TMA, mbarrier and TMEM protocols. Nothing Blackwell-specific has been
-> compared with real hardware. An approximate, uncalibrated timing model shows
-> what limits a kernel under stated parameters. See [PLAN.md](PLAN.md) for the
-> roadmap.
+- the kernel's results, to compare with NumPy;
+- findings from checkers for races and for misuse of the TMA, mbarrier and
+  tensor-memory protocols, each with the PTX line responsible;
+- a shared-memory bank-conflict report;
+- on request, an approximate and uncalibrated timing model that says what
+  limits the kernel under stated parameters.
 
-## Try it
+## Quick start
 
 ```bash
+git clone https://github.com/Knarf04/warplens && cd warplens
 pip install -e ".[dev]"
-python examples/00_vecadd/run.py       # run an nvcc-compiled kernel, compare with NumPy
-python examples/00_divergent/run.py    # watch a warp's active mask as its lanes diverge
-python examples/01_smem_transpose/run.py  # bank conflicts of three shared-memory layouts
-python examples/02_tma_copy/run.py     # TMA + mbarrier, then five deliberate bugs and their reports
-examples/03_cutlass_mma/build.sh       # fetch CUTLASS and compile four Blackwell tutorials (needs nvcc)
-python examples/03_cutlass_mma/run.py  # run those tcgen05 GEMMs on the CPU
-python -m warplens.viz.tmem 64 32      # where a tcgen05.mma result lands in tensor memory
-python examples/04_pipelined_gemm/run.py out/  # pipelined GEMM: what limits it at 1, 2, 4 stages
-examples/03_cutlass_mma/build.sh --programs    # build the CUTLASS tutorials as ordinary programs
-warplens run examples/03_cutlass_mma/bin/tutorial_04   # and run one, unmodified
-warplens run examples/05_triton/run.py         # Triton kernels (pip install triton)
-pytest
 ```
 
+<!-- test: run -->
+```bash
+python examples/00_vecadd/run.py          # an nvcc-compiled sm_100a kernel, checked against NumPy
+python examples/02_tma_copy/run.py        # TMA and mbarriers, then five deliberate bugs and their reports
+python examples/04_pipelined_gemm/run.py  # what limits a pipelined GEMM, under the timing model
+```
+
+That needs Python 3.11 or newer, NumPy and PyYAML, and nothing from CUDA: the
+examples' PTX is checked in. In Python:
+
+<!-- test: run -->
 ```python
 import numpy as np, warplens
 
+a, b = np.arange(1000, dtype=np.float32), np.ones(1000, dtype=np.float32)
 sim = warplens.Device("B200")
-A, B = sim.from_numpy(a), sim.from_numpy(b)
-C = sim.empty(n, "f32")
-sim.launch("examples/00_vecadd/vecadd.ptx", "vecadd", grid=4, block=256, args=[A, B, C, n])
-assert np.array_equal(C.numpy(), a + b)
+A, B, C = sim.from_numpy(a), sim.from_numpy(b), sim.empty(1000, "f32")
+stats = sim.launch("examples/00_vecadd/vecadd.ptx", "vecadd", grid=4, block=256, args=[A, B, C, 1000])
+assert np.array_equal(C.numpy(), a + b) and not stats.findings
 ```
 
-Running needs only Python 3.11+, NumPy and PyYAML. Compiling your own CUDA C++ to PTX
-needs `nvcc` from CUDA 12.8 or newer; [env/](env/README.md) sets up an isolated
-conda env with it.
+Unmodified programs run too: `warplens run ./program` for a CUDA C++ program
+built to carry PTX, `warplens run script.py` for Triton, and
+`warplens run python script.py` for TIRx and the CuTe DSL.
 
 ## Documentation
 
-- [PLAN.md](PLAN.md): goals, architecture, milestones
-- [docs/m0.md](docs/m0.md): what M0 covers and how the executor works
-- [docs/m1.md](docs/m1.md): shared memory, bank model, barriers, findings
-- [docs/m2.md](docs/m2.md): TMA, tensor maps, mbarriers, protocol checkers
-- [docs/m3.md](docs/m3.md): tcgen05, tensor memory, running a CUTLASS tutorial
-- [docs/m4.md](docs/m4.md): the timing model, its sources and assumptions, traces and reports
-- [docs/m5.md](docs/m5.md): clusters, multicast, distributed shared memory, the two-CTA MMA
-- [docs/m6.md](docs/m6.md): `warplens run` for compiled programs, Triton, the CuTe DSL spike
-- [docs/numerics.md](docs/numerics.md): what is computed bit-exactly, what is not, and TF32
-- [docs/coverage.md](docs/coverage.md): which PTX is supported
-- [validation/README.md](validation/README.md): cross-checks against a real GPU
+- **[docs/guide.md](docs/guide.md)**: the user guide. Installation, every way
+  to get code in, how to read the results, limits, troubleshooting.
+- [notebooks/book_tour.ipynb](notebooks/book_tour.ipynb): the nine GEMM kernels
+  of the book *Modern GPU Programming for MLSys*, chapter by chapter, in the
+  simulator. It runs them from your own clone of the book.
+- [docs/coverage.md](docs/coverage.md): the PTX that is supported.
+  [docs/numerics.md](docs/numerics.md): what is computed exactly.
+- [validation/README.md](validation/README.md): the comparisons with a real GPU.
+- [PLAN.md](PLAN.md): goals, architecture and what is still owed.
+  [docs/m0.md](docs/m0.md) to [docs/m6.md](docs/m6.md) record the design
+  decisions of each milestone.
 
-warplens is not related to NVIDIA Warp.
+## Status
+
+Version 0.0.1; not on PyPI. What runs today, unmodified and matching its
+reference: the first four CUTLASS Blackwell tutorials (the last two on
+clusters of 16 CTAs, with TMA multicast and a two-CTA MMA), a Triton matmul,
+and the nine GEMM kernels of the book, which are written in TIRx. CuTe DSL
+kernels run unless they use TMA.
+
+What that rests on:
+
+- **Checked against a real GPU** (an RTX 3080 Ti, Ampere): everything Ampere
+  shares with Blackwell that has a recorded comparison. Shuffles, barriers,
+  `printf`, calls to device functions, `ldmatrix`, `bfe`, `prmt`, `cp.async`,
+  `.ftz` arithmetic and the float32-to-TF32 conversion match exactly, and so
+  do the shared-memory bank-conflict counters.
+- **Not checked against any hardware**: everything specific to Hopper and
+  Blackwell. TMA, tensor maps, mbarriers, `tcgen05`, tensor memory and
+  clusters follow the PTX specification, the CUDA headers and the CUTLASS
+  sources, and the evidence for them is that real kernels from three
+  independent code generators produce correct output. Nothing has run on a
+  Blackwell GPU.
+- **Uncalibrated**: the timing model. Several of its parameters are
+  assumptions, and no simulated time has been compared with a measured one.
+
+PTX that is not implemented stops a launch with an error naming the
+instruction; [docs/guide.md](docs/guide.md#8-limits) lists the limits.
+
+## License
+
+Apache-2.0; see [LICENSE](LICENSE). warplens is not related to NVIDIA Warp.

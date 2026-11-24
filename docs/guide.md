@@ -775,6 +775,13 @@ Every kind, by area:
 | `tmem-unallocated` | an MMA, load or store on columns that are not allocated |
 | `tmem-leak` | columns still allocated when the kernel returned |
 | `tmem-dealloc-repeated` | a second `tcgen05.dealloc` of an allocation already released; the repeat is ignored |
+| `clc-canceled-cluster-lost` | a cluster finished having canceled another whose coordinate no thread read with `get_first_ctaid`: nobody did that cluster's work |
+| `clc-not-waited` | a CTA returned while its `clusterlaunchcontrol.try_cancel` request was in flight |
+| `clc-response-unsynchronized` | a cancel response was read, or overwritten by another request, by a warp that had not waited on the request's mbarrier |
+| `clc-query-not-a-response` | `query_cancel` was given a value that no `try_cancel` wrote; it is treated as a failed request |
+| `clc-ctaid-of-failed-cancel` | `get_first_ctaid` of a failed response, which the PTX manual leaves undefined; it reads as zero. The CuTe DSL's `clc_response` does this once per kernel |
+| `clc-try-cancel-after-failure` | `try_cancel` after a thread of the CTA saw a request fail; undefined in the manual, it fails again here |
+| `clc-multicast-to-exited-cta` | a multicast request after a CTA of the cluster returned |
 | `tcgen05-not-waited` | the kernel returned with an MMA or a commit in flight |
 | `mma-operand-overwritten` | shared memory written while an MMA was reading it |
 | `mma-swizzle-mismatch` | an operand's descriptor names a different swizzle than the TMA load that wrote the buffer |
@@ -1106,7 +1113,6 @@ PTX is [coverage.md](coverage.md); anything not in it raises
   `.pack`/`.unpack`, `tcgen05.cp`, `tcgen05.shift`, `.exclusive` allocation,
   partial commits. `warplens.numerics` models the FP8/FP4 formats on the host
   only.
-- `clusterlaunchcontrol` (CLC).
 
 **Semantics that are approximations**
 

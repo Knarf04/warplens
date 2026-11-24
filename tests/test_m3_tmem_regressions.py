@@ -193,3 +193,14 @@ def test_largest_legal_transfer_covers_expected_rectangle(shape, count, nrows, n
     assert set(zip(rows.ravel().tolist(), cols.ravel().tolist())) == {
         (row, col) for row in range(nrows) for col in range(ncols)
     }
+
+
+def test_repeated_deallocation_is_a_finding_not_a_failure(sim):
+    """hgemm_v7 to v9 of the book release their one allocation from every warpgroup."""
+    stats = launch(sim, ALLOC + LOAD_BASE + FREE + FREE)
+    assert [f.kind for f in stats.findings] == ["tmem-dealloc-repeated"]
+
+
+def test_deallocation_after_reallocation_is_ordinary(sim):
+    stats = launch(sim, ALLOC + LOAD_BASE + FREE + ALLOC + LOAD_BASE + FREE)
+    assert not stats.findings

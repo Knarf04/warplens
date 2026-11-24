@@ -58,6 +58,14 @@ jobs:
         run: examples/03_cutlass_mma/build.sh --programs
       - name: Build the shim libraries
         run: warplens/shim/build.sh
+      # The book's kernels are run from its own repository, which has no license to copy from.
+      # The commit is the one tests/test_book.py was written against.
+      - name: Fetch the MLSys book
+        run: |
+          git init -q "$RUNNER_TEMP/book"
+          git -C "$RUNNER_TEMP/book" fetch -q --depth 1 https://github.com/mlc-ai/modern-gpu-programming-for-mlsys 3a24144defa6da03d4ab8a1dfcf513b18007d15f
+          git -C "$RUNNER_TEMP/book" checkout -q FETCH_HEAD
+          echo "WARPLENS_BOOK=$RUNNER_TEMP/book" >> "$GITHUB_ENV"
       - name: Run the whole suite; no test may skip
         run: |
           set -o pipefail

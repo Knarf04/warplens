@@ -287,11 +287,18 @@ def _ldmatrix(w, ins, mask):
 @op("mapa")
 def _mapa(w, ins, mask):
     """mapa.shared::cluster d, a, rank: the cluster-wide address of shared address `a`
-    as it exists in the CTA with that rank."""
-    if len(ins.mods) != 2 or ins.mods[0] != "shared::cluster" or ins.mods[1] not in ("u32", "u64"):
-        raise unsupported(ins, "expected mapa.shared::cluster.{u32,u64}")
+    as it exists in the CTA with that rank. Without a space (`mapa.u64`), `a` and the
+    result are generic addresses of shared memory."""
+    generic = ins.mods == ("u64",)
+    if not generic and (len(ins.mods) != 2 or ins.mods[0] != "shared::cluster"
+                        or ins.mods[1] not in ("u32", "u64")):
+        raise unsupported(ins, "expected mapa.shared::cluster.{u32,u64} or mapa.u64")
     d, a, rank = _operands(ins, 3)
     offset = w.read_address(a)
+    if generic:
+        if ((offset[mask] < GENERIC_WINDOW) | (offset[mask] >= GENERIC_WINDOW + CLUSTER_WINDOW)).any():
+            raise ExecutionError("mapa source is not a generic address of shared memory")
+        offset = offset - np.uint64(GENERIC_WINDOW)
     ranks = w.read(rank, "u32").astype(np.uint64)
     if (offset[mask] // np.uint64(CLUSTER_STRIDE) >= len(w.cta.cluster.ctas)).any():
         raise ExecutionError("mapa source does not point to shared memory in this cluster")
@@ -299,7 +306,9 @@ def _mapa(w, ins, mask):
         raise ExecutionError(f"mapa to CTA rank {int(ranks[mask].max())}, but the cluster has "
                              f"{len(w.cta.cluster.ctas)} CTA(s)")
     value = ranks * np.uint64(CLUSTER_STRIDE) + offset % np.uint64(CLUSTER_STRIDE)
-    w.write(d, value.astype(NP_TYPES[ins.mods[1]]), mask)
+    if generic:
+        value = value + np.uint64(GENERIC_WINDOW)
+    w.write(d, value.astype(NP_TYPES[ins.mods[-1]]), mask)
 
 
 @op("cvta")

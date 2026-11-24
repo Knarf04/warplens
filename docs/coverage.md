@@ -61,6 +61,6 @@ that names the instruction and its PTX line.
 | Group | Instructions | Notes |
 | --- | --- | --- |
 | Cluster barrier | `barrier.cluster.arrive`, `barrier.cluster.wait` (with `.aligned`) | |
-| Distributed shared memory | `mapa.shared::cluster`, `ld`/`st.shared::cluster`, `mbarrier.arrive.shared::cluster` | other mbarrier operations cannot be remote |
+| Distributed shared memory | `mapa.shared::cluster`, `mapa.u64` on generic addresses, `ld`/`st.shared::cluster`, `mbarrier.arrive.shared::cluster` | other mbarrier operations cannot be remote |
 | TMA | `.multicast::cluster` on tensor loads, also with `.cta_group::2` | not on raw `cp.async.bulk` |
 | tcgen05 | `cta_group::2` forms of `alloc`, `dealloc`, `relinquish_alloc_permit`, `mma` (M = 128 or 256), `commit`; `commit` with `.multicast::cluster` | no `clusterlaunchcontrol` |

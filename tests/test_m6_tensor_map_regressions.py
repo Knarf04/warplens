@@ -115,20 +115,17 @@ def driver_shim(tmp_path_factory):
             if (length) *length = capacity;
             return 0;
         }
-        /* The module and launch calls of the driver shim are not exercised here. */
-        void *warplens_load_module(const void *image) { (void)image; return 0; }
-        void *warplens_module_kernel(void *module, const char *name) { (void)module; (void)name; return 0; }
-        int warplens_launch(const void *key, const uint32_t grid[3], const uint32_t block[3],
-                            const uint32_t cluster[3], uint64_t shared_memory, void **arguments) {
-            (void)key; (void)grid; (void)block; (void)cluster; (void)shared_memory; (void)arguments;
-            return 1;
-        }
-        int warplens_device_attribute(int attribute) { (void)attribute; return 0; }
     """)
     library = tmp / "libdriver_test.so"
-    subprocess.run([cc, "-shared", "-fPIC", "-Wall", "-Wextra", "-Werror",
-                    "-I" + str(include), "-I" + str(root / "warplens/shim"),
-                    str(root / "warplens/shim/cuda_shim.c"), str(stub), "-o", str(library)],
+    # The driver shim also calls the runtime shim (memory, modules). Link the real one, with its
+    # own protocol function renamed, so that only the driver shim's requests reach the stub.
+    runtime = tmp / "runtime.o"
+    flags = ["-fPIC", "-Wall", "-Wextra", "-Werror", "-I" + str(include), "-I" + str(root / "warplens/shim")]
+    subprocess.run([cc, "-c", *flags, "-Dwarplens_call=runtime_shim_call",
+                    str(root / "warplens/shim/cudart_shim.c"), "-o", str(runtime)],
+                   check=True, capture_output=True, text=True)
+    subprocess.run([cc, "-shared", *flags, str(root / "warplens/shim/cuda_shim.c"), str(stub), str(runtime),
+                    "-lpthread", "-ldl", "-o", str(library)],
                    check=True, capture_output=True, text=True)
     lib = ctypes.CDLL(str(library))
     lib.cuTensorMapEncodeTiled.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint32,

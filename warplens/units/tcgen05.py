@@ -65,6 +65,7 @@ class Tmem:
         self.pending = np.zeros((LANES, COLUMNS), dtype=np.int32)  # MMA that last targeted the cell
         self.allocated = np.zeros(COLUMNS, dtype=np.bool_)
         self.allocations: dict[int, tuple[int, object]] = {}  # first column -> (columns, alloc instr)
+        self.freed: set[tuple[int, int]] = set()  # (first column, columns) released and not reallocated
         self.alloc_permit = True
         self.last_alloc_size = COLUMNS
 
@@ -81,6 +82,8 @@ class Tmem:
             if not self.allocated[start:start + ncols].any():
                 self.allocated[start:start + ncols] = True
                 self.last_alloc_size = ncols
+                self.freed = {(first, count) for first, count in self.freed
+                              if first + count <= start or first >= start + ncols}
                 return start
         return None  # the issuing warp retries after another warp frees memory
 
@@ -90,6 +93,7 @@ class Tmem:
             raise ExecutionError(f"tcgen05.dealloc of {ncols} columns at column {start} does not "
                                  "match an allocation")
         del self.allocations[start]
+        self.freed.add((start, ncols))
         self.allocated[start:start + ncols] = False
         self.written[:, start:start + ncols] = False
         self.pending[:, start:start + ncols] = 0
@@ -534,6 +538,14 @@ def _tcgen05(w, ins, mask):
             raise unsupported(ins, "deallocation with different tensor-memory addresses across lanes")
         tmem = _tmem(cta)
         start = int(addresses[0])
+        if start not in tmem.allocations and (start, ncols) in tmem.freed:
+            # Kernels that run on hardware do this: every warpgroup's first warp releases the
+            # one allocation (hgemm_v7 to v9 of the book "Modern GPU Programming for MLSys").
+            # What the hardware does with the repeat is not known; here it does nothing.
+            cta.findings.add("tmem-dealloc-repeated", f"tensor memory at column {start} ({ncols} "
+                             "columns) was already released by an earlier tcgen05.dealloc; this "
+                             "one is ignored", w, ins, np.flatnonzero(mask))
+            return
         if start in tmem.allocations and tmem.allocations[start][0] == ncols:
             _check_tmem_overwrite(w, ins, tmem.pending[:, start:start + ncols],
                                   np.flatnonzero(mask), dealloc=True)

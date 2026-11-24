@@ -79,3 +79,42 @@ def test_aligned_cluster_barrier_reports_partial_warp_participation(sim):
 def test_invalid_cluster_barrier_qualifiers_are_not_silently_ignored(sim, mods):
     with pytest.raises(warplens.UnsupportedError):
         sim.launch(kernel(f"barrier.cluster.{mods}; ret;"), "k", grid=1, block=1)
+
+
+def test_mapa_without_a_space_maps_generic_addresses(sim):
+    """`mapa.u64 d, a, rank`, as TIRx emits it: `a` and the result are generic addresses."""
+    mod = kernel("""
+        .reg .b32 %rank, %other, %value;
+        .reg .b64 %here, %there, %out, %offset;
+        .shared .align 4 .u32 cell;
+        mov.u32 %rank, %cluster_ctarank;
+        xor.b32 %other, %rank, 1;
+        mov.u64 %here, cell;
+        cvta.shared.u64 %here, %here;
+        add.u32 %value, %rank, 10;
+        st.u32 [%here], %value;
+        barrier.cluster.arrive.release.aligned;
+        barrier.cluster.wait.acquire.aligned;
+        mapa.u64 %there, %here, %other;
+        ld.u32 %value, [%there];
+        ld.param.u64 %out, [out];
+        mul.wide.u32 %offset, %rank, 4;
+        add.u64 %out, %out, %offset;
+        st.global.u32 [%out], %value;
+        ret;
+    """, ".param .u64 out")
+    out = sim.empty(2, "u32")
+    stats = sim.launch(mod, "k", grid=2, block=32, cluster=2, args=[out])
+    assert out.numpy().tolist() == [11, 10]  # each CTA read the other's cell
+    assert not stats.findings
+
+
+def test_mapa_without_a_space_rejects_an_address_outside_shared_memory(sim):
+    mod = kernel("""
+        .reg .b64 %a;
+        ld.param.u64 %a, [out];
+        mapa.u64 %a, %a, 0;
+        ret;
+    """, ".param .u64 out")
+    with pytest.raises(warplens.ExecutionError, match="not a generic address of shared memory"):
+        sim.launch(mod, "k", grid=2, block=1, cluster=2, args=[sim.empty(1, "u32")])

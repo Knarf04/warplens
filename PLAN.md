@@ -272,9 +272,10 @@ Weak:
   it; expect more of that kind.
 - The timing model is uncalibrated and several parameters are assumptions.
 - `main` is still the initial commit; work is on stacked branches.
-- TIRx and CuTe DSL scripts launch through `warplens run` unchanged, but only
-  with arrays that work without a GPU: TVM's own for TIRx, none yet for the
-  DSL. PyTorch tensors, which the book and the DSL's examples use, do not.
+- TIRx and CuTe DSL scripts launch through `warplens run` unchanged, with
+  arrays that work without a GPU (TVM's, or driver memory), not PyTorch's.
+  A DSL kernel that uses TMA does not run: the DSL writes real tensor-map
+  descriptors, whose layout the simulator cannot read.
 
 ### Steps before renting
 
@@ -284,19 +285,16 @@ Weak:
 2. Done: CI's `full` job builds the CUTLASS tutorials and the shim libraries,
    installs Triton and the CuTe DSL, and runs the whole suite with
    `WARPLENS_NO_SKIPS=1`, under which a skipped test fails the run.
-3. Mostly done: one script runs unchanged in the simulator and on the GPU, for
-   TIRx (`examples/07_tirx`) and the CuTe DSL (`examples/06_cute_dsl`). What
-   was measured and how each is reached is in `docs/m6.md`. TIRx goes through
-   the `libcuda` shim as planned, and its script must ask for PTX. The DSL
-   hands the driver machine code through a CUDA runtime of its own, so it gets
-   a runtime library relinked against the shim and its PTX is taken from disk.
-   Left:
-   - arrays for DSL scripts, probably cuda-python buffers over new driver
-     memory calls; the example passes a scalar only;
-   - calls to device functions (`.func`), which TIRx's `printf` and possibly
-     the book's larger kernels need;
-   - the book's `hgemm` kernels and a DSL kernel with TMA and tcgen05, run
-     through this path instead of from hand-compiled PTX.
+3. Done, except for one thing that needs hardware. One script runs unchanged
+   in the simulator and on the GPU, for TIRx (`examples/07_tirx`) and the CuTe
+   DSL (`examples/06_cute_dsl`), with arrays in both; all nine `hgemm` kernels
+   of the book run from a clone of it (`examples/08_book`). What was measured
+   and how each runtime is reached is in `docs/m6.md`. Left:
+   - CuTe DSL kernels that use TMA. The DSL writes the 128-byte tensor-map
+     descriptor itself, in the driver's layout. Reading it needs samples from
+     the driver's encoder, which only encodes on a GPU that has TMA. Step 7
+     now includes that sweep; the decoder can be written from its output
+     without a GPU.
 4. Decide whether `clusterlaunchcontrol` is in scope. It is the one planned
    instruction family not implemented.
 
@@ -314,11 +312,14 @@ kernels, a host program that prints results, a comparison script)
 
 7. TMA: swizzle by address versus by offset, with a deliberately misaligned
    buffer; out-of-bounds fill and the NaN fill constant; whether `complete_tx`
-   counts filled bytes; element strides; ranks 1 to 5.
+   counts filled bytes; element strides; ranks 1 to 5. Also save the bytes
+   `cuTensorMapEncodeTiled` writes over a sweep of its parameters (step 3).
 8. mbarrier: phase parity; over-arrival; an undersized `expect_tx`, under a
    timeout.
 9. TMEM: the lane-window rule, including addresses that name another window;
-   Layout F at both offsets; all four load/store shapes; allocation rules.
+   Layout F at both offsets; all four load/store shapes; allocation rules. Whether a second
+   `tcgen05.dealloc` of the same columns is harmless, as the book's
+   `hgemm_v7` to `v9` assume.
 10. MMA: K-major and MN-major operands in every swizzle mode; whether results
     match the simulator bit for bit or only to rounding; what `kind::tf32` does
     with low mantissa bits; `cvt.rn` and `cvt.rz` to TF32.

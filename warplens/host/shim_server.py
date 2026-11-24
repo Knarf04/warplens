@@ -3,8 +3,10 @@ program in the simulator. See warplens/shim/protocol.h for the wire format."""
 
 from __future__ import annotations
 
+import os
 import re
 import struct
+from pathlib import Path
 
 import numpy as np
 
@@ -81,7 +83,6 @@ class ShimServer:
         self.machine_code = False  # a runtime handed over a compiled module instead of PTX
         self.kept_ptx = kept_ptx  # the directory where a compiler keeps the PTX of such modules
         self.kept: set[int] = set()  # the modules whose kernels are looked up there
-        import os
         self.debug = bool(os.environ.get("WARPLENS_SHIM_DEBUG"))  # log every request
 
     def serve(self, sock) -> None:
@@ -123,6 +124,9 @@ class ShimServer:
             if ".version" not in texts[0][:4096]:
                 raise WarplensError("the module is not PTX text (no .version directive)")
         if texts:
+            if dump := os.environ.get("WARPLENS_DUMP_PTX"):  # keep what the program handed over
+                for index, text in enumerate(texts):
+                    Path(dump, name if len(texts) == 1 else f"{index}.{name}").write_text(text)
             return [parse_ptx(text, name=name) for text in texts]
         if self.kept_ptx is None:
             self.machine_code = True

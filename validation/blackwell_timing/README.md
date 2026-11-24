@@ -237,8 +237,14 @@ per CTA more. `../ampere/compare_ncu.py`: all counters match. Under `sudo` the s
 `python3` is the system's, without NumPy, so both comparisons failed inside the run and
 were made again as the user; `run.sh` runs the suite inside the env, where they have it.
 
-Still untested: what ncu prints for a rejected counter name; the pinned ncu reading a
-counter; and whether the B200's ncu knows each counter at run time.
+The same again that day with the pinned ncu 2026.4.0 (conda-forge's `nsight-compute` in an
+env of its own, as `NCU_BIN`) and `PYTHON` set to the project env's: counters read on this
+driver, the same six programs and the transpose, as many rows per program as with 2024.1,
+no reduced counter list, both comparisons made inside the run and with the same result.
+`l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal` is `n/a` on this GPU with both.
+
+Still untested: what ncu prints for a rejected counter name, and whether the B200's ncu
+knows each counter at run time.
 
 `ncu_banks` is the program for TIM-17: nine kernels, the three layouts in three block
 shapes, launched once each with `--trials 1`. `ncu_banks_compare.py NCU.csv` simulates the

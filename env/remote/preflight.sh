@@ -242,7 +242,7 @@ info privileges "container: $(container_kind); $privileges"
 # ---------------------------------------------------------------------------
 # Kernels on the GPU. Needs the env.
 # ---------------------------------------------------------------------------
-gpu_checks="compile driver-api run-trivial ptx-jit tcgen05 tensor-map tma nvrtc ncu"
+gpu_checks="compile predictions driver-api run-trivial ptx-jit tcgen05 tensor-map tma nvrtc torch ncu"
 if (( quick )); then
   :
 elif ! env_installed; then
@@ -272,6 +272,24 @@ else
   done
   ptx_version="$(sed -n 's/^\.version //p' "$work/vecadd.ptx" 2>/dev/null | head -n 1)"
   (( compiled )) && pass compile "nvcc $nvcc_version: $arch machine code and PTX (.version $ptx_version), $blackwell_arch tcgen05 and TMA kernels"
+
+  # Is this the compiler the committed predictions were made with? If not, every
+  # comparison is between two different compilations of a probe. A WARN, so
+  # that the run goes on, but run.sh carries it into the archive in capitals.
+  nvcc_full="$(env_run nvcc --version 2>/dev/null | sed -n 's/^Cuda compilation tools, release [0-9.]*, V\([0-9.]*\).*/\1/p' | head -n 1)"
+  IFS='|' read -r comparable comparable_why \
+    <<<"$(toolkit_verdict "$nvcc_full" "$(predictions_nvcc blackwell)" "$driver_cuda")"
+  case "$comparable" in
+    comparable) pass predictions "$comparable_why" ;;
+    comparable-native) warn predictions "$comparable_why" ;;
+    *) warn predictions "$comparable_why"
+       note "To build with the predictions' compiler: env/remote/setup.sh --toolkit pinned --force, then run.sh again."
+       note "run.sh --strict-toolkit stops here instead of going on." ;;
+  esac
+  timing_nvcc="$(predictions_nvcc timing)"
+  if [[ -n "$timing_nvcc" && -n "$nvcc_full" && "$timing_nvcc" != "$nvcc_full" ]]; then
+    warn predictions "the timing predictions were made with nvcc $timing_nvcc, the benchmarks will be built by nvcc $nvcc_full: predicted instruction counts are another compiler's"
+  fi
 
   if (( ! have_gpu )); then
     for check in driver-api run-trivial ptx-jit tcgen05 tensor-map tma; do skip "$check" "no driver"; done
@@ -351,6 +369,22 @@ else
     pass nvrtc "NVRTC $(field nvrtc "$out") compiles for $blackwell_arch (PTX .version $(field nvrtc_ptx_version "$out"))"
   else
     warn nvrtc "NVRTC cannot compile for $blackwell_arch, so TIRx kernels will not build: $(field error "$out")"
+  fi
+
+  # PyTorch, for the Triton-on-GPU step only. A WARN: everything else runs without.
+  torch_py="$(torch_python)"
+  if [[ ! -x "$torch_py" ]]; then
+    warn torch "no PyTorch env ($torch_py): the Triton-on-GPU step will be SKIPPED. setup.sh makes it unless --no-torch was given or the driver is of an older major release than its CUDA runtime"
+  elif ! out="$(env_run timeout 120 "$torch_py" "$REMOTE_DIR/check_env.py" torch 2>&1)"; then
+    warn torch "PyTorch does not import in $torch_py: $(field torch "$out"); the Triton-on-GPU step will fail"
+  elif [[ "$(field torch_cuda_available "$out")" != 1 ]]; then
+    warn torch "PyTorch $(field torch_build "$out") sees no CUDA device ($(field torch_cuda_available "$out")); the Triton-on-GPU step will be SKIPPED"
+  elif [[ "$(field torch_triton "$out")" != "$PIN_TRITON" ]]; then
+    warn torch "the PyTorch env imports Triton $(field torch_triton "$out"), not the pinned $PIN_TRITON the simulator's prediction was made with"
+  elif [[ ",$(field torch_arch_list "$out")," != *",sm_${gpu0_cap/./},"* && "$gpu0_cap" =~ ^[0-9] ]]; then
+    warn torch "PyTorch $(field torch_build "$out") was not built for sm_${gpu0_cap/./} (it lists $(field torch_arch_list "$out")); its own operators may not run on this GPU"
+  else
+    pass torch "PyTorch $(field torch_build "$out") with Triton $(field torch_triton "$out") sees $(field torch_device "$out") (capability $(field torch_device_cap "$out"))"
   fi
 
   # ncu and the performance counters (plan step E21). A WARN, not a FAIL:

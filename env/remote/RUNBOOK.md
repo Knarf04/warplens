@@ -69,21 +69,89 @@ What to look for in a listing:
   the `ncu` comparison in the timing suite (plan step C14) is skipped.
 - **Driver.** Ask for, or pick the image with, the newest driver. What matters is
   the "CUDA Version" in the header of `nvidia-smi`:
-  - 13.5 or newer: everything runs as pinned.
+  - 13.5 or newer: everything runs as pinned, and results are held against the
+    committed predictions without reservation.
   - 13.0 to 13.4: `setup.sh` installs that toolkit release in place of 13.5
     (measured on a 13.0 driver: PTX from nvcc 13.5 is refused with
     `CUDA_ERROR_UNSUPPORTED_PTX_VERSION`, machine code from it runs, and with
-    toolkit 13.0 installed both run).
+    toolkit 13.0 installed both run). **The probes are then not built by the
+    compiler the predictions were made with**, and the run says so everywhere;
+    read "Driver older than the toolkit" below before starting.
   - 12.8 or 12.9: the CUDA C++ probes can run with toolkit 12.x, but TIRx and the
     CuTe DSL will not (measured with toolkit 12.8: their tests fail; they need
-    `libcudart.so.13`). Avoid if there is a choice.
+    `libcudart.so.13`), and there is no PyTorch for the Triton step (the pinned
+    PyTorch carries the CUDA 13.2 runtime). Avoid if there is a choice.
   - below 12.8: unusable; preflight fails.
-- **Disk:** 12 GB free where `WARPLENS_REMOTE_HOME` points (measured: the env is
-  4.8 GB and the package cache 1 GB). **Network:** outbound HTTPS to github.com,
-  conda.anaconda.org and pypi.org.
+- **Disk:** 18 GB free where `WARPLENS_REMOTE_HOME` points (measured: 9.7 GB
+  after `setup.sh`, of which the PyTorch env is 4.3 GB; downloads and unpacking
+  need the rest for a while). `setup.sh` puts its temporary files there too,
+  not in `/tmp`. **Network:** outbound HTTPS to github.com, conda.anaconda.org
+  and pypi.org.
 - A shared card (another tenant on the same GPU) makes the timing numbers
   worthless. Preflight warns when it sees other processes or load, but from
   inside a container it cannot see other tenants. Rent a dedicated GPU.
+
+### Driver older than the toolkit
+
+The committed predictions are what the simulator printed when it ran PTX from
+nvcc 13.5.37 (`validation/blackwell/predicted/provenance.json`,
+`validation/blackwell_timing/predicted/meta.json`). A driver that supports only
+CUDA 13.0 to 13.4 refuses that PTX. There are two ways to run on such a machine,
+and neither is silent:
+
+| | `--toolkit auto` (the default) | `--toolkit pinned` |
+| --- | --- | --- |
+| nvcc installed | the release matching the driver (on the development machine: 13.0.88) | 13.5.37, as pinned |
+| probes run as | PTX, compiled by the driver | machine code (`bin-native/`), compiled by the toolkit's ptxas; `run_all.py` falls back to it by itself |
+| same compiler as the predictions | **no**: `BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE` | yes (`predictions_comparable=comparable-native`) |
+| timing benchmarks | built by the other nvcc: predicted instruction counts are another compiler's | as predicted |
+| TIRx on the GPU (the book's kernels, `e2e/book_hgemm`) | works: NVRTC of the installed release | fails to load: NVRTC 13.5 writes PTX the driver refuses. In the simulator it works either way |
+| ncu | the release for that toolkit (measured: 2025.3.1.4 with 13.0) | 2026.4.0.10, as pinned |
+
+Where the first column is flagged: `setup.sh` (a block between rows of `!` at
+the end, and `predictions_comparable=not-comparable` in `resolved/versions.txt`),
+`preflight.sh` (check `predictions`, WARN), `run.sh` (after setup and as its
+last output; `predictions_comparable` in `manifest.txt`;
+`PREDICTIONS-NOT-COMPARABLE.txt` at the top of the archive),
+`validation/blackwell/run_all.py` (`TOOLKIT-MISMATCH.txt`, `env/toolkit.txt`),
+`compare.py` (before and after its table), and the timing suite's `TOOLKIT.txt`
+and `status.txt`. `run.sh --strict-toolkit` stops after setup instead of going
+on.
+
+Which to choose is a decision for the day, not one the scripts make: if the
+point of the rental is the probe verdicts and the timing calibration, use
+`env/remote/run.sh --toolkit pinned`; if the book's kernels on hardware matter
+more, keep the default. With time for both, run the default first, then
+`WARPLENS_REMOTE_HOME=$HOME/warplens-pinned env/remote/run.sh --toolkit pinned --skip selftest`
+(a second env, about 8 more minutes of setup) and bring back both archives.
+Only the default was run end to end here (on the 3080 Ti, where everything
+Blackwell fails by design); `--toolkit pinned` was measured for setup,
+preflight and the PTX refusal, not for a whole run.
+
+**Afterwards: predictions for the toolkit that was used.** A run flagged "not
+comparable" can still be held against predictions, because predictions need no
+GPU: make them again with the nvcc the rental used, on any Linux machine.
+
+```bash
+# the env of the rental's toolkit (its release is toolkit_installed in resolved/versions.txt)
+WARPLENS_REMOTE_HOME=$HOME/warplens-13.0 env/remote/setup.sh --toolkit 13.0 --no-torch --no-ncu
+E=$HOME/warplens-13.0/envrun
+$E validation/blackwell/build.sh
+$E python validation/blackwell/run_all.py --mode predict --no-build --no-e2e --predicted /tmp/predicted-13.0
+validation/blackwell/compare.py <the run's blackwell archive> --predicted /tmp/predicted-13.0
+$E env NVCC=nvcc validation/blackwell_timing/build.sh sim
+$E python validation/blackwell_timing/predict.py --out /tmp/timing-predicted-13.0
+python validation/blackwell_timing/fit.py <the run's timing results> --predicted /tmp/timing-predicted-13.0
+```
+
+`compare.py` then prints no banner if the two nvcc versions agree (it reads
+`provenance.json` of the directory it is given). Measured here with nvcc
+13.0.88 against the committed predictions from 13.5.37: all 98 probe
+predictions come out byte-identical, so for the probes the flag changes
+nothing; of the 14 timing benchmarks all run and 13 have other instruction
+counts, so for timing the predictions of the right compiler are the ones to
+use. (`conda-forge` may serve another patch release of 13.0 than the rental
+got; `resolved/conda-explicit.txt` in the archive has the exact packages.)
 
 ## 3. From a blank machine to results
 
@@ -100,7 +168,7 @@ does not matter; `run.sh` also ignores the hang-up itself.
 ```bash
 nvidia-smi                                   # first look: is it a B200, which CUDA Version
 git clone warplens.bundle warplens && cd warplens     # no git? see below
-export WARPLENS_REMOTE_HOME=$HOME/warplens-remote     # 12 GB; point it at the big disk
+export WARPLENS_REMOTE_HOME=$HOME/warplens-remote     # 18 GB; point it at the big disk
 env/remote/preflight.sh --quick              # 2 seconds. FAIL gpu-identity: release the machine now
 env/remote/run.sh --dry-run                  # the plan; no stage may say MISSING
 tmux new -s run
@@ -134,16 +202,16 @@ sha256sum -c warplens-b200-*.tar.gz.sha256
 | --- | --- | --- |
 | log in, upload, clone | 5 to 10 | guess |
 | `preflight-quick` | under 1 | measured: 2 s |
-| `setup` | 2 to 8 | measured: 57 to 64 s for a fresh install (5.8 GB on disk) on a fast link; the upper end is a guess for a slow link or disk |
+| `setup` | 3 to 12 | measured: 79 s for the main env and 144 s for the PyTorch env on a fast link (9.7 GB on disk in all); the upper end is a guess for a slow link or disk |
 | `preflight` | 1 to 2 | measured: 5 s, but there the Blackwell kernels fail at load; on a B200 they run, and `ncu` attaches |
-| `selftest` (the repository's tests, in the simulator) | 1 to 3 | measured: 50 s on 20 cores |
-| `build-blackwell` | 1 to 6 | measured: 8 s on 20 cores (67 CPU-seconds) for an unfinished copy of the suite, 21 probes; upper end is a guess for the finished suite |
-| `build-timing` | 1 to 4 | measured: 41 s for an unfinished copy of the suite |
+| `selftest` (the repository's tests, in the simulator) | 4 to 20 | measured: 10.5 min on 20 cores (1513 tests). It includes the whole predict path, which is what says whether the committed predictions hold for the installed compiler; worth its time on a first rental with a fallback toolkit, `--skip selftest` otherwise. Limit: 30 min |
+| `build-blackwell` | 1 to 6 | measured: 8 s on 20 cores for the 51 programs (13 s with `--native`); the upper end is a guess for a smaller machine |
+| `build-timing` | 1 to 4 | measured: 62 s for the 14 benchmarks |
 | `run-blackwell` | 3 to 20 | guess. Kernels are tiny; the time is process start-up and the probes that wait out a timeout on purpose |
 | `run-timing` | 3 to 20 | guess. Under `ncu` every kernel is replayed per counter group |
 | `collect` | under 1 | measured |
 | copy back, verify, second copy | 5 | guess |
-| **Total** | **25 to 80** | the two run stages are the unknown |
+| **Total** | **28 to 101** | the two run stages are the unknown; 16 fewer at the upper end with `--skip selftest` |
 
 Limits: each build stage is stopped after 30 minutes and each run stage after 60
 (`WARPLENS_BUILD_MINUTES`, `WARPLENS_RUN_MINUTES`). The timing suite gives each
@@ -159,7 +227,7 @@ the providers, and prices move).
 
 | | Hours | At $8/h |
 | --- | --- | --- |
-| Everything works first time | 0.5 to 1.3 | $4 to $11 |
+| Everything works first time | 0.5 to 1.7 | $4 to $14 |
 | Budget, with one retry of a stage | 2 | $16 |
 | Provider bills whole hours | 1 or 2 | $8 or $16 |
 | Only an 8-GPU node is on offer | 2 x 8 GPUs | about $130 |
@@ -201,9 +269,11 @@ object storage is needed.
 | `nvidia-smi` FAIL | no driver visible | A container started without the GPU. Nothing to fix from inside: release it. |
 | `gpu-identity` FAIL | not compute capability 10.0 | **Release the instance.** The message names the card. Nothing else is worth running. |
 | `driver` FAIL | driver older than CUDA 12.8 | Cannot run `sm_100a`. Release, or pick another image with a newer driver. |
-| `driver` WARN | driver older than the pinned toolkit | Nothing to do: `setup.sh` matches the toolkit to it. Note it; results come from that toolkit, recorded in `resolved/`. |
+| `driver` WARN | driver older than the pinned toolkit | `setup.sh` matches the toolkit to it by default, and the results are then flagged as not comparable with the predictions. Decide between that and `--toolkit pinned`: section 2, "Driver older than the toolkit". |
+| `predictions` WARN | the nvcc in the env is not the one the predictions were made with (`BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE`), or the driver refuses its PTX and machine code will run | The first: `env/remote/run.sh --toolkit pinned --redo setup` builds with the predictions' compiler; or go on and read every verdict with the flag in mind. The second needs nothing. `run.sh --strict-toolkit` stops instead of going on. |
+| `torch` WARN | no PyTorch env, or it does not see the GPU | Only the Triton-on-GPU step is lost (recorded as `skipped`). `env/remote/setup.sh` again retries the install; with a 12.x driver there is no PyTorch to install (pins.env). |
 | `gpu-memory` / `gpu-idle` WARN | something else is on the GPU | If it is yours, stop it. If not, the card is shared: functional results are fine, timing is not. Ask for a dedicated GPU or note it. |
-| `disk` FAIL | under 12 GB (2 GB once installed) | `export WARPLENS_REMOTE_HOME=/path/on/the/big/disk` and start again. |
+| `disk` FAIL | under 18 GB (2 GB once installed) | `export WARPLENS_REMOTE_HOME=/path/on/the/big/disk` and start again. `setup.sh --no-torch` needs 12 GB. |
 | `cpu` / `ram` WARN | small host | Builds are slower; nothing else. |
 | `clock` WARN | clock wrong | Downloads may fail on certificate dates and the manifest's times are off. `sudo timedatectl set-ntp true` if you can; otherwise write down the true time next to the archive. |
 | `env` FAIL | `setup.sh` has not run | Run `env/remote/setup.sh`, or use `run.sh`, which does. |
@@ -218,6 +288,13 @@ object storage is needed.
 
 A stage of `run.sh` that fails prints the end of its log and the run goes on.
 The archive is written regardless. Fix, then run `env/remote/run.sh` again.
+
+`run-blackwell` fails when any probe did not launch (`launch-failed`: the driver
+could not load its kernels), had a host error or was not built; its log ends
+with the count in capitals. That is different from probes whose kernel faulted
+or whose output differs, which do not fail the stage: those are results.
+`validation/blackwell/README.md`, "When probes do not launch", says what to do.
+In the timing suite the same thing is `LAUNCH FAILED` in `status.txt`.
 
 ## 8. The last minutes before releasing the instance
 
@@ -263,13 +340,49 @@ Measured on the development machine, into throwaway directories that were remove
   as they stood that day: both built; the timing suite ran (every benchmark
   failing on Ampere) and its outputs were archived; resuming skipped finished
   stages.
+- Again on 2026-11-23 with the finished suites (101 probe runs, 14 benchmarks,
+  the PyTorch env): `setup.sh` from nothing took 79 s for the main env and 144 s
+  for the PyTorch env; the first attempt at the latter failed with "No space
+  left on device" because pip unpacked into a small `/tmp`, which is why
+  `setup.sh` now keeps its temporary files under `WARPLENS_REMOTE_HOME`, and a
+  second `setup.sh` retried just that part. `run.sh --keep-going` with
+  `PREFLIGHT_EXPECT_CAP=8.6` took 13 min 52 s: the self-test 10 min 31 s (1513
+  tests), the builds 8 s and 62 s, the probe run 2 min (every Blackwell probe
+  reported as failed to launch, the stage failing for it), the timing run 4 s.
+  The Triton step, the TIRx script and the CuTe DSL script ran on the GPU; the
+  book's kernels were compiled and reached the driver, then failed as they must
+  on Ampere. Ctrl-C during the self-test stopped the stage and wrote the
+  archive.
+- What the fallback toolkit does to the predictions: with nvcc 13.0.88 the
+  simulator printed the committed predictions for all 98 predicted probe runs
+  (after a fix to the probes; `validation/blackwell/README.md`, finding 16). So
+  for the probes a fallback toolkit is flagged but, as far as the simulator can
+  tell, harmless. On the rented machine the self-test repeats this check with
+  whatever nvcc is installed (`tests/test_predict_path.py`): its per-probe
+  failures name the predictions that do not hold for that compiler. Instruction
+  counts do differ between the two compilers (one or two per kernel in the
+  guide's examples), so the timing predictions are compiler-specific.
+- The self-test with that fallback toolkit is not all green, and need not be:
+  expect `tests/test_predict_path.py::test_the_compiler_is_the_one_the_committed_predictions_name`
+  (it says which nvcc is installed), four `tests/test_clc.py::test_the_kernels_assemble`
+  cases (their PTX says `.version 9.5`, which ptxas 13.0 refuses) and three
+  `tests/test_guide.py` examples (the guide prints instruction counts of nvcc
+  13.5 code). In the rehearsal there were 26 failures: those 8, the 16 probe
+  predictions that finding 16 has since fixed, and 2 caused by the rehearsal's
+  own `PREFLIGHT_EXPECT_CAP`. Any other failure on the day is news.
 
 Not tried, because there was no way to here:
 
 - Anything on a B200: every PASS path of the `tcgen05`, tensor-map, TMA and
   `ncu` checks. The simulator says the kernels are right; hardware has not.
-- Root, in a container or not: the `apt-get` branches of `setup.sh`, and `ncu`
-  succeeding. No container runtime was usable on the development machine.
+- Root, in a container or not: a real `apt-get`, a real root shell, and `ncu`
+  succeeding. No container runtime was usable on the development machine
+  (docker needs its group, podman is not installed, and Ubuntu 24.04 denies
+  unprivileged user namespaces). What stands in: `tests/test_remote_setup_paths.py`
+  runs `setup.sh` up to the download in a bare `PATH`, as a normal user and as
+  root under `fakeroot` with a stand-in `apt-get` (the decisions, not the
+  privileges), and `shellcheck` 0.11 is clean on every script here.
+- `--toolkit pinned` on a driver older than the toolkit, as a whole run.
 - Ubuntu 22.04 (the development machine is 24.04), any provider's image, a slow
   network, Arm.
 - A driver newer than the pinned toolkit, and a 12.x driver (only a 12.8

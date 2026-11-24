@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Install the pinned environment on a fresh rented Linux GPU machine.
 #
-#   env/remote/setup.sh [--toolkit auto|pinned|X.Y] [--no-ncu] [--force]
+#   env/remote/setup.sh [--toolkit auto|pinned|X.Y] [--no-ncu] [--no-torch] [--force]
 #
 # Non-interactive and safe to run again: a finished setup is recognized and
 # only re-verified. Needs no root, no conda and no system CUDA toolkit: it
@@ -15,10 +15,13 @@
 #   --toolkit pinned   the pinned toolkit whatever the driver is
 #   --toolkit X.Y      that toolkit release
 #   --no-ncu           do not install Nsight Compute (about 0.5 GB)
+#   --no-torch         do not make the PyTorch env (about 4.5 GB). Only the
+#                      Triton-on-GPU step of the probe suite needs it
 #   --force            redo every step even if setup finished before
 #
 #   WARPLENS_REMOTE_HOME   where everything goes (default: ~/warplens-remote).
-#                          Needs about 12 GB; point it at the large disk.
+#                          Needs about 18 GB (12 with --no-torch); point it at
+#                          the large disk.
 #
 # Writes $WARPLENS_REMOTE_HOME/resolved/: the exact conda packages, pip freeze,
 # and versions.txt with what was actually installed next to what was pinned.
@@ -28,14 +31,16 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 
 toolkit_mode=auto
 with_ncu=1
+with_torch=1
 force=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --toolkit) toolkit_mode="${2:?--toolkit needs a value}"; shift ;;
     --toolkit=*) toolkit_mode="${1#*=}" ;;
     --no-ncu) with_ncu=0 ;;
+    --no-torch) with_torch=0 ;;
     --force) force=1 ;;
-    -h|--help) sed -n '2,24p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,27p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -47,7 +52,11 @@ die()  { echo "setup: error: $*" >&2; exit 1; }
 warnings=()
 
 load_pins
-mkdir -p "$REMOTE_HOME"/{bin,state,resolved,mamba}
+mkdir -p "$REMOTE_HOME"/{bin,state,resolved,mamba,tmp}
+# pip and mktemp unpack under TMPDIR. /tmp is often a small disk of its own: on the
+# development machine the PyTorch wheels (3 GB) filled it and the install failed with
+# "No space left on device". Everything goes where the env goes.
+export TMPDIR="$REMOTE_HOME/tmp"
 export MAMBA_ROOT_PREFIX="$REMOTE_HOME/mamba"
 # Packages in ~/.local must neither satisfy pip nor be imported: a fresh rented
 # machine has none, and the development machine's would hide what is missing.
@@ -72,8 +81,9 @@ esac
 
 free_kb="$(df -Pk "$REMOTE_HOME" | awk 'NR==2 {print $4}')"
 free_gb=$((free_kb / 1024 / 1024))
-if [[ ! -f "$REMOTE_HOME/state/setup.done" ]] && (( free_gb < 12 )); then
-  die "$REMOTE_HOME has $free_gb GB free; the env and its package cache need about 12 GB. Set WARPLENS_REMOTE_HOME to a directory on a larger disk"
+need_gb=$(( with_torch ? 18 : 12 ))
+if [[ ! -f "$REMOTE_HOME/state/setup.done" ]] && (( free_gb < need_gb )); then
+  die "$REMOTE_HOME has $free_gb GB free; the env and its package cache need about $need_gb GB (12 with --no-torch). Set WARPLENS_REMOTE_HOME to a directory on a larger disk"
 fi
 
 # Root, or sudo that asks nothing; empty when neither.
@@ -120,7 +130,7 @@ fi
 
 # One line that identifies this configuration; a finished setup with the same
 # line is not redone.
-config_id="pins=$(sha256sum "$PINS_FILE" | cut -c1-16) toolkit=$toolkit ncu=$with_ncu repo=$REPO_DIR"
+config_id="pins=$(sha256sum "$PINS_FILE" | cut -c1-16) toolkit=$toolkit ncu=$with_ncu torch=$with_torch repo=$REPO_DIR"
 if (( ! force )) && [[ -f "$REMOTE_HOME/state/setup.done" ]] \
    && [[ "$(cat "$REMOTE_HOME/state/setup.done")" == "$config_id" ]] \
    && [[ -x "$MAMBA_BIN" && -x "$ENV_PREFIX/bin/python" ]]; then
@@ -229,6 +239,34 @@ if (( ! already )); then
   say "warplens from $REPO_DIR (editable)"
   env_run python -m pip install -q --no-input --disable-pip-version-check --no-deps -e "$REPO_DIR" \
     || die "installing warplens failed (see above)"
+  rm -rf "$TORCH_ENV"   # it was made for the env that has just been replaced
+fi
+
+# ---------------------------------------------------------------------------
+# 5b. PyTorch, in a venv on top of the env (why not in it: pins.env)
+# ---------------------------------------------------------------------------
+# Nothing but the Triton-on-GPU step needs it, so a failure here is a warning:
+# the step is then reported as skipped, and the rest runs. Tried again by every
+# run of this script for as long as the env is missing, also after a setup that
+# finished without it.
+IFS='|' read -r torch_action torch_why <<<"$(choose_torch "$driver_cuda" "$PIN_TORCH_CUDA_VERSION")"
+if (( ! with_torch )); then
+  say "PyTorch: not installed (--no-torch); the Triton-on-GPU step will be skipped"
+  rm -rf "$TORCH_ENV"
+elif [[ "$torch_action" == skip ]]; then
+  warn "PyTorch: not installed: $torch_why"
+elif [[ -x "$TORCH_ENV/bin/python" && -f "$REMOTE_HOME/state/torch.done" ]]; then
+  say "PyTorch: already in $TORCH_ENV"
+else
+  say "PyTorch: $torch_why"
+  say "PyPI: torch $PIN_TORCH into $TORCH_ENV (a venv that sees the env's packages)"
+  rm -f "$REMOTE_HOME/state/torch.done"
+  if install_torch_env "$REMOTE_HOME/state/pip-constraints.txt"; then
+    echo "$PIN_TORCH" > "$REMOTE_HOME/state/torch.done"
+  else
+    warn "PyTorch did not install (see above); the Triton-on-GPU step will be skipped. Run env/remote/setup.sh again to retry"
+    rm -rf "$TORCH_ENV"
+  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -267,8 +305,35 @@ package_status=0
   echo "cuda_nvrtc=$(conda_version cuda-nvrtc)"
   echo "nsight_compute=$(conda_version nsight-compute)"
   env_run python "$REMOTE_DIR/check_env.py" versions || package_status=1
+  if [[ -x "$TORCH_ENV/bin/python" ]]; then
+    env_run "$TORCH_ENV/bin/python" "$REMOTE_DIR/check_env.py" torch || echo "torch=MISSING"
+  else
+    echo "torch=not-installed"
+  fi
 } > "$resolved/versions.txt"
 (( package_status == 0 )) || { grep MISSING "$resolved/versions.txt" >&2; die "a required package is missing or does not import (above)"; }
+
+# The three versions that decide whether a result can be held against a committed
+# prediction: the driver, the nvcc installed here, and the nvcc the predictions
+# were made with. Recorded, compared, and said loudly when they do not agree.
+installed_nvcc="$(conda_version cuda-nvcc)"
+IFS='|' read -r comparable comparable_why \
+  <<<"$(toolkit_verdict "$installed_nvcc" "$(predictions_nvcc blackwell)" "$driver_cuda")"
+{
+  echo "predictions_nvcc=$(predictions_nvcc blackwell)"
+  echo "predictions_nvcc_timing=$(predictions_nvcc timing)"
+  echo "predictions_comparable=$comparable"
+  echo "predictions_comparable_why=$comparable_why"
+} >> "$resolved/versions.txt"
+case "$comparable" in
+  comparable) say "predictions: $comparable_why" ;;
+  comparable-native) warn "predictions: $comparable_why" ;;
+  *) warn "$comparable_why"
+     banner="$comparable_why" ;;
+esac
+if [[ -n "$(predictions_nvcc timing)" && "$(predictions_nvcc timing)" != "$(predictions_nvcc blackwell)" ]]; then
+  warn "the timing predictions were made with nvcc $(predictions_nvcc timing), the probe predictions with nvcc $(predictions_nvcc blackwell): regenerate one of them"
+fi
 
 drift=()
 while IFS='=' read -r key value; do
@@ -281,10 +346,18 @@ while IFS='=' read -r key value; do
   [[ "${!pin_var}" == "$value" ]] || drift+=("$key: pinned ${!pin_var}, installed $value")
 done < "$resolved/versions.txt"
 [[ "$(conda_version python)" == "$PIN_PYTHON" ]] || drift+=("python (conda): pinned $PIN_PYTHON, installed $(conda_version python)")
+# The torch env (its torch_ and torch_pip_ lines were compared with the TORCH_ pins by
+# the loop above): the Triton it imports must be the main env's.
+if [[ -x "$TORCH_ENV/bin/python" ]]; then
+  torch_triton="$(sed -n 's/^torch_triton=//p' "$resolved/versions.txt")"
+  [[ "$torch_triton" == "$PIN_TRITON" ]] || drift+=("torch env's triton: pinned $PIN_TRITON, it imports '${torch_triton:-none}'")
+fi
 for line in "${drift[@]}"; do
-  # A fallback toolkit differs from the pins by design; without ncu, so does nsight_compute.
+  # A fallback toolkit differs from the pins by design; without ncu, so does nsight_compute;
+  # without the torch env, so does torch.
   case "$line" in
     cuda_*|nsight_compute*) [[ "$toolkit_status" == fallback || "$line" == nsight_compute*MISSING ]] && { say "differs from pins: $line"; continue; } ;;
+    torch:*not-installed) say "differs from pins: $line"; continue ;;
   esac
   warn "differs from pins: $line"
 done
@@ -314,6 +387,12 @@ rm -rf "$check_dir"
 if nvrtc_out="$(env_run python "$REMOTE_DIR/check_env.py" nvrtc sm_100a 2>&1)"; then
   say "NVRTC: $(tr '\n' ' ' <<<"$nvrtc_out")"
   grep -E '^nvrtc' <<<"$nvrtc_out" >> "$resolved/versions.txt"
+  # cuda-bindings takes the first NVRTC it finds, and prefers one from a pip wheel
+  # (nvidia-cuda-nvrtc, which PyTorch pulls in) to the toolkit's. That would change
+  # the PTX of every TIRx kernel without a word, so it is checked.
+  nvrtc_loaded="$(sed -n 's/^nvrtc=//p' <<<"$nvrtc_out" | head -n 1)"
+  [[ "$nvrtc_loaded" == "$toolkit" ]] \
+    || warn "cuda-bindings loads NVRTC $nvrtc_loaded, not the installed toolkit's $toolkit: TIRx kernels are compiled by another compiler than on the development machine. Is an nvidia-cuda-nvrtc wheel in the env (pip list)? PyTorch belongs in $TORCH_ENV, not here"
 elif [[ "${toolkit%%.*}" == "${PIN_CUDA_VERSION%%.*}" ]]; then
   die "NVRTC cannot compile for sm_100a: $nvrtc_out"
 else
@@ -331,10 +410,16 @@ exec "$MAMBA_BIN" run -p "$ENV_PREFIX" "\$@"
 EOF
 chmod +x "$REMOTE_HOME/envrun"
 
+rm -rf "$REMOTE_HOME/tmp"
 echo "$config_id" > "$REMOTE_HOME/state/setup.done"
 say "done. Env: $ENV_PREFIX. Versions: $resolved/versions.txt"
 say "run a command in it with: $REMOTE_HOME/envrun <command>"
 if (( ${#warnings[@]} )); then
   say "${#warnings[@]} warning(s):"
   printf 'setup:   - %s\n' "${warnings[@]}"
+fi
+if [[ -n "${banner:-}" ]]; then
+  bar="$(printf '!%.0s' {1..100})"
+  printf '%s\nsetup: %s\nsetup: To build with the predictions'"'"' compiler instead: env/remote/setup.sh --toolkit pinned --force\nsetup: (the driver then refuses its PTX and the machine-code builds are run; see RUNBOOK.md, "Driver older than the toolkit").\n%s\n' \
+    "$bar" "$banner" "$bar" >&2
 fi

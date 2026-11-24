@@ -3,7 +3,8 @@
 # and run both probe suites, pack one results archive.
 #
 #   env/remote/run.sh [--dry-run] [--keep-going] [--redo STAGE|all] [--skip STAGE] [--collect-only]
-#                     [--toolkit auto|pinned|X.Y] [--no-ncu] [--price DOLLARS_PER_HOUR]
+#                     [--toolkit auto|pinned|X.Y] [--no-ncu] [--no-torch] [--strict-toolkit]
+#                     [--price DOLLARS_PER_HOUR]
 #
 # Never asks anything. Safe to run again after an interruption or a failure:
 # stages that finished are skipped, the rest run, and the archive is rebuilt.
@@ -25,7 +26,12 @@
 #   --redo STAGE   run STAGE again even if it finished (repeatable; `all` for every stage)
 #   --skip STAGE   leave STAGE out (repeatable), e.g. --skip selftest on a second rental
 #   --collect-only run nothing; write the archive from what earlier runs left
-#   --toolkit, --no-ncu   passed to setup.sh
+#   --toolkit, --no-ncu, --no-torch   passed to setup.sh
+#   --strict-toolkit   stop after setup if the probes would not be built by the
+#                  nvcc the committed predictions were made with (a fallback toolkit).
+#                  Without it the run goes on and is flagged: PREDICTIONS-NOT-COMPARABLE.txt
+#                  at the top of the archive, predictions_comparable in manifest.txt, and
+#                  a banner at the end
 #   --price        hourly price for the cost estimate of --dry-run (default 8)
 #
 #   WARPLENS_REMOTE_HOME     where the env and results go (default ~/warplens-remote)
@@ -39,6 +45,8 @@
 #   WARPLENS_PTX_JIT            ok | refused | unknown: whether the driver takes
 #                               PTX from this toolkit (preflight's ptx-jit check)
 #   WARPLENS_NCU                ok | unavailable: whether ncu can read counters
+#   WARPLENS_TORCH_PYTHON       the interpreter of the PyTorch env, when there is one
+#   WARPLENS_PREDICTIONS        comparable | comparable-native | not-comparable | unknown
 # Whatever a suite prints is archived too (logs/<stage>.log), and so are
 # directories named results*, out or output that the run creates inside the
 # suite's directory.
@@ -62,6 +70,7 @@ fi
 dry_run=0
 keep_going=0
 collect_only=0
+strict_toolkit=0
 price=8
 redo=()
 skip=()
@@ -75,8 +84,10 @@ while [[ $# -gt 0 ]]; do
     --skip) skip+=("${2:?--skip needs a stage}"); shift ;;
     --toolkit) setup_args+=(--toolkit "${2:?--toolkit needs a value}"); shift ;;
     --no-ncu) setup_args+=(--no-ncu) ;;
+    --no-torch) setup_args+=(--no-torch) ;;
+    --strict-toolkit) strict_toolkit=1 ;;
     --price) price="${2:?--price needs a number}"; shift ;;
-    -h|--help) sed -n '2,52p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,60p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -102,11 +113,11 @@ SUITE_timing="validation/blackwell_timing"
 estimate() {
   case "$1" in
     preflight-quick) echo "1|1|measured: 2 s" ;;
-    setup)           echo "2|8|measured: 75 s to download and install 5.8 GB on a fast link; a slow link or disk is the upper end" ;;
+    setup)           echo "3|12|measured: 75 s to download and install 5.8 GB on a fast link, and 159 s for the PyTorch env (4.3 GB installed) on the same link; a slow link or disk is the upper end" ;;
     preflight)       echo "1|2|measured: 5 s without the Blackwell kernels; allows for a first-use driver compile and ncu start-up" ;;
-    selftest)        echo "1|3|measured: 41 s for the whole test suite" ;;
-    build-blackwell) echo "1|6|measured: 8 s on 20 cores (67 CPU-seconds) for an unfinished copy of the suite with 21 probes; the finished suite and a smaller machine are the upper end" ;;
-    build-timing)    echo "1|4|measured: 41 s, one compile at a time, for an unfinished copy of the suite" ;;
+    selftest)        echo "4|20|measured: 10.5 min on 20 cores for the whole test suite (1513 tests; it runs the whole predict path, which is what says whether the predictions hold for the installed compiler). --skip selftest saves it" ;;
+    build-blackwell) echo "1|6|measured: 8 s on 20 cores for the 51 probe programs (13 s with --native); a smaller machine is the upper end" ;;
+    build-timing)    echo "1|4|measured: 62 s, one compile at a time, for the 14 benchmarks" ;;
     run-blackwell)   echo "3|20|guess: short kernels, but some probes wait out a timeout on purpose; limit $run_minutes min" ;;
     run-timing)      echo "3|20|guess: repeated microbenchmarks, and ncu reruns each kernel per counter group; limit $run_minutes min" ;;
     collect)         echo "1|1|measured: under 1 s for a small archive" ;;
@@ -254,6 +265,8 @@ suite_stage() {  # suite_stage build-blackwell [args...]
   cd "$REPO_DIR" || return 1
   env_run env NVCC=nvcc PYTHON=python WARPLENS_RESULTS_DIR="$out" \
       WARPLENS_PTX_JIT="${WARPLENS_PTX_JIT:-unknown}" WARPLENS_NCU="${WARPLENS_NCU:-unavailable}" \
+      WARPLENS_PREDICTIONS="${WARPLENS_PREDICTIONS:-unknown}" \
+      ${WARPLENS_TORCH_PYTHON:+WARPLENS_TORCH_PYTHON="$WARPLENS_TORCH_PYTHON"} \
       bash "$script" "$@"
 }
 
@@ -311,6 +324,12 @@ collect() {
     echo "uid=$EUID"
     echo "ptx_jit=$ptx_jit"
     echo "ncu=$ncu_state"
+    echo "driver=$(sed -n 's/^driver=//p' "$REMOTE_HOME/resolved/versions.txt" 2>/dev/null)"
+    echo "driver_cuda=$(sed -n 's/^driver_cuda=//p' "$REMOTE_HOME/resolved/versions.txt" 2>/dev/null)"
+    echo "toolkit_installed=$(sed -n 's/^cuda_nvcc=//p' "$REMOTE_HOME/resolved/versions.txt" 2>/dev/null)"
+    echo "predictions_nvcc=$(predictions_nvcc blackwell)"
+    echo "predictions_comparable=$predictions_state"
+    echo "predictions_comparable_why=$predictions_why"
     for stage in "${STAGES[@]}"; do
       [[ "$stage" == collect ]] || echo "stage_${stage//-/_}=${result[$stage]:-not-reached}"
     done
@@ -323,6 +342,13 @@ collect() {
   cp "$PINS_FILE" "$RUN_DIR/pins.env"
   nvidia-smi > "$RUN_DIR/nvidia-smi.txt" 2>&1 || true
   nvidia-smi -q > "$RUN_DIR/nvidia-smi-q.txt" 2>&1 || true
+  # Impossible to miss when the archive is unpacked: a file named for what it says.
+  rm -f "$RUN_DIR/PREDICTIONS-NOT-COMPARABLE.txt"
+  case "$predictions_state" in
+    comparable|comparable-native) ;;
+    *) printf '%s\n\nEvery verdict of validation/blackwell/compare.py and every predicted time in\nvalidation/blackwell_timing is to be read with this in mind. See env/remote/RUNBOOK.md,\n"Driver older than the toolkit".\n' \
+         "$predictions_why" > "$RUN_DIR/PREDICTIONS-NOT-COMPARABLE.txt" ;;
+  esac
   # Outputs a suite left in its own directory instead of WARPLENS_RESULTS_DIR.
   # Only what this run made: directories that came with the checkout are older
   # than the run's first start.
@@ -358,11 +384,22 @@ collect() {
 finish() {  # finish EXIT_STATUS
   collect || failures=$((failures + 1))
   say "stages: $(for s in "${STAGES[@]}"; do [[ $s == collect ]] || printf '%s=%s ' "$s" "${result[$s]:-not-reached}"; done)"
+  case "$predictions_state" in
+    comparable|comparable-native) ;;
+    *) local bar; bar="$(printf '!%.0s' {1..100})"
+       printf '%s\nrun: %s\n%s\n' "$bar" "$predictions_why" "$bar" ;;
+  esac
   exit "$1"
 }
 
 ptx_jit=unknown
 ncu_state=unavailable
+# Whether results can be held against the committed predictions; from setup.sh's record
+# until the preflight has looked at the nvcc that is really in the env.
+predictions_state="$(sed -n 's/^predictions_comparable=//p' "$REMOTE_HOME/resolved/versions.txt" 2>/dev/null)"
+predictions_why="$(sed -n 's/^predictions_comparable_why=//p' "$REMOTE_HOME/resolved/versions.txt" 2>/dev/null)"
+predictions_state="${predictions_state:-unknown}"
+predictions_why="${predictions_why:-TOOLKIT NOT RECORDED: setup.sh has not written resolved/versions.txt, so it is not known which nvcc built the probes}"
 if (( collect_only )); then
   # The status each stage had when it last ran, from the history.
   for stage in "${STAGES[@]}"; do
@@ -389,6 +426,23 @@ if ! run_stage setup 45 bash "$REMOTE_DIR/setup.sh" "${setup_args[@]}"; then
   say "stopping: without the env nothing can be built. Fix the cause (log above) and run again."
   finish 3
 fi
+# What setup.sh found about driver, toolkit and the predictions' toolkit.
+if [[ -f "$REMOTE_HOME/resolved/versions.txt" ]]; then
+  predictions_state="$(sed -n 's/^predictions_comparable=//p' "$REMOTE_HOME/resolved/versions.txt")"
+  predictions_why="$(sed -n 's/^predictions_comparable_why=//p' "$REMOTE_HOME/resolved/versions.txt")"
+  predictions_state="${predictions_state:-unknown}"
+  predictions_why="${predictions_why:-TOOLKIT NOT RECORDED: resolved/versions.txt does not say whether the installed nvcc is the one the predictions were made with}"
+fi
+case "$predictions_state" in
+  comparable) say "toolkit: $predictions_why" ;;
+  comparable-native) say "toolkit: $predictions_why" ;;
+  *) bar="$(printf '!%.0s' {1..100})"
+     printf '%s\nrun: %s\n%s\n' "$bar" "$predictions_why" "$bar"
+     if (( strict_toolkit )); then
+       say "stopping (--strict-toolkit). To build with the predictions' compiler: env/remote/run.sh --toolkit pinned --redo setup"
+       finish 3
+     fi ;;
+esac
 
 # 3. Kernels on the GPU.
 run_stage preflight 15 bash "$REMOTE_DIR/preflight.sh" --out "$RUN_DIR/preflight.txt" --status "$RUN_DIR/preflight.status"
@@ -408,7 +462,7 @@ if (( rc != 0 && ! keep_going )); then
 fi
 
 # 4. The simulator on this machine, as installed.
-run_stage selftest 20 "${self[@]}" selftest || true
+run_stage selftest 30 "${self[@]}" selftest || true
 
 # 5-8. Build both suites, then run what built.
 # Arguments for the suite scripts. The defaults are the two things run.sh knows
@@ -422,7 +476,10 @@ fi
 [[ -n "${WARPLENS_BLACKWELL_RUN_ARGS+set}" ]] && stage_args[run-blackwell]="$WARPLENS_BLACKWELL_RUN_ARGS"
 [[ -n "${WARPLENS_TIMING_BUILD_ARGS+set}" ]] && stage_args[build-timing]="$WARPLENS_TIMING_BUILD_ARGS"
 [[ -n "${WARPLENS_TIMING_RUN_ARGS+set}" ]] && stage_args[run-timing]="$WARPLENS_TIMING_RUN_ARGS"
-export WARPLENS_PTX_JIT="$ptx_jit" WARPLENS_NCU="$ncu_state"
+export WARPLENS_PTX_JIT="$ptx_jit" WARPLENS_NCU="$ncu_state" WARPLENS_PREDICTIONS="$predictions_state"
+if [[ -z "${WARPLENS_TORCH_PYTHON:-}" && -x "$TORCH_ENV/bin/python" ]]; then
+  export WARPLENS_TORCH_PYTHON="$TORCH_ENV/bin/python"
+fi
 suite_run_stage() {  # suite_run_stage STAGE MINUTES
   local words=()
   read -r -a words <<<"${stage_args[$1]}"

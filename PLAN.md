@@ -109,7 +109,7 @@ Target users:
 
 | Area | PTX |
 | --- | --- |
-| Core | int/fp ALU, `cvt`, `setp`, `selp`, `bra`, `ret`, `ld/st.{global,shared,param,local}`, `atom`/`red` (global, shared), `shfl.sync`, `vote`, `elect.sync`, `bar.sync`/`bar.arrive` (named barriers), special registers (`%tid`, `%ctaid`, `%clusterid`, `%cluster_ctarank`, …) |
+| Core | int/fp ALU, `cvt`, `setp`, `selp`, `bra`, `ret`, `ld/st.{global,shared,param,local}`, `atom`/`red` (global, shared, generic), `shfl.sync`, `vote`, `elect.sync`, `bar.sync`/`bar.arrive` (named barriers), special registers (`%tid`, `%ctaid`, `%clusterid`, `%cluster_ctarank`, …) |
 | mbarrier | `init`, `arrive`(`.expect_tx`, count), `expect_tx`, `complete_tx`, `test_wait`/`try_wait`(`.parity`), `inval` |
 | TMA | `cp.async.bulk.tensor.{1..5}d` load (tile mode, OOB fill) and store, `cp.async.bulk` (non-tensor), `.multicast::cluster` (M5), `cp.async.bulk.commit_group`/`wait_group(.read)`, `prefetch.tensormap` |
 | Fences / proxies | `fence.proxy.async`, `fence.mbarrier_init`, `fence.acq_rel` (modeled as checker events) |
@@ -435,7 +435,8 @@ Found by this work in the simulator, and fixed since unless marked open:
   Blackwell guarantees.
 - Atomic instructions were missing. The CUDA-emitted add, exchange, CAS,
   bitwise, min/max and increment/decrement operations now run, with
-  `red.add`, generic pointers and relaxed cta/gpu/sys scope. Review fixes
+  `red`, generic pointers and relaxed cta/gpu/sys scope, in the spellings of
+  both nvcc 13.5 and nvcc 12.4 (no ordering or scope; `red` for discarded results). Review fixes
   add natural-alignment validation, f32 global FTZ and shared access diagnostics;
   see `docs/atomics.md`. Stronger memory ordering remains unsupported.
 - CI uses the exact compiler patch named by the predictions and remote pins.

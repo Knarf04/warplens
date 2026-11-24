@@ -220,18 +220,21 @@ extern "C" __global__ void atomic_shared(unsigned long long* sums, unsigned long
 """
 
 
-@pytest.fixture(scope="module")
-def compiled_atomic_add(tmp_path_factory):
+# For sm_100a nvcc 13.5 writes `atom.relaxed.gpu.global.add.u32`; for sm_86 it writes what
+# CUDA 12.x does, `atom.global.add.u32`.
+@pytest.fixture(scope="module", params=[("sm_100a", "atom.relaxed.gpu.global.add."), ("sm_86", "atom.global.add.")])
+def compiled_atomic_add(tmp_path_factory, request):
     nvcc = shutil.which("nvcc")
     if not nvcc:
         pytest.skip("nvcc is required to compile CUDA atomicAdd")
+    arch, spelling = request.param
     tmp = tmp_path_factory.mktemp("atomic_add_cuda")
     source, ptx = tmp / "atomic.cu", tmp / "atomic.ptx"
     source.write_text(CUDA)
-    subprocess.run([nvcc, "-arch=sm_100a", "-ptx", str(source), "-o", str(ptx)], check=True,
+    subprocess.run([nvcc, f"-arch={arch}", "-ptx", str(source), "-o", str(ptx)], check=True,
                    capture_output=True, text=True, timeout=60)
     text = ptx.read_text()
-    assert "atom." in text
+    assert spelling in text
     return warplens.parse_ptx(text)
 
 

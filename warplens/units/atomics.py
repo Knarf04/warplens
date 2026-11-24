@@ -1,7 +1,16 @@
-"""Scalar atomic read/modify/write operations, and scalar red.add.
+"""Scalar atomic read/modify/write operations: `atom`, and `red`, which is the same update
+without the value it replaced.
 
 PTX rules: https://docs.nvidia.com/cuda/parallel-thread-execution/
-#parallel-synchronization-and-communication-instructions-atom
+#parallel-synchronization-and-communication-instructions-atom and ...-red
+
+Spellings. nvcc 13.5 for sm_100a writes ordering and scope out (`atom.relaxed.gpu.global.add.u32`)
+and never emits `red`. nvcc 12.4 (and 13.5 for sm_80/sm_86) omits both
+(`atom.global.add.u32`, `atom.add.u32` through a pointer it cannot place), writes a scope only
+for the _block and _system functions (`atom.shared.cta.add.u32`), and turns every atomic function
+whose result is unused into `red` (`red.global.min.u32`), except exchange and compare-and-swap,
+which `red` does not have. PTX defines the omitted ordering as `.relaxed` and the omitted scope
+as `.gpu`, so the short forms are the long ones.
 
 The scheduler executes an entire instruction before another warp runs. Serializing
 its active lanes therefore makes each read/modify/write indivisible. Lane order is
@@ -38,8 +47,10 @@ def _form(ins):
     if noftz:
         mods.pop()
     operation = mods.pop() if mods else ""
-    if ty not in _TYPES.get(operation, ()) or ins.opcode == "red" and operation != "add":
-        raise unsupported(ins, "unsupported scalar atomic operation/type; red supports add only")
+    if ins.opcode == "red" and operation in ("exch", "cas"):
+        raise unsupported(ins, "red has no exch or cas; they are atom operations")
+    if ty not in _TYPES.get(operation, ()):
+        raise unsupported(ins, "unsupported scalar atomic operation/type")
     if noftz and (operation, ty) != ("add", "f32"):
         raise unsupported(ins, ".noftz is supported only with atomic add.f32")
     if len(mods) != len(set(mods)) or set(mods) - (_SPACES | _SCOPES | {"relaxed"}):

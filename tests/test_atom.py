@@ -1,5 +1,6 @@
-"""`atom`: the forms nvcc 13.5 emits for sm_100a, the order of lanes that share an address,
-the shared-memory race detector, and what the timing model charges."""
+"""`atom` and `red`: the forms nvcc 13.5 emits for sm_100a and nvcc 12.4 for sm_80/sm_86, the
+order of lanes that share an address, the shared-memory race detector, and what the timing
+model charges."""
 
 import numpy as np
 import pytest
@@ -12,6 +13,11 @@ from conftest import kernel
 # _block and _system variants, on pointers it knows to be global or shared and on others.
 PREFIXES = ["relaxed.gpu.global", "relaxed.gpu.shared", "relaxed.gpu",
             "global.cta", "global.sys", "shared.cta", "shared.sys", "cta", "sys"]
+# What nvcc 12.4 emits for sm_80 and sm_86 (and 13.5 for those targets): no ordering, and a
+# scope only for _block and _system. PTX gives the omitted ordering as .relaxed and the omitted
+# scope as .gpu, so `atom.global.add.u32` is `atom.relaxed.gpu.global.add.u32`. "" is a
+# pointer the compiler cannot place.
+LEGACY_PREFIXES = ["global", "shared", "", "global.cta", "global.sys", "shared.cta", "shared.sys", "cta", "sys"]
 OPERATIONS = ["add.u32", "add.u64", "add.f32", "add.f64", "and.b32", "and.b64", "or.b32", "or.b64",
               "xor.b32", "xor.b64", "exch.b32", "exch.b64", "cas.b32", "cas.b64", "inc.u32", "dec.u32",
               "min.s32", "min.u32", "min.s64", "min.u64", "max.s32", "max.u32", "max.s64", "max.u64"]
@@ -87,22 +93,53 @@ def lane_inputs(operation: str, ty: str):
 
 # -- every form, one lane per word ------------------------------------------------------------
 
-@pytest.mark.parametrize("prefix", PREFIXES)
-@pytest.mark.parametrize("operation", OPERATIONS)
-def test_every_emitted_form(sim, prefix, operation):
+def check_form(sim, opcode, prefix, operation):
+    """`atom` returns what it found; `red` is the same update with no destination, so %d keeps
+    the marker it was given."""
     name, ty = operation.split(".")
     bits = int(ty[1:])
     old, b, c = lane_inputs(name, ty)
     want = np.array([expected(name, ty, int(o), int(x), int(y)) for o, x, y in zip(old, b, c)], old.dtype)
-    instruction = f"atom.{prefix}.{operation} %d, [%a], %b{', %c' if name == 'cas' else ''};"
+    spelling = ".".join(part for part in (opcode, prefix, operation) if part)
+    if opcode == "atom":
+        instruction = f"{spelling} %d, [%a], %b{', %c' if name == 'cas' else ''};"
+    else:
+        instruction = f"mov.b{bits} %d, 0x5a; {spelling} [%a], %b;"
     generic = "global" not in prefix and "shared" not in prefix
     for where in ("global", "shared") if generic else (prefix.replace("relaxed.gpu.", "").split(".")[0],):
         mem, out = sim.from_numpy(old.copy()), sim.empty(32, old.dtype)
         stats = sim.launch(lane_kernel(instruction, bits, where, generic), "k", grid=1, block=32,
                            args=[mem, sim.from_numpy(b), sim.from_numpy(c), out])
         assert not stats.findings
-        np.testing.assert_array_equal(out.numpy(), old)  # the value found is returned
+        np.testing.assert_array_equal(out.numpy(), old if opcode == "atom" else 0x5a)
         np.testing.assert_array_equal(mem.numpy(), want)
+
+
+@pytest.mark.parametrize("prefix", PREFIXES)
+@pytest.mark.parametrize("operation", OPERATIONS)
+def test_every_emitted_form(sim, prefix, operation):
+    check_form(sim, "atom", prefix, operation)
+
+
+@pytest.mark.parametrize("prefix", ["global", "shared", ""])  # the rest are in PREFIXES
+@pytest.mark.parametrize("operation", OPERATIONS)
+def test_every_form_without_ordering_or_scope(sim, prefix, operation):
+    check_form(sim, "atom", prefix, operation)
+
+
+# nvcc 12.4 turns an atomic function whose result is not used into `red`, for every function
+# but atomicExch and atomicCAS (PTX has no red.exch or red.cas). nvcc 13.5 emits no `red`.
+@pytest.mark.parametrize("prefix", LEGACY_PREFIXES)
+@pytest.mark.parametrize("operation", [o for o in OPERATIONS if o.split(".")[0] not in ("exch", "cas")])
+def test_every_emitted_red_form(sim, prefix, operation):
+    check_form(sim, "red", prefix, operation)
+
+
+@pytest.mark.parametrize("prefix", ["relaxed.gpu.global", "relaxed.gpu.shared", "relaxed.gpu"])
+@pytest.mark.parametrize("operation", ["add.u32", "min.s64", "xor.b64", "inc.u32"])
+def test_red_with_the_ordering_and_scope_written_out(sim, prefix, operation):
+    """What the legacy spelling means, as PTX defines `red`; no compiler here emits it."""
+    check_form(sim, "red", prefix, operation)
 
 
 @pytest.mark.parametrize("instruction, why", [
@@ -120,6 +157,24 @@ def test_every_emitted_form(sim, prefix, operation):
     ("atom.relaxed.gpu.global.cas.b32 %d, [%a], %b;", "expected 4 operands"),
     ("atom.relaxed.gpu.global.add.u32 %d, [%a], %b, %c;", "expected 3 operands"),
     ("atom.relaxed.gpu.global.add.u32 %d, %a, %b;", r"expected a \[address\] operand"),
+    # Without ordering or scope the same limits hold.
+    ("atom.global.sub.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.global.exch.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.local.add.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.global.add %d, [%a], %b;", "unsupported instruction"),
+    # red: PTX has no exchange or compare-and-swap that returns nothing.
+    ("red.global.exch.b32 [%a], %b;", "red has no exch or cas"),
+    ("red.global.cas.b32 [%a], %b, %c;", "red has no exch or cas"),
+    ("red.relaxed.gpu.shared.exch.b64 [%a], %b;", "red has no exch or cas"),
+    ("red.global.sub.u32 [%a], %b;", "unsupported instruction"),
+    ("red.global.min.f32 [%a], %b;", "unsupported instruction"),
+    ("red.global.inc.u64 [%a], %b;", "unsupported instruction"),
+    ("red.global.and.u32 [%a], %b;", "unsupported instruction"),
+    ("red.acquire.gpu.global.add.u32 [%a], %b;", "unsupported instruction"),
+    ("red.global.cluster.or.b32 [%a], %b;", "unsupported instruction"),
+    ("red.local.add.u32 [%a], %b;", "unsupported instruction"),
+    ("red.global.min.u32 %d, [%a], %b;", "expected 2 operands"),
+    ("red.global.min.u32 [%a];", "expected 2 operands"),
 ])
 def test_other_forms_are_refused(sim, instruction, why):
     old = np.zeros(32, np.uint32)

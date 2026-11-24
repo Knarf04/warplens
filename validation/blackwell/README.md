@@ -466,8 +466,9 @@ Those marked "fixed since" were fixed on other branches.
     and matrix row MB-03.
 11. **Atomic updates are implemented.** The forms nvcc 13.5 emits for the
     atomic functions run and match the recorded RTX 3080 Ti results
-    (`validation/ampere/atom_golden.txt`). The integrated implementation also
-    accepts `red.add`, older default-scope spellings and `add.s32`. Review checks
+    (`validation/ampere/atom_golden.txt`), as do the forms nvcc 12.4 emits: the
+    spellings without ordering or scope (`atom.global.add.u32`) and `red` for
+    every operation but `exch` and `cas`. `add.s32` is accepted too. Review checks
     enforce natural alignment, global f32 FTZ and shared race/async diagnostics.
     Acquire/release, cluster scope and packed/half/vector forms remain
     unsupported; see `docs/atomics.md`. The CLC probes still use single-writer

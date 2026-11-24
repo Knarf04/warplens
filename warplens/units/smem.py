@@ -30,6 +30,27 @@ from ..errors import MemoryFault
 # tests/test_sim_bug_regressions.py keeps equal to this one.
 MAX_SMEM_BYTES = 227 * 1024
 
+# The shared memory of one CTA that a program gets without asking: what the device reports as
+# its shared memory per block (WL_DEFAULT_SMEM_BYTES in warplens/shim/protocol.h, kept equal
+# by tests/test_sim_bug_regressions.py). 48 KB is what every compute capability in the CUDA
+# C++ Programming Guide's table has; a B200 has not been asked (RT-03).
+DEFAULT_SMEM_BYTES = 48 * 1024
+
+
+def default_max_dynamic(static: int) -> int:
+    """The most dynamic shared memory a launch of a kernel with `static` bytes of static
+    shared memory may use when the program has not set the kernel's maximum
+    (cudaFuncSetAttribute with cudaFuncAttributeMaxDynamicSharedMemorySize, or
+    cuFuncSetAttribute): what cudaFuncGetAttributes reports as maxDynamicSharedSizeBytes.
+
+    Measured on an RTX 3080 Ti at its own limits (validation/README.md, "Launch errors"): the
+    rest of the default, for a kernel whose static shared memory fits the default; and the
+    rest of the opt-in maximum, for a kernel whose static shared memory is larger than the
+    default, which therefore launches without any opt-in. Setting the attribute replaces
+    this number, with a smaller one too, and is refused above `MAX_SMEM_BYTES - static`.
+    Only programs run under the shim are held to it: `Device.launch` has no such step."""
+    return max((DEFAULT_SMEM_BYTES if static <= DEFAULT_SMEM_BYTES else MAX_SMEM_BYTES) - static, 0)
+
 # Shadow "writer" value for bytes last written by TMA rather than by a warp.
 ASYNC_PROXY = -2
 

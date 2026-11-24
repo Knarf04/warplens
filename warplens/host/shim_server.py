@@ -12,11 +12,13 @@ import numpy as np
 
 from ..errors import CUDA_INVALID_VALUE, CUDA_LAUNCH_FAILURE, LaunchError, WarplensError
 from ..frontend.ptx_parser import parse_ptx
+from ..units.smem import MAX_SMEM_BYTES, default_max_dynamic
 from . import tensor_map
 from .device import Device
 
 (REGISTER_FATBIN, REGISTER_FUNCTION, MALLOC, FREE, WRITE, READ, COPY, FILL, LAUNCH,
- TENSOR_MAP, REGISTER_MODULE) = range(1, 12)
+ TENSOR_MAP, REGISTER_MODULE, SET_ATTRIBUTE, GET_ATTRIBUTES) = range(1, 14)
+MAX_DYNAMIC_SMEM = 8  # cudaFuncAttributeMaxDynamicSharedMemorySize, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
 LAUNCH_FAILURE = CUDA_LAUNCH_FAILURE  # cudaErrorLaunchFailure: the kernel started and failed
 INVALID_VALUE = CUDA_INVALID_VALUE  # cudaErrorInvalidValue
 MEMORY_ALLOCATION = 2  # cudaErrorMemoryAllocation
@@ -82,6 +84,9 @@ class ShimServer:
         self.clc_limit = clc_limit
         self.modules: list = []
         self.functions: list[tuple[int, int, str]] = []
+        # The maximum dynamic shared memory of each kernel the program set it for, by index
+        # into `functions`; the others have `default_max_dynamic` of their static shared memory.
+        self.max_dynamic: dict[int, int] = {}
         self.launches: list[tuple[str, object]] = []  # (kernel name, LaunchStats)
         self.needs_ptx = False
         self.machine_code = False  # a runtime handed over a compiled module instead of PTX
@@ -159,8 +164,41 @@ class ShimServer:
         self.machine_code = True
         raise WarplensError(f"kernel `{kernel}`: {MACHINE_CODE}")
 
+    def shared_memory(self, function: int) -> tuple[int, int] | None:
+        """The static shared memory of a registered kernel and the most dynamic shared memory
+        a launch of it may use now. None for a kernel the simulator cannot prepare (it uses
+        an instruction that is not implemented): its launch says so."""
+        module, index, name = self.functions[function]
+        try:
+            static = self.device.program(self.modules[module][index], name).smem_static
+        except WarplensError:
+            return None
+        return static, self.max_dynamic.get(function, default_max_dynamic(static))
+
+    def check_opt_in(self, function: int, smem: int) -> None:
+        """Refuse a launch with more dynamic shared memory than the kernel may use, as a GPU
+        does. A launch over the device's limit is left to `Device.launch`, which says that."""
+        known = self.shared_memory(function)
+        if known is None:
+            return
+        static, allowed = known
+        name = self.functions[function][2]
+        if smem <= allowed or static + smem > MAX_SMEM_BYTES:
+            return
+        if function in self.max_dynamic:
+            why = f"the program set its maximum to {allowed}"
+        else:
+            why = (f"without opt-in it may use {allowed}" +
+                   (f" ({static} bytes of static shared memory count against the default)" if static else ""))
+        raise LaunchError(
+            f"kernel `{name}` was launched with {smem} bytes of dynamic shared memory, but {why}. A GPU "
+            f"refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute("
+            f"kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, {smem}), or with the driver API "
+            f"cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, {smem})")
+
     def handle(self, op: int, data: bytes) -> bytes:
-        sizes = {MALLOC: 8, FREE: 8, READ: 16, COPY: 24, FILL: 20, TENSOR_MAP: 140}
+        sizes = {MALLOC: 8, FREE: 8, READ: 16, COPY: 24, FILL: 20, TENSOR_MAP: 140,
+                 SET_ATTRIBUTE: 12, GET_ATTRIBUTES: 4}
         minimum = {REGISTER_FUNCTION: 4, WRITE: 8, LAUNCH: 48}
         if ((op in sizes and len(data) != sizes[op]) or
                 (op in minimum and len(data) < minimum[op])):
@@ -239,6 +277,7 @@ class ShimServer:
             if len(data) != expected:
                 raise WarplensError(f"kernel `{name}` launch needs {expected - 48} argument bytes, "
                                     f"got {len(data) - 48}")
+            self.check_opt_in(function, smem)
             args, at = [], 48
             for p in parsed.functions[name].params:
                 args.append(data[at:at + p.size])
@@ -249,6 +288,23 @@ class ShimServer:
                                        cluster=(kx, ky, kz) if kx else None)
             self.launches.append((name, stats))
             return stats.output.encode()
+        if op in (SET_ATTRIBUTE, GET_ATTRIBUTES):
+            (function,) = struct.unpack_from("<I", data)
+            if function >= len(self.functions):
+                raise WarplensError(f"unknown kernel function {function}")
+            static, allowed = self.shared_memory(function) or (0, self.max_dynamic.get(function, default_max_dynamic(0)))
+            if op == GET_ATTRIBUTES:
+                return struct.pack("<II", static, allowed)
+            attribute, value = struct.unpack_from("<ii", data, 4)
+            if attribute != MAX_DYNAMIC_SMEM:
+                raise WarplensError(f"function attribute {attribute} is not kept by the server")
+            if not 0 <= value <= MAX_SMEM_BYTES - static:
+                raise LaunchError(
+                    f"kernel `{self.functions[function][2]}`: a maximum of {value} bytes of dynamic shared memory "
+                    f"was refused: with its {static} bytes of static shared memory the kernel may have "
+                    f"{max(MAX_SMEM_BYTES - static, 0)}, as the device's limit is {MAX_SMEM_BYTES}")
+            self.max_dynamic[function] = value
+            return b""
         if op == TENSOR_MAP:
             data_type, rank, swizzle, fill, interleave, address = struct.unpack_from("<5IQ", data)
             dims = struct.unpack_from("<5Q", data, 28)

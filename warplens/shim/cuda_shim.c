@@ -160,9 +160,13 @@ CUresult cuModuleUnload(CUmodule module) { (void)module; return CUDA_SUCCESS; }
 CUresult cuFuncGetAttribute(int *pi, CUfunction_attribute attrib, CUfunction function) {
   if (!pi) return CUDA_ERROR_INVALID_VALUE;
   if (!function) return CUDA_ERROR_INVALID_HANDLE;
+  int fixed = 0, max_dynamic = 0;
   switch (attrib) {
     case CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK: *pi = 1024; break;
-    case CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES: *pi = WL_MAX_SMEM_BYTES; break;
+    case CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES: case CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES:
+      if (warplens_function_shared_memory(function, &fixed, &max_dynamic)) return CUDA_ERROR_INVALID_HANDLE;
+      *pi = attrib == CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES ? fixed : max_dynamic;
+      break;
     case CU_FUNC_ATTRIBUTE_PTX_VERSION: case CU_FUNC_ATTRIBUTE_BINARY_VERSION: *pi = 100; break;
     default: *pi = 0; break;  /* sizes of the compiled kernel, which PTX does not fix */
   }
@@ -177,7 +181,9 @@ CUresult cuKernelGetAttribute(int *pi, CUfunction_attribute attrib, CUkernel ker
 
 CUresult cuFuncSetAttribute(CUfunction function, CUfunction_attribute attrib, int value) {
   if (!function) return CUDA_ERROR_INVALID_HANDLE;
-  return wl_function_attribute_is_valid((int)attrib, value) ? CUDA_SUCCESS : CUDA_ERROR_INVALID_VALUE;
+  int status = warplens_set_function_attribute(function, (int)attrib, value);
+  /* A handle that names no kernel is the driver's invalid handle, not the runtime's code. */
+  return status == cudaErrorInvalidDeviceFunction ? CUDA_ERROR_INVALID_HANDLE : (CUresult)status;
 }
 
 static CUresult launch(CUfunction function, const uint32_t grid[3], const uint32_t block[3],

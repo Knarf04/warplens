@@ -136,6 +136,14 @@ class Device:
         `trace`, if given, is called as trace(warp, pc, instr, active_mask)
         before every instruction.
         """
+        return run_kernel(self.program(ptx, entry), self.memory, grid=grid, block=block,
+                          args=args, smem=smem, trace=trace, max_steps=max_steps,
+                          async_delay=async_delay, timing=self._timing(timing, active_sms),
+                          cluster=cluster, clc_limit=clc_limit)
+
+    def program(self, ptx, entry: str) -> Program:
+        """Kernel `entry` of `ptx` (a path or a parsed Module) prepared for launching, which
+        happens once: what `launch` runs. It knows the kernel's static shared memory."""
         module = ptx if isinstance(ptx, Module) else self.load_ptx(ptx)
         if entry not in module.functions:
             known = ", ".join(sorted(module.functions)) or "none"
@@ -148,10 +156,7 @@ class Device:
                     placed[var.name] = self.memory.alloc(max(len(var.data), 1), align=max(var.align, 16))
                     self.memory.buffer(placed[var.name])[:len(var.data)] = np.frombuffer(var.data, np.uint8)
             self._programs[key] = Program(module, module.functions[entry], self._globals[id(module)])
-        return run_kernel(self._programs[key], self.memory, grid=grid, block=block,
-                          args=args, smem=smem, trace=trace, max_steps=max_steps,
-                          async_delay=async_delay, timing=self._timing(timing, active_sms),
-                          cluster=cluster, clc_limit=clc_limit)
+        return self._programs[key]
 
     def _timing(self, timing, active_sms):
         if timing is None or timing is False:

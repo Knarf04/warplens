@@ -12,6 +12,15 @@ number advances and the arrival count is reloaded.
     complete_tx               what a TMA load does to the barrier when it lands
     test_wait / try_wait      has a given phase completed?
 
+The token `arrive` returns carries one bit of the phase, its parity, in bit 63.
+A wait given a token answers "is the barrier's phase parity different from the
+token's now?", exactly as the `.parity` forms do with bit 0 of their operand.
+So a token is true during the phase after its own, false again one phase
+later, and so on: measured on an RTX 3080 Ti for tokens up to eight phases old
+and for made-up tokens (validation/ampere/mbarrier_token_golden.txt). The low
+half of the simulator's token is the phase number, for whoever prints it; a
+GPU has unrelated bits there and no wait looks at them.
+
 `try_wait` may suspend the thread on real hardware; here it blocks the warp
 until the phase completes, which lets a wait that can never succeed be
 reported as a deadlock instead of spinning forever.
@@ -83,7 +92,7 @@ def _mbarrier(w, ins, mask):
         n = count(ops[2]) if len(ops) == 3 else None
         token = np.zeros(len(mask), dtype=np.uint64)
         for l, bar in bars(ops[1]):
-            token[l] = bar.phase
+            token[l] = token_of(bar.phase)
             if expect:
                 bar.expect_tx(int(n[l]))
                 bar.arrive(1, w, ins, [l])
@@ -105,7 +114,7 @@ def _mbarrier(w, ins, mask):
         result = np.zeros(len(mask), dtype=np.bool_)
         waiting = []
         for l, bar in bars(ops[1]):
-            done = (bar.phase & 1) != (int(arg[l]) & 1) if parity else bar.phase != int(arg[l])
+            done = (bar.phase & 1) != (int(arg[l]) & 1 if parity else int(arg[l]) >> 63)
             result[l] = done
             if done:
                 if "relaxed" not in ins.mods:
@@ -155,6 +164,12 @@ def _fence(w, ins, mask):
         pass
     else:
         raise unsupported(ins)
+
+
+def token_of(phase: int) -> int:
+    """The token of an arrival made in `phase`: its parity in bit 63, the only bit a wait
+    reads, and the phase number in the low half (the simulator's own addition)."""
+    return (phase & 1) << 63 | phase & 0xFFFFFFFF
 
 
 class Mbarrier:

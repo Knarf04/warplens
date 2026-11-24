@@ -236,3 +236,28 @@ def test_proxy_fence_only_publishes_writes_in_its_state_space(sim, space):
 def test_unsupported_proxy_fences_are_not_silently_ignored(sim, instruction):
     with pytest.raises(warplens.UnsupportedError, match="fence.proxy"):
         sim.launch(kernel(instruction + "\nret;"), "k", grid=1, block=1)
+
+
+def test_a_token_carries_only_the_parity_of_its_phase(sim):
+    """An RTX 3080 Ti answers `test_wait` from bit 63 of the token (the parity of the phase the
+    arrival was made in), so a token two completions old is false again, and so is a made-up
+    token with the same bit (validation/ampere/mbarrier_token_golden.txt)."""
+    steps = "".join(f"""
+        mbarrier.arrive.shared::cta.b64 %new, [%bar];
+        mbarrier.test_wait.shared::cta.b64 %p, [%bar], %token;
+        {_record(k)}""" for k in range(5))
+    mod = _barrier_kernel(f"""
+        .reg .b64 %new;
+        mbarrier.init.shared::cta.b64 [%bar], 1;
+        mbarrier.arrive.shared::cta.b64 %token, [%bar];
+        {steps}
+        mbarrier.test_wait.shared::cta.b64 %p, [%bar], 0x8000000000000000;
+        {_record(5)}
+        mbarrier.test_wait.shared::cta.b64 %p, [%bar], 0x7fffffffffffffff;
+        {_record(6)}
+    """)
+    out = sim.empty(7, "u32")
+    stats = sim.launch(mod, "k", grid=1, block=1, args=[out])
+    # The token is of phase 0; the tests are made in phases 2, 3, 4, 5, 6 and twice more in 6.
+    assert out.numpy().tolist() == [0, 1, 0, 1, 0, 1, 0]
+    assert not stats.findings

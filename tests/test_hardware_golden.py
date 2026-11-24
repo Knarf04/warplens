@@ -272,3 +272,25 @@ def test_min_max_and_float_to_integer_match_real_gpu(sim):
             problems.append(f"{name}: {len(wrong)} of {n} differ, e.g. " + "; ".join(
                 f"{rows[i, 0]:x} {rows[i, 1]:x} -> gpu {expect[i]:x}, sim {got[i]:x}" for i in wrong[:4]))
     assert not problems, "\n".join(problems)
+
+
+def test_mbarrier_tokens_match_real_gpu(sim):
+    """mbarrier_token_golden.txt is bin/mbarrier_token_golden on an RTX 3080 Ti: after every
+    arrival, `test_wait` with the token of each arrival so far (up to eight phases old), with
+    the made-up tokens 1 << b, and `test_wait.parity` with 0 to 3. The GPU answers from bit 63
+    of the token alone, which holds the parity of the phase the arrival was made in."""
+    rows = [l.split() for l in (AMPERE / "mbarrier_token_golden.txt").read_text().splitlines()]
+    assert len(rows) == 8 * (1 + 2 + 3 + 5)
+    problems = []
+    for count in (1, 2, 3, 5):
+        expect = np.array([[int(r[2])] + [int(x, 16) for x in r[3:]] for r in rows if int(r[0]) == count],
+                          dtype=np.uint64)
+        steps = len(expect)
+        out = sim.from_numpy(np.zeros(4 * steps, np.uint64))
+        stats = sim.launch(AMPERE / "mbarrier_token_probe.ptx", "mbarrier_token_probe", grid=1, block=1,
+                           args=[np.uint32(count), np.int32(steps), out])
+        assert not stats.findings
+        got = out.numpy().reshape(steps, 4)
+        problems += [f"count {count}, arrival {s}: gpu {[hex(v) for v in expect[s]]}, sim {[hex(v) for v in got[s]]}"
+                     for s in range(steps) if (got[s] != expect[s]).any()]
+    assert not problems, f"{len(problems)} arrivals differ:\n" + "\n".join(problems[:8])

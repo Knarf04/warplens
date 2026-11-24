@@ -505,7 +505,7 @@ int warplens_device_attribute(int attribute) {
     case cudaDevAttrMaxGridDimX: return 2147483647;
     case cudaDevAttrMaxGridDimY: case cudaDevAttrMaxGridDimZ: return 65535;
     case cudaDevAttrMaxSharedMemoryPerBlock: return 48 * 1024;
-    case cudaDevAttrMaxSharedMemoryPerBlockOptin: return 227 * 1024;
+    case cudaDevAttrMaxSharedMemoryPerBlockOptin: return WL_MAX_SMEM_BYTES;
     case cudaDevAttrMaxSharedMemoryPerMultiprocessor: return 228 * 1024;
     case cudaDevAttrMaxRegistersPerBlock: case cudaDevAttrMaxRegistersPerMultiprocessor: return 65536;
     case cudaDevAttrWarpSize: return 32;
@@ -559,7 +559,7 @@ cudaError_t cudaFuncGetAttributes(struct cudaFuncAttributes *attr, const void *f
   TRACE("cudaFuncGetAttributes(%p)", func);
   memset(attr, 0, sizeof *attr);
   attr->maxThreadsPerBlock = 1024;
-  attr->maxDynamicSharedSizeBytes = 227 * 1024;
+  attr->maxDynamicSharedSizeBytes = WL_MAX_SMEM_BYTES;
   attr->ptxVersion = 100;  /* the compute architecture (compute_100), which thrust dispatches on */
   attr->binaryVersion = 100;
   return cudaSuccess;

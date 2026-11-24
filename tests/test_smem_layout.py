@@ -47,7 +47,7 @@ def test_dynamic_shared_padding_does_not_extend_the_requested_buffer(sim):
 
 
 def test_dynamic_alignment_padding_counts_towards_the_shared_memory_limit(sim):
-    with pytest.raises(warplens.LaunchError, match="the limit is 233472"):
+    with pytest.raises(warplens.LaunchError, match="the limit is 232448"):
         sim.launch(layout_kernel(256), "k", grid=1, block=1,
                    smem=MAX_SMEM_BYTES - 128, args=[sim.empty(2, "u32")])
 

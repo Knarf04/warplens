@@ -137,7 +137,7 @@ CUresult cuFuncGetAttribute(int *pi, CUfunction_attribute attrib, CUfunction fun
   if (!function) return CUDA_ERROR_INVALID_HANDLE;
   switch (attrib) {
     case CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK: *pi = 1024; break;
-    case CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES: *pi = 227 * 1024; break;
+    case CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES: *pi = WL_MAX_SMEM_BYTES; break;
     case CU_FUNC_ATTRIBUTE_PTX_VERSION: case CU_FUNC_ATTRIBUTE_BINARY_VERSION: *pi = 100; break;
     default: *pi = 0; break;  /* sizes of the compiled kernel, which PTX does not fix */
   }

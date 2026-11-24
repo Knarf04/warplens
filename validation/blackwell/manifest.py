@@ -103,7 +103,7 @@ def _tmem() -> list[Probe]:
         Probe("tmem/layout_f", "tmem/layout_f", (), ("TM-04", "TM-01"),
               "M = 128: row m on lane m. M = 64: row m on lane 32 (m / 16) + m % 16 + a, a = 0 or 16"),
         Probe("tmem/layout_f.64_8", "tmem/layout_f", ("64", "8"), ("TM-04",),
-              "M = 64 with lane offset 8: the simulator just adds the offset", risk="fault"),
+              "M = 64 with lane offset 8, neither of Layout F's two positions: refused", risk="fault"),
         Probe("tmem/transfer_shapes", "tmem/transfer_shapes", (), ("TM-05",),
               "thread and register to (lane, column) for 32x32b, 16x64b, 16x128b, 16x256b, load and store"),
         Probe("tmem/alloc_addresses", "tmem/alloc", (), ("TM-07",),

@@ -29,6 +29,8 @@
 //                             NaNs; cvt from f32 and f64 to the four integer types in the
 //                             four rounding modes, 15844 lines "instruction a b result"
 //                             (NUM-11)
+//   ampere_replay bitfield    bitfield_golden.cu: bfi.b32, bfi.b64 and the four shf forms,
+//                             2925 lines "a b pos len" and the seven results (NUM-12)
 //
 // The whole of each file is printed, not a sample: a difference in NaN selection shows in
 // particular operand positions, the files are what tests/test_hardware_golden.py holds the
@@ -59,6 +61,9 @@
 #define main replay_minmax_cvt
 #include "../../ampere/minmax_cvt_golden.cu"
 #undef main
+#define main replay_bitfield
+#include "../../ampere/bitfield_golden.cu"
+#undef main
 
 int main(int argc, char** argv) {
     const char* which = argc > 1 ? argv[1] : "";
@@ -66,6 +71,7 @@ int main(int argc, char** argv) {
     if (!strcmp(which, "nan_cvt_ftz")) return nan_run(NAN_ONLY_CVT_FTZ);
     if (!strcmp(which, "intdiv")) return replay_intdiv();
     if (!strcmp(which, "minmax_cvt")) return replay_minmax_cvt();
-    printf("HOST ERROR: usage: ampere_replay nan|nan_cvt_ftz|intdiv|minmax_cvt\n");
+    if (!strcmp(which, "bitfield")) return replay_bitfield();
+    printf("HOST ERROR: usage: ampere_replay nan|nan_cvt_ftz|intdiv|minmax_cvt|bitfield\n");
     return 2;
 }

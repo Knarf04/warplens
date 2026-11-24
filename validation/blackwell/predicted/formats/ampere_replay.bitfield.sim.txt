@@ -1,0 +1,3 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  bitfield_probe: 12 CTA(s), 5020 warp-instructions

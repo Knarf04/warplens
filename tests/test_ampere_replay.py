@@ -61,6 +61,7 @@ REPLAYED = {
     "mbarrier_token_golden.txt": ("mbarrier/ampere_token", "mbarrier_token_golden.cu", _whole, _whole),
     "minmax_cvt_golden.txt": ("formats/ampere_replay.minmax_cvt", "minmax_cvt_golden.cu", _whole, _whole),
     "intdiv_golden.txt": ("formats/ampere_replay.intdiv", "intdiv_golden.cu", _whole, _whole),
+    "bitfield_golden.txt": ("formats/ampere_replay.bitfield", "bitfield_golden.cu", _whole, _whole),
     "nan_golden.txt": ("formats/ampere_replay.nan", "nan_golden.cu", _without_cvt_ftz, _whole),
     "ftz_golden.txt": ("formats/ftz", "ftz_golden.cu", _ftz_nan_as_text, _whole),
 }

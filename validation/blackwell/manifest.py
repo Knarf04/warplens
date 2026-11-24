@@ -283,6 +283,9 @@ def _formats() -> list[Probe]:
         Probe("formats/ampere_replay.intdiv", "formats/ampere_replay", ("intdiv",), ("NUM-12",),
               "as on an RTX 3080 Ti (validation/ampere/intdiv_golden.txt): div and rem on 16, 32 and 64 bits; "
               "by zero (unspecified in PTX) both give all ones, the minimum over -1 gives the minimum and 0"),
+        Probe("formats/ampere_replay.bitfield", "formats/ampere_replay", ("bitfield",), ("NUM-12",),
+              "as on an RTX 3080 Ti (validation/ampere/bitfield_golden.txt): bfi.b32, bfi.b64 and "
+              "shf.{l,r}.{wrap,clamp}.b32 over positions and lengths up to and past the register width"),
         Probe("formats/ampere_replay.nan", "formats/ampere_replay", ("nan",), ("NUM-13",),
               "as on an RTX 3080 Ti (validation/ampere/nan_golden.txt without its 44 cvt.ftz lines): the bits "
               "of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt, f32 and f64"),

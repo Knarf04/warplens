@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Is this machine worth the rental? Run before anything else.
 #
-#   env/remote/preflight.sh [--quick] [--e2e] [--book PATH] [--out FILE] [--status FILE]
+#   env/remote/preflight.sh [--quick] [--e2e] [--book PATH] [--no-ncu] [--out FILE] [--status FILE]
 #
 # Prints one line per check, PASS, WARN, FAIL, INFO or SKIP, then a summary.
 # Exit status 1 if any check FAILed, 0 otherwise.
@@ -11,9 +11,15 @@
 #                  privileges). A few seconds. Run this first.
 #   (default)      also compile and run kernels on the GPU, encode a tensor map
 #                  and read a performance counter with ncu. Needs the env from
-#                  env/remote/setup.sh. About a minute.
-#   --e2e          also require native Triton (CUDA PyTorch) and WARPLENS_BOOK
-#   --book PATH    book clone for --e2e (default WARPLENS_BOOK)
+#                  env/remote/setup.sh. About a minute. The counter must really
+#                  be read: no ncu, no permission (ERR_NVGPUCTRPERM) or no value
+#                  is a FAIL, because the timing suite is held against counters
+#   --no-ncu       counters are not needed: whatever keeps ncu from reading one
+#                  is a WARN. The report still says that none was read
+#   --e2e          also require native Triton (CUDA PyTorch) and a clone of the
+#                  book, and check which commit of the book it is
+#   --book PATH    book clone for --e2e (default: WARPLENS_BOOK, else the clone
+#                  setup.sh made in $WARPLENS_REMOTE_HOME/book)
 #   --out FILE     also write the report to FILE
 #   --status FILE  write "check STATUS" lines to FILE, for run.sh
 #
@@ -25,6 +31,7 @@
 #                                 the kernel checks on a development GPU
 #   WARPLENS_ENV_RUN="conda run -n warplens"   use an existing env
 #   PREFLIGHT_OFFLINE=1           do not ask the network for the time
+#   PREFLIGHT_NCU_CANDIDATES=...  where to look for an ncu that is not in the env or on PATH
 set -uo pipefail
 # shellcheck source=env/remote/lib.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
@@ -40,17 +47,19 @@ fi
 
 quick=0
 with_e2e=0
-book="${WARPLENS_BOOK:-}"
+require_ncu=1
+book="$(book_path)"
 out_file=""
 status_file=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick) quick=1 ;;
     --e2e) with_e2e=1 ;;
+    --no-ncu) require_ncu=0 ;;
     --book) book="${2:?--book needs a path}"; shift ;;
     --out) out_file="${2:?--out needs a file}"; shift ;;
     --status) status_file="${2:?--status needs a file}"; shift ;;
-    -h|--help) sed -n '2,25p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,34p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -263,8 +272,22 @@ else
       pass native-e2e "CUDA PyTorch, Triton and the book clone are available"
     else
       fail native-e2e "native end-to-end prerequisites are missing: $(tr '\n' ' ' <<<"$out")"
-      note "PyTorch: env/remote/setup.sh installs it (run it again). The book: clone it and set WARPLENS_BOOK (RUNBOOK.md, section 3)."
+      note "PyTorch and the book: env/remote/setup.sh installs the one and fetches the other (run it again,"
+      note "without --no-torch or --no-book). Or clone the book by hand and set WARPLENS_BOOK (RUNBOOK.md, section 3)."
       note "For a probe-only run: WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e env/remote/run.sh"
+    fi
+    # Which book: the committed prediction of row RT-08 is for one commit of it (pins.env).
+    if is_book_clone "$book"; then
+      book_head="$(book_commit "$book")"
+      if [[ "$book_head" == "$PIN_BOOK_COMMIT" ]]; then
+        pass book "$book is at commit ${book_head:0:12}, the one the predictions were made against"
+      elif [[ "$book" == "$BOOK_DIR" ]]; then
+        fail book "$book, the clone setup.sh keeps, is at commit $book_head, not the pinned $PIN_BOOK_COMMIT"
+        note "env/remote/setup.sh fetches the pinned commit again (run it; with run.sh: --redo setup)."
+      else
+        warn book "$book is at commit $book_head, not the pinned $PIN_BOOK_COMMIT the predictions were made against: row RT-08 runs other kernels than were predicted"
+        note "Unset WARPLENS_BOOK (and drop --book) to use the clone env/remote/setup.sh fetches at the pinned commit."
+      fi
     fi
   fi
   work="$(mktemp -d)"
@@ -408,25 +431,46 @@ else
     pass torch "PyTorch $(field torch_build "$out") with Triton $(field torch_triton "$out") sees $(field torch_device "$out") (capability $(field torch_device_cap "$out"))"
   fi
 
-  # ncu and the performance counters (plan step E21). A WARN, not a FAIL:
-  # only the counter comparison in the timing suite needs it.
+  # ncu and the performance counters (plan step E21). The rental is there to hold the
+  # timing model against real counters, so a counter must actually be read: every other
+  # outcome is a FAIL, which stops run.sh before the GPU stages. With --no-ncu (the run
+  # was told to do without counters) the same outcomes are WARNs. Nothing but PASS means
+  # that a counter was read; run.sh records anything else as "unavailable".
+  ncu_missed() {  # ncu_missed DETAIL: counters were not read
+    if (( require_ncu )); then fail ncu "$1"; else warn ncu "counters are not needed (--no-ncu) and were not read: $1"; fi
+  }
+  ncu_consequence() {
+    if (( require_ncu )); then
+      note "A full run needs the counters: the timing suite's counter comparison is what they are for."
+      note "If this machine cannot grant them, env/remote/run.sh --no-ncu runs everything else;"
+      note "the archive then says that no counter was read (NCU-COUNTERS-NOT-READ.txt)."
+    else
+      note "Counters were declared not needed (--no-ncu): the run goes on and the ncu counter comparison is lost."
+    fi
+  }
   ncu_bin="$(env_run bash -c 'command -v ncu' 2>/dev/null || true)"
   if [[ -z "$ncu_bin" ]]; then
-    for candidate in /usr/local/cuda/bin/ncu /opt/nvidia/nsight-compute/*/ncu; do
+    for candidate in ${PREFLIGHT_NCU_CANDIDATES:-/usr/local/cuda/bin/ncu /opt/nvidia/nsight-compute/*/ncu}; do
       [[ -x "$candidate" ]] && ncu_bin="$candidate"
     done
   fi
   if [[ -z "$ncu_bin" ]]; then
-    warn ncu "no ncu in the env, on PATH, in /usr/local/cuda/bin or in /opt/nvidia/nsight-compute: counters cannot be read. Rerun env/remote/setup.sh without --no-ncu"
+    ncu_missed "no ncu in the env, on PATH, in /usr/local/cuda/bin or in /opt/nvidia/nsight-compute: counters cannot be read. Rerun env/remote/setup.sh without --no-ncu"
+    ncu_consequence
   elif (( ! trivial_ran )); then
-    skip ncu "$ncu_bin found, but the trivial kernel did not run, so there is nothing to profile"
+    # Not a pass and, when counters are needed, not a skip either: nothing was read.
+    if (( require_ncu )); then
+      fail ncu "$ncu_bin found, but the trivial kernel did not run, so there was nothing to profile and no counter was read"
+    else
+      skip ncu "$ncu_bin found, but the trivial kernel did not run, so there is nothing to profile (--no-ncu: not needed)"
+    fi
   else
     ncu_version="$("$ncu_bin" --version 2>/dev/null | sed -n 's/^Version \([0-9.]*\).*/\1/p' | head -n 1)"
     metric=smsp__inst_executed.sum
     out="$(env_run timeout 300 "$ncu_bin" --csv --metrics "$metric" python "$REMOTE_DIR/gpu_probe.py" vecadd "$work/vecadd.cubin" 2>&1)"
     IFS='|' read -r ncu_result ncu_detail <<<"$(parse_ncu_output "$metric" "$out")"
     if [[ "$ncu_result" == permission ]]; then
-      warn ncu "ncu $ncu_version runs but may not read performance counters:"
+      ncu_missed "ncu $ncu_version runs but may not read performance counters:"
       note "$ncu_detail"
       note "Remedies, from https://developer.nvidia.com/ERR_NVGPUCTRPERM:"
       note "  1. run as root, or with CAP_SYS_ADMIN (CAP_PERFMON also works from driver R565):"
@@ -435,12 +479,13 @@ else
       note "       modprobe nvidia NVreg_RestrictProfilingToAdminUsers=0"
       note "       or 'options nvidia NVreg_RestrictProfilingToAdminUsers=0' in a file in /etc/modprobe.d"
       note "  3. in a container: only the host can grant it, by 2. or by starting the container with --cap-add=SYS_ADMIN"
-      note "If none is possible on this machine, the run still completes; the ncu counter comparison is skipped."
+      ncu_consequence
     elif [[ "$ncu_result" == ok ]]; then
       pass ncu "ncu $ncu_version ($ncu_bin) read a performance counter: $metric = $ncu_detail"
     else
-      warn ncu "ncu $ncu_version ($ncu_bin) did not report the counter; its last output:"
+      ncu_missed "ncu $ncu_version ($ncu_bin) did not report the counter; its last output:"
       while IFS= read -r l; do note "$l"; done <<<"$(tail -n 6 <<<"$out")"
+      ncu_consequence
     fi
   fi
 fi

@@ -1,27 +1,36 @@
 #!/usr/bin/env bash
 # Install the pinned environment on a fresh rented Linux GPU machine.
 #
-#   env/remote/setup.sh [--toolkit auto|pinned|X.Y] [--no-ncu] [--no-torch] [--force]
+#   env/remote/setup.sh [--toolkit auto|pinned|X.Y] [--no-ncu] [--no-torch] [--no-book] [--force]
 #
 # Non-interactive and safe to run again: a finished setup is recognized and
 # only re-verified. Needs no root, no conda and no system CUDA toolkit: it
 # downloads one static micromamba binary and builds a private env from
-# conda-forge and PyPI, at the versions in env/remote/pins.env. Root is used
-# only if a download tool, git or gdb is missing and apt-get is available.
+# conda-forge and PyPI, at the versions in env/remote/pins.env, and clones the
+# book whose kernels the end-to-end step runs, at the commit pinned there. Root
+# is used only if a download tool, git or gdb is missing and apt-get is available.
 #
 #   --toolkit auto     (default) the pinned CUDA toolkit, or the release that
 #                      matches the driver when the driver is older (the driver
 #                      of a rented machine cannot be changed; see RUNBOOK.md)
 #   --toolkit pinned   the pinned toolkit whatever the driver is
 #   --toolkit X.Y      that toolkit release
-#   --no-ncu           do not install Nsight Compute (about 0.5 GB)
+#   --no-ncu           do not install Nsight Compute (about 0.5 GB). Counters can
+#                      then not be read: preflight.sh and run.sh need --no-ncu too
 #   --no-torch         do not make the PyTorch env (about 4.5 GB). Only the
 #                      Triton-on-GPU step of the probe suite needs it
+#   --no-book          do not fetch the book ("Modern GPU Programming for MLSys",
+#                      matrix row RT-08) into $WARPLENS_REMOTE_HOME/book. It is
+#                      not fetched either when WARPLENS_BOOK is set: that clone
+#                      is the one used. Without a book a full run stops at
+#                      preflight (check native-e2e)
 #   --force            redo every step even if setup finished before
 #
 #   WARPLENS_REMOTE_HOME   where everything goes (default: ~/warplens-remote).
 #                          Needs about 18 GB (12 with --no-torch); point it at
 #                          the large disk.
+#   WARPLENS_BOOK_URL      fetch the book from here instead of its repository
+#                          on github.com (a mirror)
 #
 # Writes $WARPLENS_REMOTE_HOME/resolved/: the exact conda packages, pip freeze,
 # and versions.txt with what was actually installed next to what was pinned.
@@ -32,6 +41,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 toolkit_mode=auto
 with_ncu=1
 with_torch=1
+with_book=1
 force=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,8 +49,9 @@ while [[ $# -gt 0 ]]; do
     --toolkit=*) toolkit_mode="${1#*=}" ;;
     --no-ncu) with_ncu=0 ;;
     --no-torch) with_torch=0 ;;
+    --no-book) with_book=0 ;;
     --force) force=1 ;;
-    -h|--help) sed -n '2,27p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,36p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -131,8 +142,13 @@ fi
 # One line that identifies this configuration; a finished setup with the same
 # line is not redone.
 config_id="pins=$(sha256sum "$PINS_FILE" | cut -c1-16) toolkit=$toolkit ncu=$with_ncu torch=$with_torch repo=$REPO_DIR"
-if (( ! force )) && [[ -f "$REMOTE_HOME/state/setup.done" ]] \
-   && [[ "$(cat "$REMOTE_HOME/state/setup.done")" == "$config_id" ]] \
+# An env that was installed with ncu serves a later --no-ncu as it is (run.sh --no-ncu
+# after a preflight that could not read counters must not spend minutes reinstalling).
+done_id="$(cat "$REMOTE_HOME/state/setup.done" 2>/dev/null || true)"
+if (( ! with_ncu )) && [[ "$done_id" == "${config_id/ ncu=0 / ncu=1 }" ]]; then
+  config_id="$done_id"
+fi
+if (( ! force )) && [[ -n "$done_id" && "$done_id" == "$config_id" ]] \
    && [[ -x "$MAMBA_BIN" && -x "$ENV_PREFIX/bin/python" ]]; then
   say "already set up in $REMOTE_HOME for this configuration; verifying only (use --force to reinstall)"
   already=1
@@ -292,6 +308,20 @@ elif [[ -n "$gdb_bin" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 5d. The book, for the end-to-end step (matrix row RT-08)
+# ---------------------------------------------------------------------------
+# validation/blackwell/e2e runs the book's GEMM kernels from a clone of the book's own
+# repository: it has no license, so it is not in this one, and it is only ever cloned.
+# The commit is the one the committed prediction was made against (pins.env). Like the
+# PyTorch env, a failure is a warning here and is tried again by every run of this script;
+# a full run then stops at preflight (check native-e2e), before anything is run on the GPU.
+IFS='|' read -r book_state book_why <<<"$(provide_book "$with_book" "$PIN_BOOK_COMMIT")"
+case "$book_state" in
+  present|fetched|opted-out|given) say "the book: $book_state: $book_why" ;;
+  *) warn "the book: ${book_why:-not fetched}. Row RT-08 (the book's GEMM kernels) cannot run and a full run stops at preflight (native-e2e). Run env/remote/setup.sh again to retry, or clone it by hand and set WARPLENS_BOOK (RUNBOOK.md, section 3)" ;;
+esac
+
+# ---------------------------------------------------------------------------
 # 6. Record what was installed, and compare with the pins
 # ---------------------------------------------------------------------------
 resolved="$REMOTE_HOME/resolved"
@@ -326,6 +356,9 @@ package_status=0
   echo "cuda_cudart_dev=$(conda_version cuda-cudart-dev)"
   echo "cuda_nvrtc=$(conda_version cuda-nvrtc)"
   echo "nsight_compute=$(conda_version nsight-compute)"
+  (( with_ncu )) || echo "ncu_requested=no (--no-ncu): this setup was told to do without Nsight Compute, so no performance counters are expected"
+  # The clone setup.sh keeps, whatever WARPLENS_BOOK says: what was fetched here.
+  if is_book_clone "$BOOK_DIR"; then echo "book_commit=$(book_commit "$BOOK_DIR")"; else echo "book_commit=not-fetched"; fi
   echo "gdb=$( { [[ -n "$gdb_bin" ]] && "$gdb_bin" --version 2>/dev/null | head -n 1; } || echo none)"
   env_run python "$REMOTE_DIR/check_env.py" versions || package_status=1
   if [[ -x "$TORCH_ENV/bin/python" ]]; then
@@ -377,10 +410,10 @@ if [[ -x "$TORCH_ENV/bin/python" ]]; then
 fi
 for line in "${drift[@]}"; do
   # A fallback toolkit differs from the pins by design; without ncu, so does nsight_compute;
-  # without the torch env, so does torch.
+  # without the torch env, so does torch; without the book (said or warned of above), so does it.
   case "$line" in
     cuda_*|nsight_compute*) [[ "$toolkit_status" == fallback || "$line" == nsight_compute*MISSING ]] && { say "differs from pins: $line"; continue; } ;;
-    torch:*not-installed) say "differs from pins: $line"; continue ;;
+    torch:*not-installed|book_commit:*not-fetched) say "differs from pins: $line"; continue ;;
   esac
   warn "differs from pins: $line"
 done

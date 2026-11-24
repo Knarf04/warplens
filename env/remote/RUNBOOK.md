@@ -12,7 +12,7 @@ means neither. Nothing here has run on a B200.
 | File | What it does |
 | --- | --- |
 | `pins.env` | Every version, exact. The only place a version is written. |
-| `setup.sh` | Installs the env from the pins. No root, no conda, no system toolkit needed. |
+| `setup.sh` | Installs the env from the pins and clones the book at its pinned commit. No root, no conda, no system toolkit needed. |
 | `preflight.sh` | Is this machine a real B200 and does everything on it work? PASS / WARN / FAIL per check. |
 | `run.sh` | Preflight, setup, build and run both probe suites, pack one archive. Resumable. |
 | `predict_toolkit.sh` | Makes the predictions again with the installed nvcc, without a GPU. `run.sh` runs it by itself when setup fell back to another toolkit (section 2). |
@@ -42,6 +42,8 @@ Do these at home; none needs the B200.
       is older than the toolkit: it refuses NVRTC's PTX, traced or not.
 - [ ] The toolkit policy of section 2 is read, and the owner has confirmed or changed the
       budget for a second rental (section 5).
+- [ ] The image is checked against "Before paying" in section 2: counters, ptrace, driver,
+      network, disk.
 - [ ] Write down the commit: `git rev-parse HEAD`. The archive's manifest must show the same.
 - [ ] Make the bundle to upload (section 3). No credentials go on the rented machine.
 
@@ -58,6 +60,52 @@ Do these at home; none needs the B200.
 | NVIDIA RTX PRO 6000 Blackwell (Workstation **and Server Edition**) | 12.0 | no |
 | NVIDIA GB10 (DGX Spark) | 12.1 | no |
 | H100, H200 | 9.0 | no |
+
+### Before paying: what to confirm about the image
+
+A listing that says B200 can still be an image on which the run stops at preflight or comes
+back without what it was rented for. Each line is something a script here needs; where it
+says so is in brackets. Ask the provider, or read the image's description, before the clock
+starts.
+
+- [ ] **Root on a VM or bare metal, or a container started with `CAP_SYS_ADMIN`.** `ncu` reads
+      performance counters only as root or with `CAP_SYS_ADMIN` (`CAP_PERFMON` also works
+      from driver R565), or when the *host's* driver has
+      `NVreg_RestrictProfilingToAdminUsers=0` (documented:
+      <https://developer.nvidia.com/ERR_NVGPUCTRPERM>). Root *inside* a container is not
+      enough: only the provider can start it with `--cap-add=SYS_ADMIN` or open the host
+      driver. Without a counter read the full preflight FAILs and `run.sh` stops before
+      anything is built or run on the GPU (`preflight.sh`, check `ncu`); the timing model
+      is held against counters, so this is asked first. The alternative is decided at home,
+      not on the clock: `run.sh --no-ncu` (section 7).
+- [ ] **`ptrace` is permitted in the container.** Rows RT-10 and RT-11 start a program under
+      gdb (`validation/blackwell/e2e/driver_call_trace.py`); where the container's seccomp
+      profile forbids `ptrace` they come back `skipped (... ptrace is not permitted)`, and
+      the tensor maps of RT-11 are a reason for a second rental (section 5). Docker's
+      default profile allows it on current kernels (not tried in a provider's container:
+      section 9); a VM or bare metal has no such profile. The run does not stop for this,
+      so nothing warns you before the rows are lost: ask.
+- [ ] **The driver's "CUDA Version" is at least the pinned toolkit's** (`CUDA_VERSION` in
+      `pins.env`: 13.5). If the image has an older 13.x driver the run still works, with the
+      fallback toolkit ("Driver" below): then make that toolkit's predictions at home
+      *before* renting ("At home: the predictions of a fallback toolkit"), so that what
+      depends on the compiler is known in advance. Below 12.8 (`CUDA_VERSION_MIN`) preflight
+      fails. A rented driver cannot be changed from inside a container.
+- [ ] **Outbound HTTPS**, to: github.com and the hosts its downloads redirect to (the
+      micromamba binary, the clone of the book, the clone of CUTLASS that
+      `examples/03_cutlass_mma/build.sh` makes for the end-to-end step, and the clock check);
+      conda.anaconda.org (conda-forge: Python, nvcc, the CUDA headers, NVRTC, Nsight Compute;
+      git and gdb too when the image has none); pypi.org and files.pythonhosted.org (Triton,
+      the CuTe DSL, TIRx, cuda-bindings, PyTorch). And the image's own package mirror if
+      you are root and it lacks `curl`, `git` or `gdb` (`apt-get`). No fetch here can be
+      replaced by an upload except the repository itself (the bundle of section 3) and,
+      with `WARPLENS_BOOK`, the book.
+- [ ] **18 GB free on one filesystem you can write to** (`WARPLENS_REMOTE_HOME`; `setup.sh`
+      refuses to start with less, 12 GB with `--no-torch`), and not counting `/tmp`:
+      everything, temporary files included, goes under that directory. The archive is small
+      next to it (section 6).
+- [ ] **x86_64, one dedicated GPU.** `setup.sh` refuses any other CPU (a GB200 node is Arm);
+      a shared card makes the timing numbers worthless and preflight cannot always see it.
 
 What to look for in a listing:
 
@@ -79,8 +127,11 @@ What to look for in a listing:
   (documented: <https://developer.nvidia.com/ERR_NVGPUCTRPERM>). In a VM you are
   root over the driver. In a container you are root only inside it: unless the
   provider started it with `--cap-add=SYS_ADMIN` or opened the host driver,
-  nothing you do inside helps. The run completes either way; without counters
-  the `ncu` comparison in the timing suite (plan step C14) is skipped.
+  nothing you do inside helps. **A full run requires a counter read**: without
+  one the full preflight FAILs (check `ncu`) and `run.sh` stops before anything
+  is built or run on the GPU. The run goes on without counters only when told
+  to, with `run.sh --no-ncu`; the `ncu` comparison in the timing suite (plan
+  step C14) is then lost and the archive says so (section 7).
 - **Driver.** Ask for, or pick the image with, the newest driver. What matters is
   the "CUDA Version" in the header of `nvidia-smi`:
   - 13.5 or newer: everything runs as pinned, and results are held against the
@@ -258,18 +309,15 @@ nvidia-smi                                   # first look: is it a B200, which C
 git clone warplens.bundle warplens && cd warplens     # no git? see below
 export WARPLENS_REMOTE_HOME=$HOME/warplens-remote     # 18 GB; point it at the big disk
 env/remote/preflight.sh --quick              # 2 seconds. FAIL gpu-identity: release the machine now
-# The book's kernels (row RT-08) are run from the book's own repository, at the commit the
-# predictions were made against (tests/test_book.py, COMMIT). It has no license and is not copied.
-git init -q ~/book
-git -C ~/book fetch -q --depth 1 https://github.com/mlc-ai/modern-gpu-programming-for-mlsys 3a24144defa6da03d4ab8a1dfcf513b18007d15f
-git -C ~/book checkout -q FETCH_HEAD
-export WARPLENS_BOOK=$HOME/book
 env/remote/run.sh --dry-run                  # the plan; no stage may say MISSING
 tmux new -s run
 env/remote/run.sh 2>&1 | tee ~/run.log       # everything; prints the archive path and checksum at the end
 ```
 
 The same command whatever the driver is: the toolkit policy of section 2 is built in.
+Nothing else is fetched by hand: `setup.sh` installs PyTorch and clones the book
+("PyTorch and the book" below). A full run needs `ncu` to read a counter and stops at
+preflight if it cannot (section 7, `ncu` FAIL): become root before the first command.
 
 - No `git` on the machine: `setup.sh` installs it with `apt-get` when it is root
   (not exercised) or puts conda-forge's git into the env (measured). To get the
@@ -277,8 +325,9 @@ The same command whatever the driver is: the toolkit policy of section 2 is buil
   `rsync -a --exclude __pycache__ ./ <user>@<host>:warplens/` (include `.git`;
   the commit is read from it without a git program).
 - If you are not root and `sudo` works, become root first (`sudo -i`) and do
-  everything as root, so that `ncu` may read counters. Decide this before the
-  first command: the env lives under `$HOME` of whoever runs `setup.sh`.
+  everything as root, so that `ncu` may read counters; without them the run
+  stops at preflight. Decide this before the first command: the env lives under
+  `$HOME` of whoever runs `setup.sh`.
 - Again after any failure or interruption: the same `env/remote/run.sh`.
   Finished stages are skipped only for the same commit, pins and run configuration.
   Changing `--toolkit` or suite arguments reruns the stages. `--redo STAGE` repeats
@@ -321,13 +370,47 @@ sha256sum -c warplens-b200-*.tar.gz.sha256
   `torch_cuda_version`, `torch_cuda_available` and `torch_device_cap`.
 - It takes 4.3 GB and 144 s on a fast link (measured).
 
-**The book: nothing fetches it for you.** The commands above clone it and set
-`WARPLENS_BOOK` (they are the ones CI runs; `--book` through
-`WARPLENS_BLACKWELL_RUN_ARGS` does the same).
+**The book: `setup.sh` fetches it; there is nothing to prepare.** The book's kernels (row
+RT-08) are run from the book's own repository, at the commit the predictions were made
+against. It has no license, so it is not in this repository and is only ever cloned.
+What `setup.sh` does (its section 5d, `ensure_book` in `lib.sh`, `BOOK_COMMIT` in `pins.env`):
+
+- It clones <https://github.com/mlc-ai/modern-gpu-programming-for-mlsys> into
+  `$WARPLENS_REMOTE_HOME/book`, that one commit without history (11 MB; measured), and
+  checks that what it got is at exactly the pinned commit and has the GEMM chapter. The
+  pin is the commit `tests/test_book.py` names (`COMMIT`) and CI checks out;
+  `tests/test_remote_env.py` holds the three together.
+- Every run of `setup.sh` looks again: a clone at the pinned commit is left alone, one at
+  another commit is replaced, a missing one is fetched. The fetch goes into a directory
+  beside it and takes its place only when it is right, so a failed fetch leaves what was
+  there.
+- A failed fetch (no network, the commit gone) is a warning, as for PyTorch, and the next
+  `setup.sh` tries again; `book_commit=` in `resolved/versions.txt` says what is there.
+- It is not fetched with `setup.sh --no-book` (through `run.sh`: `run.sh --no-book`), or
+  when `WARPLENS_BOOK` is set: that clone is then the one used.
+- `run.sh` and `preflight.sh` take `$WARPLENS_REMOTE_HOME/book` for `WARPLENS_BOOK` when the
+  variable is not set and the clone is there. `WARPLENS_BOOK` set by you wins, and so does
+  `--book` (through `WARPLENS_BLACKWELL_RUN_ARGS` for `run.sh`); `WARPLENS_BOOK=` set to
+  nothing means no book. `book=` and `book_commit=` in `manifest.txt` say which was used.
+- The clone lies beside the run directory, not in it, and `run.sh` archives the run
+  directory only: no file of the book is in the archive. What is there, as before, is
+  what the captures keep of a run: the PTX compiled from its kernels, the commit and a
+  checksum of each chapter read.
+
+The fallback, when the rented machine cannot reach github.com but you can upload: clone it
+by hand, at the same commit, and name it. These are the commands CI runs.
+
+```bash
+git init -q ~/book
+git -C ~/book fetch -q --depth 1 https://github.com/mlc-ai/modern-gpu-programming-for-mlsys 3a24144defa6da03d4ab8a1dfcf513b18007d15f
+git -C ~/book checkout -q FETCH_HEAD        # elsewhere, then: rsync -a ~/book <user>@<host>:
+export WARPLENS_BOOK=$HOME/book             # before env/remote/run.sh
+```
 
 A full run checks both before the suites start: the preflight check `native-e2e` FAILs,
-and the run stops, when the PyTorch env does not see the GPU or `WARPLENS_BOOK` is not
-a clone of the book. `run.sh` asks for that check by itself unless the Blackwell suite is
+and the run stops, when the PyTorch env does not see the GPU or there is no clone of the
+book; the check `book` says which commit the clone is at (FAIL for `setup.sh`'s own clone
+at another commit than the pinned one, WARN for a clone you named). `run.sh` asks for that check by itself unless the Blackwell suite is
 skipped or restricted with `--no-e2e` / `--only`; a standalone `preflight.sh` does it
 with `--e2e`. If PyTorch cannot be had (a 12.x driver), run the probes without the
 end-to-end programs, which also leaves out the launches of rows RT-10 and RT-11:
@@ -457,7 +540,9 @@ plan step D17), and `run.sh --dry-run` is clean:
    `failed` for `e2e/cute_dsl_tma`). They are what a decoder for CuTe DSL kernels with
    TMA is written against, and nothing else produces them.
 4. `ncu` could not read counters (a container) and the timing fit needs them: rent a VM
-   or bare metal.
+   or bare metal. With the first rental's default this shows at preflight, in its first
+   minutes, and not afterwards; it is a second rental only if the first went on with
+   `--no-ncu` or `--keep-going` (`NCU-COUNTERS-NOT-READ.txt` in its archive).
 
 What does not: a difference in an **informational** row; a mismatch that was explained
 and fixed without changing a prediction that hardware has to confirm; a row that matched.
@@ -484,10 +569,10 @@ Contents:
 
 | Path | What |
 | --- | --- |
-| `manifest.txt` | commit, branch, start and end times, host, the status of every stage |
+| `manifest.txt` | commit, branch, start and end times, host, the status of every stage; `ncu=ok` only when preflight read a counter, `ncu_required`, `ncu_counters`; `book` and `book_commit` (the clone used; the book itself is never in the archive) |
 | `stages.tsv` | every attempt of every stage: status, exit code, start, end, seconds |
 | `preflight-quick.txt`, `preflight.txt` | the two preflight reports |
-| `resolved/` | what `setup.sh` installed: every conda package with its hash, `pip freeze`, `versions.txt`, `drift.txt` (differences from the pins) |
+| `resolved/` | what `setup.sh` installed: every conda package with its hash, `pip freeze`, `versions.txt`, `drift.txt` (differences from the pins). The archive's `versions.txt` ends with `ncu_counters=read` or `not-read (...)` |
 | `pins.env` | what was asked for |
 | `nvidia-smi.txt`, `nvidia-smi-q.txt` | the GPU as the driver describes it |
 | `logs/<stage>.log` | latest output of each stage; earlier attempts are preserved in `logs/history/` |
@@ -495,6 +580,7 @@ Contents:
 | `out/blackwell/rows/` | the rows without a probe: `status.tsv`, the UE4M3 answer of ptxas (NUM-05), the driver call traces (RT-10), the CuTe DSL tutorial's output and the kernel parameters of its launch, tensor maps included (RT-11). Section 3 |
 | `out/predicted-toolkit/` | only with a fallback toolkit: the predictions made with the installed nvcc before the GPU stages, `DIFFERENCES.txt`, `toolkit.txt`. Section 2 |
 | `PREDICTIONS-NOT-COMPARABLE.txt` | only with a fallback toolkit: why, and the two commands that compare with `out/predicted-toolkit/` |
+| `NCU-COUNTERS-NOT-READ.txt` | only when preflight read no counter: whether the run was told to do without (`--no-ncu`), did not need them (no timing suite) or required them and went on with `--keep-going` |
 | `suite-dirs/` | result directories a suite created inside its own directory |
 | `SHA256SUMS` | a checksum for every file above |
 
@@ -523,11 +609,29 @@ Transfer it with `scp` or `rsync` over the existing SSH connection.
 | `driver-api` FAIL | the driver API disagrees with `nvidia-smi` | Several GPUs in a different order: `export CUDA_VISIBLE_DEVICES=<index of the B200>`. |
 | `run-trivial` FAIL | `sm_100a` machine code does not run | With `gpu-identity` PASS this should not happen. Read the error; try `env/remote/setup.sh --toolkit <the driver's CUDA Version> --force`. If it persists the machine is unusable. |
 | `ptx-jit` WARN | the driver refuses the toolkit's PTX | `--native` covers the probes only. Full end-to-end runs also fail `e2e-ptx`; use a driver-compatible toolkit (`--toolkit auto`) or deliberately select `--no-e2e`. |
-| `native-e2e` FAIL | the PyTorch env does not see the GPU, or `WARPLENS_BOOK` is not a clone of the book | The message says which. PyTorch: `env/remote/setup.sh` again (it installs it; section 3, "PyTorch and the book"). The book: the three `git` lines of section 3 and `export WARPLENS_BOOK`. Then `env/remote/run.sh` again. For probes only, set `WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e`. |
+| `native-e2e` FAIL | the PyTorch env does not see the GPU, or there is no clone of the book | The message says which. Both: `env/remote/setup.sh` again (it installs the one and fetches the other; section 3, "PyTorch and the book"), or through `run.sh`: `env/remote/run.sh --redo setup`. If the book cannot be fetched from this machine: the fallback there, by hand, and `export WARPLENS_BOOK`. Then `env/remote/run.sh` again. For probes only, set `WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e`. |
+| `book` FAIL | `setup.sh`'s clone in `$WARPLENS_REMOTE_HOME/book` is not at the pinned commit | Something changed it. `env/remote/run.sh --redo setup` fetches the pinned commit again. |
+| `book` WARN | the clone you named (`WARPLENS_BOOK`, `--book`) is at another commit, or at none that can be read | Row RT-08 then runs other kernels than the prediction was made for. Unset `WARPLENS_BOOK` to use `setup.sh`'s clone, or note it next to the archive. |
 | `tcgen05` / `tensor-map` / `tma` FAIL | a Blackwell feature is not exposed | On a real B200 these must pass. Keep the report (it is in the archive) and stop: this is a finding about the machine or a bug in the preflight kernel, not something to debug on the clock. `--keep-going` runs the suites anyway if the failure is confined to one feature. |
 | `nvrtc` WARN | NVRTC cannot compile for `sm_100a` | TIRx kernels will not build. Expected only with a 12.x toolkit. |
-| `ncu` WARN, `ERR_NVGPUCTRPERM` | no permission to read counters | In order: run everything as root (`sudo -i`, then the commands of section 3). On a VM as root, if it still fails: `modprobe nvidia NVreg_RestrictProfilingToAdminUsers=0` needs the module reloaded, which is rarely possible with the GPU in use. In a container: only the provider can grant it (`--cap-add=SYS_ADMIN`). If none works, go on: only the counter comparison is lost. |
-| `ncu` WARN, other | ncu ran but gave no counter | The report shows its last lines. An ncu too old to know the B200 says so there; `setup.sh` installs one that matches the toolkit unless `--no-ncu` was given. |
+| `ncu` FAIL, `ERR_NVGPUCTRPERM` | no permission to read counters. **The run stops here**: a full run requires a counter read, because the timing model is held against counters | In order: run everything as root (`sudo -i`, then the commands of section 3). On a VM as root, if it still fails: `modprobe nvidia NVreg_RestrictProfilingToAdminUsers=0` needs the module reloaded, which is rarely possible with the GPU in use. In a container: only the provider can grant it (`--cap-add=SYS_ADMIN`). If none works, decide: release the machine and rent one that grants it (section 2, "Before paying"), or take everything but the counters with `env/remote/run.sh --no-ncu`. |
+| `ncu` FAIL, other | no ncu was found, ncu ran but gave no counter, or the trivial kernel did not run so there was nothing to profile | The report shows which, with ncu's last lines. No ncu: `env/remote/run.sh --redo setup` without `--no-ncu`. An ncu too old to know the B200 says so in those lines; `setup.sh` installs one that matches the toolkit. Nothing to profile: fix `run-trivial` first. Otherwise as above: `--no-ncu` to go on without. |
+| `ncu` WARN | the same outcomes, in a run that was told to do without counters (`--no-ncu`) or has no timing suite (`--skip run-timing`) | Nothing: the run goes on. The archive says that no counter was read (`NCU-COUNTERS-NOT-READ.txt`, `ncu=unavailable` and `ncu_counters=` in `manifest.txt`, `ncu_counters=` at the end of `resolved/versions.txt`). |
+
+**Counters are required by default** (decided by the owner on 2026-11-24). What the options
+do about it:
+
+| Command | A counter could not be read |
+| --- | --- |
+| `env/remote/run.sh` | preflight FAILs and the run stops before the builds and the GPU stages; the archive of what exists is written, exit status 3 |
+| `env/remote/run.sh --no-ncu` | a WARN; everything else runs; `setup.sh` installs no ncu (an env that already has one is kept as it is, not reinstalled); the archive says that no counter was read |
+| `env/remote/run.sh --keep-going` | as for every failed preflight: the suites run, the preflight stage stays `failed`, exit status 1, and the archive says that counters were required and not read |
+| `env/remote/run.sh --skip build-timing --skip run-timing` | a WARN: without the timing suite nothing reads counters |
+| `env/remote/preflight.sh` / `preflight.sh --no-ncu` | FAIL / WARN, as the first two rows |
+
+Only a PASS of the `ncu` check counts as a counter read (`WARPLENS_NCU=ok` for the suites,
+`ncu=ok` in the manifest): it means ncu printed a value for the counter of a kernel that
+ran. A check that was skipped, or never reached, is `unavailable`.
 
 A stage of `run.sh` that fails prints the end of its log and the run goes on.
 Archive or checksum failures return a nonzero status; preserve the raw run directory
@@ -583,7 +687,8 @@ Measured on the development machine, into throwaway directories that were remove
   With `PREFLIGHT_EXPECT_CAP=8.6`, the compile, driver API, trivial-kernel and
   PTX checks ran for real against that GPU, with both toolkits; the `tcgen05`,
   tensor-map and TMA checks failed as they must on Ampere; `ncu` was refused
-  with `ERR_NVGPUCTRPERM`, as a WARN with the remedies.
+  with `ERR_NVGPUCTRPERM`, then a WARN with the remedies (since 2026-11-24 a
+  FAIL; below).
 - The two preflight kernels (`tcgen05.alloc`/`dealloc`, the TMA load) run
   correctly in the simulator, from the checked-in PTX.
 - `run.sh` end to end against the 13.0 env, with copies of the two probe suites
@@ -642,6 +747,27 @@ Measured on the development machine, into throwaway directories that were remove
     point): the driver reported sizes 4, 128, 8 and the 128 bytes saved were the bytes
     passed. With the system gdb 15.1 and with conda-forge's gdb 18.1.
   - `shellcheck` 0.11 on the five scripts, `predict_toolkit.sh` included: clean.
+- On 2026-11-24, the book fetch and the required counters, as a normal user on the RTX
+  3080 Ti (driver 580.173.02), into a directory of its own that was removed afterwards:
+  - `setup.sh --no-torch` from nothing, 2 min 19 s: it cloned the book from github.com
+    into `$WARPLENS_REMOTE_HOME/book` at the pinned commit (11 MB) and recorded
+    `book_commit=` in `resolved/versions.txt`. A second `setup.sh`, with `--no-ncu` added,
+    took 4 s: `the book: present`, and the env that already had ncu was kept, not
+    reinstalled.
+  - A fetch from a repository github.com does not have: `failed`, at once and without a
+    question (git asks for a user name there unless told not to), nothing left behind.
+  - `preflight.sh --e2e` with `PREFLIGHT_EXPECT_CAP=8.6`: `PASS book` for that clone;
+    `FAIL ncu` with `ERR_NVGPUCTRPERM` and the remedies (ncu 2025.3.1, the release for
+    toolkit 13.0); with `--no-ncu` the same as `WARN ncu`.
+  - `run.sh --no-torch --skip selftest --skip predict-toolkit` with
+    `PREFLIGHT_EXPECT_CAP=8.6` and `--no-e2e`: took the clone for `WARPLENS_BOOK` by itself,
+    stopped after preflight with exit status 3 in 12 s and said why (no counter was read;
+    on this GPU the three Blackwell checks fail too), and wrote an archive with
+    `NCU-COUNTERS-NOT-READ.txt`, `ncu=unavailable`, `ncu_required=1`, `book=` and
+    `book_commit=` in its manifest and no file of the book.
+  - With stand-ins only (`tests/test_remote_regressions.py`): the book over a clone at
+    another commit, a commit that is not the book, a run that goes on with `--no-ncu` or
+    `--keep-going`, and every `PASS ncu` path.
 
 Later on 2026-11-24, `run.sh --keep-going` with `PREFLIGHT_EXPECT_CAP=8.6` from an empty
 home, on the tree with the pre-rental gap work merged (118 probe runs), 32 min in all,
@@ -694,7 +820,11 @@ Not tried, because there was no way to here:
   `apt-get install gdb` as root, conda-forge's gdb into `gdb-env`) were not exercised
   through `setup.sh`; conda-forge's gdb was installed by hand with the same package
   spec and ran the tracer.
-- The book's fetch commands of section 3 on this machine (they are CI's).
+- `PASS ncu` for real: it needs root, here as on the rented machine.
+- The book fetched by a git that `setup.sh` put into the env (a machine without git):
+  `git_run` in `lib.sh` falls back to it, and no machine without git was at hand.
+- The by-hand fetch of the book of section 3 on this machine (the commands are CI's;
+  `setup.sh` runs the same three git commands).
 - `predict_toolkit.sh` with a toolkit between 13.1 and 13.4 (13.0.88 was run, above).
 - A driver newer than the pinned toolkit, and a 12.x driver (only a 12.8
   *toolkit* on a 13.0 driver).

@@ -107,6 +107,8 @@ def test_every_pin_is_an_exact_version():
     for key, value in pins.items():
         if "SHA256" in key:
             assert re.fullmatch(r"[0-9a-f]{64}", value), key
+        elif key == "BOOK_COMMIT":      # the one pin that is a commit: whole, not abbreviated
+            assert re.fullmatch(r"[0-9a-f]{40}", value), key
         else:
             # digits and dots, optionally a build number: no ranges, wildcards or "latest"
             assert re.fullmatch(r"\d+(\.\d+)+(-\d+)?", value), f"{key}={value} is not an exact version"
@@ -114,6 +116,23 @@ def test_every_pin_is_an_exact_version():
     for key in ("CUDA_NVCC", "CUDA_CUDART_DEV", "CUDA_NVRTC"):
         assert pins[key].startswith(pins["CUDA_VERSION"] + ".")
     assert pins["CUDA_BINDINGS"].startswith(pins["CUDA_VERSION"] + ".")
+
+
+def test_the_book_is_pinned_to_one_commit_everywhere():
+    """pins.env is where the remote scripts get the book's commit; the tests and CI name the
+    same one, and no script or document carries another."""
+    pin = read_pins()["BOOK_COMMIT"]
+    in_tests = re.search(r'^COMMIT = "([0-9a-f]{40})"', (REPO / "tests" / "test_book.py").read_text(), re.M)
+    assert in_tests and in_tests[1] == pin
+    workflow = (REPO / ".github" / "workflows" / "ci.yml").read_text()
+    assert re.findall(r"modern-gpu-programming-for-mlsys ([0-9a-f]{7,40})", workflow) == [pin]
+    for name in ("lib.sh", "setup.sh", "preflight.sh", "run.sh"):       # the pin, never a literal
+        assert not re.search(r"\b[0-9a-f]{40}\b", (REMOTE / name).read_text()), name
+    assert "$PIN_BOOK_COMMIT" in (REMOTE / "setup.sh").read_text()
+    assert "$PIN_BOOK_COMMIT" in (REMOTE / "preflight.sh").read_text()
+    # The runbook's fetch by hand is for the same commit.
+    by_hand = re.findall(r"\b[0-9a-f]{40}\b", (REMOTE / "RUNBOOK.md").read_text())
+    assert by_hand and set(by_hand) == {pin}
 
 
 def test_the_shell_reads_the_same_pins():

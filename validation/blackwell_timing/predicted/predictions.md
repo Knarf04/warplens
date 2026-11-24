@@ -11,7 +11,7 @@
 | alu_chain/warps=8 | 5 | 30 | issue_slots |
 | alu_chain/warps=16 | 10 | 60 | issue_slots |
 | alu_chain/warps=32 | 20 | 120 | issue_slots |
-| cp_async/warm | 122.132 | 8.75 | latency |
+| cp_async/warm | 106.5 | 8.75 | latency |
 | cp_async/cold | 122.132 | 8.75 | latency |
 | global_load/load_chain/footprint=l1 | 24.1667 | 6.25 | latency |
 | global_load/store/footprint=l1 | 3.66667 | 5.5 | latency |
@@ -106,12 +106,12 @@
 | tma/load/warm/bytes=4096/ctas=1 | 125.833 | 9 | latency |
 | tma/load/warm/bytes=16384/ctas=1 | 189.833 | 9 | latency |
 | tma/load/warm/bytes=32768/ctas=1 | 275.167 | 9 | latency |
-| tma/store/bytes=64/ctas=1 | 105.287 | 7.5 | latency |
-| tma/store/bytes=256/ctas=1 | 112.149 | 7.5 | latency |
-| tma/store/bytes=1024/ctas=1 | 139.598 | 7.5 | latency |
-| tma/store/bytes=4096/ctas=1 | 249.392 | 7.5 | latency |
-| tma/store/bytes=16384/ctas=1 | 688.567 | 7.5 | HBM |
-| tma/store/bytes=32768/ctas=1 | 1274.13 | 7.5 | HBM |
+| tma/store/bytes=64/ctas=1 | 103.333 | 7.5 | latency |
+| tma/store/bytes=256/ctas=1 | 104.333 | 7.5 | latency |
+| tma/store/bytes=1024/ctas=1 | 108.333 | 7.5 | latency |
+| tma/store/bytes=4096/ctas=1 | 124.333 | 7.5 | latency |
+| tma/store/bytes=16384/ctas=1 | 188.333 | 7.5 | latency |
+| tma/store/bytes=32768/ctas=1 | 273.667 | 7.5 | latency |
 | tma/load/cold/bytes=64/ctas=1 | 105.81 | 9 | latency |
 | tma/load/cold/bytes=256/ctas=1 | 113.649 | 9 | latency |
 | tma/load/cold/bytes=1024/ctas=1 | 141.098 | 9 | latency |

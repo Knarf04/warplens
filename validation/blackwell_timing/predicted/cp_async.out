@@ -1,5 +1,5 @@
 DEVICE bench=cp_async name=warplens_simulated_B200 cc=10.0 sm_count=148 total_mem_bytes=206158430208 free_mem_bytes=206158430208 bench_clock=0 sim=1 trials=1 scale=1 synthetic=0
-BENCH id=cp_async/warm buffer_bytes=262144 reps=8 trial=0 event_ns=0 wall_ns=0 clk=0 check=9 sim_ns=998.3916928278181 sim_instr=101 sim_bound=latency sim_findings=0
-BENCH id=cp_async/warm buffer_bytes=262144 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=17 sim_ns=1975.4500523223094 sim_instr=171 sim_bound=latency sim_findings=0
+BENCH id=cp_async/warm buffer_bytes=262144 reps=8 trial=0 event_ns=0 wall_ns=0 clk=0 check=9 sim_ns=888.9656282701427 sim_instr=101 sim_bound=latency sim_findings=0
+BENCH id=cp_async/warm buffer_bytes=262144 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=17 sim_ns=1740.9656282701476 sim_instr=171 sim_bound=latency sim_findings=0
 BENCH id=cp_async/cold buffer_bytes=262144 reps=8 trial=0 event_ns=0 wall_ns=0 clk=0 check=9 sim_ns=998.3916928278181 sim_instr=101 sim_bound=latency sim_findings=0
 BENCH id=cp_async/cold buffer_bytes=262144 reps=16 trial=0 event_ns=0 wall_ns=0 clk=0 check=17 sim_ns=1975.4500523223094 sim_instr=171 sim_bound=latency sim_findings=0

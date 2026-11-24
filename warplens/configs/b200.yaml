@@ -21,6 +21,12 @@ hbm_capacity_gb:
   unit: GB
   source: "arXiv:2512.02189, section III-A"
   url: https://arxiv.org/abs/2512.02189
+max_power_w:
+  value: 1200
+  unit: W
+  source: "NVIDIA developer blog, Inside NVIDIA Blackwell Ultra, Table 2 (max power, TGP: up to 1,200 W for Blackwell)"
+  url: https://developer.nvidia.com/blog/inside-nvidia-blackwell-ultra-the-chip-powering-the-ai-factory-era
+  note: Not used by the timing model; recorded because it is one of the public differences from B300 (1,400 W).
 hbm_bandwidth_tb_s:
   value: 4.141
   unit: TB/s

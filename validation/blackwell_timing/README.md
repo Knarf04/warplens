@@ -94,7 +94,7 @@ loop, whose other instructions the simulator counted (`predicted/`).
 | `smem_wavefronts` | `smem_wavefront_clk` | slope of ns per access against conflict degree (1 to 32 wavefronts, `load_chain`) times `f`. `load_indep`, `store` and `warps=4` are structure checks | TIM-03 |
 | `global_load` | `global_access_latency_clk` | delta, from `load_chain/footprint=l2` (one dependent load per repetition). `l1` and `dram` footprints and `store` are reported | TIM-08 |
 | `gstream` | `hbm_bandwidth_tb_s` | STREAM Triad over arrays far larger than L2: 24 bytes / (slope of launch time against elements) / 1000 | TIM-07 (the config's cited figure is a Triad) |
-| `cp_async` | nothing of its own (the model charges `cp.async` at the TMA engine's rate and latency) | measured against predicted round trip of a 32 x 16-byte group, warm and cold source | TIM-14 |
+| `cp_async` | nothing of its own (the model charges `cp.async` at the TMA engine's rate and latency, and its source to L2 or HBM as for a TMA load) | measured against predicted round trip of a 32 x 16-byte group, warm and cold source | TIM-14 |
 | `mbar` | nothing (mbarrier instructions cost one clock each in the model) | ns per arrive + wait round trip; the overhead floor inside the `tma` and `mma_rate` intercepts | (none) |
 | `tma` | `tma_latency_ns`, `tma_bytes_per_clk`, `l2_bandwidth_per_sm_gb_s`; cross-check of `hbm_bandwidth_tb_s` | Round trip T of one copy against tile bytes (64 B to 32 KiB), straight-line fit. `tma_bytes_per_clk` = 1 / slope / `f`, from the faster of warm loads and stores. `l2_bandwidth_per_sm_gb_s` = 1 / slope of warm loads. `tma_latency_ns` = intercept of warm loads - the instruction time the simulator counts (delta on the intercept). Cold loads on 8, 37 and all SMs: CTAs x bytes / (T - fixed cost per copy) | TIM-04, TIM-05, TIM-06, TIM-07 |
 | `mma_rate` | `tensor_core_tflops_f16`, `tensor_core_tflops_tf32`, `mma_latency_clk` | Round trip of a batch of J MMAs + commit + wait, against J = 1, 2, 4, 8. TFLOPS = 2 M N K / slope x SM count / 1000 (M 128, N 256; the all-SM variant if present). `mma_latency_clk` = delta on the intercept (f16, M 128, N 256, one CTA). M = 64/128 x N = 32/128/256 x f16/tf32 are reported; `kind=i8` is hardware-only | TIM-10, TIM-11, TIM-12 |
@@ -267,7 +267,7 @@ transfers; only `32x32b.x1` and `.x8` are here.
 
 ## Problems found in the timing model
 
-Reported, not fixed (the model is outside this directory).
+Reported here; 2 and 3 have since been fixed in the model, the rest have not.
 
 1. **`warplens run` cannot set `active_sms` or the config.** A single CTA is
    charged HBM at 1/148 of the device bandwidth (28 GB/s), so a 32 KiB cold load
@@ -275,11 +275,14 @@ Reported, not fixed (the model is outside this directory).
    predicted to move 8 x 28 GB/s. `predict.py --config` swaps the config by
    replacing `warplens.timing.config.CONFIG_DIR`; a `--config` and `--active-sms`
    option on `warplens run` would be the proper way.
-2. **TMA stores are always charged to HBM**, at that same 1/active_sms share,
-   never to L2 (`schedule`: `fresh = global_bytes` unless the copy is a load with
-   line addresses). A 32 KiB store is predicted at 1274 ns.
-3. **`cp.async` likewise**: it has no line addresses, so warm and cold are both
-   charged to HBM and predicted the same (122 ns per group).
+2. **TMA stores were always charged to HBM**, at that same 1/active_sms share,
+   never to L2. Fixed: a store's destination lines use the same L2 record as a
+   load's source. The `tma/store` benchmark writes the same bytes every
+   repetition, so its slope is now a warm one: a 32 KiB store is predicted at
+   274 ns, where it was 1274 ns.
+3. **`cp.async` likewise** had no line addresses, so warm and cold were both
+   charged to HBM and predicted the same (122 ns per group). Fixed: `cp_async/warm`
+   is now predicted at 106.5 ns per group and `cp_async/cold` at 122 ns.
 4. **TMA engine rate and L2 rate are not separately identifiable** from copies,
    because of the max() above (see the lower bound).
 5. **One global-load latency.** On the 3080 Ti a dependent load took 44 ns from

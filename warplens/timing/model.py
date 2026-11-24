@@ -7,13 +7,17 @@ these resources, each a server that handles one piece of work at a time:
     SMEM          one shared-memory wavefront per `smem_wavefront_clk`
     TMA engine    `tma_bytes_per_clk`, plus a fixed `tma_latency_ns` per copy
     HBM           this SM's share of the device bandwidth, for bytes not yet in L2
-    L2            `l2_bandwidth_per_sm_gb_s`, for bytes some CTA already fetched
+    L2            `l2_bandwidth_per_sm_gb_s`, for bytes some CTA already fetched or stored
     Tensor Core   this SM's share of the device FLOP rate for the MMA's type
 
 A warp's instruction starts when the warp and its issue slot are free. A TMA
 copy or an MMA is asynchronous: it queues on its servers and completes later,
 and warps waiting on its mbarrier resume at that time. A cluster launch control
 request queues on nothing; its response lands a fixed `clc_latency_ns` later.
+
+TMA loads, TMA stores and `cp.async` copies share one L2 record. The global lines
+a copy reads or writes are charged to L2 if an earlier copy left them there and
+to HBM otherwise; either way they are in L2 once the copy completes.
 
 This explains where time goes; it does not predict it. The microarchitecture
 is not public, several parameters are assumptions (the config files say which),
@@ -103,8 +107,8 @@ class Timeline:
         self.flops = 0.0
         self.flops_by_kind = {kind: 0.0 for kind in self.flop_rate}
         self.bytes_loaded = 0.0
-        # Lines fetched by earlier CTAs are warm at this CTA's time zero.
-        # Within a CTA, issuing a fetch does not make its data available yet.
+        # Lines fetched or stored by earlier CTAs are warm at this CTA's time zero.
+        # Within a CTA, issuing a copy does not make its lines available yet.
         self.l2_ready: dict[int, float] = {}
         self.async_first = None  # window in which asynchronous work was in flight
         self.async_last = 0.0
@@ -159,10 +163,14 @@ class Timeline:
         if operation.kind in ("load", "store", "copy"):  # "copy": cp.async, charged like TMA
             nbytes = work.get("bytes", 0)
             global_bytes = work.get("global_bytes", nbytes)
+            # The global lines this copy reads (load, cp.async) or writes (store). A line
+            # an earlier copy already brought into L2 moves at the L2 rate. Any other
+            # goes through this SM's share of HBM: fetched for a load, and for a store
+            # written to a line L2 does not hold. Without lines, all of it is HBM.
             lines = work.get("lines")
             fresh = global_bytes
             new = []
-            if operation.kind == "load" and lines is not None and len(lines):
+            if lines is not None and len(lines):
                 seen = self.timing.l2_lines
                 new = [int(x) for x in lines if int(x) not in seen or
                        self.l2_ready.get(int(x), 0.0) > issued]
@@ -181,8 +189,10 @@ class Timeline:
                 self.l2_ready[address] = min(self.l2_ready.get(address, done), done)
             self.bytes_loaded += nbytes
             label = "cp.async copy" if operation.kind == "copy" else f"TMA {operation.kind}"
+            # Bytes charged to HBM: fetched from it, or for a store, written to it.
+            hbm_key = "to_hbm" if operation.kind == "store" else "from_hbm"
             self.slice("TMA engine", label, start, done, bytes=nbytes,
-                       from_hbm=int(fresh), issued_ns=issued, line=operation.ins.line)
+                       issued_ns=issued, line=operation.ins.line, **{hbm_key: int(fresh)})
         elif operation.kind == "clc":
             # A clusterlaunchcontrol.try_cancel response lands a fixed time after the request.
             # How long a launch takes to answer is not known: `clc_latency_ns` is a placeholder.
@@ -209,6 +219,14 @@ class Timeline:
         return done
 
     # -- summary -------------------------------------------------------------------
+    @property
+    def did_work(self) -> bool:
+        """Whether this CTA used anything beyond issuing instructions: shared memory,
+        a TMA or cp.async copy, or the Tensor Core. A CTA of a persistent kernel that
+        finds nothing to do and returns has not."""
+        return any(server.work for server in
+                   (self.smem, self.tma, self.hbm, self.l2, self.tensor_core))
+
     def utilization(self) -> dict[str, float]:
         total = max(self.end, 1e-12)
         window = max(self.async_last - (self.async_first or 0.0), 1e-12)
@@ -259,9 +277,18 @@ class TimingReport:
         self.time_ns = max((t.end for t in lines), default=0.0)
         self.clocks = self.time_ns * self.config["clock_ghz"]
         names = list(RESOURCE_SOURCES)
-        per_cta = [t.utilization() for t in lines]
-        self.utilization = {n: float(np.mean([u[n] for u in per_cta])) if per_cta else 0.0
-                            for n in names}
+        # Per-CTA figures are averaged over the CTAs that did work, so that CTAs which
+        # start, find nothing to do and return do not dilute them. If no CTA used more
+        # than its issue slots (a kernel of plain arithmetic), all of them count.
+        working = [t for t in lines if t.did_work] or lines
+        self.working_ctas = len(working)
+
+        def mean(group) -> dict[str, float]:
+            per_cta = [t.utilization() for t in group]
+            return {n: float(np.mean([u[n] for u in per_cta])) if per_cta else 0.0 for n in names}
+
+        self.utilization = mean(working)
+        self.utilization_all_ctas = mean(lines)  # the diluted figure, for comparison
         self.flops = sum(t.flops for t in lines)
         self.flops_by_kind = {kind: sum(t.flops_by_kind[kind] for t in lines)
                               for kind in ("f16", "tf32")}
@@ -270,8 +297,8 @@ class TimingReport:
         if not self.compute_source_keys:
             self.compute_source_keys = ("tensor_core_tflops_f16",)
         self.bytes_loaded = sum(t.bytes_loaded for t in lines)
-        self.pipeline_ns = float(np.mean([t.async_last - (t.async_first or 0.0) for t in lines])) \
-            if lines else 0.0
+        self.pipeline_ns = float(np.mean([t.async_last - (t.async_first or 0.0) for t in working])) \
+            if working else 0.0
 
     @property
     def bottleneck(self) -> str:
@@ -290,8 +317,8 @@ class TimingReport:
     def roofline(self) -> dict[str, float]:
         """Achieved rate against this SM's compute and memory ceilings, per CTA."""
         seconds = max(self.pipeline_ns, 1e-12) * 1e-9
-        per_cta_flops = self.flops / max(self.ctas, 1)
-        per_cta_bytes = self.bytes_loaded / max(self.ctas, 1)
+        per_cta_flops = self.flops / max(self.working_ctas, 1)  # as pipeline_ns: working CTAs
+        per_cta_bytes = self.bytes_loaded / max(self.working_ctas, 1)
         intensity = per_cta_flops / per_cta_bytes if per_cta_bytes else float("inf")
         # A mixed workload's ceiling weights time at each dtype's peak rate.
         peak_seconds = sum(flops / (self.config[f"tensor_core_tflops_{kind}"] * 1e12 /
@@ -311,8 +338,11 @@ class TimingReport:
                  f"  {self.ctas} CTA(s), each alone on one SM; {self.active_sms} SMs assumed to share HBM",
                  f"  kernel time {self.time_ns:,.0f} ns ({self.clocks:,.0f} clocks at "
                  f"{cfg['clock_ghz']:g} GHz, an assumed clock)",
-                 f"  verdict: {self.verdict}",
-                 "  resource       busy   derived from"]
+                 f"  verdict: {self.verdict}"]
+        if self.working_ctas < self.ctas:
+            lines.append(f"  busy is averaged over the {self.working_ctas} CTA(s) that did work; "
+                         f"{self.ctas - self.working_ctas} did none and are left out")
+        lines.append("  resource       busy   derived from")
         for name, value in self.utilization.items():
             keys = ", ".join(k + ("*" if cfg.params[k].is_assumption else "")
                              for k in RESOURCE_SOURCES[name])

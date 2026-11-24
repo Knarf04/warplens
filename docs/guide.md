@@ -1018,8 +1018,11 @@ How to read it:
 - `busy` is the fraction of time a resource was working: for the TMA engine,
   HBM, L2 and the tensor core, of the interval in which asynchronous work was
   in flight; for issue slots and shared memory, of the whole kernel. It is
-  averaged over the CTAs of the launch, so a launch in which most CTAs do no
-  work (a persistent kernel on a small problem) shows diluted numbers.
+  averaged over the CTAs that did work, meaning they used shared memory, a
+  TMA or `cp.async` copy, or the tensor core. CTAs that start and return (a
+  persistent kernel on a small problem) are left out, and the summary then
+  says how many; `report.utilization_all_ctas` has the average over all of
+  them. If no CTA did such work, all are averaged.
 - The verdict names a resource that is busy at least 85% of the time;
   otherwise the kernel is called latency-bound. The threshold is a choice.
 - `active_sms` is how many SMs are assumed to share the memory bandwidth.
@@ -1098,10 +1101,15 @@ warplens: 1 kernel launch(es) simulated on B300, 0 finding(s)
 ```
 
 The functional simulator is the same for both: the same instructions, the same
-limits. The B300 configuration is the B200 one with a different memory
-capacity (288 GB instead of 192 GB), which the timing model does not use, so
-**timing results for the two models are identical**. Nothing in it was
-measured on a B300, and the file says so entry by entry.
+limits. The B300 timing configuration differs from the B200 one where NVIDIA
+publishes a different figure: 160 SMs instead of 148, 288 GB of memory
+instead of 192, and 1,400 W instead of 1,200. Only the SM count reaches the
+timing model: one SM's share of the HBM bandwidth (with the default
+`active_sms`) and of the tensor core rate is 148/160 of a B200 SM's, so
+**timing results for the two models differ by that much and no more**. Every
+other entry is the B200 value, marked "assumed equal to B200, uncalibrated".
+Nothing in it was measured on a B300, and the file says so entry by entry.
+(The device query above still answers 148 SMs for both models.)
 
 ## 8. Limits
 
@@ -1173,10 +1181,12 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 
 - Uncalibrated, with assumed parameters (6.7).
 - CTAs do not interact in time; each starts at zero on its own SM.
-- L2 has no capacity or eviction: a byte fetched once counts as cached.
+- L2 has no capacity or eviction: a byte fetched once counts as cached, and
+  so does a byte a TMA store wrote. A store to lines L2 does not hold is
+  charged to HBM; the later write-back of cached lines is not modeled.
 - A global load costs a fixed wait and a store nothing. TMEM access and
   `tcgen05.wait` have a fixed cost. `cp.async` is charged at the TMA engine's
-  rates.
+  rates, and its source bytes to L2 or HBM as a TMA load's are.
 - An accumulating MMA's dependence on the one before it is not modeled beyond
   queueing.
 - In a cluster, a multicast load is charged to every receiving SM, and a

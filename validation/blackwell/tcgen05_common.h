@@ -178,6 +178,7 @@ struct MmaJob {
     int fmt = 0;  // 0 = F16, 2 = TF32
     int a_mn_major = 0, b_mn_major = 0;
     uint32_t d_lane = 0, repeat = 1, prefill = 0, read_lane = READ_CANONICAL;
+    uint32_t idesc_extra = 0;  // further instruction-descriptor bits, e.g. negate A (bit 13) or B (bit 14)
 };
 
 // Runs the kernel; out[thread][column] for 128 threads and job.n columns.
@@ -188,7 +189,7 @@ static void run_mma(const uint8_t* image, const MmaJob& job, uint32_t* out, cons
     dev_fill(d_out, 128 * 256, 0);
     uint32_t alloc = 32;
     while (alloc < (uint32_t)job.n) alloc *= 2;
-    uint32_t idesc = mma_idesc(job.m, job.n, job.fmt, job.a_mn_major, job.b_mn_major);
+    uint32_t idesc = mma_idesc(job.m, job.n, job.fmt, job.a_mn_major, job.b_mn_major) | job.idesc_extra;
     mma_dump<<<1, 128>>>(d_image, job.desc_a, job.desc_b, idesc, job.fmt == 0 ? 0u : 1u, job.d_lane, job.repeat,
                          job.prefill, job.read_lane, (uint32_t)job.n, alloc, d_out);
     probe_sync(what);

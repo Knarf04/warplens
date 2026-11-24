@@ -29,7 +29,7 @@ NVCC="${NVCC:-nvcc}"
 native=0
 ampere=0
 # What an Ampere GPU can run: mbarrier.init / arrive / test_wait, and the host-only program.
-AMPERE_PROBES=(mbarrier/script e2e/device_attributes)
+AMPERE_PROBES=(mbarrier/script mbarrier/lane_arrivals e2e/device_attributes)
 jobs="$(nproc 2>/dev/null || echo 4)"
 probes=()
 while [[ $# -gt 0 ]]; do

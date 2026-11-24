@@ -22,7 +22,9 @@ made yet; simulator captures exercise the collection path and are labelled `sim`
   benchmark executables and invocations. Numerical replay does not validate timing.
 
 The end-to-end inventory is four CUTLASS tutorials, two Triton kernels, TIRx SAXPY,
-CuTe DSL SAXPY, and all nine book GEMMs. Missing dependencies, skipped cases, failed
+CuTe DSL SAXPY, and all nine book GEMMs (the book is cloned by `env/remote/setup.sh` at
+the commit in `env/remote/pins.env` and used where it is; its files are never copied into
+the archive). Missing dependencies, skipped cases, failed
 programs, incomplete captures and corrupt artifacts fail collection. Successful
 collection means the evidence is complete and the programs passed their own checks.
 `validation/blackwell/compare.py` then compares every captured output tensor with the
@@ -67,7 +69,11 @@ their arbitrary outputs do not become a universal hardware contract.
    not cryptographic attestation of the machine.
 4. Check that the expected 17 end-to-end cases are present, all required probe
    statuses exist, the encoder sweep is populated, and required timing/counter data
-   was collected. A partial/custom `--only` run cannot establish full-suite coverage.
+   was collected. For the counters: `manifest.txt` must say `ncu=ok` and the archive
+   must have no `NCU-COUNTERS-NOT-READ.txt`. A full run stops at preflight when `ncu`
+   cannot read a counter, so that file exists only after `run.sh --no-ncu`,
+   `--keep-going` or a run without the timing suite (`env/remote/RUNBOOK.md`, section 7).
+   A partial/custom `--only` run cannot establish full-suite coverage.
 5. Keep an immutable copy of the original archive. Preserve mismatches and failed
    attempts as well as successful results. Keep at least two independent copies.
 

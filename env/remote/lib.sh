@@ -30,6 +30,22 @@ gdb_program() {
   fi
 }
 MAMBA_BIN="$REMOTE_HOME/bin/micromamba"
+# The clone of the book whose kernels row RT-08 runs ("Modern GPU Programming for MLSys").
+# setup.sh fetches it here at the commit pins.env names (BOOK_COMMIT). It has no license:
+# it is cloned from its own repository and never copied anywhere else, so it lives beside
+# the run directory, not in it (run.sh archives the run directory only).
+# WARPLENS_BOOK_URL names another place to fetch it from (a mirror; the tests use a stand-in).
+BOOK_DIR="$REMOTE_HOME/book"
+BOOK_URL="${WARPLENS_BOOK_URL:-https://github.com/mlc-ai/modern-gpu-programming-for-mlsys}"
+# What the suites take for a clone of the book (run_e2e.py, check_env.py).
+is_book_clone() { [[ -n "${1:-}" && -f "$1/chapter_gemm_basics/index.md" ]]; }
+# The book the suites are to use: WARPLENS_BOOK when it is set (also when set to nothing,
+# which means no book), else setup.sh's clone when there is one. Prints nothing otherwise.
+book_path() {
+  if [[ -n "${WARPLENS_BOOK+set}" ]]; then echo "$WARPLENS_BOOK"
+  elif is_book_clone "$BOOK_DIR"; then echo "$BOOK_DIR"
+  fi
+}
 
 # Load pins.env into PIN_<KEY> variables. The file is parsed, not sourced: a
 # line that is not KEY=VALUE is an error.
@@ -295,22 +311,22 @@ env_installed() {
 
 utc_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
-# The commit of the checkout. Without a git program (a bare container) it is
-# read from .git directly; "unknown" for a copy that has no .git at all.
-repo_commit() {
-  local head ref
-  if command -v git >/dev/null 2>&1 && head="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null)"; then
+# git_head DIR -> the commit checked out in DIR, or "unknown". Without a git
+# program (a bare container) it is read from DIR/.git directly.
+git_head() {
+  local dir="$1" head ref
+  if command -v git >/dev/null 2>&1 && head="$(git -C "$dir" rev-parse HEAD 2>/dev/null)"; then
     echo "$head"
     return 0
   fi
-  if [[ -f "$REPO_DIR/.git/HEAD" ]]; then
-    head="$(cat "$REPO_DIR/.git/HEAD")"
+  if [[ -f "$dir/.git/HEAD" ]]; then
+    head="$(cat "$dir/.git/HEAD")"
     if [[ "$head" == "ref: "* ]]; then
       ref="${head#ref: }"
-      if [[ -f "$REPO_DIR/.git/$ref" ]]; then
-        head="$(cat "$REPO_DIR/.git/$ref")"
+      if [[ -f "$dir/.git/$ref" ]]; then
+        head="$(cat "$dir/.git/$ref")"
       else
-        head="$(awk -v ref="$ref" '$2 == ref {print $1}' "$REPO_DIR/.git/packed-refs" 2>/dev/null)"
+        head="$(awk -v ref="$ref" '$2 == ref {print $1}' "$dir/.git/packed-refs" 2>/dev/null)"
       fi
     fi
     if [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
@@ -319,4 +335,79 @@ repo_commit() {
     fi
   fi
   echo unknown
+}
+
+# The commit of the checkout; "unknown" for a copy that has no .git at all.
+repo_commit() { git_head "$REPO_DIR"; }
+
+# The commit a clone of the book is at. Only a directory with a .git of its own counts:
+# a copy of the book's files inside some other repository is not at that repository's commit.
+book_commit() {
+  if [[ -e "$1/.git" ]]; then git_head "$1"; else echo unknown; fi
+}
+
+# git, the machine's or the one setup.sh put into the env when the machine had none.
+# Never asks for a name or password: a repository that wants one is a failed fetch.
+git_run() {
+  if command -v git >/dev/null 2>&1; then GIT_TERMINAL_PROMPT=0 git "$@"
+  else GIT_TERMINAL_PROMPT=0 env_run git "$@"
+  fi
+}
+
+# ensure_book COMMIT -> one line "status|explanation": make $BOOK_DIR a clone of the book
+# at exactly COMMIT. Returns non-zero when it is not one afterwards.
+#
+#   present   it already was; nothing was fetched
+#   fetched   fetched from $BOOK_URL (also over a clone at another commit, which is replaced)
+#   failed    the fetch failed or did not give COMMIT; what was there before is left as it was
+#
+# The fetch goes into a directory beside $BOOK_DIR and replaces it only when it is right, so
+# an interrupted or failed fetch leaves no half clone. One commit, no history (--depth 1).
+ensure_book() {
+  local commit="$1" part="$BOOK_DIR.part" head had="" lacks=""
+  if is_book_clone "$BOOK_DIR"; then
+    head="$(book_commit "$BOOK_DIR")"
+    if [[ "$head" == "$commit" ]]; then
+      echo "present|$BOOK_DIR is at commit $commit"
+      return 0
+    fi
+    had="; $BOOK_DIR is left as it was, at commit $head"
+  fi
+  rm -rf "$part"
+  # A stalled connection is given up on after 30 s below 1 kB/s: nothing here may hang the setup.
+  if ! { git_run init -q "$part" \
+         && git_run -C "$part" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
+              fetch -q --depth 1 "$BOOK_URL" "$commit" \
+         && git_run -C "$part" checkout -q --detach FETCH_HEAD; } >&2; then
+    rm -rf "$part"
+    echo "failed|could not fetch commit $commit from $BOOK_URL (is there network access to it? does the repository still have that commit?)$had"
+    return 1
+  fi
+  head="$(book_commit "$part")"
+  is_book_clone "$part" || lacks=" and has no chapter_gemm_basics/index.md"
+  if [[ "$head" != "$commit" || -n "$lacks" ]]; then
+    rm -rf "$part"
+    echo "failed|what $BOOK_URL gave for $commit is at commit $head$lacks: not the book at the pinned commit$had"
+    return 1
+  fi
+  rm -rf "$BOOK_DIR"
+  mv "$part" "$BOOK_DIR" || { echo "failed|could not move $part to $BOOK_DIR"; return 1; }
+  echo "fetched|$BOOK_DIR is at commit $commit, from $BOOK_URL"
+}
+
+# provide_book WITH_BOOK COMMIT -> "status|explanation": what setup.sh does about the book.
+# The statuses of ensure_book, and two in which nothing is fetched or touched:
+#
+#   opted-out  WITH_BOOK is 0 (setup.sh --no-book)
+#   given      WARPLENS_BOOK is set: that is the book the suites will use (book_path)
+#
+# Returns non-zero only for `failed`.
+provide_book() {
+  if [[ "$1" != 1 ]]; then
+    echo "opted-out|not fetched (--no-book). Row RT-08 needs a clone: set WARPLENS_BOOK to one, or leave the end-to-end programs out (WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e)"
+  elif [[ -n "${WARPLENS_BOOK+set}" ]]; then
+    echo "given|not fetched: WARPLENS_BOOK is set ('$WARPLENS_BOOK') and is what the suites will use"
+  else
+    ensure_book "$2"
+  fi
 }

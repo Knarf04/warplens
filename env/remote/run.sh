@@ -3,7 +3,7 @@
 # and run both probe suites, pack one results archive.
 #
 #   env/remote/run.sh [--dry-run] [--keep-going] [--redo STAGE|all] [--skip STAGE] [--collect-only]
-#                     [--toolkit auto|pinned|X.Y] [--no-ncu] [--no-torch] [--strict-toolkit]
+#                     [--toolkit auto|pinned|X.Y] [--no-ncu] [--no-torch] [--no-book] [--strict-toolkit]
 #                     [--price DOLLARS_PER_HOUR]
 #
 # Never asks anything. Safe to run again after an interruption or a failure:
@@ -13,7 +13,8 @@
 # Stages, in order, and what a failure does:
 #   preflight-quick  GPU identity, driver, disk          stops the run (not a B200: nothing to do)
 #   setup            env/remote/setup.sh                 stops the run (nothing can be built)
-#   preflight        kernels on the GPU, tensor map, ncu stops the run
+#   preflight        kernels on the GPU, tensor map, a   stops the run, before anything is
+#                    counter read by ncu, PyTorch, book  built or run on the GPU
 #   selftest         the repository's tests, simulator   continues
 #   build-blackwell  validation/blackwell/build.sh       its run stage is skipped; continues
 #   build-timing     validation/blackwell_timing/build.sh  likewise
@@ -30,7 +31,15 @@
 #   --redo STAGE   run STAGE again even if it finished (repeatable; `all` for every stage)
 #   --skip STAGE   leave STAGE out (repeatable), e.g. --skip selftest on a second rental
 #   --collect-only run nothing; write the archive from what earlier runs left
-#   --toolkit, --no-ncu, --no-torch   passed to setup.sh
+#   --toolkit, --no-torch, --no-book   passed to setup.sh
+#   --no-ncu       run without performance counters. By default a run that includes the
+#                  timing suite must read one for real in preflight: no ncu, no permission
+#                  (ERR_NVGPUCTRPERM) or no value fails preflight and stops the run, since
+#                  the timing model is held against counters. With --no-ncu that is a
+#                  warning, setup.sh installs no ncu, and the archive says that no counter
+#                  was read: NCU-COUNTERS-NOT-READ.txt, ncu= and ncu_required= in
+#                  manifest.txt, ncu_counters= in resolved/versions.txt. A run without
+#                  the timing suite (--skip run-timing) does not need counters either
 #   --strict-toolkit   stop after setup if the probes would not be built by the
 #                  nvcc the committed predictions were made with (a fallback toolkit).
 #                  Without it the run goes on and is flagged: PREDICTIONS-NOT-COMPARABLE.txt
@@ -39,6 +48,9 @@
 #   --price        hourly price for the cost estimate of --dry-run (default 8)
 #
 #   WARPLENS_REMOTE_HOME     where the env and results go (default ~/warplens-remote)
+#   WARPLENS_BOOK            a clone of the book for the end-to-end step. Not set: the
+#                            clone setup.sh fetches into $WARPLENS_REMOTE_HOME/book, at the
+#                            commit in pins.env. The book is never copied into the archive
 #   WARPLENS_BUILD_MINUTES   time limit of each build stage (default 30)
 #   WARPLENS_RUN_MINUTES     time limit of each run stage (default 60)
 #
@@ -48,7 +60,8 @@
 #                               everything written there is archived
 #   WARPLENS_PTX_JIT            ok | refused | unknown: whether the driver takes
 #                               PTX from this toolkit (preflight's ptx-jit check)
-#   WARPLENS_NCU                ok | unavailable: whether ncu can read counters
+#   WARPLENS_NCU                ok | unavailable: whether preflight read a counter with ncu
+#   WARPLENS_BOOK               the clone of the book, when there is one
 #   WARPLENS_TORCH_PYTHON       the interpreter of the PyTorch env, when there is one
 #   WARPLENS_GDB                a gdb for the rows that trace a launch, when there is one
 #   WARPLENS_PREDICTIONS        comparable | comparable-native | not-comparable | unknown
@@ -76,6 +89,7 @@ dry_run=0
 keep_going=0
 collect_only=0
 strict_toolkit=0
+no_ncu=0
 price=8
 redo=()
 skip=()
@@ -88,11 +102,12 @@ while [[ $# -gt 0 ]]; do
     --redo) redo+=("${2:?--redo needs a stage}"); shift ;;
     --skip) skip+=("${2:?--skip needs a stage}"); shift ;;
     --toolkit) setup_args+=(--toolkit "${2:?--toolkit needs a value}"); shift ;;
-    --no-ncu) setup_args+=(--no-ncu) ;;
+    --no-ncu) setup_args+=(--no-ncu); no_ncu=1 ;;
     --no-torch) setup_args+=(--no-torch) ;;
+    --no-book) setup_args+=(--no-book) ;;
     --strict-toolkit) strict_toolkit=1 ;;
     --price) price="${2:?--price needs a number}"; shift ;;
-    -h|--help) sed -n '2,65p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,78p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -105,6 +120,11 @@ for stage in "${redo[@]}" "${skip[@]}"; do
     || { echo "error: no stage '$stage' (stages: ${STAGES[*]})" >&2; exit 2; }
 done
 is_skipped() { [[ " ${skip[*]} " == *" $1 "* && "$1" != collect ]]; }
+
+# Counters are what the timing suite is held against: a run that includes it must read
+# one for real (preflight's ncu check), unless it was told to do without (--no-ncu).
+ncu_required=1
+if (( no_ncu )) || is_skipped run-timing; then ncu_required=0; fi
 
 build_minutes="${WARPLENS_BUILD_MINUTES:-30}"
 run_minutes="${WARPLENS_RUN_MINUTES:-60}"
@@ -134,7 +154,7 @@ stage_command() {
   case "$1" in
     preflight-quick) echo "env/remote/preflight.sh --quick" ;;
     setup)           echo "env/remote/setup.sh ${setup_args[*]:-}" ;;
-    preflight)       echo "env/remote/preflight.sh" ;;
+    preflight)       echo "env/remote/preflight.sh$( (( ncu_required )) || echo " --no-ncu")   (ncu must read a counter, unless --no-ncu or --skip run-timing)" ;;
     selftest)        echo "python -m pytest -q   (in the env, CUDA_VISIBLE_DEVICES empty)" ;;
     build-blackwell) echo "$SUITE_blackwell/build.sh   (adds --native if the driver refuses the toolkit's PTX)" ;;
     build-timing)    echo "$SUITE_timing/build.sh" ;;
@@ -148,8 +168,10 @@ stage_command() {
 commit="$(repo_commit)"
 # A successful stage is reusable only with the same inputs to the orchestration.
 # Changing a toolkit or suite selection must not reuse an older successful run.
+# WARPLENS_BOOK here is what the caller set, not the default taken after setup: the clone
+# setup.sh fetches must not make the second run differ from the first.
 resume_id="$( {
-  printf '%s\0' "$commit" "${setup_args[@]}" "${WARPLENS_ENV_RUN:-}" "${CUDA_VISIBLE_DEVICES-unset}" \
+  printf '%s\0' "$commit" "ncu_required=$ncu_required" "${setup_args[@]}" "${WARPLENS_ENV_RUN:-}" "${CUDA_VISIBLE_DEVICES-unset}" \
     "${WARPLENS_BLACKWELL_BUILD_ARGS:-}" "${WARPLENS_BLACKWELL_RUN_ARGS:-}" \
     "${WARPLENS_TIMING_BUILD_ARGS:-}" "${WARPLENS_TIMING_RUN_ARGS:-}" \
     "${WARPLENS_BOOK:-}" "${CUTLASS_BIN:-}"
@@ -334,6 +356,12 @@ mkdir -p "$RUN_DIR"/{state,logs,out} "$REMOTE_HOME/results"
 run_start="$(utc_now)"
 echo "$run_start $commit" >> "$RUN_DIR/state/attempts"
 [[ -f "$RUN_DIR/stages.tsv" ]] || printf 'stage\tstatus\texit\tstart\tend\tseconds\n' > "$RUN_DIR/stages.tsv"
+# Whether counters were required is the run's decision, not that of a later --collect-only.
+if (( collect_only )) && [[ -f "$RUN_DIR/state/ncu-policy" ]]; then
+  read -r no_ncu ncu_required < "$RUN_DIR/state/ncu-policy"
+elif (( ! collect_only )); then
+  echo "$no_ncu $ncu_required" > "$RUN_DIR/state/ncu-policy"
+fi
 
 collect() {
   local archive sums name first source_failed=0
@@ -355,6 +383,10 @@ collect() {
     echo "uid=$EUID"
     echo "ptx_jit=$ptx_jit"
     echo "ncu=$ncu_state"
+    echo "ncu_required=$ncu_required"
+    echo "ncu_counters=$(ncu_counters)"
+    echo "book=$(book_in_use)"
+    echo "book_commit=$(is_book_clone "$(book_in_use)" && book_commit "$(book_in_use)" || echo none)"
     echo "driver=$(sed -n 's/^driver=//p' "$REMOTE_HOME/resolved/versions.txt" 2>/dev/null)"
     echo "driver_cuda=$(sed -n 's/^driver_cuda=//p' "$REMOTE_HOME/resolved/versions.txt" 2>/dev/null)"
     echo "toolkit_installed=$(sed -n 's/^cuda_nvcc=//p' "$REMOTE_HOME/resolved/versions.txt" 2>/dev/null)"
@@ -371,6 +403,11 @@ collect() {
   rm -rf "$RUN_DIR/resolved" "$RUN_DIR/suite-dirs" || return 1
   if [[ -d "$REMOTE_HOME/resolved" ]]; then
     cp -r "$REMOTE_HOME/resolved" "$RUN_DIR/resolved" || return 1
+    # versions.txt is setup.sh's, written before anything looked at the GPU. The archive's
+    # copy also says what came of the counters, next to the ncu that was installed.
+    if [[ -f "$RUN_DIR/resolved/versions.txt" ]]; then
+      echo "ncu_counters=$(ncu_counters)" >> "$RUN_DIR/resolved/versions.txt" || return 1
+    fi
   fi
   cp "$PINS_FILE" "$RUN_DIR/pins.env" || return 1
   # Preserve the implementation itself: a commit SHA alone is not an offline oracle.
@@ -390,6 +427,12 @@ collect() {
     *) printf '%s\n\nEvery verdict of validation/blackwell/compare.py and every predicted time in\nvalidation/blackwell_timing is to be read with this in mind. See env/remote/RUNBOOK.md,\n"Driver older than the toolkit".\n\nPredictions made on this machine with the installed nvcc, before the GPU stages ran\n(stage predict-toolkit: %s), are in out/predicted-toolkit/. Hold the results against those:\n  validation/blackwell/compare.py out/blackwell --predicted out/predicted-toolkit/blackwell\n  validation/blackwell_timing/fit.py out/timing --predicted out/predicted-toolkit/timing\nout/predicted-toolkit/DIFFERENCES.txt names the predictions that differ from the committed ones.\n' \
          "$predictions_why" "${result[predict-toolkit]:-not-reached}" > "$RUN_DIR/PREDICTIONS-NOT-COMPARABLE.txt" ;;
   esac
+  # The same for counters: a run without them is a run without the timing validation.
+  rm -f "$RUN_DIR/NCU-COUNTERS-NOT-READ.txt"
+  if [[ "$ncu_state" != ok ]]; then
+    printf 'No GPU performance counter was read in this run: ncu_counters=%s.\n\nThe preflight check "ncu" is the evidence (preflight.txt; it PASSes only when ncu printed a\ncounter value for a kernel that ran). Without it the timing suite has launch times but no\ncounters to hold the model against: read out/timing/ with that in mind, and see\nenv/remote/RUNBOOK.md, "When preflight fails", for what grants the permission.\n' \
+      "$(ncu_counters)" > "$RUN_DIR/NCU-COUNTERS-NOT-READ.txt" || return 1
+  fi
   # Outputs a suite left in its own directory instead of WARPLENS_RESULTS_DIR.
   # Only what this run made: directories that came with the checkout are older
   # than the run's first start.
@@ -430,6 +473,7 @@ finish() {  # finish EXIT_STATUS
     (( code == 0 )) && code=1
   fi
   say "stages: $(for s in "${STAGES[@]}"; do [[ $s == collect ]] || printf '%s=%s ' "$s" "${result[$s]:-not-reached}"; done)"
+  [[ "$ncu_state" == ok ]] || say "performance counters: $(ncu_counters)"
   case "$predictions_state" in
     comparable|comparable-native) ;;
     *) local bar; bar="$(printf '!%.0s' {1..100})"
@@ -438,17 +482,44 @@ finish() {  # finish EXIT_STATUS
   exit "$code"
 }
 
+# Only a PASS of the ncu check is a counter that was read. WARN, FAIL, SKIP, a check
+# that was never reached and a preflight that never ran are all "unavailable".
 read_preflight_status() {
   ptx_jit=unknown
   ncu_state=unavailable
+  ncu_check=not-run
   if [[ -f "$RUN_DIR/preflight.status" ]]; then
     case "$(awk '$1 == "ptx-jit" {print $2}' "$RUN_DIR/preflight.status")" in
       PASS) ptx_jit=ok ;;
       WARN|FAIL) ptx_jit=refused ;;
     esac
-    [[ "$(awk '$1 == "ncu" {print $2}' "$RUN_DIR/preflight.status")" == PASS ]] && ncu_state=ok
+    ncu_check="$(awk '$1 == "ncu" {print $2}' "$RUN_DIR/preflight.status" | tail -n 1)"
+    ncu_check="${ncu_check:-not-run}"
+    [[ "$ncu_check" == PASS ]] && ncu_state=ok
   fi
   return 0
+}
+# One line for the archive: were counters read, and if not, was that accepted beforehand.
+ncu_counters() {
+  if [[ "$ncu_state" == ok ]]; then echo "read (preflight's ncu check passed)"
+  elif (( no_ncu )); then echo "not-read (preflight's ncu check: $ncu_check; the run was told to do without, --no-ncu)"
+  elif (( ! ncu_required )); then echo "not-read (preflight's ncu check: $ncu_check; not needed, the timing suite was left out)"
+  else echo "not-read (preflight's ncu check: $ncu_check; this run REQUIRED them)"
+  fi
+}
+# The clone of the book the Blackwell suite is given: --book among its arguments, else
+# WARPLENS_BOOK, else the clone setup.sh fetched. Empty when there is none.
+book_in_use() {
+  local words=() word next=0 found=""
+  read -r -a words <<<"${WARPLENS_BLACKWELL_RUN_ARGS:-}"
+  for word in "${words[@]}"; do
+    if (( next )); then found="$word"; next=0; continue; fi
+    case "$word" in
+      --book) next=1 ;;
+      --book=*) found="${word#*=}" ;;
+    esac
+  done
+  if [[ -n "$found" ]]; then echo "$found"; else book_path; fi
 }
 read_preflight_status
 # Whether results can be held against the committed predictions; from setup.sh's record
@@ -501,8 +572,16 @@ case "$predictions_state" in
      fi ;;
 esac
 
+# The book: the clone setup.sh fetched, unless the caller named one (or said none, with an
+# empty WARPLENS_BOOK). Exported for preflight, the self-test and the suites.
+if [[ -z "${WARPLENS_BOOK+set}" ]] && is_book_clone "$BOOK_DIR"; then
+  export WARPLENS_BOOK="$BOOK_DIR"
+  say "the book: $WARPLENS_BOOK (fetched by setup.sh; WARPLENS_BOOK was not set)"
+fi
+
 # 3. Kernels on the GPU.
 preflight_args=(--out "$RUN_DIR/preflight.txt" --status "$RUN_DIR/preflight.status")
+(( ncu_required )) || preflight_args+=(--no-ncu)
 # run_all.py omits the end-to-end programs for --no-e2e or any --only selector.
 blackwell_words=()
 read -r -a blackwell_words <<<"${WARPLENS_BLACKWELL_RUN_ARGS:-}"
@@ -523,6 +602,10 @@ rc=$?
 read_preflight_status
 if (( rc != 0 && ! keep_going )); then
   say "stopping: the full preflight failed. See 'When preflight fails' in env/remote/RUNBOOK.md."
+  if (( ncu_required )) && [[ "$ncu_state" != ok ]]; then
+    say "No performance counter was read (check ncu: $ncu_check), and this run needs them for the timing suite."
+    say "Grant the permission (the report above says how), or do without counters: env/remote/run.sh --no-ncu"
+  fi
   say "To run the suites regardless: env/remote/run.sh --keep-going"
   finish 3
 fi

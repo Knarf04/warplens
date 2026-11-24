@@ -135,6 +135,13 @@ jobs:
           cache-environment: true
       - run: env/check.sh
       - run: pip install -e ".[all]"
+      # The tracer of matrix rows RT-10 and RT-11 runs under gdb, and one test runs it for real
+      # on a program without CUDA. The runner image has no gdb, and here that skip is a failure.
+      # Any gdb with Python support does (env/remote/setup.sh installs it the same way).
+      - name: Install gdb, for the driver call tracer
+        run: |
+          command -v gdb || { sudo apt-get update -q && sudo apt-get install -y -q gdb; }
+          gdb -q -batch -ex "python print('gdb-python-ok')" | grep -q gdb-python-ok
       - name: Build the CUTLASS tutorials (PTX and host programs)
         run: examples/03_cutlass_mma/build.sh --programs
       - name: Build the shim libraries

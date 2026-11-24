@@ -76,10 +76,22 @@ class Warp:
         if sym.name in prog.symbols:
             from ..units.smem import CLUSTER_STRIDE
             return self.cta.rank * CLUSTER_STRIDE + prog.symbols[sym.name]
-        for table in (prog.local_symbols, prog.global_symbols, prog.param_offsets):
+        if sym.name in prog.local_symbols:
+            return self.local_offset(sym.name)
+        for table in (prog.global_symbols, prog.param_offsets, prog.function_symbols):
             if sym.name in table:
                 return table[sym.name]
         raise ExecutionError(f"`{sym.name}` is not a variable this kernel can address")
+
+    def local_offset(self, name: str) -> int:
+        """Where a `.local` variable is in this thread's local memory right now. A variable of a
+        recursive function has one copy per active call; the innermost one is meant."""
+        offset = self.program.local_symbols[name]
+        if name in self.program.frame_locals:
+            for entry in reversed(self.stack.entries):
+                if entry.frame is not None and name in entry.frame.layout.locals:
+                    return offset + entry.frame.delta
+        return offset
 
     def read_bytes(self, address: int, count: int, lane: int) -> bytes:
         """`count` bytes at a generic address, as seen by one lane."""

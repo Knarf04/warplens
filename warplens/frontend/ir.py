@@ -127,6 +127,25 @@ class GlobalVar:
     align: int
     data: bytes
     line: int = 0
+    relocs: tuple = ()  # (byte offset, symbol name): 8-byte elements initialized to an address
+
+
+# Where functions appear to live when their address is taken (`mov.b64 %rd1, f`). The values only
+# need to be distinct, non-null and outside every data window; an indirect call compares against them.
+FUNCTION_WINDOW = 0x1_C000_0000
+
+
+@dataclass(slots=True)
+class Frame:
+    """One copy of a recursive function's body in a kernel (see frontend/inline.py): what a
+    recursive call into it must save, and where it enters and leaves."""
+    name: str  # the function
+    entry: str  # label of its first instruction
+    regs: tuple[str, ...]  # its registers, and those of everything inlined into it
+    params: tuple[str, ...]  # scalar call-parameter storage declared inside it
+    locals: tuple[str, ...]  # its `.local` variables: a stack frame, one per active call
+    args: tuple[str, ...]  # where this copy reads its arguments: storage of its first caller
+    rets: tuple[str, ...]  # and where it leaves its results
 
 
 @dataclass(slots=True)
@@ -141,6 +160,10 @@ class Function:
     locals: list[SharedVar] = field(default_factory=list)  # `.local` variables, one copy per thread
     call_params: dict[str, str] = field(default_factory=dict)  # `.param`s declared for a call
     line: int = 0
+    # `label: .callprototype (rets) _ (params);` and `label: .calltargets f, g;` of indirect calls
+    prototypes: dict[str, tuple[list[Param], list[Param]]] = field(default_factory=dict)
+    calltargets: dict[str, tuple[str, ...]] = field(default_factory=dict)
+    frames: dict[str, Frame] = field(default_factory=dict)  # recursive copies, by name prefix
 
 
 @dataclass(slots=True)
@@ -154,3 +177,10 @@ class Module:
     shared: list[SharedVar] = field(default_factory=list)
     globals: list[GlobalVar] = field(default_factory=list)
     extern_funcs: set[str] = field(default_factory=set)
+
+    def function_address(self, name: str) -> int | None:
+        """The address a device function has when it is stored in a function pointer."""
+        for index, known in enumerate(self.device_functions):
+            if known == name:
+                return FUNCTION_WINDOW + 16 * (index + 1)
+        return None

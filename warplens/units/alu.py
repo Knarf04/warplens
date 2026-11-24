@@ -900,6 +900,15 @@ def _elements(ins, operand, width: int):
     return list(operand.elems)
 
 
+def _call_struct(w, ins, name: str, offset: int, size: int, verb: str) -> int:
+    """Where `size` bytes at `offset` of a by-value struct argument are in local memory."""
+    total = w.program.local_sizes[name]
+    if offset < 0 or offset + size > total:
+        raise ExecutionError(f"`{ins.name}` {verb} {size} byte(s) at offset {offset} of the "
+                             f"{total}-byte call argument `{name}`")
+    return w.local_offset(name) + offset
+
+
 @op("ld")
 def _ld(w, ins, mask):
     ty, space, width = _space(ins)
@@ -916,6 +925,11 @@ def _ld(w, ins, mask):
             values = np.frombuffer(raw, dtype=dt, count=width, offset=src.offset)
             for dest, v in zip(dests, values):
                 w.write(dest, np.full(len(mask), v, dtype=dt), mask)
+        elif name in w.program.local_symbols:  # a struct passed to or returned from a call
+            start = _call_struct(w, ins, name, src.offset, width * dt.itemsize, "reads")
+            for k, dest in enumerate(dests):
+                at = start + k * dt.itemsize
+                w.write(dest, np.ascontiguousarray(w.local[:, at:at + dt.itemsize]).view(dt).reshape(-1), mask)
         elif name in w.call_params and width == 1 and src.offset == 0:  # e.g. a call's return value
             w.write(dests[0], w.call_params[name].astype(UINT_BY_SIZE[dt.itemsize]).view(dt), mask)
         else:
@@ -938,9 +952,18 @@ def _st(w, ins, mask):
     values = _elements(ins, a, width)
     dt = NP_TYPES[ty]
     if space == "param":  # an argument for an upcoming call
-        if not (isinstance(dst, Mem) and isinstance(dst.base, Sym) and dst.offset == 0
-                and dst.base.name in w.program.fn.call_params and width == 1):
-            raise unsupported(ins, "st.param is only supported for scalar call arguments")
+        if not (isinstance(dst, Mem) and isinstance(dst.base, Sym)
+                and dst.base.name in w.program.fn.call_params):
+            raise unsupported(ins, "st.param is only supported for the arguments of a call")
+        if dst.base.name in w.program.local_symbols:  # a field of a struct passed by value
+            start = _call_struct(w, ins, dst.base.name, dst.offset, width * dt.itemsize, "writes")
+            for k, value in enumerate(values):
+                at = start + k * dt.itemsize
+                w.local[mask, at:at + dt.itemsize] = \
+                    np.ascontiguousarray(w.read(value, ty)).view(np.uint8).reshape(len(mask), -1)[mask]
+            return
+        if dst.offset != 0 or width != 1:
+            raise unsupported(ins, f"`{dst.base.name}` is a scalar call argument: one value at offset 0")
         slot = w.call_params.setdefault(dst.base.name, np.zeros(len(mask), dtype=np.uint64))
         bits = w.read(values[0], ty).view(UINT_BY_SIZE[dt.itemsize]).astype(np.uint64)
         np.copyto(slot, bits, where=mask)

@@ -12,10 +12,13 @@ import numpy as np
 
 
 class Entry:
-    __slots__ = ("pc", "mask", "rpc")
+    __slots__ = ("pc", "mask", "rpc", "frame")
 
-    def __init__(self, pc: int, mask: np.ndarray, rpc: int):
+    def __init__(self, pc: int, mask: np.ndarray, rpc: int, frame=None):
         self.pc, self.mask, self.rpc = pc, mask, rpc
+        # Set on the entry a recursive call pushes (units/call.py): what to restore when its
+        # lanes return. Such an entry has no reconvergence pc; the return pops it.
+        self.frame = frame
 
 
 class SimtStack:
@@ -33,6 +36,11 @@ class SimtStack:
     @property
     def top(self) -> Entry:
         return self.entries[-1]
+
+    def call(self, pc: int, lanes: np.ndarray, frame) -> None:
+        """Lanes of the top entry enter a function; the entry waits below until they return."""
+        self.entries.append(Entry(pc, lanes.copy(), -1, frame))
+        self.max_depth = max(self.max_depth, len(self.entries))
 
     def diverge(self, fallthrough: int, target: int, taken: np.ndarray,
                 not_taken: np.ndarray, reconv: int) -> None:

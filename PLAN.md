@@ -398,7 +398,7 @@ nothing Blackwell-specific has run on a GPU.
 | Steps | Where | State |
 | --- | --- | --- |
 | B5, B6, F23 | `docs/validation-matrix.md` | one row per claim with its probe, prediction and pass criterion; a test keeps its citations valid |
-| C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 118 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 22 runs also match the 3080 Ti. Every matrix row outside timing has a run. NUM-05, RT-10 and RT-11 are not probes: `run_rows.py` runs them at the end of a GPU run (ptxas asked for a UE4M3 conversion; the driver calls of TIRx and the CuTe DSL logged under gdb; the kernel parameters of a CuTe DSL TMA kernel saved, its tensor maps among them). On the 3080 Ti the first two run and the third is skipped for want of `sm_100`. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
+| C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 119 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 27 runs also match the 3080 Ti. Every matrix row outside timing has a run. NUM-05, RT-10 and RT-11 are not probes: `run_rows.py` runs them at the end of a GPU run (ptxas asked for a UE4M3 conversion; the driver calls of TIRx and the CuTe DSL logged under gdb; the kernel parameters of a CuTe DSL TMA kernel saved, its tensor maps among them). On the 3080 Ti the first two run and the third is skipped for want of `sm_100`. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
 | C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema (`clc_latency_ns` included), predictions committed, each launch timed with the active SMs its shape implies; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
 | E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. The toolkit policy for an older driver is decided and built into `run.sh` (below). Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
 | F24 | `env/remote/RUNBOOK.md`, section 5 | **proposed, awaiting the owner's confirmation**: one second rental of at most 2 hours and $16 (the first rental's own budget line at $8 per GPU-hour; 4 hours and $32 for both), only when a fix changes a prediction hardware must confirm, when probes tested nothing, when the tensor maps of RT-11 were not captured, or when `ncu` could not read counters. An 8-GPU node needs an explicit yes |
@@ -508,8 +508,13 @@ Found by this work in the simulator, and fixed since unless marked open:
   zero plus a positive offset, which the simulator reported as a memory fault.
   Fixed: with a 32-bit register the sum wraps at 32 bits, as measured on the
   RTX 3080 Ti with hand-written PTX
-  (`tests/test_sim_bug_regressions.py`). No golden file or B200 replay records
-  it yet.
+  (`tests/test_sim_bug_regressions.py`). Done: a golden file from the 3080 Ti
+  (`validation/ampere/addrwrap_golden.txt`: the reversed index as C++, and the
+  wrapping load and store as inline PTX, because nvcc 12.4, which builds the
+  program for that GPU, compiles the C++ without a wrapped register), which
+  the simulator reproduces for the PTX of both toolkits, and a rerun on the
+  B200 (`e2e/ampere_replay.addrwrap`, RT-01), where the C++ is compiled by
+  nvcc 13.5 into the wrapping form.
 - Done: `cvt` with `.ftz` as the 3080 Ti does it (`cvt_ftz_golden.txt`), with
   the conversions to an integer in f32 and f64 (`floorf`); the 44 such lines
   of `nan_golden.txt` are predicted and compared with the rest, and the new

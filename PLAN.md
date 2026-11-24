@@ -368,21 +368,31 @@ nothing Blackwell-specific has run on a GPU.
 | Steps | Where | State |
 | --- | --- | --- |
 | B5, B6, F23 | `docs/validation-matrix.md` | one row per claim with its probe, prediction and pass criterion; a test keeps its citations valid |
-| C7 to C13, D15 to D18 | `validation/blackwell/` | 24 probe programs, 59 runs, predictions committed, dry-run in the simulator; three mbarrier runs also match the 3080 Ti. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs. Matrix rows with no probe are listed in its README |
-| C14 | `validation/blackwell_timing/` | ten microbenchmarks, a fit to the config schema, predictions committed; six ran on the 3080 Ti. The `ncu` path is untested (needs root here) |
-| E19 to E22 | `env/remote/` | pinned setup, preflight, one `run.sh`, a runbook. Tested in throwaway envs and against the 3080 Ti (which it correctly refuses as not a B200) |
+| C7 to C13, D15 to D18 | `validation/blackwell/` | 51 probe programs, 101 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 15 runs also match the 3080 Ti. Every matrix row outside timing has a run except NUM-05, RT-10 and RT-11 (its README says why). Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
+| C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema, predictions committed; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
+| E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
 | F24 | | still to decide: the budget for a second rental |
 
 To settle before renting:
 
 - The driver on the rented machine will probably be older than toolkit 13.5,
   and such a driver refuses the toolkit's PTX (measured here: `.version 9.5`
-  on a 9.0 driver). `setup.sh` then falls back to a matching toolkit, so the
-  programs are not built by the nvcc that produced the committed PTX. A
-  program that carries PTX and does not check its launch error fails silently
-  in that case.
-- PyTorch is not in the pinned environment. Triton on a real GPU needs it, and
-  so does `validation/blackwell/e2e/triton_gpu.py`, which has never run.
+  on a 9.0 driver). That can no longer pass unnoticed: every probe and
+  benchmark reports a module that did not load as `LAUNCH FAILED`, apart from
+  a kernel that failed; the runner, the comparison and `run.sh` count it as a
+  failure whatever a probe is allowed to do; and the nvcc that built the
+  programs is compared with the one the predictions were made with, a mismatch
+  being flagged from `setup.sh` to `compare.py`. **Still to decide on the
+  day**, for a driver of CUDA 13.0 to 13.4: the default (`--toolkit auto`)
+  builds with the driver's toolkit, flagged "predictions not comparable";
+  `--toolkit pinned` keeps the predictions' compiler and runs machine code,
+  but the book's kernels then do not load on the GPU
+  (`env/remote/RUNBOOK.md`, "Driver older than the toolkit").
+- PyTorch is pinned (2.15.0, the release that requires Triton 3.9.0; CUDA
+  13.2 build) and installed into a venv of its own, because in the project
+  env its CUDA wheels change which NVRTC `cuda-bindings` loads.
+  `validation/blackwell/e2e/triton_gpu.py` ran whole on the 3080 Ti. With a
+  12.x driver there is no PyTorch for it and the step is skipped.
 
 Found by this work in the simulator and not yet fixed:
 

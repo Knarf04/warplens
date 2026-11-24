@@ -289,6 +289,20 @@ else
         note "Unset WARPLENS_BOOK (and drop --book) to use the clone env/remote/setup.sh fetches at the pinned commit."
       fi
     fi
+    # Matrix row RT-11 is captured under gdb, and on a B200 the stage run-blackwell fails
+    # without that capture (validation/blackwell/run_rows.py). Better known now than then.
+    tracer="$(gdb_program)"
+    if [[ -z "$tracer" ]]; then
+      warn rt11-tracer "no gdb: matrix row RT-11 cannot be captured, and run-blackwell will fail for it"
+      note "As root: apt-get install -y gdb. Otherwise env/remote/setup.sh again, or WARPLENS_GDB=/path/to/gdb (RUNBOOK.md, section 3)."
+    elif out="$(timeout --kill-after=5 60 "$tracer" -q -batch -ex "python print('gdb-python-ok')" -ex run --args /bin/true 2>&1)" \
+         && grep -q 'gdb-python-ok' <<<"$out" && grep -q 'exited normally' <<<"$out"; then
+      pass rt11-tracer "$tracer has Python and may trace a process"
+    else
+      warn rt11-tracer "$tracer cannot trace a process, or has no Python: matrix row RT-11 cannot be captured, and run-blackwell will fail for it"
+      note "$(tail -n 2 <<<"$out" | tr '\n' ' ')"
+      note "A container that forbids ptrace needs --cap-add=SYS_PTRACE or another machine (RUNBOOK.md, section 3)."
+    fi
   fi
   work="$(mktemp -d)"
   arch="$(arch_for_cap "$expect_cap")"

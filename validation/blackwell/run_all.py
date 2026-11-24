@@ -28,7 +28,10 @@ GPU mode
     4. runs the probes in manifest order
     5. runs the end-to-end programs (e2e/run_e2e.py) unless --no-e2e
     6. runs the matrix rows that are not probes (run_rows.py: NUM-05, RT-10, RT-11) into
-       <out>/rows/; informational, so a failure there is recorded and never fails the run
+       <out>/rows/. NUM-05 and RT-10 are informational: a failure there is recorded and never
+       fails the run. RT-11's capture is required on a GPU of compute capability 10.x: without
+       it the exit status is 1 and <out>/RT-11-NOT-CAPTURED.txt says why (--rt11 optional
+       to do without; --no-e2e and --only leave the rows out and are not failures)
     7. writes <out>.tar.gz
 
 Simulator modes need the `warplens` package and its Python environment:
@@ -39,6 +42,8 @@ Options
     --only PATTERN    run only probes whose name matches this shell pattern; repeatable
     --no-build        do not run build.sh first
     --no-e2e          skip the end-to-end programs
+    --rt11 WHEN       auto (default), required or optional: whether a missing RT-11 capture fails
+                      the run (run_rows.py)
     --book PATH       clone of the MLSys book, for e2e (see e2e/run_e2e.py)
     --predicted DIR   predict mode: write the predictions there instead of predicted/ (how
                       tests/test_predict_path.py runs the whole path without touching the
@@ -294,6 +299,7 @@ def main() -> int:
     parser.add_argument("--only", action="append", default=[])
     parser.add_argument("--no-build", action="store_true")
     parser.add_argument("--no-e2e", action="store_true")
+    parser.add_argument("--rt11", choices=["auto", "required", "optional"], default="auto")
     parser.add_argument("--book", default=os.environ.get("WARPLENS_BOOK", ""))
     parser.add_argument("--predicted")
     parser.add_argument("--binaries", choices=["auto", "ptx", "native", "ampere"], default="auto")
@@ -378,14 +384,23 @@ def main() -> int:
         infrastructure_failures += status != "ok"
 
     if args.mode == "gpu" and not args.only:
-        # The rows without a probe (NUM-05, RT-10, RT-11). No prediction, no verdict: whatever
-        # happens there is in rows/status.tsv and does not count against the run.
-        command = [sys.executable, str(HERE / "run_rows.py"), "--out", str(out),
+        # The rows without a probe (NUM-05, RT-10, RT-11). No prediction, no verdict: what
+        # happens to NUM-05 and RT-10 is in rows/status.tsv and does not count against the run.
+        # run_rows.py exits non-zero only when RT-11's capture is required (a B200) and is not
+        # there, or when it broke before it could say; either way the capture is missing.
+        command = [sys.executable, str(HERE / "run_rows.py"), "--out", str(out), "--rt11", args.rt11,
                    "--timeout-scale", str(args.timeout_scale)] + (["--no-e2e"] if args.no_e2e else [])
         status, _, stdout, stderr = run_process(command, 2 * 3600 * args.timeout_scale)
         (out / "rows-runner.log").write_bytes(stdout + stderr)
         print(stdout.decode(errors="replace"), end="")
         print(f"rows without a probe (run_rows.py): {status}", flush=True)
+        if status != "ok":
+            infrastructure_failures += 1
+            if not (out / "RT-11-NOT-CAPTURED.txt").is_file():
+                (out / "RT-11-NOT-CAPTURED.txt").write_text(
+                    f"run_rows.py ended with: {status}, before it could say whether matrix row RT-11 was "
+                    "captured. See rows-runner.log and rows/status.tsv; env/remote/RUNBOOK.md, section 3, "
+                    "\"The rows without a probe\", has the commands to run it by hand.\n")
 
     (out / "manifest.py").write_bytes((HERE / "manifest.py").read_bytes())
     (out / "elapsed.txt").write_text(f"{time.monotonic() - started:.0f} seconds\n")
@@ -410,6 +425,9 @@ def main() -> int:
             print(toolkit["reason"])
         print(f"compare with: python {HERE / 'compare.py'} {archive}")
         infrastructure_failures += any(broken.values())
+        if (out / "RT-11-NOT-CAPTURED.txt").is_file():      # run_rows.py's banner, again as the last thing said
+            bar = "!" * 100
+            print(f"{bar}\n{(out / 'RT-11-NOT-CAPTURED.txt').read_text()}{bar}")
     return 1 if infrastructure_failures else 0
 
 

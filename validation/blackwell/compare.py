@@ -249,6 +249,11 @@ def main() -> int:
         if args.require_same_toolkit:
             return 3
 
+    if (results / "RT-11-NOT-CAPTURED.txt").is_file():
+        # No verdict here depends on it; a reader of this report must still not miss it.
+        bar = "!" * 100
+        print(f"{bar}\n{read(results / 'RT-11-NOT-CAPTURED.txt')}{bar}\n")
+
     artifact_errors = validate_probe_archive(results, {p.program for p in PROBES})
     rows, details, bad, unverified = [], artifact_errors, int(bool(artifact_errors)), 0
     for probe in PROBES:

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Run a CuTe DSL kernel that uses TMA on the B200 and save the tensor maps it is handed
-(matrix row RT-11). Informational: there is no prediction.
+"""Run a CuTe DSL kernel that uses TMA on the B200 and save the tensor maps it is handed,
+its code, and the memory it reads and writes (matrix row RT-11). There is no prediction;
+what is checked is that the capture is complete.
 
     validation/blackwell/e2e/cute_dsl_tma.py --out DIR [--tutorial FILE] [--python PROGRAM] [--force]
 
@@ -9,7 +10,9 @@ Why: the DSL does not ask the driver for its tensor maps; its compiled host code
 made (docs/m6.md, "Not working: kernels that use TMA"). The bytes saved here, next to the
 driver's own encodings from tma/tensormap_encode_sweep (TMA-12), are the test data for a
 decoder, after which such kernels can run in the simulator. Nothing else on the rental
-produces them.
+produces them. With the decoder written, the launch of step 3 can be replayed in the
+simulator with no GPU: its PTX, its parameters, the memory they point into as it was before
+the kernel, and the same memory afterwards to compare with.
 
 Steps, each under a timeout:
   1. CUTLASS's `fp16_gemm_0.py`, unmodified (it seeds its inputs itself: torch.manual_seed(1111)),
@@ -18,18 +21,44 @@ Steps, each under a timeout:
      every kernel parameter's offset, size and bytes; parameters of 64 bytes or more are
      also saved raw as DIR/trace/launchNN.paramMM.bin. A tensor map is a parameter of 128
      bytes, or 128 bytes inside a larger one.
+  3. The tutorial again under the tracer, with a problem small enough to keep and to simulate
+     (`--mnk 256,512,512`: 2 x 2 tiles, 8 steps of K; --capture-mnk or
+     WARPLENS_RT11_CAPTURE_MNK for another), and everything saved
+     (e2e/gdb_driver_trace.py, WARPLENS_TRACE_CAPTURE=module,memory) to DIR/capture/:
+       moduleNN.bin        the code handed to the driver. The DSL hands it machine code (a
+                           fat binary around a cubin, at cuLibraryLoadData), not PTX
+       dsl_dump/*.ptx, *.cubin   the DSL's own dump of the same compilation (CUTE_DSL_KEEP,
+                           CUTE_DSL_DUMP_DIR): the PTX a simulator needs. The cubin is
+                           checked to be the bytes inside moduleNN.bin
+       capture.json        modules, kernel lookups, every device allocation and free
+       launches.json       as in step 2, and per launch "memory": each pointer found in a
+                           parameter (at any byte offset, so also the address inside a tensor
+                           map), the allocation it points into, and that allocation's dump
+                           before the kernel and after cuCtxSynchronize
+       mem/<sha256>.bin    the dumps. PyTorch's allocator keeps many tensors in one
+                           allocation; the dump is the whole allocation
+     PyTorch's own kernels (C++ names, `_Z...`) are launched too; their parameters are saved,
+     their memory is not read, and their modules (a megabyte each) are listed and not kept.
+  4. e2e/launch_capture.py checks that nothing is missing and writes DIR/summary.txt and
+     DIR/capture.sha256. An incomplete capture fails this script.
+
+Size: about 5 MB for the three tensors' allocation before and after (the three tensors are
+1 MiB together, inside one 2 MiB allocation of PyTorch's small-block pool; a second copy is
+kept only of an allocation the kernel changed), 0.1 MB for the rest. Measured for the
+stand-ins on an RTX 3080 Ti (env/remote/RUNBOOK.md, section 9), not for the tutorial.
 
 The tutorial is the one in the CUTLASS clone that examples/03_cutlass_mma/build.sh makes
 (same pinned commit; cloned here if it is missing). It needs PyTorch with CUDA: --python,
 else WARPLENS_TORCH_PYTHON (env/remote/run.sh sets it to the PyTorch env of setup.sh), else
 this interpreter.
 
-Exit status: 0 the tutorial passed and its launch parameters were saved; 1 something
-failed (the output says what); 2 with a first line `SKIPPED: why` when it cannot run here:
+Exit status: 0 the tutorial passed and the capture is complete; 1 something failed or is
+missing (the output says what); 2 with a first line `SKIPPED: why` when it cannot run here:
 the GPU is not compute capability 10.x (--force runs it anyway), no CUDA PyTorch, no gdb.
 `--script FILE` traces another DSL script in place of the tutorial and skips the checks for
 sm_100 and PyTorch; the dry run on the development machine uses it with
-examples/06_cute_dsl/saxpy.py.
+examples/06_cute_dsl/saxpy.py. Such a script has no tensor map and prints no PASS, so those
+two checks are left out unless --expect-descriptor or --expect-last-line ask for them.
 
 Not done here: the DSL's experimental `create_tensor_map_tiled`, which docs/m6.md says may
 go through the driver. It needs a kernel written for it; env/remote/RUNBOOK.md lists it as
@@ -39,7 +68,9 @@ an optional manual step.
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -48,6 +79,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
+import launch_capture  # noqa: E402
 from driver_call_trace import describe, find_gdb, trace  # noqa: E402
 from probe_process import forward_interrupts, run_process  # noqa: E402
 
@@ -78,6 +110,14 @@ def main() -> int:
     parser.add_argument("--python", default=os.environ.get("WARPLENS_TORCH_PYTHON") or sys.executable)
     parser.add_argument("--force", action="store_true", help="run on a GPU that is not compute capability 10.x")
     parser.add_argument("--timeout", type=float, default=900)
+    parser.add_argument("--capture-mnk", default=os.environ.get("WARPLENS_RT11_CAPTURE_MNK", "256,512,512"),
+                        help="the tutorial's --mnk for the run whose memory is saved ('' for its default, "
+                             "8192,8192,8192: three allocations of 128 MiB, read twice). "
+                             "Default: WARPLENS_RT11_CAPTURE_MNK, else 256,512,512")
+    parser.add_argument("--expect-descriptor", action="store_true",
+                        help="with --script: fail unless a launch has a parameter of 128 bytes or more")
+    parser.add_argument("--expect-last-line", default=None,
+                        help="with --script: the line both runs must end with (the tutorial: PASS)")
     args = parser.parse_args()
     out = Path(args.out)
     env = dict(os.environ)
@@ -125,10 +165,44 @@ def main() -> int:
     candidates = [p for p in read if p["size"] >= 128]
     print(f"{len(launches)} launch(es), {len(read)} parameter(s) read, {len(candidates)} of 128 bytes or more "
           f"(where a tensor map can be); bytes in {out / 'trace' / 'launches.txt'}")
-    if plain != "ok" or status != "ok" or not read:
-        print("FAILED: " + ("the plain run did not pass; " if plain != "ok" else "")
-              + ("the traced run did not finish cleanly; " if status != "ok" else "")
-              + ("no kernel parameter was read" if not read else ""))
+
+    # 3. Everything a replay needs, for a problem small enough to keep.
+    capture = out / "capture"
+    shutil.rmtree(capture, ignore_errors=True)
+    dump = capture / "dsl_dump"
+    dump.mkdir(parents=True)        # the DSL writes nothing into a directory that does not exist
+    capture_env = dict(env, CUTE_DSL_DUMP_DIR=str(dump), CUTE_DSL_KEEP=",".join(
+        sorted({*filter(None, env.get("CUTE_DSL_KEEP", "").split(",")), "ptx", "cubin"})))
+    capture_command = list(command)
+    expect = {"descriptor": args.expect_descriptor, "ptx": True, "last_line": args.expect_last_line or ""}
+    if not args.script:
+        expect.update(descriptor=True, last_line="PASS")
+        # PyTorch's own kernels (and cuBLAS's, for the reference result): parameters, no memory, no code.
+        capture_env["WARPLENS_TRACE_MEMORY_SKIP"] = "^_Z"
+        capture_env["WARPLENS_TRACE_MODULE_SKIP_WRAPPED"] = "1"
+        if args.capture_mnk:
+            capture_command += ["--mnk", args.capture_mnk]
+    (capture / "expect.json").write_text(json.dumps(expect, indent=1) + "\n")
+    (capture / "command.txt").write_text(
+        " ".join(capture_command) + "\n" + "".join(f"{key}={capture_env[key]}\n" for key in sorted(capture_env)
+                                                    if key.startswith(("CUTE_DSL_", "WARPLENS_TRACE_"))))
+    captured, facts = trace(capture_command, capture, args.timeout, env=capture_env, capture=("module", "memory"))
+    print(f"capture run ({' '.join(capture_command[1:])}): {captured}")
+    for launch in facts.get("launches", []):
+        print(describe(launch))
+    problems = launch_capture.write_summary(out)
+    print(f"capture: {'INCOMPLETE' if problems else 'complete'}; {out / 'summary.txt'}")
+    for problem in problems:
+        print(f"  missing: {problem}")
+
+    failures = [what for bad, what in (
+        (plain != "ok", "the plain run did not pass"),
+        (status != "ok", "the traced run did not finish cleanly"),
+        (not read, "no kernel parameter was read"),
+        (captured != "ok", f"the capture run did not finish cleanly ({captured})"),
+        (bool(problems), "the capture is incomplete: " + "; ".join(problems)[:600])) if bad]
+    if failures:
+        print("FAILED: " + "; ".join(failures))
         return 1
     return 0
 

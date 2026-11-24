@@ -38,6 +38,10 @@ Do these at home; none needs the B200.
       `conda run -n warplens python validation/blackwell/run_rows.py --out /tmp/rows` must
       print `ok` for `formats/ue4m3_ptxas` and `e2e/driver_call_trace.cute_dsl`, and
       `skipped (needs sm_100 ...)` for `e2e/cute_dsl_tma` (section 3, "The rows without a probe").
+      The capture of that row dry-runs there with a stand-in kernel:
+      `conda run -n warplens python validation/blackwell/e2e/cute_dsl_tma.py --out /tmp/rt11 --script examples/06_cute_dsl/saxpy.py`
+      must end with `capture: complete`, and `python -m pytest -q tests/test_launch_capture.py`
+      must pass with nothing skipped but the PyTorch test.
       `e2e/driver_call_trace.tirx` is `failed` there for as long as that machine's driver
       is older than the toolkit: it refuses NVRTC's PTX, traced or not.
 - [ ] The toolkit policy of section 2 is read, and the owner has confirmed or changed the
@@ -413,7 +417,9 @@ book; the check `book` says which commit the clone is at (FAIL for `setup.sh`'s 
 at another commit than the pinned one, WARN for a clone you named). `run.sh` asks for that check by itself unless the Blackwell suite is
 skipped or restricted with `--no-e2e` / `--only`; a standalone `preflight.sh` does it
 with `--e2e`. If PyTorch cannot be had (a 12.x driver), run the probes without the
-end-to-end programs, which also leaves out the launches of rows RT-10 and RT-11:
+end-to-end programs, which also leaves out the launches of rows RT-10 and RT-11. That is a
+run without the RT-11 capture by request, and not a failure; the capture is then still
+owed (section 5):
 
 ```bash
 WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e env/remote/run.sh
@@ -425,14 +431,25 @@ Three rows of `docs/validation-matrix.md` are not kernels with a predicted outpu
 are scripted all the same: `validation/blackwell/run_all.py` ends a GPU run with
 `validation/blackwell/run_rows.py`, inside the stage `run-blackwell`, so there is nothing
 to type. Outputs go to `out/blackwell/rows/` of the archive, one line per step to
-`out/blackwell/rows/status.tsv`. They are informational: a step that fails or is skipped
-is a line there and never fails the stage, and `compare.py` does not read them.
+`out/blackwell/rows/status.tsv`. NUM-05 and RT-10 are informational: a step that fails or
+is skipped is a line there and never fails the stage.
+
+**RT-11 is required on a B200.** Its capture is the one thing of the rental that nothing
+else produces and that a later decoder cannot be written without, so on a GPU of compute
+capability 10.x anything but `ok` for `e2e/cute_dsl_tma` (skipped for want of gdb or
+PyTorch, failed, incomplete, timed out) makes `run_rows.py`, `run_all.py` and so the stage
+`run-blackwell` fail. It is said in a banner that `run_rows.py`, `run_all.py`, `run.sh`
+(after its line of stage statuses) and `compare.py` each print, and in
+`out/blackwell/RT-11-NOT-CAPTURED.txt`, which is there for exactly as long as the capture is
+missing. On any other GPU the step skips itself and nothing fails. `--no-e2e` and `--only`
+(through `WARPLENS_BLACKWELL_RUN_ARGS`) leave the rows out and are not failures;
+`--rt11 optional` there runs the row and accepts whatever it ends as.
 
 | Row | Step in `rows/status.tsv` | What runs | What to look for afterwards |
 | --- | --- | --- | --- |
 | NUM-05 (UE4M3) | `formats/ue4m3_ptxas` | `formats/ue4m3_ptxas.py`: asks the installed ptxas whether any `cvt` to or from UE4M3 exists, with the formats that do exist as controls. No GPU | `rows/formats/ue4m3_ptxas.stdout` ends with `NUM-05: no UE4M3 conversion in this toolkit; the row stays open`. Status `news (...)` means ptxas accepted one: the row can then be tested with a sweep like NUM-01's |
 | RT-10 (driver calls) | `e2e/driver_call_trace.tirx`, `e2e/driver_call_trace.cute_dsl` | `e2e/driver_call_trace.py`: `examples/07_tirx/run.py` and `examples/06_cute_dsl/saxpy.py` under gdb, a breakpoint on every export of `libcuda.so` and `libcudart.so` | `rows/e2e/driver_call_trace.<name>/summary.txt` (each call and how often) and `calls.txt` (in order) against the table of `docs/m6.md`; a call the shims lack is the news |
-| RT-11 (tensor maps of the CuTe DSL) | `e2e/cute_dsl_tma` | `e2e/cute_dsl_tma.py`: CUTLASS's `fp16_gemm_0.py`, unmodified, once plain and once under the same tracer, which reads every kernel parameter at the launch | `rows/e2e/cute_dsl_tma/tutorial.stdout` ends with `PASS`; `rows/e2e/cute_dsl_tma/trace/launches.txt` has the parameters in hex, and `launchNN.paramMM.bin` the raw bytes of each one of 64 bytes or more. **These files are what unblocks CuTe DSL kernels with TMA in the simulator: check that they exist before releasing the instance** (section 8) |
+| RT-11 (a CuTe DSL kernel with TMA: tensor maps, code, memory) | `e2e/cute_dsl_tma` | `e2e/cute_dsl_tma.py`: CUTLASS's `fp16_gemm_0.py`, unmodified, once plain, once under the same tracer, which reads every kernel parameter at the launch, and once more under it at a small size with the capture on: the code handed to the driver, the DSL's PTX, and the device memory the launch's parameters point into, before the kernel and after it. Then `e2e/launch_capture.py` checks that nothing is missing | `rows/e2e/cute_dsl_tma/summary.txt` starts with `RT-11 capture: COMPLETE`; the table below says what is where. **This is what unblocks CuTe DSL kernels with TMA in the simulator, and the only required row here: without it the stage fails** (below, and section 8) |
 
 What they need, and what `setup.sh` does about it: gdb with Python support. `setup.sh`
 uses the machine's gdb, else installs the system package as root, else puts
@@ -446,15 +463,57 @@ and `R=$WARPLENS_REMOTE_HOME/run/out/blackwell`:
 
 ```bash
 cat $R/rows/status.tsv                                  # which step, and why
+cat $R/rows/e2e/cute_dsl_tma/summary.txt                # RT-11: what was captured and what is missing
 command -v gdb || apt-get install -y gdb                # the usual cause; or WARPLENS_GDB=/path/to/gdb
+export WARPLENS_TORCH_PYTHON=$WARPLENS_REMOTE_HOME/torch-env/bin/python   # RT-11's PyTorch; run.sh sets it itself
 $E python validation/blackwell/run_rows.py --out $R     # all of them again
-# or one at a time:
-$E python validation/blackwell/formats/ue4m3_ptxas.py | tee $R/rows/formats/ue4m3_ptxas.stdout
-$E python validation/blackwell/e2e/driver_call_trace.py --out $R/rows/e2e/driver_call_trace.cute_dsl -- python examples/06_cute_dsl/saxpy.py
-$E env WARPLENS_TORCH_PYTHON=$WARPLENS_REMOTE_HOME/torch-env/bin/python \
-   python validation/blackwell/e2e/cute_dsl_tma.py --out $R/rows/e2e/cute_dsl_tma
+# or one at a time (status.tsv keeps the lines of the steps that are not run again):
+$E python validation/blackwell/run_rows.py --out $R --only e2e/cute_dsl_tma
+$E python validation/blackwell/run_rows.py --out $R --only 'e2e/driver_call_trace.*'
+$E python validation/blackwell/run_rows.py --out $R --only formats/ue4m3_ptxas
 env/remote/run.sh --collect-only                        # pack again; the new files are in the archive
 ```
+
+Run RT-11 through `run_rows.py`, as above, and not `cute_dsl_tma.py` directly: it is
+`run_rows.py` that takes `RT-11-NOT-CAPTURED.txt` away when the row ends as `ok`, and
+`run.sh --collect-only` exits 1 and repeats the banner for as long as that file is there.
+The stage `run-blackwell` stays `failed` in `manifest.txt` (it did fail); the capture's own
+`summary.txt` saying `RT-11 capture: COMPLETE` is what counts afterwards.
+
+What RT-11 leaves in `rows/e2e/cute_dsl_tma/`, and what to do when its capture run is the
+part that fails:
+
+| Path | What |
+| --- | --- |
+| `summary.txt` | first line `RT-11 capture: COMPLETE` or `INCOMPLETE`; then every problem, every warning, and each pointer with its allocation and its two dumps |
+| `capture.sha256` | SHA-256 of every file here; `sha256sum -c capture.sha256` |
+| `tutorial.stdout` | the tutorial run plain, at its own size (8192 x 8192 x 8192); ends with `PASS` |
+| `trace/` | the same under the tracer: `launches.txt`, `launches.json`, `launchNN.paramMM.bin`. The tensor maps at the tutorial's own size |
+| `capture/` | the tutorial once more under the tracer, at `--mnk 256,512,512`, with everything a replay needs: `moduleNN.bin` (the fat binary the DSL hands the driver), `dsl_dump/*.ptx` and `*.cubin` (the DSL's own dump of that compilation; the PTX is what the simulator runs), `capture.json` (modules, kernel lookups, allocations), `launches.json` (parameters, and under `memory` each pointer found in them with its allocation and dumps), `mem/<sha256>.bin` (device memory before the kernel and after it), `capture.log` (every call the tracer made in the program, written before the call), `command.txt`, `expect.json` |
+
+About 5 MB: the three tensors are 1 MiB together and PyTorch keeps them in one 2 MiB
+allocation, which is saved whole before and after the kernel (measured for a stand-in
+kernel over PyTorch tensors on an RTX 3080 Ti, where the tutorial itself got as far as
+that one allocation; not for the tutorial's launch). `python validation/blackwell/e2e/launch_capture.py verify $R/rows/e2e/cute_dsl_tma`
+checks it again, there or at home.
+
+- `INCOMPLETE` with `the traced run did not print 'PASS'` and a failed assertion in
+  `capture/gdb.stdout`: the tutorial does not pass at the small size. Take another:
+  `$E env WARPLENS_RT11_CAPTURE_MNK=512,512,512 python validation/blackwell/run_rows.py --out $R --only e2e/cute_dsl_tma`
+  (M a multiple of 128, N of 256. An empty value is the tutorial's own size: three
+  allocations of 128 MiB, 0.8 GB of dumps).
+- The capture run times out, and the last line of `capture/capture.log` is a call with no
+  result under it: that call into the driver did not return. The tracer makes its calls with
+  the program's other threads running; try them held, `WARPLENS_TRACE_LOCK_THREADS=1` in
+  front of the command (on driver 580.173.02 one call needed the opposite, which is why
+  running is the default). What was saved before the hang is kept.
+- `WARNING: ... no pointer was found in parameter N (128 bytes)` is not a failure: the
+  address in that tensor map is in a form the scan does not know, and every live
+  allocation was saved instead.
+- `no PTX with .entry ...`: the DSL's own dump did not appear in `capture/dsl_dump/`. The
+  machine code in `moduleNN.bin` is still the kernel; say so in the notes and keep the
+  directory. A replay needs the PTX, so this is a reason to look at
+  `CUTE_DSL_KEEP`/`CUTE_DSL_DUMP_DIR` in `capture/command.txt` before leaving.
 
 Still by hand, and optional (matrix row RT-11, last sentence): the DSL's experimental
 `create_tensor_map_tiled` (`cutlass.experimental.cuda.tensor_map`), which `docs/m6.md`
@@ -480,7 +539,7 @@ What was and was not tried of this is in section 9.
 | `build-blackwell` | 1 to 6 | measured: 8 s on 20 cores for the 51 programs (13 s with `--native`); the upper end is a guess for a smaller machine |
 | `build-timing` | 1 to 4 | measured: 62 s for the 14 benchmarks |
 | `predict-toolkit` | 0, or 5 to 15 | 0 when the driver takes the pinned toolkit's PTX (the stage is skipped). With a fallback toolkit, measured with nvcc 13.5.37 on 20 cores: 65 s for the 108 probe predictions, 8 at once, and about 7 min for the 14 timing benchmarks, one at a time; the upper end is a guess for a slower CPU. Limit: 30 min |
-| `run-blackwell` | 3 to 20 | guess. Kernels are tiny; the time is process start-up and the probes that wait out a timeout on purpose. The rows without a probe at its end add about 15 s here (measured without the RT-11 tutorial, which needs a B200; that is two runs of a GEMM and a guess of 1 to 2 min) |
+| `run-blackwell` | 3 to 20 | guess. Kernels are tiny; the time is process start-up and the probes that wait out a timeout on purpose. The rows without a probe at its end add about 15 s here (measured without the RT-11 tutorial, which needs a B200; that is three runs of a GEMM, two of them under gdb, and a guess of 1 to 3 min; a stand-in over PyTorch tensors took 7 s under the tracer with the capture on) |
 | `run-timing` | 3 to 20 | guess. Under `ncu` every kernel is replayed per counter group |
 | `collect` | under 1 | measured |
 | copy back, verify, second copy | 5 | guess |
@@ -536,9 +595,12 @@ plan step D17), and `run.sh --dry-run` is clean:
    what that row predicts. Hardware must then confirm the new prediction.
 2. Probes that tested nothing in the first rental: `FAILED TO LAUNCH`, `HOST ERROR`,
    `not run`, a stage that hit its time limit, or the instance was released early.
-3. The tensor maps of row RT-11 were not captured (`rows/status.tsv` says `skipped` or
-   `failed` for `e2e/cute_dsl_tma`). They are what a decoder for CuTe DSL kernels with
-   TMA is written against, and nothing else produces them.
+3. Row RT-11 was not captured: `out/blackwell/RT-11-NOT-CAPTURED.txt` is in the archive,
+   or `rows/e2e/cute_dsl_tma/summary.txt` does not start with `RT-11 capture: COMPLETE`
+   (`rows/status.tsv` then says `skipped` or `failed` for `e2e/cute_dsl_tma`). The tensor
+   maps are what a decoder for CuTe DSL kernels with TMA is written against, the rest of
+   the capture is what such a kernel is then replayed from, and nothing else produces
+   either. `run.sh` exits 1 for this, so it is not found out at home.
 4. `ncu` could not read counters (a container) and the timing fit needs them: rent a VM
    or bare metal. With the first rental's default this shows at preflight, in its first
    minutes, and not afterwards; it is a second rental only if the first went on with
@@ -577,7 +639,8 @@ Contents:
 | `nvidia-smi.txt`, `nvidia-smi-q.txt` | the GPU as the driver describes it |
 | `logs/<stage>.log` | latest output of each stage; earlier attempts are preserved in `logs/history/` |
 | `out/blackwell/`, `out/timing/` | the suites' raw outputs (`WARPLENS_RESULTS_DIR`) |
-| `out/blackwell/rows/` | the rows without a probe: `status.tsv`, the UE4M3 answer of ptxas (NUM-05), the driver call traces (RT-10), the CuTe DSL tutorial's output and the kernel parameters of its launch, tensor maps included (RT-11). Section 3 |
+| `out/blackwell/rows/` | the rows without a probe: `status.tsv`, the UE4M3 answer of ptxas (NUM-05), the driver call traces (RT-10), and in `e2e/cute_dsl_tma/` the capture of the CuTe DSL tutorial (RT-11): its output, the kernel parameters of its launch, tensor maps included, its code and PTX, the memory it reads and writes, `summary.txt` and `capture.sha256`. About 5 MB. Section 3 |
+| `out/blackwell/RT-11-NOT-CAPTURED.txt` | only when the capture of row RT-11 was required and is missing: why. Section 3 |
 | `out/predicted-toolkit/` | only with a fallback toolkit: the predictions made with the installed nvcc before the GPU stages, `DIFFERENCES.txt`, `toolkit.txt`. Section 2 |
 | `PREDICTIONS-NOT-COMPARABLE.txt` | only with a fallback toolkit: why, and the two commands that compare with `out/predicted-toolkit/` |
 | `NCU-COUNTERS-NOT-READ.txt` | only when preflight read no counter: whether the run was told to do without (`--no-ncu`), did not need them (no timing suite) or required them and went on with `--keep-going` |
@@ -609,6 +672,7 @@ Transfer it with `scp` or `rsync` over the existing SSH connection.
 | `driver-api` FAIL | the driver API disagrees with `nvidia-smi` | Several GPUs in a different order: `export CUDA_VISIBLE_DEVICES=<index of the B200>`. |
 | `run-trivial` FAIL | `sm_100a` machine code does not run | With `gpu-identity` PASS this should not happen. Read the error; try `env/remote/setup.sh --toolkit <the driver's CUDA Version> --force`. If it persists the machine is unusable. |
 | `ptx-jit` WARN | the driver refuses the toolkit's PTX | `--native` covers the probes only. Full end-to-end runs also fail `e2e-ptx`; use a driver-compatible toolkit (`--toolkit auto`) or deliberately select `--no-e2e`. |
+| `rt11-tracer` WARN | no gdb, a gdb without Python, or a machine that does not let gdb trace a process | Matrix row RT-11 cannot be captured without it, and on a B200 the stage `run-blackwell` then fails at its end (section 3, "The rows without a probe"). Fix it now: `apt-get install -y gdb` as root, or `env/remote/setup.sh` again, or `WARPLENS_GDB`; in a container, `--cap-add=SYS_PTRACE`. The probes do not need it. |
 | `native-e2e` FAIL | the PyTorch env does not see the GPU, or there is no clone of the book | The message says which. Both: `env/remote/setup.sh` again (it installs the one and fetches the other; section 3, "PyTorch and the book"), or through `run.sh`: `env/remote/run.sh --redo setup`. If the book cannot be fetched from this machine: the fallback there, by hand, and `export WARPLENS_BOOK`. Then `env/remote/run.sh` again. For probes only, set `WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e`. |
 | `book` FAIL | `setup.sh`'s clone in `$WARPLENS_REMOTE_HOME/book` is not at the pinned commit | Something changed it. `env/remote/run.sh --redo setup` fetches the pinned commit again. |
 | `book` WARN | the clone you named (`WARPLENS_BOOK`, `--book`) is at another commit, or at none that can be read | Row RT-08 then runs other kernels than the prediction was made for. Unset `WARPLENS_BOOK` to use `setup.sh`'s clone, or note it next to the archive. |
@@ -653,11 +717,11 @@ The machine's disk is gone when it is released. In this order:
    running and time is up, press Ctrl-C once: `run.sh` stops the stage, packs
    what exists and prints the same three lines. `env/remote/run.sh --collect-only`
    packs again without running anything.
-2. `cat $WARPLENS_REMOTE_HOME/run/out/blackwell/rows/status.tsv`: `e2e/cute_dsl_tma` must
-   say `ok`, and `ls $WARPLENS_REMOTE_HOME/run/out/blackwell/rows/e2e/cute_dsl_tma/trace/`
-   must show `launches.txt` and at least one `launch*.param*.bin`. If not, section 3,
-   "The rows without a probe", has the commands; they take a minute, and a missing
-   capture is a reason for a second rental (section 5). Then `env/remote/run.sh --collect-only`.
+2. `run.sh` did not end with the banner `MATRIX ROW RT-11 WAS NOT CAPTURED`, and
+   `head -1 $WARPLENS_REMOTE_HOME/run/out/blackwell/rows/e2e/cute_dsl_tma/summary.txt` says
+   `RT-11 capture: COMPLETE`. If not, section 3, "The rows without a probe", has the
+   commands; they take a minute, and a missing capture is a reason for a second rental
+   (section 5). Then `env/remote/run.sh --collect-only`.
 3. Copy the archive and its `.sha256` to your machine. Run `sha256sum -c` **there**
    and compare the value with the one `run.sh` printed.
 4. Unpack it locally and check `manifest.txt`: the commit is the one you wrote
@@ -793,6 +857,43 @@ exit status 1 as it must be on Ampere:
   skipped for want of `sm_100`); the stage and `run.sh` reported the failure.
 - In the simulator, `e2e/run_e2e.py --mode sim` exits 0 with all eight steps `ok`, and
   exits 1 with `e2e/book_hgemm` as `exit 1` when the book's runner is made to fail.
+- On 2026-11-24, the capture of row RT-11 (code, memory before and after; section 3), all
+  on the RTX 3080 Ti, driver 580.173.02, each with the system gdb 15.1 and with
+  conda-forge's gdb 18.1:
+  - `cute_dsl_tma.py --script examples/06_cute_dsl/saxpy.py`, the whole path: `capture:
+    complete`. The DSL hands the driver a fat binary at `cuLibraryLoadData` (3584 bytes),
+    not PTX; the cubin of the DSL's own dump is inside it byte for byte, and the PTX of
+    that dump is the PTX the frontend capture of the same script saves. The two 1024-byte
+    allocations were followed from `cuMemAlloc_v2`, the driver's `cuMemGetAddressRange`
+    agrees, and the dumps are the script's inputs before the kernel and its result after,
+    bit for bit (`tests/test_launch_capture.py`).
+  - A CUDA C++ kernel that takes three 128-byte, 64-byte-aligned structs by value
+    (`tests/data/launch_capture_descriptors.cu`): the address at offset 0 and the one at
+    offset 3 were found, the one stored shifted by 4 bits was not, and its memory was in
+    the capture all the same (every live allocation is read when a parameter is that
+    large); the after dump of the output is the expected sum.
+  - A CuTe DSL kernel over PyTorch tensors (`tests/data/cute_dsl_torch_saxpy.py`, torch
+    2.15.0+cu132 in a venv made as `install_torch_env` makes one), traced as the tutorial
+    is: both tensors inside one 2 MiB allocation of PyTorch's allocator, followed through
+    `cudaMalloc`; PyTorch's own four launches listed, their memory not read, their three
+    modules (about 1 MB each) not kept; 4.1 MB in all, 7 s.
+  - `fp16_gemm_0.py` itself with `--force` and `CUTE_DSL_ARCH=sm_100a`, so that the DSL
+    compiles the real kernel for a GPU that is not there: the capture run saved its fat
+    binary (35664 bytes), the DSL's PTX (26855 bytes, six parameters, two of them
+    `.align 64`) and cubin (inside the fat binary), the kernel's name, and the one 2 MiB
+    allocation that holds the three tensors at `--mnk 256,512,512`. It ends at
+    `cuLibraryGetKernel` with error 209, no binary for this GPU, before any launch.
+    Without `CUTE_DSL_ARCH` the DSL refuses `tcgen05` for `sm_86` before it compiles.
+  - What went wrong on the way, and is why the tracer is as it is: a call made in the
+    stopped program with its other threads held (`cuKernelGetParamInfo` at a launch by
+    PyTorch) never returned. The capture's calls now run with the other threads running;
+    gdb 15's time limit on such calls was seen to end one after its limit and hand the
+    program back; `capture.log` names the call. And gdb 18.1 would not let the program go
+    on once the CuTe DSL's runtime library was unloaded at exit with a breakpoint of the
+    tracer still in it (where the launch returned to); such breakpoints are now removed
+    as soon as the call has returned.
+  - `run_rows.py`: RT-11 `skipped (needs sm_100 ...)` and exit status 0; with
+    `--rt11 required`, exit status 1, the banner and `RT-11-NOT-CAPTURED.txt`.
 
 Not tried, because there was no way to here:
 
@@ -808,11 +909,19 @@ Not tried, because there was no way to here:
 - `--toolkit pinned` on a driver older than the toolkit, as a whole run.
 - Ubuntu 22.04 (the development machine is 24.04), any provider's image, a slow
   network, Arm.
-- RT-11 itself: `fp16_gemm_0.py` has not run under the tracer anywhere, because it
-  needs a B200 and PyTorch (the development machine's env has no PyTorch). That the
-  DSL's tensor maps arrive as kernel parameters is what `docs/m6.md` saw in the
-  simulator; on hardware it is expected, not observed. If they do not, `calls.txt` of
-  the same trace shows what the DSL called instead.
+- RT-11 itself: the launch of `fp16_gemm_0.py` has not happened under the tracer
+  anywhere, because it needs a B200. Everything up to it has, on the RTX 3080 Ti (the
+  list above): the tutorial compiled for `sm_100a`, its module and PTX saved, its
+  allocation followed. First on the B200: the launch's parameters (that the tensor maps
+  arrive as two 128-byte, 64-byte-aligned parameters is what the kernel's PTX says; where
+  in them the address is, is not known), the scan of those parameters for addresses, the
+  reads of device memory at that launch, `cuCtxSynchronize` after a `tcgen05` kernel, and
+  the tutorial passing at 256 x 512 x 512. If the tensor maps are not parameters,
+  `calls.txt` of the same trace shows what the DSL called instead.
+- A gdb older than 15 (Ubuntu 22.04 has 12.1) for the capture of RT-11. It has no time
+  limit for a call made in the program, so a call that does not return costs the capture
+  run its whole timeout (15 min); what was saved before it is kept. Nothing else in the
+  tracer is known to need a newer gdb, and none was tried.
 - gdb inside a provider's container. Starting a child under gdb needs `ptrace`, which
   Docker's default seccomp profile allows on current kernels; a stricter profile makes
   the two tracing rows `skipped (... ptrace is not permitted)`.

@@ -15,11 +15,19 @@
 //   ampere_replay prmt          prmt.b32
 //   ampere_replay cpasync       cp.async with a source size
 //   ampere_replay call          calls to device functions (matrix row RT-02)
+//   ampere_replay callforms     structs by value, calls through function pointers, recursion
+//                               (RT-02)
 //   ampere_replay barrier_exit  __syncthreads() with exited threads, cases 0 and 1
 //
 // `printf` prints from the device. The device's lines and the host's "out:" line reach
 // standard output through different buffers, so their relative order is not defined;
 // compare that case as a set of lines.
+//
+// The Ampere programs that are not here have a probe of their own, so that a module the
+// B200's driver or the simulator will not take cannot stop these cases: the NaN, integer
+// division and min/max programs are formats/ampere_replay, the mbarrier token program is
+// mbarrier/ampere_token, the atomic updates e2e/ampere_atom and the PTX kernels of
+// reconvergence_golden.py e2e/ampere_reconvergence.
 //
 // Failures are reported as in the other probes (HOST ERROR, KERNEL FAILED, LAUNCH FAILED),
 // through the two macros the Ampere programs use for their checks.
@@ -50,6 +58,9 @@
 #define main replay_call
 #include "../../ampere/call_golden.cu"
 #undef main
+#define main replay_callforms
+#include "../../ampere/callforms_golden.cu"
+#undef main
 #define main replay_barrier_exit
 #include "../../ampere/barrier_exit_hw.cu"
 #undef main
@@ -62,6 +73,7 @@ int main(int argc, char** argv) {
     if (!strcmp(which, "prmt")) return replay_prmt();
     if (!strcmp(which, "cpasync")) return replay_cpasync();
     if (!strcmp(which, "call")) return replay_call();
+    if (!strcmp(which, "callforms")) return replay_callforms();
     if (!strcmp(which, "barrier_exit")) {
         char zero[] = "0", one[] = "1";
         char* first[] = {argv[0], zero};
@@ -70,6 +82,6 @@ int main(int argc, char** argv) {
         fflush(stdout);
         return status ? status : replay_barrier_exit(2, second);
     }
-    printf("HOST ERROR: usage: ampere_replay shfl|printf|ldmatrix|prmt|cpasync|call|barrier_exit\n");
+    printf("HOST ERROR: usage: ampere_replay shfl|printf|ldmatrix|prmt|cpasync|call|callforms|barrier_exit\n");
     return 2;
 }

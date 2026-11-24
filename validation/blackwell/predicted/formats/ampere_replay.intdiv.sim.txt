@@ -1,0 +1,39 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 12 finding(s)
+  _Z12intdiv_probePKiPKyS2_Pyi: 23 CTA(s), 6806 warp-instructions
+    [integer-divide-by-zero] div.s16 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 649: div.s16 %rs10, %rs11, %rs12;
+      first in CTA (0, 0, 0), warp 0, lanes 0, 22
+    [integer-divide-by-zero] div.u16 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 662: div.u16 %rs7, %rs8, %rs9;
+      first in CTA (1, 0, 0), warp 7, lanes 4, 26
+    [integer-divide-by-zero] div.s32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 573: div.s32 %r16, %r17, %r18;
+      first in CTA (3, 0, 0), warp 7, lanes 20
+    [integer-divide-by-zero] div.u32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 675: div.u32 %r13, %r14, %r15;
+      first in CTA (5, 0, 0), warp 5, lanes 12
+    [integer-divide-by-zero] div.s64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 688: div.s64 %rd52, %rd53, %rd54;
+      first in CTA (7, 0, 0), warp 5, lanes 6, 28
+    [integer-divide-by-zero] div.u64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (16 times)
+      line 594: div.u64 %rd45, %rd46, %rd47;
+      first in CTA (9, 0, 0), warp 4, lanes 10
+    [integer-divide-by-zero] rem.s16 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (16 times)
+      line 700: rem.s16 %rs4, %rs5, %rs6;
+      first in CTA (11, 0, 0), warp 2, lanes 24
+    [integer-divide-by-zero] rem.u16 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (16 times)
+      line 713: rem.u16 %rs1, %rs2, %rs3;
+      first in CTA (13, 0, 0), warp 2, lanes 18
+    [integer-divide-by-zero] rem.s32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 616: rem.s32 %r10, %r11, %r12;
+      first in CTA (15, 0, 0), warp 1, lanes 0, 22
+    [integer-divide-by-zero] rem.u32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 726: rem.u32 %r7, %r8, %r9;
+      first in CTA (17, 0, 0), warp 0, lanes 4, 26
+    [integer-divide-by-zero] rem.s64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 739: rem.s64 %rd18, %rd19, %rd20;
+      first in CTA (18, 0, 0), warp 7, lanes 8, 30
+    [integer-divide-by-zero] rem.u64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (15 times)
+      line 637: rem.u64 %rd11, %rd12, %rd13;
+      first in CTA (20, 0, 0), warp 7, lanes 2, 24

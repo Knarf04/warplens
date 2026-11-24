@@ -356,7 +356,7 @@ def test_a_triton_script_gets_the_options_in_its_own_process(shim, tmp_path):
     for arguments, timing in ((["--timing"], (148, "B200", clock["B200"])),
                               (["--active-sms", "4"], (4, "B200", clock["B200"])),
                               (["--timing-config", slow, "--active-sms", "5"], (5, "B200", 0.5)),
-                              (["--model", "B300", "--timing"], (148, "B300", clock["B300"]))):
+                              (["--model", "B300", "--timing"], (GpuConfig.load("B300")["sm_count"], "B300", clock["B300"]))):
         timed = command(*arguments, script)
         assert timed.returncode == 0, timed.stdout[-1500:] + timed.stderr[-1500:]
         assert timed.stdout.splitlines()[1] == f"timing: {timing}"

@@ -1,0 +1,33 @@
+info: sharedMemPerBlock 49152, sharedMemPerBlockOptin 232448
+not opted in: 0 static bytes, at most 49152 dynamic
+not opted in, 49152 dynamic bytes: launched; last byte a5
+not opted in, 49168 dynamic bytes: launch refused
+info: not opted in, 49168 dynamic bytes: the launch returned cudaErrorInvalidValue; cudaDeviceSynchronize then cudaSuccess
+not opted in, 232448 dynamic bytes: launch refused
+info: not opted in, 232448 dynamic bytes: the launch returned cudaErrorInvalidValue; cudaDeviceSynchronize then cudaSuccess
+opted in to 64 KiB: maximum of 65536 accepted
+opted in to 64 KiB: 0 static bytes, at most 65536 dynamic
+opted in to 64 KiB, 65536 dynamic bytes: launched; last byte a5
+opted in to 64 KiB, 65552 dynamic bytes: launch refused
+info: opted in to 64 KiB, 65552 dynamic bytes: the launch returned cudaErrorInvalidValue; cudaDeviceSynchronize then cudaSuccess
+another kernel, not opted in, 65536 dynamic bytes: launch refused
+info: another kernel, not opted in, 65536 dynamic bytes: the launch returned cudaErrorInvalidValue; cudaDeviceSynchronize then cudaSuccess
+opted in to the maximum: maximum of 232448 accepted
+opted in to the maximum, 232448 dynamic bytes: launched; last byte a5
+maximum set to 1 KiB: maximum of 1024 accepted
+maximum set to 1 KiB: 0 static bytes, at most 1024 dynamic
+maximum set to 1 KiB, 1024 dynamic bytes: launched; last byte a5
+maximum set to 1 KiB, 1040 dynamic bytes: launch refused
+info: maximum set to 1 KiB, 1040 dynamic bytes: the launch returned cudaErrorInvalidValue; cudaDeviceSynchronize then cudaSuccess
+maximum set to 1 KiB, 49152 dynamic bytes: launch refused
+info: maximum set to 1 KiB, 49152 dynamic bytes: the launch returned cudaErrorInvalidValue; cudaDeviceSynchronize then cudaSuccess
+40 KiB static, not opted in: 40960 static bytes, at most 8192 dynamic
+40 KiB static, not opted in, 0 dynamic bytes: launched; last byte a5
+40 KiB static, not opted in, 8192 dynamic bytes: launched; last byte a5
+40 KiB static, not opted in, 8208 dynamic bytes: launch refused
+info: 40 KiB static, not opted in, 8208 dynamic bytes: the launch returned cudaErrorInvalidValue; cudaDeviceSynchronize then cudaSuccess
+40 KiB static: maximum of 191504 refused
+info: 40 KiB static: cudaFuncSetAttribute returned cudaErrorInvalidValue
+40 KiB static: maximum of 191488 accepted
+40 KiB static, opted in to the rest of the maximum: 40960 static bytes, at most 191488 dynamic
+40 KiB static, opted in to the rest of the maximum, 191488 dynamic bytes: launched; last byte a5

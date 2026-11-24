@@ -40,10 +40,11 @@ and 101376 with opt-in; it has no clusters.
 | --- | --- | --- |
 | `cudaFuncSetAttribute(MaxDynamicSharedMemorySize)` with 0 to the opt-in maximum | `cudaSuccess` | `CUDA_SUCCESS` |
 | the same with the maximum + 1, + 16, + 1024, 2^30, or -1 | `cudaErrorInvalidValue` | `CUDA_ERROR_INVALID_VALUE` |
-| the same with the opt-in maximum, for a kernel that also has 1024 bytes of static shared memory | `cudaSuccess` (the attribute is checked against the device, not against what a launch could use) | not run |
+| the same for a kernel with static shared memory: up to the opt-in maximum less the static bytes; one byte more | `cudaSuccess`; `cudaErrorInvalidValue` (1024 and 61440 static bytes) | `CUDA_SUCCESS`; `CUDA_ERROR_INVALID_VALUE` (40960 static bytes) |
 | `PreferredSharedMemoryCarveout` with -1 to 100; with 101 or -2 | `cudaSuccess`; `cudaErrorInvalidValue` | 101: `CUDA_ERROR_INVALID_VALUE` |
 | a number that names no attribute (99, runtime API); an attribute that can only be read (`MAX_THREADS_PER_BLOCK`, driver API) | `cudaErrorInvalidValue` | `CUDA_ERROR_INVALID_VALUE` |
-| launch with more dynamic shared memory than was opted in to (default 48 KB), or static + dynamic above the opt-in maximum | `cudaErrorInvalidValue` | `CUDA_ERROR_INVALID_VALUE` |
+| launch with more dynamic shared memory than the kernel's maximum (below), which static + dynamic above the opt-in maximum always is | `cudaErrorInvalidValue` | `CUDA_ERROR_INVALID_VALUE` |
+| `cudaFuncSetAttribute` or `cudaFuncGetAttributes` for a function that is no kernel | `cudaErrorInvalidDeviceFunction` | not run |
 | launch with a block of 1025 threads, (33, 32, 1), (1, 1, 65) or (0, 1, 1); a grid of (0, 1, 1) or (1, 65536, 1) | `cudaErrorInvalidConfiguration` | `CUDA_ERROR_INVALID_VALUE` |
 | launch with a cluster dimension attribute, any shape, (1, 1, 1) included | `cudaErrorInvalidClusterSize` | `CUDA_ERROR_INVALID_CLUSTER_SIZE` |
 
@@ -55,16 +56,84 @@ launch runs.
 The cluster attributes of a function (required cluster shape, non-portable
 sizes, scheduling policy) were not tried; the shim accepts them unchecked.
 
-`warplens/shim` returns these codes at the simulated device's limits (227 KB;
-clusters of up to 16 CTAs): `tests/test_driver_shim.py::test_refusals_carry_the_codes_a_gpu_gives`,
-`tests/test_shim.py::test_a_refused_launch_has_the_runtime_code_for_that_refusal`.
+### The shared-memory opt-in
+
+The lines after "launch, ordinary, afterwards" in `launch_errors_3080ti.txt`,
+and after the second "cuLaunchKernel, ordinary" in `driver_errors_3080ti.txt`.
+Every kernel has a maximum of dynamic shared memory, which
+`cudaFuncGetAttributes` reports as `maxDynamicSharedSizeBytes`
+(`CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES`), next to its static shared
+memory `sharedSizeBytes`. With D = 49152 (the default, `sharedMemPerBlock`)
+and O = 101376 (`sharedMemPerBlockOptin`) on this GPU:
+
+| Static shared memory of the kernel | Maximum before any `cudaFuncSetAttribute` | Measured with |
+| --- | --- | --- |
+| 0 | 49152 = D | launches with 49152 (accepted), 49153 and 49168 (refused) |
+| 40960 | 8192 = D - static | 8192 accepted, 8208 refused |
+| 49152 (= D) | 0 | 0 accepted, 16 refused |
+| 49168 (D + 16) | 52208 = O - static | 16 and 52208 accepted, 52224 refused |
+| 61440 | 39936 = O - static | 0, 16 and 39936 accepted, 39952 refused |
+| 101376 (= O) | 0 | 0 accepted, 16 refused |
+
+- A launch is refused exactly when its dynamic shared memory is above the
+  kernel's maximum. The launch call returns `cudaErrorInvalidValue`
+  (`CUDA_ERROR_INVALID_VALUE`); `cudaPeekAtLastError` shows it,
+  `cudaDeviceSynchronize` returns success, `cudaGetLastError` returns it once,
+  and the next launch runs. The two APIs agree in every case both ran.
+- Static shared memory counts against the default: 40960 static + 8208
+  dynamic bytes need the opt-in although neither is above 48 KB.
+- **Static shared memory above the default needs no opt-in.** Such a kernel
+  launches as it is, and without any call it may also use all the dynamic
+  shared memory up to the opt-in maximum.
+- `cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, n)`
+  replaces the maximum by n. It is accepted for 0 <= n <= O - static and
+  refused above, leaving the maximum as it was. It also *lowers* the maximum:
+  after n = 1024 a launch with 1040 bytes, or with the default 49152, is
+  refused; after 60000 and then 0, every launch with dynamic shared memory is.
+- The maximum belongs to one kernel: opting one in does not let another
+  launch.
+
+An earlier version of this table said the attribute "is checked against the
+device, not against what a launch could use". That was an artifact: the
+kernel meant to have 1024 static bytes had its array removed by the compiler
+(only one thread used it), which `sharedSizeBytes` now shows. The arrays are
+shared between threads now, and the row is corrected above.
+
+Which static sizes exist at all is the compiler's decision, not the launch's.
+`ptxas` 12.4 (the `nvcc` these programs are built with) compiles 61440 and
+101376 static bytes for `sm_86`. The driver's own compiler (580.173.02, on
+this GPU) and `ptxas` 13.5 (for `sm_86`, `sm_89`, `sm_90` and `sm_100`) refuse
+more than 49152 static bytes: "uses too much shared data (0xf000 bytes, 0xc000
+max)". `ptxas` 13.5 accepts 232448 (0x38c00, 227 KB) and refuses 232449 for
+the architecture-specific targets `sm_100a` and `sm_103a`, and accepts 232448
+for `sm_90a`. So the same
+program built with PTX only (`-gencode arch=compute_86,code=compute_86`)
+fails here before any of this: every call that needs the module, the
+attribute calls included, returns `cudaErrorInvalidPtx`, and
+`cuModuleLoadData` of such PTX returns `CUDA_ERROR_INVALID_PTX`
+(`driver_errors_3080ti.txt`, 49153 static bytes; 49152 load and launch).
+
+`warplens/shim` returns these codes at the simulated device's limits (48 KB
+by default, 227 KB with opt-in; clusters of up to 16 CTAs) and follows the
+opt-in rule (`default_max_dynamic` in `warplens/units/smem.py`, applied by
+`warplens/host/shim_server.py`): `tests/test_driver_shim.py::test_refusals_carry_the_codes_a_gpu_gives`,
+`tests/test_driver_shim.py::test_launches_need_the_opt_in_a_gpu_needs`,
+`tests/test_shim.py::test_a_refused_launch_has_the_runtime_code_for_that_refusal`,
+`tests/test_shim.py::test_a_launch_is_held_to_the_shared_memory_the_kernel_was_opted_in_to`.
+The Python API (`Device.launch`) has no opt-in step and is not held to it.
 What this does not show: that a B200 returns `cudaErrorInvalidClusterSize`
 for a cluster of more than 16 CTAs or a grid that is not a multiple of the
 cluster. The code is the one the CUDA headers define for "a kernel launch
 error due to cluster misconfiguration" and the one Ampere gives for any
-cluster, but no cluster launch could be made here (RT-12). The simulator
-also does not require the opt-in a GPU requires before a launch may use more
-than 48 KB.
+cluster, but no cluster launch could be made here (RT-12). Nor that a B200 follows the opt-in
+rule as measured here: that its default is 48 KB and its maximum 227 KB
+(RT-03, RT-04), that a kernel with more static shared memory than the default
+launches without opt-in there too (`validation/blackwell_timing/pipelined_gemm.cu`
+has 98 KiB and relies on it), and that its driver compiles such a kernel from
+`sm_100a` PTX as `ptxas` 13.5 does. The simulator does not model the
+compiler's limit: PTX for a target that is not architecture-specific with
+more than 48 KB of static shared memory is run, where a driver would refuse
+to load it.
 
 ## Running the bank-counter comparison
 

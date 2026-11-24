@@ -154,14 +154,14 @@ program's `KERNEL FAILED` output, and `compare.py` reports what the GPU did as
 the manifest allows on hardware **by design**: the behaviour is unknown or undefined, and the
 run is isolated for that reason.
 
-<!-- tables: written by `python manifest.py --tables`; tests/test_blackwell_probes.py compares -->
-
 ### `e2e/`
 
 | Run | Program and arguments | Matrix | Claim tested | In the simulator | On hardware may |
 | --- | --- | --- | --- | --- | --- |
 | `device_attributes` | `device_attributes` | RT-03 | the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives | runs | - |
 | `smem_limit` | `smem_limit` | RT-04 | a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory | runs | - |
+| `smem_optin` | `smem_optin` | RT-13 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
+| `smem_static` | `smem_static` | RT-13 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
 | `elect` | `elect` | RT-05 | elect.sync elects the lowest lane of the member mask; every executing lane gets its id | runs | - |
 | `elect.all` | `elect all` | RT-05 | lanes outside the member mask execute elect.sync too: the lowest lane of the mask is elected | runs | fault |
 | `elect.partial` | `elect partial` | RT-05 | the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected | runs | fault |
@@ -491,7 +491,14 @@ Those marked "fixed since" were fixed on other branches.
     own limits; the B200 cluster code follows CUDA headers and is not measured.
     Real kernel faults still become `cudaErrorLaunchFailure`. Clearing that fault
     with `cudaGetLastError` is a simulator recovery policy, not CUDA context recovery
-    (`docs/m6.md`). Explicit opt-in above 48 KiB is still not required by the model.
+    (`docs/m6.md`). Programs run under the shim now need the shared-memory opt-in a
+    GPU needs: a launch with more dynamic shared memory than the 48 KiB default
+    leaves after the kernel's static shared memory is refused with
+    `cudaErrorInvalidValue` unless `cudaFuncSetAttribute` (`cuFuncSetAttribute`)
+    raised the kernel's maximum first. The rule, including that static shared
+    memory above 48 KiB needs no opt-in, was measured on Ampere
+    (`validation/README.md`, "The shared-memory opt-in") and is assumed for the
+    B200; `e2e/smem_limit` opts in before each launch, so it does not test it.
 14. Not the simulator: **TVM's CUDA runtime does not find `libcudart.so.13` under plain
     `python`** (its library has no run path to the env's `lib`), and TIRx then reports "no
     CUDA device is available" on a machine with a working GPU. `e2e/run_e2e.py` sets

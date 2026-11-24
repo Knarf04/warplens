@@ -23,9 +23,11 @@
 // simulator's ctas=8 numbers are the "whole device busy" row of docs/m4.md, not its "8 SMs
 // share HBM" row; that needs `active_sms=8`, which only the Python API has
 // (examples/04_pipelined_gemm/run.py).
-// Not verified on hardware: the kernel declares 98 KiB of STATIC shared memory. ptxas accepts
-// that for sm_100a; whether the driver launches it without an opt-in is not known. A refused
-// launch shows as a BENCH_ERROR line.
+// Not verified on a B200: the kernel declares 98 KiB of STATIC shared memory and never calls
+// cudaFuncSetAttribute. ptxas accepts that for sm_100a (up to 227 KiB; 48 KiB for sm_100), and
+// an RTX 3080 Ti launches static shared memory above its 48 KiB default without opt-in
+// (validation/README.md, "The shared-memory opt-in"), which is the rule the simulator follows.
+// Whether a B200 does is RT-13. A refused launch shows as a BENCH_ERROR line.
 //
 // Blackwell only (simulator and sm_100a here).
 #include <cmath>

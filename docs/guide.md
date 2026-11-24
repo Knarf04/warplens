@@ -147,7 +147,9 @@ against the CUDA headers found next to the `nvcc` on `PATH`, and cached under
 `~/.cache/warplens/` (or `$XDG_CACHE_HOME`). The build takes a second or two
 and prints `warplens: building the shim libraries (first run)`. To build them
 by hand, for example with headers that are somewhere else, run
-`warplens/shim/build.sh <CUDA include directory>` (section 9).
+`warplens/shim/build.sh <CUDA include directory>` (section 9). Libraries are
+never used with other shim sources than they were built from: a changed
+source means a new build, by itself.
 
 ## 4. A first run
 
@@ -442,6 +444,28 @@ deadlock, unsupported PTX) is printed and reaches the program as
 a GPU gives it: `cudaErrorInvalidValue` (too much shared memory),
 `cudaErrorInvalidConfiguration` (block or grid dimensions) or
 `cudaErrorInvalidClusterSize` (a cluster the device does not accept).
+
+"Too much shared memory" includes the opt-in a GPU requires. A kernel may use
+48 KB of shared memory per CTA unless the program asks for more before it
+launches:
+
+```cpp
+cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, bytes);  // up to 227 KB
+kernel<<<grid, block, bytes>>>(...);
+```
+
+(`cuFuncSetAttribute` with `CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES`
+in the driver API.) Without it the launch is refused here as on the GPU, and
+`warplens run` says which kernel asked for how much:
+
+```text
+warplens: kernel `smem_touch` was launched with 65536 bytes of dynamic shared memory, but without opt-in it may use 49152. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 65536), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 65536)
+```
+
+Static shared memory counts against the 48 KB; a kernel whose static shared
+memory alone is larger needs no opt-in. The details are in
+[m6.md](m6.md). `Device.launch` (section 5) has no such step: its `smem` is
+simply what the launch gets.
 
 The CUTLASS tutorials are programs of this kind. Built with those flags, they
 run as they are and pass their own check against a reference:
@@ -1340,9 +1364,22 @@ Run .../warplens/shim/build.sh <CUDA include directory> by hand.
 Either put `nvcc` on `PATH` (activate the conda env), or run
 `warplens/shim/build.sh /path/to/cuda/include`, where the directory is the one
 that holds `cuda_runtime_api.h`. `CC` selects the compiler. A build made by
-hand lands in `warplens/shim/lib/` and is used from then on. If the CuTe DSL's
+hand lands in `warplens/shim/lib/` and is used from then on, as long as it is
+a build of the shim sources that are there (see the next entry). If the CuTe DSL's
 runtime cannot be relinked, `warplens run` says so and continues; the DSL's
 launches are then not simulated.
+
+**"was built from other shim sources ...; rebuilding it"**. The libraries in
+`warplens/shim/lib/` were built by hand before `cudart_shim.c`, `cuda_shim.c`,
+`protocol.h` or `build.sh` changed (after a `git pull`, say). `build.sh`
+records what each build is of, `warplens run` compares that once per run, and
+a build of other sources is rebuilt in place, against the CUDA headers it was
+built with. Nothing needs doing. When the rebuild is impossible the run stops
+with "... and it could not be rebuilt", the compiler's output, and "The stale
+libraries are not used": run `build.sh` by hand as above, or remove
+`warplens/shim/lib/` to have the libraries built in the cache. A `.py` script
+continues without the shim, as it does when the libraries cannot be built at
+all.
 
 **`UnsupportedError`**. The kernel uses PTX that is not implemented. The
 message names the instruction and its line; [coverage.md](coverage.md) lists

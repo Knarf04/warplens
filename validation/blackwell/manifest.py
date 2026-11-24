@@ -282,6 +282,12 @@ def _device() -> list[Probe]:
               "the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives"),
         Probe("e2e/smem_limit", "e2e/smem_limit", (), ("RT-04",),
               "a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory"),
+        Probe("e2e/smem_optin", "e2e/smem_optin", (), ("RT-13",),
+              "a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what "
+              "cudaFuncSetAttribute set for that kernel"),
+        Probe("e2e/smem_static", "e2e/smem_static", (), ("RT-13",),
+              "a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the "
+              "rest of 227 KiB", risk="fault"),
         Probe("e2e/elect", "e2e/elect", (), ("RT-05",),
               "elect.sync elects the lowest lane of the member mask; every executing lane gets its id"),
         Probe("e2e/elect.all", "e2e/elect", ("all",), ("RT-05",),

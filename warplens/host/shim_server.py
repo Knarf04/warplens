@@ -13,7 +13,7 @@ from . import tensor_map
 from .device import Device
 
 (REGISTER_FATBIN, REGISTER_FUNCTION, MALLOC, FREE, WRITE, READ, COPY, FILL, LAUNCH,
- TENSOR_MAP) = range(1, 11)
+ TENSOR_MAP, REGISTER_PTX) = range(1, 12)
 LAUNCH_FAILURE = 719  # cudaErrorLaunchFailure
 INVALID_VALUE = 1  # cudaErrorInvalidValue
 MEMORY_ALLOCATION = 2  # cudaErrorMemoryAllocation
@@ -75,6 +75,7 @@ class ShimServer:
         self.functions: list[tuple[int, int, str]] = []
         self.launches: list[tuple[str, object]] = []  # (kernel name, LaunchStats)
         self.needs_ptx = False
+        self.machine_code = False  # a runtime handed over a compiled module instead of PTX
         import os
         self.debug = bool(os.environ.get("WARPLENS_SHIM_DEBUG"))  # log every request
 
@@ -116,6 +117,20 @@ class ShimServer:
                     "the program carries no PTX, only machine code for a real GPU. Build it with "
                     "nvcc -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared")
             self.modules.append([parse_ptx(t, name=f"module{len(self.modules)}.ptx") for t in texts])
+            return struct.pack("<I", len(self.modules) - 1)
+        if op == REGISTER_PTX:
+            if data.startswith(b"\x7fELF"):
+                self.machine_code = True
+                raise WarplensError(
+                    "the module is machine code for a real GPU, and the simulator runs PTX. Ask the "
+                    'compiler for PTX (TIRx: backend_config={"cuda": {"target_format": "ptx"}})')
+            try:
+                text = data.decode()
+            except UnicodeDecodeError:
+                raise WarplensError("the module is not PTX text") from None
+            if ".version" not in text[:4096]:
+                raise WarplensError("the module is not PTX text (no .version directive)")
+            self.modules.append([parse_ptx(text, name=f"module{len(self.modules)}.ptx")])
             return struct.pack("<I", len(self.modules) - 1)
         if op == REGISTER_FUNCTION:
             (module,) = struct.unpack_from("<I", data)

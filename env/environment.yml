@@ -16,3 +16,5 @@ dependencies:
   - cuda-version=13.5
   - cuda-nvcc
   - cuda-cudart-dev
+  # NVRTC that knows sm_100a: TIRx compiles its kernels with it, in process.
+  - cuda-nvrtc

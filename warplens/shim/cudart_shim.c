@@ -25,6 +25,7 @@ static __thread cudaError_t last_error = cudaSuccess;
 struct function { const void *host; uint32_t id, count, size[MAX_PARAMS]; };
 static struct function functions[MAX_FUNCTIONS];
 static int function_count;
+static pthread_mutex_t function_lock = PTHREAD_MUTEX_INITIALIZER;
 
 struct allocation { uint64_t base, size; };
 static struct allocation allocations[MAX_ALLOCATIONS];
@@ -136,25 +137,37 @@ void __cudaRegisterVar(void **handle, char *hostVar, char *deviceAddress, const 
   (void)ext; (void)size; (void)constant; (void)global;
 }
 
+int warplens_register_function(uint32_t module, const char *name, const void *key) {
+  struct wl_part parts[2] = {{&module, sizeof module}, {name, strlen(name)}};
+  uint32_t reply[2 + MAX_PARAMS];
+  size_t length = 0;
+  int status = warplens_call(WL_REGISTER_FUNCTION, parts, 2, reply, sizeof reply, &length);
+  if (status) return status;
+  if (length > sizeof reply) die("a kernel has too many parameters");
+  pthread_mutex_lock(&function_lock);
+  if (function_count == MAX_FUNCTIONS) die("too many kernels");
+  struct function *f = &functions[function_count];
+  f->host = key; f->id = reply[0]; f->count = reply[1];
+  memcpy(f->size, reply + 2, f->count * sizeof(uint32_t));
+  ++function_count;
+  pthread_mutex_unlock(&function_lock);
+  return 0;
+}
+
 void __cudaRegisterFunction(void **handle, const char *hostFun, char *deviceFun,
                             const char *deviceName, int thread_limit, uint3 *tid, uint3 *bid,
                             dim3 *bDim, dim3 *gDim, int *wSize) {
   (void)deviceFun; (void)thread_limit; (void)tid; (void)bid; (void)bDim; (void)gDim; (void)wSize;
-  if (function_count == MAX_FUNCTIONS) die("too many kernels");
-  struct wl_part parts[2] = {{handle, sizeof(uint32_t)}, {deviceName, strlen(deviceName)}};
-  uint32_t reply[2 + MAX_PARAMS];
-  size_t length = 0;
-  if (warplens_call(WL_REGISTER_FUNCTION, parts, 2, reply, sizeof reply, &length)) _exit(70);
-  if (length > sizeof reply) die("a kernel has too many parameters");
-  struct function *f = &functions[function_count++];
-  f->host = hostFun; f->id = reply[0]; f->count = reply[1];
-  memcpy(f->size, reply + 2, f->count * sizeof(uint32_t));
+  if (warplens_register_function(*(uint32_t *)handle, deviceName, hostFun)) _exit(70);
 }
 
 static struct function *find_function(const void *host) {
-  for (int i = 0; i < function_count; ++i)
-    if (functions[i].host == host) return &functions[i];
-  return NULL;
+  struct function *found = NULL;
+  pthread_mutex_lock(&function_lock);
+  for (int i = 0; i < function_count && !found; ++i)
+    if (functions[i].host == host) found = &functions[i];
+  pthread_mutex_unlock(&function_lock);
+  return found;
 }
 
 cudaError_t __cudaGetKernel(cudaKernel_t *kernel, const void *hostFun) {
@@ -212,6 +225,13 @@ static cudaError_t launch(const void *host, dim3 grid, dim3 block, dim3 cluster,
 }
 
 static const dim3 no_cluster = {0, 0, 0};
+
+int warplens_launch(const void *key, const uint32_t grid[3], const uint32_t block[3],
+                    const uint32_t cluster[3], uint64_t shared_memory, void **arguments) {
+  dim3 g = {grid[0], grid[1], grid[2]}, b = {block[0], block[1], block[2]};
+  dim3 c = {cluster[0], cluster[1], cluster[2]};
+  return launch(key, g, b, c, shared_memory, arguments);
+}
 
 cudaError_t __cudaLaunchKernel(cudaKernel_t kernel, dim3 gridDim, dim3 blockDim, void **args,
                                size_t sharedMem, cudaStream_t stream) {
@@ -315,6 +335,20 @@ cudaError_t cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaM
   return cudaMemcpy(dst, src, count, kind);
 }
 
+cudaError_t cudaMemcpyPeerAsync(void *dst, int dstDevice, const void *src, int srcDevice,
+                                size_t count, cudaStream_t stream) {
+  (void)stream;
+  if (dstDevice != 0 || srcDevice != 0) return result(cudaErrorInvalidDevice);
+  return cudaMemcpy(dst, src, count, cudaMemcpyDeviceToDevice);
+}
+
+/* Host memory needs no pinning here: every transfer goes through the server anyway. */
+cudaError_t cudaMallocHost(void **ptr, size_t size) {
+  *ptr = malloc(size ? size : 1);
+  return result(*ptr ? cudaSuccess : cudaErrorMemoryAllocation);
+}
+cudaError_t cudaFreeHost(void *ptr) { free(ptr); return cudaSuccess; }
+
 cudaError_t cudaMemset(void *devPtr, int value, size_t count) {
   uint64_t head[2] = {(uint64_t)devPtr, count};
   uint32_t byte = (uint32_t)value & 0xFF;
@@ -328,6 +362,31 @@ cudaError_t cudaDeviceSynchronize(void) { TRACE("cudaDeviceSynchronize -> %d", (
 cudaError_t cudaStreamSynchronize(cudaStream_t stream) { (void)stream; TRACE("cudaStreamSynchronize -> %d", (int)last_error); return last_error; }
 cudaError_t cudaGetLastError(void) { cudaError_t e = last_error; TRACE("cudaGetLastError -> %d", (int)e); last_error = cudaSuccess; return e; }
 cudaError_t cudaPeekAtLastError(void) { TRACE("cudaPeekAtLastError -> %d", (int)last_error); return last_error; }
+
+/* Streams and events are tokens: work finishes before the call that started it returns, and
+ * the simulator's clock is not wall time, so an elapsed time is always zero. */
+cudaError_t cudaStreamCreateWithFlags(cudaStream_t *stream, unsigned int flags) {
+  (void)flags;
+  *stream = malloc(1);
+  return result(*stream ? cudaSuccess : cudaErrorMemoryAllocation);
+}
+cudaError_t cudaStreamDestroy(cudaStream_t stream) { free(stream); return cudaSuccess; }
+cudaError_t cudaStreamWaitEvent(cudaStream_t stream, cudaEvent_t event, unsigned int flags) {
+  (void)stream; (void)event; (void)flags;
+  return cudaSuccess;
+}
+cudaError_t cudaEventCreate(cudaEvent_t *event) {
+  *event = malloc(1);
+  return result(*event ? cudaSuccess : cudaErrorMemoryAllocation);
+}
+cudaError_t cudaEventDestroy(cudaEvent_t event) { free(event); return cudaSuccess; }
+cudaError_t cudaEventRecord(cudaEvent_t event, cudaStream_t stream) { (void)event; (void)stream; return cudaSuccess; }
+cudaError_t cudaEventSynchronize(cudaEvent_t event) { (void)event; return last_error; }
+cudaError_t cudaEventElapsedTime(float *ms, cudaEvent_t start, cudaEvent_t end) {
+  (void)start; (void)end;
+  *ms = 0.0f;
+  return cudaSuccess;
+}
 
 const char *cudaGetErrorName(cudaError_t error) {
   TRACE("cudaGetErrorName(%d)", (int)error);
@@ -355,29 +414,69 @@ cudaError_t cudaGetDeviceCount(int *count) { *count = 1; return cudaSuccess; }
 cudaError_t cudaGetDevice(int *device) { TRACE("cudaGetDevice"); *device = 0; return cudaSuccess; }
 cudaError_t cudaSetDevice(int device) { return result(device == 0 ? cudaSuccess : cudaErrorInvalidDevice); }
 
+/* NVIDIA's CUDA GPU list gives B200 CC 10.0 and B300 CC 10.3.
+ * https://developer.nvidia.com/cuda/gpus */
+static int is_b300(void) {
+  const char *model = getenv("WARPLENS_MODEL");
+  return model && strcmp(model, "B300") == 0;
+}
+static size_t total_memory(void) { return (size_t)(is_b300() ? 288 : 192) << 30; }
+
+int warplens_device_attribute(int attribute) {
+  switch (attribute) {
+    case cudaDevAttrMaxThreadsPerBlock: return 1024;
+    case cudaDevAttrMaxBlockDimX: case cudaDevAttrMaxBlockDimY: return 1024;
+    case cudaDevAttrMaxBlockDimZ: return 64;
+    case cudaDevAttrMaxGridDimX: return 2147483647;
+    case cudaDevAttrMaxGridDimY: case cudaDevAttrMaxGridDimZ: return 65535;
+    case cudaDevAttrMaxSharedMemoryPerBlock: return 48 * 1024;
+    case cudaDevAttrMaxSharedMemoryPerBlockOptin: return 227 * 1024;
+    case cudaDevAttrMaxSharedMemoryPerMultiprocessor: return 228 * 1024;
+    case cudaDevAttrMaxRegistersPerBlock: case cudaDevAttrMaxRegistersPerMultiprocessor: return 65536;
+    case cudaDevAttrWarpSize: return 32;
+    case cudaDevAttrMultiProcessorCount: return 148;
+    case cudaDevAttrMaxBlocksPerMultiprocessor: return 32;
+    case cudaDevAttrComputeCapabilityMajor: return 10;
+    case cudaDevAttrComputeCapabilityMinor: return is_b300() ? 3 : 0;
+    default: TRACE("device attribute %d is not described; answering 0", attribute); return 0;
+  }
+}
+
+cudaError_t cudaDeviceGetAttribute(int *value, enum cudaDeviceAttr attr, int device) {
+  if (device != 0) return result(cudaErrorInvalidDevice);
+  *value = warplens_device_attribute((int)attr);
+  return cudaSuccess;
+}
+
+cudaError_t cudaMemGetInfo(size_t *free_bytes, size_t *total_bytes) {
+  if (free_bytes) *free_bytes = total_memory();
+  if (total_bytes) *total_bytes = total_memory();
+  return cudaSuccess;
+}
+
 cudaError_t cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
   TRACE("cudaGetDeviceProperties(%d)", device);
   if (device != 0) return result(cudaErrorInvalidDevice);
   memset(prop, 0, sizeof *prop);
   const char *model = getenv("WARPLENS_MODEL");
   snprintf(prop->name, sizeof prop->name, "warplens simulated %s", model ? model : "B200");
-  /* NVIDIA's CUDA GPU list gives B200 CC 10.0 and B300 CC 10.3.
-   * https://developer.nvidia.com/cuda/gpus */
-  int b300 = model && strcmp(model, "B300") == 0;
-  prop->totalGlobalMem = (size_t)(b300 ? 288 : 192) << 30;
-  prop->sharedMemPerBlock = 48 * 1024;
-  prop->sharedMemPerBlockOptin = 227 * 1024;
-  prop->sharedMemPerMultiprocessor = 228 * 1024;
-  prop->regsPerBlock = 65536;
-  prop->regsPerMultiprocessor = 65536;
-  prop->warpSize = 32;
-  prop->maxThreadsPerBlock = 1024;
+  prop->totalGlobalMem = total_memory();
+  prop->sharedMemPerBlock = (size_t)warplens_device_attribute(cudaDevAttrMaxSharedMemoryPerBlock);
+  prop->sharedMemPerBlockOptin = (size_t)warplens_device_attribute(cudaDevAttrMaxSharedMemoryPerBlockOptin);
+  prop->sharedMemPerMultiprocessor = (size_t)warplens_device_attribute(cudaDevAttrMaxSharedMemoryPerMultiprocessor);
+  prop->regsPerBlock = warplens_device_attribute(cudaDevAttrMaxRegistersPerBlock);
+  prop->regsPerMultiprocessor = warplens_device_attribute(cudaDevAttrMaxRegistersPerMultiprocessor);
+  prop->warpSize = warplens_device_attribute(cudaDevAttrWarpSize);
+  prop->maxThreadsPerBlock = warplens_device_attribute(cudaDevAttrMaxThreadsPerBlock);
   prop->maxThreadsPerMultiProcessor = 2048;
-  prop->maxThreadsDim[0] = 1024; prop->maxThreadsDim[1] = 1024; prop->maxThreadsDim[2] = 64;
-  prop->maxGridSize[0] = 2147483647; prop->maxGridSize[1] = 65535; prop->maxGridSize[2] = 65535;
-  prop->major = 10; prop->minor = b300 ? 3 : 0;
-  prop->multiProcessorCount = 148;
-  prop->maxBlocksPerMultiProcessor = 32;
+  for (int i = 0; i < 3; ++i) {
+    prop->maxThreadsDim[i] = warplens_device_attribute(cudaDevAttrMaxBlockDimX + i);
+    prop->maxGridSize[i] = warplens_device_attribute(cudaDevAttrMaxGridDimX + i);
+  }
+  prop->major = warplens_device_attribute(cudaDevAttrComputeCapabilityMajor);
+  prop->minor = warplens_device_attribute(cudaDevAttrComputeCapabilityMinor);
+  prop->multiProcessorCount = warplens_device_attribute(cudaDevAttrMultiProcessorCount);
+  prop->maxBlocksPerMultiProcessor = warplens_device_attribute(cudaDevAttrMaxBlocksPerMultiprocessor);
   return cudaSuccess;
 }
 

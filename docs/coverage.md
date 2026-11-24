@@ -31,7 +31,7 @@ that names the instruction and its PTX line.
 | --- | --- | --- |
 | Moves | `mov` (including the address of a variable, and packing or unpacking a `{vector}`), `cvta[.to].{global,const,shared,local,param}` | |
 | Integer | `add`, `sub`, `mul.{lo,hi,wide}`, `mad.{lo,hi,wide}`, `div`, `rem`, `min`, `max`, `neg`, `abs` | no `.sat`, no carry forms |
-| Float | `add`, `sub`, `mul`, `div`, `fma`, `mad`, `min`, `max`, `neg`, `abs`, `sqrt` | round-to-nearest only; `fma` and floating `mad` round once |
+| Float | `add`, `sub`, `mul`, `div`, `fma`, `mad`, `min`, `max`, `neg`, `abs`, `sqrt` | round-to-nearest only; `fma` and floating `mad` round once; `.ftz` on `.f32` for `add`, `sub`, `mul`, `div`, `fma`, `sqrt` (what fast-math emits), checked on a GPU |
 | Bitwise | `and`, `or`, `xor`, `not`, `shl`, `shr` | also on `.pred` (not shifts) |
 | Bit fields | `bfe.{u32,s32,u64,s64}`, `prmt.b32` (default mode) | both checked on a GPU; no `bfi`, no other `prmt` modes |
 | Matrix load | `ldmatrix.sync.aligned.m8n8.x{1,2,4}[.trans].shared.b16` | also `.shared::cta` or a generic shared pointer; the six layouts were checked on a GPU; bank counts use one 128-byte transaction per matrix |

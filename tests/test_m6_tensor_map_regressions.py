@@ -115,6 +115,16 @@ def driver_shim(tmp_path_factory):
             if (length) *length = capacity;
             return 0;
         }
+        /* The module and launch calls of the driver shim are not exercised here. */
+        int warplens_register_function(uint32_t module, const char *name, const void *key) {
+            (void)module; (void)name; (void)key; return 1;
+        }
+        int warplens_launch(const void *key, const uint32_t grid[3], const uint32_t block[3],
+                            const uint32_t cluster[3], uint64_t shared_memory, void **arguments) {
+            (void)key; (void)grid; (void)block; (void)cluster; (void)shared_memory; (void)arguments;
+            return 1;
+        }
+        int warplens_device_attribute(int attribute) { (void)attribute; return 0; }
     """)
     library = tmp / "libdriver_test.so"
     subprocess.run([cc, "-shared", "-fPIC", "-Wall", "-Wextra", "-Werror",

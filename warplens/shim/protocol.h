@@ -20,7 +20,8 @@ enum {
   WL_COPY = 7,              /* uint64 dst, uint64 src, uint64 bytes                              */
   WL_FILL = 8,              /* uint64 address, uint64 bytes, uint32 value                        */
   WL_LAUNCH = 9,            /* uint32 function, grid[3], block[3], cluster[3], uint64 smem, argument bytes -> printed text */
-  WL_TENSOR_MAP = 10        /* uint32 type, rank, swizzle, fill, interleave; uint64 address; uint64 dim[5], stride[4]; uint32 box[5], step[5] -> 128 bytes */
+  WL_TENSOR_MAP = 10,       /* uint32 type, rank, swizzle, fill, interleave; uint64 address; uint64 dim[5], stride[4]; uint32 box[5], step[5] -> 128 bytes */
+  WL_REGISTER_PTX = 11      /* PTX text                              -> uint32 module            */
 };
 
 /* Exported by the libcudart shim; the libcuda shim uses it too.
@@ -30,5 +31,15 @@ enum {
 struct wl_part { const void *data; size_t size; };
 int warplens_call(uint32_t op, const struct wl_part *parts, int count,
                   void *reply, size_t capacity, size_t *length);
+
+/* Also exported by the libcudart shim, for the driver API's own modules and launches.
+ * `key` is any address that names the kernel from then on. Both return the reply's status;
+ * the launch prints whatever the kernel printed. A zero cluster means no cluster. */
+int warplens_register_function(uint32_t module, const char *name, const void *key);
+int warplens_launch(const void *key, const uint32_t grid[3], const uint32_t block[3],
+                    const uint32_t cluster[3], uint64_t shared_memory, void **arguments);
+/* The value of a device attribute (the runtime's and the driver's enumerations agree), or 0
+ * for one the simulated device does not describe. */
+int warplens_device_attribute(int attribute);
 
 #endif

@@ -18,6 +18,7 @@ from .smem import (CLUSTER_STRIDE, CLUSTER_WINDOW, GENERIC_WINDOW, MAX_SMEM_BYTE
 HANDLERS: dict = {}
 
 _ROUND_NEAREST = frozenset({"rn"})
+_FLOAT_MODES = frozenset({"rn", "ftz"})
 
 
 def op(*names):
@@ -44,6 +45,58 @@ def _type(ins: Instr, allowed=frozenset(), kinds: str = "iuf"):
         if e not in allowed:
             raise unsupported(ins, f"modifier .{e}")
     return ty, extra
+
+
+# Halfway between the smallest normal f32 and the 24-bit value below it. An exact result under
+# this is "tiny after rounding": rounded to 24 bits with no limit on the exponent, it is still
+# below the normal range. At the midpoint itself it rounds to even, which is the normal number.
+_TINY = np.float64(np.finfo(np.float32).tiny) * (1 - np.float64(2.0) ** -25)
+
+
+def _flush(x: np.ndarray, small=None) -> np.ndarray:
+    """Subnormal values (or those marked `small`) become zeros of the same sign."""
+    if small is None:
+        small = np.abs(x) < np.finfo(x.dtype).tiny
+    return np.where(small, np.copysign(x.dtype.type(0), x), x)
+
+
+def _product_is_tiny(x, y):
+    return np.abs(x.astype(np.float64) * y.astype(np.float64)) < _TINY  # the product is exact
+
+
+def _quotient_is_tiny(x, y):
+    # Correct although the float64 quotient is rounded: a ratio of two f32 values that is not
+    # exactly the threshold is further from it than float64 can round across.
+    with np.errstate(all="ignore"):
+        return np.abs(x.astype(np.float64) / y.astype(np.float64)) < _TINY
+
+
+def _fused_is_tiny(x, y, z):
+    with np.errstate(all="ignore"):
+        product, addend = x.astype(np.float64) * y.astype(np.float64), z.astype(np.float64)
+        total = product + addend
+        part = total - product  # two-sum: `error` is what rounding `total` lost
+        error = (product - (total - part)) + (addend - part)
+        size = np.abs(total)
+        return (size < _TINY) | ((size == _TINY) & (np.sign(error) == -np.sign(total)))
+
+
+def _float_result(ins: Instr, ty: str, extra, fn, *inputs, is_tiny=None):
+    """fn(*inputs), under `.ftz` (the PTX manual: f32 only, "subnormal inputs and results to
+    sign-preserving zero"). Compilers emit it under fast-math.
+
+    Which results count as subnormal was measured on an RTX 3080 Ti
+    (validation/ampere/ftz_golden.txt): those that are tiny after rounding, in IEEE 754's
+    words. 0x00800000 * 0x3f7fffff is flushed although it rounds to the smallest normal number,
+    while 0x00800001 * 0x3f7ffffe, closer to that number than half a unit in the 24th bit, is
+    not. `is_tiny` answers this for operations that round."""
+    if "ftz" not in extra:
+        return fn(*inputs)
+    if ty != "f32":
+        raise unsupported(ins, ".ftz applies to .f32 only")
+    inputs = [_flush(v) for v in inputs]
+    out = fn(*inputs)
+    return _flush(out, is_tiny(*inputs) if is_tiny else None)
 
 
 def _operands(ins: Instr, n: int):
@@ -271,18 +324,19 @@ def _cvta(w, ins, mask):
 
 @op("add", "sub")
 def _add_sub(w, ins, mask):
-    ty, _ = _type(ins, allowed=_ROUND_NEAREST if _is_float(ins.mods[-1]) else frozenset())
+    ty, extra = _type(ins, allowed=_FLOAT_MODES if _is_float(ins.mods[-1]) else frozenset())
     d, a, b = _operands(ins, 3)
-    x, y = w.read(a, ty), w.read(b, ty)
-    w.write(d, x + y if ins.opcode == "add" else x - y, mask)
+    combine = np.add if ins.opcode == "add" else np.subtract
+    w.write(d, _float_result(ins, ty, extra, combine, w.read(a, ty), w.read(b, ty)), mask)
 
 
 def _mul_parts(w, ins, a, b):
     """Shared by mul and mad: returns (product, type the product has)."""
     last = ins.mods[-1] if ins.mods else ""
     if last in NP_TYPES and _is_float(last):
-        ty, _ = _type(ins, allowed=_ROUND_NEAREST)
-        return w.read(a, ty) * w.read(b, ty), ty
+        ty, extra = _type(ins, allowed=_FLOAT_MODES)
+        return _float_result(ins, ty, extra, np.multiply, w.read(a, ty), w.read(b, ty),
+                             is_tiny=_product_is_tiny), ty
     ty, extra = _type(ins, allowed={"lo", "hi", "wide"}, kinds="iu")
     if len(extra) != 1:
         raise unsupported(ins, "integer multiply needs exactly one of .lo/.hi/.wide")
@@ -318,10 +372,10 @@ def _mad(w, ins, mask):
 
 @op("fma")
 def _fma(w, ins, mask):
-    ty, _ = _type(ins, allowed=_ROUND_NEAREST, kinds="f")
+    ty, extra = _type(ins, allowed=_FLOAT_MODES, kinds="f")
     d, a, b, c = _operands(ins, 4)
     x, y, z = w.read(a, ty), w.read(b, ty), w.read(c, ty)
-    w.write(d, fused_multiply_add(x, y, z), mask)
+    w.write(d, _float_result(ins, ty, extra, fused_multiply_add, x, y, z, is_tiny=_fused_is_tiny), mask)
 
 
 @op("div", "rem")
@@ -330,9 +384,10 @@ def _div_rem(w, ins, mask):
     if last in NP_TYPES and _is_float(last):
         if ins.opcode == "rem":
             raise unsupported(ins, "rem is integer-only")
-        ty, _ = _type(ins, allowed={"rn", "full", "approx"})
+        ty, extra = _type(ins, allowed={"rn", "full", "approx", "ftz"})
         d, a, b = _operands(ins, 3)
-        w.write(d, w.read(a, ty) / w.read(b, ty), mask)
+        w.write(d, _float_result(ins, ty, extra, np.divide, w.read(a, ty), w.read(b, ty),
+                                 is_tiny=_quotient_is_tiny), mask)
         return
     ty, _ = _type(ins, kinds="iu")
     d, a, b = _operands(ins, 3)
@@ -376,9 +431,9 @@ def _neg_abs(w, ins, mask):
 
 @op("sqrt")
 def _sqrt(w, ins, mask):
-    ty, _ = _type(ins, allowed={"rn", "approx"}, kinds="f")
+    ty, extra = _type(ins, allowed={"rn", "approx", "ftz"}, kinds="f")
     d, a = _operands(ins, 2)
-    w.write(d, np.sqrt(w.read(a, ty)), mask)
+    w.write(d, _float_result(ins, ty, extra, np.sqrt, w.read(a, ty)), mask)
 
 
 # -- bitwise ---------------------------------------------------------------------

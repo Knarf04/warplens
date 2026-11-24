@@ -166,7 +166,7 @@ def run(args) -> int:
         out = sys.stderr
         if not server.launches:
             print("warplens: the program launched no kernels", file=out)
-            if server.needs_ptx or not server.modules:
+            if not server.machine_code and (server.needs_ptx or not server.modules):
                 print(BUILD_HINT, file=out)
         else:
             summary(server.launches, args.model)

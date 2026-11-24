@@ -37,7 +37,7 @@ jobs:
 
   # Everything, with no test allowed to skip: the conda env from env/ supplies nvcc and the
   # CUDA headers (compile-only, no GPU), so the CUTLASS tutorials are fetched and built, the
-  # shim libraries are compiled, and Triton and the CuTe DSL are installed.
+  # shim libraries are compiled, and Triton, the CuTe DSL and TIRx are installed.
   full:
     runs-on: ubuntu-latest
     env:
@@ -53,7 +53,7 @@ jobs:
           environment-file: env/environment.yml
           cache-environment: true
       - run: env/check.sh
-      - run: pip install -e ".[dev,triton]" nvidia-cutlass-dsl
+      - run: pip install -e ".[dev,triton]" nvidia-cutlass-dsl apache-tvm-tirx cuda-bindings
       - name: Build the CUTLASS tutorials (PTX and host programs)
         run: examples/03_cutlass_mma/build.sh --programs
       - name: Build the shim libraries

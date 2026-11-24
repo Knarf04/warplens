@@ -136,3 +136,40 @@ def test_prmt_matches_real_gpu(sim):
     out = sim.empty(n + pad, "u32")
     sim.launch(mod, "k", grid=(n + pad) // 256, block=256, args=[*(sim.from_numpy(c) for c in columns), out])
     np.testing.assert_array_equal(out.numpy()[:n], rows[:, 3])
+
+
+def test_flush_to_zero_arithmetic_matches_real_gpu(sim):
+    """ftz_golden.txt is bin/ftz_golden on an RTX 3080 Ti: add, sub, mul, div, fma and sqrt with
+    `.ftz` on operands around the subnormal range. NaN results are compared as NaNs only."""
+    from conftest import kernel
+    rows = np.array([[int(x, 16) for x in l.split()] for l in (AMPERE / "ftz_golden.txt").read_text().splitlines()],
+                    dtype=np.uint32)
+    assert len(rows) == 7075
+    bodies = ["add.rn.ftz.f32 %d, %a, %b;", "sub.rn.ftz.f32 %d, %a, %b;", "mul.rn.ftz.f32 %d, %a, %b;",
+              "div.rn.ftz.f32 %d, %a, %b;", "fma.rn.ftz.f32 %d, %a, %b, %c;", "sqrt.rn.ftz.f32 %d, %a;"]
+    for op, body in enumerate(bodies):
+        cases = rows[rows[:, 0] == op]
+        n = len(cases)
+        mod = kernel(f"""
+            .reg .b64 %pa, %pb, %pc, %po, %off; .reg .b32 %i, %x, %y; .reg .f32 %a, %b, %c, %d;
+            ld.param.u64 %pa, [a]; ld.param.u64 %pb, [b]; ld.param.u64 %pc, [c]; ld.param.u64 %po, [o];
+            mov.u32 %x, %ctaid.x; mov.u32 %y, %tid.x;
+            mad.lo.u32 %i, %x, 256, %y;
+            mul.wide.u32 %off, %i, 4;
+            add.u64 %pa, %pa, %off; add.u64 %pb, %pb, %off; add.u64 %pc, %pc, %off; add.u64 %po, %po, %off;
+            ld.global.f32 %a, [%pa]; ld.global.f32 %b, [%pb]; ld.global.f32 %c, [%pc];
+            {body}
+            st.global.f32 [%po], %d;
+            ret;
+        """, ".param .u64 a, .param .u64 b, .param .u64 c, .param .u64 o")
+        pad = -n % 256
+        columns = [np.concatenate([cases[:, k], np.zeros(pad, np.uint32)]) for k in (1, 2, 3)]
+        out = sim.empty(n + pad, "u32")
+        sim.launch(mod, "k", grid=(n + pad) // 256, block=256, args=[*(sim.from_numpy(c) for c in columns), out])
+        got, expect = out.numpy()[:n], cases[:, 4]
+        nan = np.isnan(expect.view(np.float32))
+        assert (np.isnan(got.view(np.float32)) == nan).all(), body
+        wrong = np.flatnonzero((got != expect) & ~nan)
+        assert not len(wrong), (f"{body} {len(wrong)} of {n} differ, e.g. " +
+                                "; ".join(f"{cases[i, 1]:08x} {cases[i, 2]:08x} {cases[i, 3]:08x} -> gpu "
+                                          f"{expect[i]:08x}, sim {got[i]:08x}" for i in wrong[:6]))

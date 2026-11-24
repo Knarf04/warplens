@@ -26,7 +26,9 @@ GPU mode
        the driver compiles them, else the machine-code ones in bin-native/ (--binaries)
     4. runs the probes in manifest order
     5. runs the end-to-end programs (e2e/run_e2e.py) unless --no-e2e
-    6. writes <out>.tar.gz
+    6. runs the matrix rows that are not probes (run_rows.py: NUM-05, RT-10, RT-11) into
+       <out>/rows/; informational, so a failure there is recorded and never fails the run
+    7. writes <out>.tar.gz
 
 Simulator modes need the `warplens` package and its Python environment:
     PYTHONPATH=$PWD conda run -n warplens python validation/blackwell/run_all.py --mode sim
@@ -355,6 +357,16 @@ def main() -> int:
         (out / "e2e-runner.log").write_bytes(stdout + stderr)
         print(f"end-to-end runner: {status}", flush=True)
         infrastructure_failures += status != "ok"
+
+    if args.mode == "gpu" and not args.only:
+        # The rows without a probe (NUM-05, RT-10, RT-11). No prediction, no verdict: whatever
+        # happens there is in rows/status.tsv and does not count against the run.
+        command = [sys.executable, str(HERE / "run_rows.py"), "--out", str(out),
+                   "--timeout-scale", str(args.timeout_scale)] + (["--no-e2e"] if args.no_e2e else [])
+        status, _, stdout, stderr = run_process(command, 2 * 3600 * args.timeout_scale)
+        (out / "rows-runner.log").write_bytes(stdout + stderr)
+        print(stdout.decode(errors="replace"), end="")
+        print(f"rows without a probe (run_rows.py): {status}", flush=True)
 
     (out / "manifest.py").write_bytes((HERE / "manifest.py").read_bytes())
     (out / "elapsed.txt").write_text(f"{time.monotonic() - started:.0f} seconds\n")

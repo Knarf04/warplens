@@ -398,15 +398,10 @@ nothing Blackwell-specific has run on a GPU.
 | Steps | Where | State |
 | --- | --- | --- |
 | B5, B6, F23 | `docs/validation-matrix.md` | one row per claim with its probe, prediction and pass criterion; a test keeps its citations valid |
-<<<<<<< HEAD
-| C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 117 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 22 runs also match the 3080 Ti. Every matrix row outside timing has a run except NUM-05, RT-10 and RT-11 (its README says why). Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
-| C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema, predictions committed; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
-=======
-| C7 to C13, D15 to D18 | `validation/blackwell/` | 55 probe programs, 109 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 22 runs also match the 3080 Ti. Every matrix row outside timing has a run except NUM-05, RT-10 and RT-11 (its README says why). Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
+| C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 117 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 22 runs also match the 3080 Ti. Every matrix row outside timing has a run. NUM-05, RT-10 and RT-11 are not probes: `run_rows.py` runs them at the end of a GPU run (ptxas asked for a UE4M3 conversion; the driver calls of TIRx and the CuTe DSL logged under gdb; the kernel parameters of a CuTe DSL TMA kernel saved, its tensor maps among them). On the 3080 Ti the first two run and the third is skipped for want of `sm_100`. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
 | C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema (`clc_latency_ns` included), predictions committed, each launch timed with the active SMs its shape implies; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
->>>>>>> work/timing-model
-| E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
-| F24 | | still to decide: the budget for a second rental |
+| E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. The toolkit policy for an older driver is decided and built into `run.sh` (below). Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
+| F24 | `env/remote/RUNBOOK.md`, section 5 | **proposed, awaiting the owner's confirmation**: one second rental of at most 2 hours and $16 (the first rental's own budget line at $8 per GPU-hour; 4 hours and $32 for both), only when a fix changes a prediction hardware must confirm, when probes tested nothing, when the tensor maps of RT-11 were not captured, or when `ncu` could not read counters. An 8-GPU node needs an explicit yes |
 
 To settle before renting:
 
@@ -417,17 +412,25 @@ To settle before renting:
   a kernel that failed; the runner, the comparison and `run.sh` count it as a
   failure whatever a probe is allowed to do; and the nvcc that built the
   programs is compared with the one the predictions were made with, a mismatch
-  being flagged from `setup.sh` to `compare.py`. **Still to decide on the
-  day**, for a driver of CUDA 13.0 to 13.4: the default (`--toolkit auto`)
-  builds with the driver's toolkit, flagged "predictions not comparable";
-  `--toolkit pinned` keeps the predictions' compiler and runs machine code,
-  but the book's kernels then do not load on the GPU
+  being flagged from `setup.sh` to `compare.py`. **Decided (2026-11-24)**, so
+  that the day has one command whatever the driver is: toolkit 13.5 as pinned
+  when the driver takes its PTX; for a driver of CUDA 13.0 to 13.4 the
+  toolkit of the driver's release, and the predictions made again with that
+  nvcc by `run.sh` itself (stage `predict-toolkit`), before the GPU stages,
+  into the archive. `--toolkit pinned` was the alternative: it keeps the
+  predictions' compiler and runs machine code, but the CUTLASS tutorials and
+  the book's kernels then do not load on the GPU, which cannot be made up
+  afterwards, while predictions can
   (`env/remote/RUNBOOK.md`, "Driver older than the toolkit").
 - PyTorch is pinned (2.15.0, the release that requires Triton 3.9.0; CUDA
   13.2 build) and installed into a venv of its own, because in the project
   env its CUDA wheels change which NVRTC `cuda-bindings` loads.
   `validation/blackwell/e2e/triton_gpu.py` ran whole on the 3080 Ti. With a
   12.x driver there is no PyTorch for it and the step is skipped.
+  `setup.sh` installs it; the book is the one thing to fetch by hand
+  (`env/remote/RUNBOOK.md`, section 3).
+- The budget for a second rental (F24) is a proposal until the owner confirms
+  it (`env/remote/RUNBOOK.md`, section 5).
 
 Found by this work in the simulator, and fixed since unless marked open:
 

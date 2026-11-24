@@ -81,22 +81,57 @@ def _fused_is_tiny(x, y, z):
         return (size < _TINY) | ((size == _TINY) & (np.sign(error) == -np.sign(total)))
 
 
-def _float_result(ins: Instr, ty: str, extra, fn, *inputs, is_tiny=None):
-    """fn(*inputs), under `.ftz` (the PTX manual: f32 only, "subnormal inputs and results to
-    sign-preserving zero"). Compilers emit it under fast-math.
+_NAN_F32 = 0x7FFF_FFFF  # every f32 NaN an RTX 3080 Ti computes
+_NAN_F64 = 0xFFF8_0000_0000_0000  # its f64 NaN for an invalid operation
+_QUIET_F64 = np.uint64(1 << 51)
+
+
+def _gpu_nans(out: np.ndarray, *by_priority: np.ndarray) -> np.ndarray:
+    """Give the NaNs in `out` the bit patterns a GPU gives them. The PTX manual says nothing
+    about NaN payloads; this is what an RTX 3080 Ti returned (validation/ampere/nan_golden.txt):
+
+    * f32: 0x7fffffff, whatever the operands were and with or without `.ftz`;
+    * f64: the first NaN among `by_priority` (the instruction's operands, in the order that
+      instruction prefers them) with its quiet bit set and its sign and payload kept, or
+      0xfff8000000000000 when no operand is a NaN (inf - inf, 0 * inf, 0 / 0, sqrt(-1), ...).
+
+    Other widths are left as computed."""
+    nan = np.isnan(out)
+    if not nan.any():
+        return out
+    if out.dtype == np.float32:
+        out = out.copy()
+        out.view(np.uint32)[nan] = _NAN_F32
+    elif out.dtype == np.float64:
+        bits = np.full(len(out), _NAN_F64, dtype=np.uint64)
+        for operand in reversed(by_priority):
+            bits = np.where(np.isnan(operand), operand.view(np.uint64) | _QUIET_F64, bits)
+        out = out.copy()
+        out.view(np.uint64)[nan] = bits[nan]
+    return out
+
+
+def _float_result(ins: Instr, ty: str, extra, fn, *inputs, is_tiny=None, nan_order=None):
+    """fn(*inputs) with the GPU's NaNs (`_gpu_nans`; `nan_order` lists the operand indices in
+    the order an f64 NaN result prefers them, default first to last), under `.ftz` (the PTX
+    manual: f32 only, "subnormal inputs and results to sign-preserving zero"). Compilers emit
+    `.ftz` under fast-math.
 
     Which results count as subnormal was measured on an RTX 3080 Ti
     (validation/ampere/ftz_golden.txt): those that are tiny after rounding, in IEEE 754's
     words. 0x00800000 * 0x3f7fffff is flushed although it rounds to the smallest normal number,
     while 0x00800001 * 0x3f7ffffe, closer to that number than half a unit in the 24th bit, is
     not. `is_tiny` answers this for operations that round."""
+    order = range(len(inputs)) if nan_order is None else nan_order
     if "ftz" not in extra:
-        return fn(*inputs)
+        with np.errstate(all="ignore"):
+            return _gpu_nans(fn(*inputs), *(inputs[k] for k in order))
     if ty != "f32":
         raise unsupported(ins, ".ftz applies to .f32 only")
     inputs = [_flush(v) for v in inputs]
-    out = fn(*inputs)
-    return _flush(out, is_tiny(*inputs) if is_tiny else None)
+    with np.errstate(all="ignore"):
+        out = fn(*inputs)
+    return _gpu_nans(_flush(out, is_tiny(*inputs) if is_tiny else None))
 
 
 def _operands(ins: Instr, n: int):
@@ -350,7 +385,11 @@ def _add_sub(w, ins, mask):
     ty, extra = _type(ins, allowed=_FLOAT_MODES if _is_float(ins.mods[-1]) else frozenset())
     d, a, b = _operands(ins, 3)
     combine = np.add if ins.opcode == "add" else np.subtract
-    w.write(d, _float_result(ins, ty, extra, combine, w.read(a, ty), w.read(b, ty)), mask)
+    if not _is_float(ty):
+        w.write(d, combine(w.read(a, ty), w.read(b, ty)), mask)
+        return
+    # Of two f64 NaN operands the GPU returns the second, for add, sub and mul.
+    w.write(d, _float_result(ins, ty, extra, combine, w.read(a, ty), w.read(b, ty), nan_order=(1, 0)), mask)
 
 
 def _mul_parts(w, ins, a, b):
@@ -359,7 +398,7 @@ def _mul_parts(w, ins, a, b):
     if last in NP_TYPES and _is_float(last):
         ty, extra = _type(ins, allowed=_FLOAT_MODES)
         return _float_result(ins, ty, extra, np.multiply, w.read(a, ty), w.read(b, ty),
-                             is_tiny=_product_is_tiny), ty
+                             is_tiny=_product_is_tiny, nan_order=(1, 0)), ty
     ty, extra = _type(ins, allowed={"lo", "hi", "wide"}, kinds="iu")
     if len(extra) != 1:
         raise unsupported(ins, "integer multiply needs exactly one of .lo/.hi/.wide")
@@ -398,7 +437,9 @@ def _fma(w, ins, mask):
     ty, extra = _type(ins, allowed=_FLOAT_MODES, kinds="f")
     d, a, b, c = _operands(ins, 4)
     x, y, z = w.read(a, ty), w.read(b, ty), w.read(c, ty)
-    w.write(d, _float_result(ins, ty, extra, fused_multiply_add, x, y, z, is_tiny=_fused_is_tiny), mask)
+    # Of several f64 NaN operands the GPU returns the second, else the third, else the first.
+    w.write(d, _float_result(ins, ty, extra, fused_multiply_add, x, y, z, is_tiny=_fused_is_tiny,
+                             nan_order=(1, 2, 0)), mask)
 
 
 @op("div", "rem")
@@ -415,15 +456,22 @@ def _div_rem(w, ins, mask):
     ty, _ = _type(ins, kinds="iu")
     d, a, b = _operands(ins, 3)
     x, y = w.read(a, ty), w.read(b, ty)
-    y = np.where(y == 0, 1, y).astype(x.dtype)  # division by zero is undefined in PTX
-    q = x // y
-    r = x - q * y
-    if x.dtype.kind == "i":
-        # NumPy floors; PTX truncates toward zero like C.
-        fix = (r != 0) & ((x < 0) != (y < 0))
-        q = q + fix.astype(x.dtype)
+    # The PTX manual leaves division by zero undefined. An RTX 3080 Ti returns all ones for
+    # `div` and for `rem`, signed or unsigned, at 16, 32 and 64 bits; the minimum over -1 wraps
+    # to the minimum, with remainder 0 (validation/ampere/intdiv_golden.txt).
+    by_zero = y == 0
+    y = np.where(by_zero, 1, y).astype(x.dtype)
+    with np.errstate(over="ignore"):
+        q = x // y
         r = x - q * y
-    w.write(d, q if ins.opcode == "div" else r, mask)
+        if x.dtype.kind == "i":
+            # NumPy floors; PTX truncates toward zero like C.
+            fix = (r != 0) & ((x < 0) != (y < 0))
+            q = q + fix.astype(x.dtype)
+            r = x - q * y
+    result = q if ins.opcode == "div" else r
+    w.write(d, np.where(by_zero, x.dtype.type(-1) if x.dtype.kind == "i" else np.iinfo(x.dtype).max,
+                        result).astype(x.dtype), mask)
 
 
 @op("min", "max")
@@ -457,7 +505,12 @@ def _neg_abs(w, ins, mask):
     ty, _ = _type(ins, kinds="if")
     d, a = _operands(ins, 2)
     x = w.read(a, ty)
-    w.write(d, -x if ins.opcode == "neg" else np.abs(x), mask)
+    result = -x if ins.opcode == "neg" else np.abs(x)
+    if _is_float(ty):
+        # A NaN does not have its sign changed: f32 gives 0x7fffffff, f64 the operand made
+        # quiet (validation/ampere/nan_golden.txt).
+        result = _gpu_nans(np.where(np.isnan(x), x, result), x)
+    w.write(d, result, mask)
 
 
 @op("sqrt")
@@ -599,7 +652,38 @@ def _cvt(w, ins, mask):
         return
     if extra and not (dd.kind == "f" and set(extra) <= _ROUND_NEAREST):
         raise unsupported(ins, f"modifier .{extra[0]}")
-    w.write(d, x.astype(dd), mask)
+    result = x.astype(dd)
+    if da.kind == "f" and dd.kind == "f":
+        result = _converted_nans(x, result)
+    w.write(d, result, mask)
+
+
+_FLOAT_LAYOUT = {2: (np.uint16, 10), 4: (np.uint32, 23), 8: (np.uint64, 52)}  # (bits, fraction width)
+
+
+def _converted_nans(x: np.ndarray, result: np.ndarray) -> np.ndarray:
+    """NaNs of a conversion between floating types, as an RTX 3080 Ti returns them
+    (validation/ampere/nan_golden.txt). Between f32 and f16 the result is all ones below the
+    sign bit (0x7fffffff, 0x7fff), like every f32 NaN the GPU computes. A conversion to or
+    from f64 keeps the sign, sets the quiet bit and keeps the payload's leading bits."""
+    nan = np.isnan(x)
+    if not nan.any():
+        return result
+    (src_bits, src_fraction), (dst_bits, dst_fraction) = _FLOAT_LAYOUT[x.itemsize], _FLOAT_LAYOUT[result.itemsize]
+    width = result.itemsize * 8
+    if 8 not in (x.itemsize, result.itemsize):
+        bits = np.full(len(x), (1 << (width - 1)) - 1, dtype=dst_bits)
+    else:
+        raw = x.view(src_bits).astype(np.uint64)
+        fraction = raw & np.uint64((1 << src_fraction) - 1)
+        fraction = (fraction << np.uint64(dst_fraction - src_fraction) if dst_fraction > src_fraction
+                    else fraction >> np.uint64(src_fraction - dst_fraction))
+        sign = (raw >> np.uint64(x.itemsize * 8 - 1)) << np.uint64(width - 1)
+        quiet_nan = ((1 << (width - 1 - dst_fraction)) - 1) << dst_fraction | 1 << (dst_fraction - 1)
+        bits = (sign | np.uint64(quiet_nan) | fraction).astype(dst_bits)
+    result = result.copy()
+    result.view(dst_bits)[nan] = bits[nan]
+    return result
 
 
 # -- memory ------------------------------------------------------------------------

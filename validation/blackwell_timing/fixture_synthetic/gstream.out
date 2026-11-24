@@ -1,0 +1,5 @@
+DEVICE bench=gstream name=SYNTHETIC_not_measured cc=10.0 sm_count=148 total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 trials=2 scale=1 synthetic=1
+BENCH id=gstream/triad norm=24 reps=134217728 trial=0 event_ns=1093741.824 wall_ns=1098741.824 clk=2040109 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=0 event_ns=2167483.648 wall_ns=2172483.648 clk=4080219 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=1 event_ns=1094974.480 wall_ns=1099974.480 clk=2040109 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=1 event_ns=2174149.437 wall_ns=2179149.437 clk=4080219 check=0

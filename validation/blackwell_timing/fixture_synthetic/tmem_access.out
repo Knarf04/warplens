@@ -1,0 +1,25 @@
+DEVICE bench=tmem_access name=SYNTHETIC_not_measured cc=10.0 sm_count=148 total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 trials=2 scale=1 synthetic=1
+BENCH id=tmem_access/ld/x1 reps=16000 trial=0 event_ns=112656.632 wall_ns=117656.632 clk=176048 check=0
+BENCH id=tmem_access/ld/x1 reps=32000 trial=0 event_ns=205288.211 wall_ns=210288.211 clk=352048 check=0
+BENCH id=tmem_access/ld/x1 reps=16000 trial=1 event_ns=112700.736 wall_ns=117700.736 clk=176048 check=0
+BENCH id=tmem_access/ld/x1 reps=32000 trial=1 event_ns=206017.505 wall_ns=211017.505 clk=352048 check=0
+BENCH id=tmem_access/ld/x8 reps=16000 trial=0 event_ns=171605.053 wall_ns=176605.053 clk=288050 check=0
+BENCH id=tmem_access/ld/x8 reps=32000 trial=0 event_ns=323184.000 wall_ns=328184.000 clk=576050 check=0
+BENCH id=tmem_access/ld/x8 reps=16000 trial=1 event_ns=172144.767 wall_ns=177144.767 clk=288050 check=0
+BENCH id=tmem_access/ld/x8 reps=32000 trial=1 event_ns=324218.464 wall_ns=329218.464 clk=576050 check=0
+BENCH id=tmem_access/st/x1 reps=16000 trial=0 event_ns=104234.526 wall_ns=109234.526 clk=160046 check=0
+BENCH id=tmem_access/st/x1 reps=32000 trial=0 event_ns=188445.053 wall_ns=193445.053 clk=320046 check=0
+BENCH id=tmem_access/st/x1 reps=16000 trial=1 event_ns=104331.901 wall_ns=109331.901 clk=160046 check=0
+BENCH id=tmem_access/st/x1 reps=32000 trial=1 event_ns=188513.778 wall_ns=193513.778 clk=320046 check=0
+BENCH id=tmem_access/st/x8 reps=16000 trial=0 event_ns=104235.579 wall_ns=109235.579 clk=160048 check=0
+BENCH id=tmem_access/st/x8 reps=32000 trial=0 event_ns=188446.105 wall_ns=193446.105 clk=320048 check=0
+BENCH id=tmem_access/st/x8 reps=16000 trial=1 event_ns=104355.530 wall_ns=109355.530 clk=160048 check=0
+BENCH id=tmem_access/st/x8 reps=32000 trial=1 event_ns=188717.640 wall_ns=193717.640 clk=320048 check=0
+BENCH id=tmem_access/ld/x1/nowait reps=16000 trial=0 event_ns=102134.000 wall_ns=107134.000 clk=156055 check=0
+BENCH id=tmem_access/ld/x1/nowait reps=32000 trial=0 event_ns=184239.263 wall_ns=189239.263 clk=312055 check=0
+BENCH id=tmem_access/ld/x1/nowait reps=16000 trial=1 event_ns=102296.954 wall_ns=107296.954 clk=156055 check=0
+BENCH id=tmem_access/ld/x1/nowait reps=32000 trial=1 event_ns=184837.751 wall_ns=189837.751 clk=312055 check=0
+BENCH id=tmem_access/st/x1/nowait reps=16000 trial=0 event_ns=93711.368 wall_ns=98711.368 clk=140052 check=0
+BENCH id=tmem_access/st/x1/nowait reps=32000 trial=0 event_ns=167395.579 wall_ns=172395.579 clk=280052 check=0
+BENCH id=tmem_access/st/x1/nowait reps=16000 trial=1 event_ns=93767.094 wall_ns=98767.094 clk=140052 check=0
+BENCH id=tmem_access/st/x1/nowait reps=32000 trial=1 event_ns=167887.291 wall_ns=172887.291 clk=280052 check=0

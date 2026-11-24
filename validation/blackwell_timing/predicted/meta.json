@@ -1,0 +1,67 @@
+{
+ "model": "B200",
+ "config_file": "b200.yaml",
+ "config": {
+  "sm_count": 148.0,
+  "clock_ghz": 1.5,
+  "hbm_capacity_gb": 192.0,
+  "hbm_bandwidth_tb_s": 4.141,
+  "l2_bandwidth_per_sm_gb_s": 400.0,
+  "tma_latency_ns": 100.0,
+  "tma_bytes_per_clk": 128.0,
+  "smem_wavefront_clk": 1.0,
+  "global_access_latency_clk": 30.0,
+  "tmem_access_clk": 4.0,
+  "tensor_core_tflops_f16": 1929.6,
+  "tensor_core_tflops_tf32": 964.5,
+  "mma_latency_clk": 11.3
+ },
+ "active_sms": 148,
+ "command": "warplens run --timing --model B200 bin/sim/<bench> --sim",
+ "benchmarks": {
+  "launch": {
+   "status": "ok",
+   "launches": 4
+  },
+  "alu_chain": {
+   "status": "ok",
+   "launches": 14
+  },
+  "smem_wavefronts": {
+   "status": "ok",
+   "launches": 40
+  },
+  "global_load": {
+   "status": "ok",
+   "launches": 12
+  },
+  "gstream": {
+   "status": "ok",
+   "launches": 2
+  },
+  "cp_async": {
+   "status": "ok",
+   "launches": 4
+  },
+  "mbar": {
+   "status": "ok",
+   "launches": 4
+  },
+  "tma": {
+   "status": "ok",
+   "launches": 42
+  },
+  "mma_rate": {
+   "status": "ok",
+   "launches": 112
+  },
+  "tmem_access": {
+   "status": "ok",
+   "launches": 12
+  }
+ },
+ "not_simulated": {
+  "mma_rate/kind=i8": "warplens implements tcgen05.mma for kind::f16 and kind::tf32 only, and the timing model has no rate for other kinds; the i8 variant is hardware-only",
+  "%clock64": "warplens does not implement the %clock64 register; the simulator build (BENCH_CLOCK=0) omits the two clock reads around each loop, so clk is 0 in every predicted line"
+ }
+}

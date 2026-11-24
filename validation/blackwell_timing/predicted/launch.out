@@ -1,0 +1,5 @@
+DEVICE bench=launch name=warplens_simulated_B200 cc=10.0 sm_count=148 total_mem_bytes=206158430208 free_mem_bytes=206158430208 bench_clock=0 sim=1 trials=1 scale=1 synthetic=0
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=0 event_ns=0 wall_ns=0 clk=0 check=1 sim_ns=6.666666666666667 sim_instr=10 sim_bound=latency sim_findings=0
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=1 event_ns=0 wall_ns=0 clk=0 check=1 sim_ns=6.666666666666667 sim_instr=10 sim_bound=latency sim_findings=0
+BENCH id=launch/empty/ctas=allsm nctas=148 reps=0 trial=0 event_ns=0 wall_ns=0 clk=0 check=1 sim_ns=6.666666666666667 sim_instr=1039 sim_bound=latency sim_findings=0
+BENCH id=launch/empty/ctas=allsm nctas=148 reps=0 trial=1 event_ns=0 wall_ns=0 clk=0 check=1 sim_ns=6.666666666666667 sim_instr=1039 sim_bound=latency sim_findings=0

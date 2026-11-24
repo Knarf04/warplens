@@ -1,0 +1,25 @@
+DEVICE bench=global_load name=SYNTHETIC_not_measured cc=10.0 sm_count=148 total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 trials=2 scale=1 synthetic=1
+BENCH id=global_load/load_chain/footprint=l1 footprint_bytes=16384 reps=32000 trial=0 event_ns=883177.895 wall_ns=888177.895 clk=1640038 check=0
+BENCH id=global_load/load_chain/footprint=l1 footprint_bytes=16384 reps=64000 trial=0 event_ns=1746335.789 wall_ns=1751335.789 clk=3280038 check=0
+BENCH id=global_load/load_chain/footprint=l1 footprint_bytes=16384 reps=32000 trial=1 event_ns=884103.221 wall_ns=889103.221 clk=1640038 check=0
+BENCH id=global_load/load_chain/footprint=l1 footprint_bytes=16384 reps=64000 trial=1 event_ns=1749249.844 wall_ns=1754249.844 clk=3280038 check=0
+BENCH id=global_load/store/footprint=l1 footprint_bytes=16384 reps=32000 trial=0 event_ns=112650.526 wall_ns=117650.526 clk=176036 check=0
+BENCH id=global_load/store/footprint=l1 footprint_bytes=16384 reps=64000 trial=0 event_ns=205282.105 wall_ns=210282.105 clk=352036 check=0
+BENCH id=global_load/store/footprint=l1 footprint_bytes=16384 reps=32000 trial=1 event_ns=112969.985 wall_ns=117969.985 clk=176036 check=0
+BENCH id=global_load/store/footprint=l1 footprint_bytes=16384 reps=64000 trial=1 event_ns=205634.882 wall_ns=210634.882 clk=352036 check=0
+BENCH id=global_load/load_chain/footprint=l2 footprint_bytes=65536 reps=32000 trial=0 event_ns=883177.895 wall_ns=888177.895 clk=1640038 check=0
+BENCH id=global_load/load_chain/footprint=l2 footprint_bytes=65536 reps=64000 trial=0 event_ns=1746335.789 wall_ns=1751335.789 clk=3280038 check=0
+BENCH id=global_load/load_chain/footprint=l2 footprint_bytes=65536 reps=32000 trial=1 event_ns=883637.105 wall_ns=888637.105 clk=1640038 check=0
+BENCH id=global_load/load_chain/footprint=l2 footprint_bytes=65536 reps=64000 trial=1 event_ns=1749698.692 wall_ns=1754698.692 clk=3280038 check=0
+BENCH id=global_load/store/footprint=l2 footprint_bytes=65536 reps=32000 trial=0 event_ns=112650.526 wall_ns=117650.526 clk=176036 check=0
+BENCH id=global_load/store/footprint=l2 footprint_bytes=65536 reps=64000 trial=0 event_ns=205282.105 wall_ns=210282.105 clk=352036 check=0
+BENCH id=global_load/store/footprint=l2 footprint_bytes=65536 reps=32000 trial=1 event_ns=112925.884 wall_ns=117925.884 clk=176036 check=0
+BENCH id=global_load/store/footprint=l2 footprint_bytes=65536 reps=64000 trial=1 event_ns=205677.127 wall_ns=210677.127 clk=352036 check=0
+BENCH id=global_load/load_chain/footprint=dram footprint_bytes=262144 reps=32000 trial=0 event_ns=883177.895 wall_ns=888177.895 clk=1640038 check=0
+BENCH id=global_load/load_chain/footprint=dram footprint_bytes=262144 reps=64000 trial=0 event_ns=1746335.789 wall_ns=1751335.789 clk=3280038 check=0
+BENCH id=global_load/load_chain/footprint=dram footprint_bytes=262144 reps=32000 trial=1 event_ns=885750.165 wall_ns=890750.165 clk=1640038 check=0
+BENCH id=global_load/load_chain/footprint=dram footprint_bytes=262144 reps=64000 trial=1 event_ns=1749615.827 wall_ns=1754615.827 clk=3280038 check=0
+BENCH id=global_load/store/footprint=dram footprint_bytes=262144 reps=32000 trial=0 event_ns=112650.526 wall_ns=117650.526 clk=176036 check=0
+BENCH id=global_load/store/footprint=dram footprint_bytes=262144 reps=64000 trial=0 event_ns=205282.105 wall_ns=210282.105 clk=352036 check=0
+BENCH id=global_load/store/footprint=dram footprint_bytes=262144 reps=32000 trial=1 event_ns=112766.895 wall_ns=117766.895 clk=176036 check=0
+BENCH id=global_load/store/footprint=dram footprint_bytes=262144 reps=64000 trial=1 event_ns=205299.892 wall_ns=210299.892 clk=352036 check=0

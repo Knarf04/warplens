@@ -1,0 +1,3 @@
+SYNTHETIC data written by validation/blackwell_timing/make_synthetic.py.
+Not measured on any GPU. The 'hardware' is the simulator run with the parameters in
+truth.json; it exists to test fit.py.

@@ -1,0 +1,5 @@
+DEVICE bench=launch name=SYNTHETIC_not_measured cc=10.0 sm_count=148 total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 trials=2 scale=1 synthetic=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=0 event_ns=20005.263 wall_ns=25005.263 clk=10 check=0
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=1 event_ns=20005.273 wall_ns=25005.273 clk=10 check=0
+BENCH id=launch/empty/ctas=allsm nctas=148 reps=0 trial=0 event_ns=20005.263 wall_ns=25005.263 clk=10 check=0
+BENCH id=launch/empty/ctas=allsm nctas=148 reps=0 trial=1 event_ns=20005.280 wall_ns=25005.280 clk=10 check=0

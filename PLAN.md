@@ -420,11 +420,24 @@ Found by this work in the simulator, and fixed since unless marked open:
 - The device query answered 148 SMs for a B300 and `warplens.numerics` encoded
   an E5M2 NaN as 0x7d where the `cvt` instructions give 0x7f. Fixed: 160 SMs,
   and 0x7f in both.
+- Four disagreements with the 3080 Ti, found by the probes. Fixed, each with
+  a golden file from that GPU (`validation/README.md`): an mbarrier token
+  carries only the parity of its phase, so a token two completions old tests
+  false again; a NaN result has the GPU's bits (`0x7fffffff` for f32, a
+  quieted operand or `0xfff8000000000000` for f64); integer division by zero
+  gives all ones; and a launch refused before the kernel runs has the
+  runtime's code for it (`cudaErrorInvalidValue`,
+  `cudaErrorInvalidConfiguration`, `cudaErrorInvalidClusterSize`) instead of
+  `cudaErrorLaunchFailure`, with `cudaFuncSetAttribute` refusing more than
+  227 KB. All measured on Ampere; MB-03, NUM-12, NUM-13, RT-04 and RT-12 keep
+  them as claims for the B200.
 - Open: lanes pass `bar.sync` before lane 0 arrives in two control-flow
   layouts nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`);
-  a stale mbarrier token tests true where the 3080 Ti gives false; `atom` is
-  not implemented (`validation/blackwell/README.md`, "Found while writing the
-  probes").
+  `atom` is not implemented (`validation/blackwell/README.md`, "Found while
+  writing the probes"). The three new golden programs (`nan_golden`,
+  `intdiv_golden`, `mbarrier_token_golden`) are not yet among those
+  `e2e/ampere_replay` reruns on the B200; the shim does not require the
+  shared-memory opt-in a GPU requires above 48 KB.
 - Documents that contradict the code are listed in
   `docs/validation-matrix.md`, "Discrepancies found".
 

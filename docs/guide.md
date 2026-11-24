@@ -437,7 +437,10 @@ every finding, on standard error. `--timing` adds the simulated duration and
 the verdict of the timing model to each line; `--quiet` drops the summary. The
 exit status is the program's. An error inside a kernel (a memory fault, a
 deadlock, unsupported PTX) is printed and reaches the program as
-`cudaErrorLaunchFailure`.
+`cudaErrorLaunchFailure`. A launch refused before the kernel runs has the code
+a GPU gives it: `cudaErrorInvalidValue` (too much shared memory),
+`cudaErrorInvalidConfiguration` (block or grid dimensions) or
+`cudaErrorInvalidClusterSize` (a cluster the device does not accept).
 
 The CUTLASS tutorials are programs of this kind. Built with those flags, they
 run as they are and pass their own check against a reference:

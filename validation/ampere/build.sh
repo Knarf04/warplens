@@ -28,6 +28,8 @@ mkdir -p bin
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/mbarrier_token_golden mbarrier_token_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/nan_golden nan_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/intdiv_golden intdiv_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -std=c++17 -o bin/launch_errors_hw launch_errors_hw.cu
+"${CC:-cc}" -I"$(dirname "$(dirname "$(command -v "$HW_NVCC")")")/include" -o bin/driver_errors_hw driver_errors_hw.c -lcuda
 $PTX_NVCC -arch=sm_100a -ptx shfl_probe.cu -o shfl_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx barrier_exit_hw.cu -o barrier_exit.ptx
 $PTX_NVCC -arch=sm_100a -ptx printf_probe.cu -o printf_probe.ptx

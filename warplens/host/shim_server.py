@@ -10,15 +10,15 @@ from pathlib import Path
 
 import numpy as np
 
-from ..errors import WarplensError
+from ..errors import CUDA_INVALID_VALUE, CUDA_LAUNCH_FAILURE, LaunchError, WarplensError
 from ..frontend.ptx_parser import parse_ptx
 from . import tensor_map
 from .device import Device
 
 (REGISTER_FATBIN, REGISTER_FUNCTION, MALLOC, FREE, WRITE, READ, COPY, FILL, LAUNCH,
  TENSOR_MAP, REGISTER_MODULE) = range(1, 12)
-LAUNCH_FAILURE = 719  # cudaErrorLaunchFailure
-INVALID_VALUE = 1  # cudaErrorInvalidValue
+LAUNCH_FAILURE = CUDA_LAUNCH_FAILURE  # cudaErrorLaunchFailure: the kernel started and failed
+INVALID_VALUE = CUDA_INVALID_VALUE  # cudaErrorInvalidValue
 MEMORY_ALLOCATION = 2  # cudaErrorMemoryAllocation
 MACHINE_CODE = ("the module is machine code for a real GPU, and the simulator runs PTX. Ask the "
                 'compiler for PTX (TIRx: backend_config={"cuda": {"target_format": "ptx"}})')
@@ -102,6 +102,11 @@ class ShimServer:
                     return
                 try:
                     status, reply = 0, self.handle(op, payload)
+                except LaunchError as e:
+                    # Refused before any kernel code ran: the runtime's code for that refusal
+                    # (invalid value, invalid configuration, invalid cluster size), which a
+                    # GPU returns from the launch call and which leaves the context usable.
+                    status, reply = (e.cuda_error if op == LAUNCH else INVALID_VALUE), str(e).encode()
                 except WarplensError as e:
                     status, reply = (LAUNCH_FAILURE if op == LAUNCH else INVALID_VALUE), str(e).encode()
                 except MemoryError:

@@ -26,6 +26,44 @@ toolkit for the GPU binaries and the `warplens` conda env for the PTX.
 | Transpose output | `bin/transpose_hw` | correct on the GPU and in the simulator |
 | Shared-memory bank counters | `run_ncu.sh` profiles `bin/transpose_hw` with Nsight Compute and compares its counters with the simulator's bank model. Recorded in `transpose_ncu_3080ti_grid64.csv`; `tests/test_hardware_golden.py` checks the simulator against it. | conflict and instruction counters match exactly; the total wavefront counter is 4160 higher, which `run_wavefront_probe.sh` explains (see below) |
 
+## Launch errors
+
+`bin/launch_errors_hw > launch_errors_3080ti.txt` (runtime API) and
+`bin/driver_errors_hw > driver_errors_3080ti.txt` (driver API) record what
+CUDA 12.4 returns on the RTX 3080 Ti for requests it refuses before a kernel
+runs. The GPU's limits are 49152 bytes of shared memory per block by default
+and 101376 with opt-in; it has no clusters.
+
+| Request | Runtime API | Driver API |
+| --- | --- | --- |
+| `cudaFuncSetAttribute(MaxDynamicSharedMemorySize)` with 0 to the opt-in maximum | `cudaSuccess` | `CUDA_SUCCESS` |
+| the same with the maximum + 1, + 16, + 1024, 2^30, or -1 | `cudaErrorInvalidValue` | `CUDA_ERROR_INVALID_VALUE` |
+| the same with the opt-in maximum, for a kernel that also has 1024 bytes of static shared memory | `cudaSuccess` (the attribute is checked against the device, not against what a launch could use) | not run |
+| `PreferredSharedMemoryCarveout` with -1 to 100; with 101 or -2 | `cudaSuccess`; `cudaErrorInvalidValue` | 101: `CUDA_ERROR_INVALID_VALUE` |
+| a number that names no attribute (99, runtime API); an attribute that can only be read (`MAX_THREADS_PER_BLOCK`, driver API) | `cudaErrorInvalidValue` | `CUDA_ERROR_INVALID_VALUE` |
+| launch with more dynamic shared memory than was opted in to (default 48 KB), or static + dynamic above the opt-in maximum | `cudaErrorInvalidValue` | `CUDA_ERROR_INVALID_VALUE` |
+| launch with a block of 1025 threads, (33, 32, 1), (1, 1, 65) or (0, 1, 1); a grid of (0, 1, 1) or (1, 65536, 1) | `cudaErrorInvalidConfiguration` | `CUDA_ERROR_INVALID_VALUE` |
+| launch with a cluster dimension attribute, any shape, (1, 1, 1) included | `cudaErrorInvalidClusterSize` | `CUDA_ERROR_INVALID_CLUSTER_SIZE` |
+
+In every case the error is returned by the call, `cudaPeekAtLastError` shows
+it, `cudaDeviceSynchronize` (`cuCtxSynchronize`) returns success,
+`cudaGetLastError` returns it once and then success, and the next ordinary
+launch runs.
+
+The cluster attributes of a function (required cluster shape, non-portable
+sizes, scheduling policy) were not tried; the shim accepts them unchecked.
+
+`warplens/shim` returns these codes at the simulated device's limits (227 KB;
+clusters of up to 16 CTAs): `tests/test_driver_shim.py::test_refusals_carry_the_codes_a_gpu_gives`,
+`tests/test_shim.py::test_a_refused_launch_has_the_runtime_code_for_that_refusal`.
+What this does not show: that a B200 returns `cudaErrorInvalidClusterSize`
+for a cluster of more than 16 CTAs or a grid that is not a multiple of the
+cluster. The code is the one the CUDA headers define for "a kernel launch
+error due to cluster misconfiguration" and the one Ampere gives for any
+cluster, but no cluster launch could be made here (RT-12). The simulator
+also does not require the opt-in a GPU requires before a launch may use more
+than 48 KB.
+
 ## Running the bank-counter comparison
 
 `ncu` refuses to read performance counters as a normal user on this machine

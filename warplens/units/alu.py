@@ -667,7 +667,7 @@ def _converted_nans(x: np.ndarray, result: np.ndarray) -> np.ndarray:
     sign bit (0x7fffffff, 0x7fff), like every f32 NaN the GPU computes. A conversion to or
     from f64 keeps the sign, sets the quiet bit and keeps the payload's leading bits."""
     nan = np.isnan(x)
-    if not nan.any():
+    if not nan.any() or x.itemsize == result.itemsize:  # same width: not measured, left alone
         return result
     (src_bits, src_fraction), (dst_bits, dst_fraction) = _FLOAT_LAYOUT[x.itemsize], _FLOAT_LAYOUT[result.itemsize]
     width = result.itemsize * 8

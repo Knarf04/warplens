@@ -1,0 +1,23 @@
+cuModuleLoadData                                                 0 CUDA_SUCCESS
+plain 49152 optin 101376
+cuLaunchKernel, no opt-in, default maximum + 16                  1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(MAX_DYNAMIC_SHARED_SIZE_BYTES, 49152)         0 CUDA_SUCCESS
+cuFuncSetAttribute(MAX_DYNAMIC_SHARED_SIZE_BYTES, 101376)        0 CUDA_SUCCESS
+cuFuncSetAttribute(MAX_DYNAMIC_SHARED_SIZE_BYTES, 101377)        1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(MAX_DYNAMIC_SHARED_SIZE_BYTES, 102400)        1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(MAX_DYNAMIC_SHARED_SIZE_BYTES, -1)            1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(MAX_DYNAMIC_SHARED_SIZE_BYTES, 0)             0 CUDA_SUCCESS
+cuFuncSetAttribute(PREFERRED_SHARED_MEMORY_CARVEOUT, 101)        1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(MAX_THREADS_PER_BLOCK, 5) (read-only)         1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(opt-in maximum)                               0 CUDA_SUCCESS
+cuLaunchKernel, opted in, opt-in maximum                         0 CUDA_SUCCESS
+cuLaunchKernel, opted in, opt-in maximum + 16                    1 CUDA_ERROR_INVALID_VALUE
+cuLaunchKernel, block of 1025                                    1 CUDA_ERROR_INVALID_VALUE
+cuLaunchKernel, block (0, 1, 1)                                  1 CUDA_ERROR_INVALID_VALUE
+cuLaunchKernel, grid (0, 1, 1)                                   1 CUDA_ERROR_INVALID_VALUE
+cuCtxSynchronize                                                 0 CUDA_SUCCESS
+cuLaunchKernelEx, grid 4, cluster (1, 1, 1)                      912 CUDA_ERROR_INVALID_CLUSTER_SIZE
+cuLaunchKernelEx, grid 4, cluster (2, 1, 1)                      912 CUDA_ERROR_INVALID_CLUSTER_SIZE
+cuCtxSynchronize                                                 0 CUDA_SUCCESS
+cuLaunchKernel, ordinary                                         0 CUDA_SUCCESS
+cuCtxSynchronize                                                 0 CUDA_SUCCESS

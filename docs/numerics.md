@@ -14,12 +14,42 @@ products inside one MMA are accumulated.
 | Operation | Rule | Checked |
 | --- | --- | --- |
 | Integer arithmetic | wraps; division truncates toward zero; shifts clamp at the register width | by test, from the PTX rules |
+| Integer `div` and `rem` by zero, and the minimum over -1 | by zero: all ones, for `div` and for `rem`, signed and unsigned, 16, 32 and 64 bits. Minimum over -1: the minimum, remainder 0. The PTX manual leaves division by zero undefined | on a GPU (Ampere): `validation/ampere/intdiv_golden.txt`, 5808 cases. Blackwell may differ |
 | `add`, `sub`, `mul`, `div`, `sqrt` on floats | IEEE round-to-nearest-even, as NumPy does them | NumPy |
+| NaN results | see "NaN bit patterns" below | on a GPU (Ampere), bit for bit: `validation/ampere/nan_golden.txt`, 14270 cases. Blackwell may differ |
 | `fma`, floating `mad` | exact product and sum with integer significands, rounded once | against exact rational arithmetic, and against libc `fma` by the reviewer |
 | `min`, `max` | a NaN operand yields the other; `min(+0, -0)` is `-0`, `max` is `+0`. Two NaNs give `0x7fffffff` for f32, and the second operand made quiet for f64 | on a GPU, bit for bit: `validation/ampere/minmax_cvt_golden.txt` (f32 and f64) |
 | float to integer | saturates; NaN gives 0, or the sign-bit pattern when the source is f64 or the result is 64-bit | on a GPU, bit for bit: the same file (f32 and f64 to s32, u32, s64, u64, all four rounding modes) |
 | `cvt.rna.tf32.f32` | see below | on a GPU, bit for bit |
 | `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | see below | against exact rational arithmetic only |
+
+## NaN bit patterns
+
+The PTX manual does not say which NaN an instruction returns. The simulator
+returns what an RTX 3080 Ti returned (`validation/ampere/nan_golden.txt`,
+`validation/ampere/ftz_golden.txt`, `validation/ampere/minmax_cvt_golden.txt`;
+`tests/test_hardware_golden.py`), implemented in
+`warplens/units/alu.py:_gpu_nans` and `warplens/units/alu.py:_converted_nans`:
+
+| Result | NaN |
+| --- | --- |
+| f32, from `add`, `sub`, `mul`, `div`, `fma`, `sqrt`, with or without `.rn` and `.ftz` | `0x7fffffff`, whatever the operands: an invalid operation, a quiet or a signalling NaN of either sign and any payload |
+| f32, from `neg` and `abs` of a NaN | `0x7fffffff` too: the sign is not changed |
+| f32, from `min` / `max` of two NaNs | `0x7fffffff` |
+| f64, invalid operation (`inf - inf`, `0 * inf`, `0 / 0`, `inf / inf`, `sqrt` of a negative number, the same inside `fma`) | `0xfff8000000000000` |
+| f64, with a NaN operand | that operand with the quiet bit set, sign and payload kept. Of several NaN operands: the second, else the first, for `add`, `sub` and `mul`; the first, else the second, for `div`; the second, else the third, else the first, for `fma`; the second for `min` / `max` |
+| f64, `neg` and `abs` of a NaN | the operand made quiet; the sign is not changed |
+| `cvt` between f16 and f32 | `0x7fff` and `0x7fffffff` |
+| `cvt` to or from f64 | the sign kept, the quiet bit set, the payload's leading bits kept (shifted to the new width) |
+| `mov` | the bits, unchanged |
+
+Not measured: NaNs of `div.full`, `div.approx` and `sqrt.approx` (in the
+simulator they share the code of `div.rn` and `sqrt.rn` and so give
+`0x7fffffff` as well), rounding modes other than `.rn` (not implemented), and
+f16 arithmetic. `cvt` with `.ftz` is recorded in the golden file and not
+implemented. A NaN that the tensor core or
+TMA's NaN fill produces is a separate claim (TMA-05). All of this is Ampere
+behaviour; NUM-13 keeps it as a claim for Blackwell.
 
 ## TF32
 

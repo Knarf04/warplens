@@ -77,6 +77,9 @@ int main(int argc, char **argv) {
     CHECK(prop.major == 10 && prop.minor == (b300 ? 3 : 0));
     CHECK(prop.totalGlobalMem == (size_t)(b300 ? 288 : 192) << 30);
     CHECK(strstr(prop.name, b300 ? "B300" : "B200"));
+    int cluster_launch = -1;
+    CHECK(cudaDeviceGetAttribute(&cluster_launch, cudaDevAttrClusterLaunch, 0) == cudaSuccess);
+    CHECK(cluster_launch == 1 && prop.clusterLaunch == 1);
     return 0;
   }
   if (!strcmp(argv[1], "thread_allocations")) {

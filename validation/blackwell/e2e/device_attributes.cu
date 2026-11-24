@@ -7,7 +7,11 @@
 // Claim tested (warplens/shim/cudart_shim.c `warplens_device_attribute`): the simulated B200
 // reports compute capability 10.0, 148 SMs, warp size 32, 1024 threads per block, block
 // dimensions up to 1024 x 1024 x 64, 48 KiB of shared memory per block by default and
-// 227 KiB on request, 228 KiB per SM. The name and the memory size go on "info:" lines.
+// 227 KiB on request, 228 KiB per SM, and that it supports cluster launch
+// (cudaDevAttrClusterLaunch = 1, which CUTLASS-style hosts query before a cluster launch).
+// The attribute is printed from both cudaDeviceGetAttribute and cudaDeviceProp, so a GPU
+// that answers otherwise shows as a difference. The name and the memory size go on "info:"
+// lines.
 //
 //   device_attributes
 #include "../common.h"
@@ -33,5 +37,8 @@ int main() {
     printf("registers per block %d, per multiprocessor %d\n", p.regsPerBlock, p.regsPerMultiprocessor);
     printf("max threads per multiprocessor %d, max blocks per multiprocessor %d\n", p.maxThreadsPerMultiProcessor,
            p.maxBlocksPerMultiProcessor);
+    int cluster_launch = -1;
+    HOST_CHECK(cudaDeviceGetAttribute(&cluster_launch, cudaDevAttrClusterLaunch, device));
+    printf("cluster launch %d (attribute), %d (properties)\n", cluster_launch, p.clusterLaunch);
     return 0;
 }

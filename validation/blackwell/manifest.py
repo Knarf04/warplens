@@ -299,7 +299,8 @@ def _formats() -> list[Probe]:
 def _device() -> list[Probe]:
     return [
         Probe("e2e/device_attributes", "e2e/device_attributes", (), ("RT-03",),
-              "the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives"),
+              "the device reports compute capability 10.0, 148 SMs, the shared-memory limits the shim gives "
+              "and cluster launch support (cudaDevAttrClusterLaunch = 1)"),
         Probe("e2e/smem_limit", "e2e/smem_limit", (), ("RT-04",),
               "a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory"),
         Probe("e2e/smem_optin", "e2e/smem_optin", (), ("RT-15",),

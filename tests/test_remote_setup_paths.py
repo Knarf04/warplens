@@ -58,12 +58,13 @@ def setup(bare: Path, *args: str, root: bool = False, **env: str):
         fakeroot = shutil.which("fakeroot")
         if not fakeroot:
             pytest.skip("fakeroot is not installed")
-        # fakeroot itself needs the real PATH to start; the script gets the bare one.
-        command = [fakeroot, "env", *(f"{k}={v}" for k, v in full.items()), *command]
-        # Give fakeroot a real PATH to start, but keep the simulated machine's
-        # environment isolated just as in the non-root case. GitHub runners set
-        # DEBIAN_FRONTEND, which must not leak into this bare-image fixture.
-        full = {**full, "PATH": os.environ["PATH"]}
+        # fakeroot itself needs the real PATH to start; the script gets the bare one, and of
+        # the environment only what is set here plus what fakeroot works through (its
+        # preloaded library and the key of its daemon). Whatever else the machine running
+        # the tests exports stays out: a GitHub runner has DEBIAN_FRONTEND=noninteractive.
+        command = [fakeroot, "sh", "-c", 'exec env -i LD_PRELOAD="$LD_PRELOAD" LD_LIBRARY_PATH="$LD_LIBRARY_PATH" '
+                   'FAKEROOTKEY="$FAKEROOTKEY" "$@"', "sh", *(f"{k}={v}" for k, v in full.items()), *command]
+        full = {**os.environ, **full, "PATH": os.environ["PATH"]}
     return subprocess.run(command, capture_output=True, text=True, env=full, timeout=120)
 
 

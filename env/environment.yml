@@ -12,9 +12,12 @@ dependencies:
   - numpy
   - pyyaml
   - pytest
-  # Compile-only. cuda-version selects the release, not its compiler patch.
-  # Keep these exact builds aligned with remote/pins.env and both prediction
-  # provenance files; a new patch can emit different PTX.
+  # CUDA toolchain (compile-only). cuda-version pins the release of every cuda-* package;
+  # the three below are pinned to the exact build, because the committed predictions
+  # (validation/blackwell/predicted/provenance.json, validation/blackwell_timing/predicted/
+  # meta.json) are the simulator's run of this nvcc's PTX and check.sh refuses any other.
+  # The same versions are in env/remote/pins.env; tests/test_rental_harness.py holds the
+  # four files together. To move to another build see README.md, "Changing the toolkit".
   - cuda-version=13.5
   - cuda-nvcc=13.5.37
   - cuda-cudart-dev=13.5.37

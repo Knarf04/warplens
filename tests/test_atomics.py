@@ -163,7 +163,7 @@ def test_atomic_add_reports_uninitialized_shared_memory(sim):
     assert any(f.kind == "smem-uninitialized-read" for f in stats.findings)
 
 
-@pytest.mark.parametrize("name", ["atom.global.max.u32", "atom.global.add.s64", "atom.global.add.f16",
+@pytest.mark.parametrize("name", ["atom.global.sub.u32", "atom.global.add.s64", "atom.global.add.f16",
     "atom.acquire.gpu.global.add.u32", "atom.release.gpu.global.add.u32", "atom.acq_rel.gpu.global.add.u32",
     "atom.relaxed.cluster.global.add.u32", "atom.shared::cluster.add.u32", "atom.global.add.ftz.f32",
     "atom.global.v2.add.f32", "atom.global.global.add.u32", "atom.global.add.noftz.f64"])
@@ -310,7 +310,7 @@ def test_generic_atomic_rejects_non_global_non_shared_spaces(sim, space):
     mod = kernel(f""".reg .u64 %p; .reg .u32 %old; {variable}
         cvta.{space}.u64 %p, {name}; atom.add.u32 %old, [%p], 1; ret;
     """, ".param .u32 value")
-    with pytest.raises(warplens.UnsupportedError, match="global or shared"):
+    with pytest.raises(warplens.ExecutionError, match="global and shared"):
         sim.launch(mod, "k", grid=1, block=1, args=[0])
 
 
@@ -329,15 +329,6 @@ def test_generic_local_shared_atomic_keeps_cluster_rank(sim):
     stats = sim.launch(mod, "k", grid=2, block=64, cluster=2, args=[out])
     np.testing.assert_array_equal(out.numpy(), [64, 64])
     assert not stats.findings
-
-
-def test_generic_atomic_rejects_remote_shared_addresses(sim):
-    mod = kernel(""".reg .u64 %p; .reg .u32 %old; .shared .u32 cell;
-        cvta.shared.u64 %p, cell; mapa.u64 %p, %p, 1;
-        atom.add.u32 %old, [%p], 1; ret;
-    """)
-    with pytest.raises(warplens.UnsupportedError, match="another CTA"):
-        sim.launch(mod, "k", grid=2, block=1, cluster=2)
 
 
 def test_bad_atomic_destination_does_not_modify_memory(sim):
@@ -362,3 +353,33 @@ def test_atomic_write_does_not_hide_an_earlier_ordinary_writer(sim, synchronize)
     """)
     stats = sim.launch(mod, "k", grid=1, block=64)
     assert any(f.kind == "smem-race" for f in stats.findings) != synchronize
+
+
+def test_proxy_fence_uses_latest_atomic_writer_after_multiple_contenders():
+    from warplens.units.smem import SharedMemory
+    smem = SharedMemory(4)
+    at, dt = np.array([0], dtype=np.uint64), np.dtype("u4")
+    smem.write(at, np.array([0], dtype=dt), 0)
+    smem.epoch += 1
+    smem.atomic(at, dt, 0, lambda old: old + 1)
+    smem.atomic(at, dt, 1, lambda old: old + 1)
+    smem.fence_async(0)
+    assert smem.unfenced.all()  # another warp's later write is not ordered
+    smem.fence_async(1)
+    assert not smem.unfenced.any()  # its own final RMW is ordered
+
+
+def test_proxy_fence_ownership_does_not_reuse_preserved_ordinary_race_history():
+    from warplens.units.smem import SharedMemory
+    smem = SharedMemory(4)
+    at, dt = np.array([0], dtype=np.uint64), np.dtype("u4")
+    smem.write(at, np.array([0], dtype=dt), 0)
+    _, _, races = smem.atomic(at, dt, 1, lambda old: old + 1)
+    assert races.tolist() == [0]
+    smem.fence_async(0)
+    assert smem.unfenced.all()
+    smem.fence_async(1)
+    assert not smem.unfenced.any()
+    # Fencing does not erase the independent ordinary-store race provenance.
+    _, _, races = smem.atomic(at, dt, 2, lambda old: old + 1)
+    assert races.tolist() == [0]

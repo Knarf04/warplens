@@ -247,17 +247,27 @@ def test_the_predictions_name_the_pinned_compiler():
     assert json.loads((TIMING / "predicted" / "meta.json").read_text())["nvcc_version"] == pinned
 
 
-def test_ci_and_remote_setup_select_the_same_compiler_patch():
-    """A cuda-version=major.minor pin alone floats to a new patch and makes CI
-    reject its own committed predictions before running any tests."""
+def test_the_development_env_installs_the_pinned_compiler():
+    """env/environment.yml is what CI's `full` job builds its env from, and env/check.sh
+    fails there when nvcc is not the predictions'. So the file pins the toolkit packages to
+    that exact version: a new conda-forge build must arrive as a commit that also regenerates
+    the predictions (env/README.md, "Changing the toolkit"), not as a red CI. The lock file
+    written from the env agrees."""
     import yaml
-
-    environment = yaml.safe_load((ROOT / "env" / "environment.yml").read_text())
-    dependencies = dict(item.split("=", 1) for item in environment["dependencies"] if "=" in item)
-    remote = pins()
-    for package, key in (("cuda-version", "CUDA_VERSION"), ("cuda-nvcc", "CUDA_NVCC"),
+    pinned = pins()
+    specs = dict(spec.split("=", 1) for spec in yaml.safe_load((ROOT / "env" / "environment.yml").read_text())
+                 ["dependencies"] if isinstance(spec, str) and "=" in spec)
+    assert specs["cuda-version"] == pinned["CUDA_VERSION"]
+    assert specs["cuda-nvcc"] == pinned["CUDA_NVCC"]
+    assert specs["cuda-cudart-dev"] == pinned["CUDA_CUDART_DEV"]
+    assert specs["cuda-nvrtc"] == pinned["CUDA_NVRTC"]
+    lock = (ROOT / "env" / "conda-linux-64.lock").read_text()
+    for package, key in (("cuda-nvcc", "CUDA_NVCC"), ("cuda-nvcc-tools", "CUDA_NVCC"),
                          ("cuda-cudart-dev", "CUDA_CUDART_DEV"), ("cuda-nvrtc", "CUDA_NVRTC")):
-        assert dependencies.get(package) == remote[key], f"{package} must pin the prediction compiler"
+        assert re.findall(rf"/{package}-(\d[\d.]*)-[^-/]+\.conda#", lock) == [pinned[key]], package
+    # CI builds from this file and runs the check that refuses another compiler.
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    assert "environment-file: env/environment.yml" in workflow and "run: env/check.sh" in workflow
 
 
 def test_a_fallback_toolkit_is_flagged_everywhere(suite):

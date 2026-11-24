@@ -303,7 +303,10 @@ run is isolated for that reason.
 
 These print error norms and "matches NumPy" lines, not bit patterns, and their outputs
 contain times. `compare.py` treats them as informational and shows the result lines from the
-GPU next to the simulator's.
+GPU next to the simulator's. The `max error` of a "matches NumPy" line is measured against
+NumPy on the machine that ran the script, whose BLAS decides the last float16 digit of the
+reference (0.0078 on one CPU, 0.0156 on another, for the same kernel output): the claim is
+the name, the size and "matches NumPy", and `compare.py` says so when only that number differs.
 
 ## Reading the comparison
 
@@ -457,13 +460,14 @@ Those marked "fixed since" were fixed on other branches.
     `mbarrier-invalid-token` and grants no synchronization credit. The model's true
     fallback and the RTX 3080 Ti's false result are not portable predictions; the probe
     records them on `info:` lines. See `docs/m2.md` and matrix row MB-03.
-11. **Scalar atomic addition is implemented.** `atomicAdd(uint32_t*, 1u)`
-    (`atom.relaxed.gpu.global.add.u32`) now runs, as do scalar `atom.add` and
-    `red.add` for s32/u32/u64/f32/f64 in global and CTA-local shared memory.
-    CUDA-compiled kernels and CPU-only regressions cover old values, contention,
-    masks and floating subnormal rules. Other operations, acquire/release,
-    cluster scope and packed/half/vector forms remain unsupported; see
-    `docs/atomics.md`. The CLC probes still use single-writer words.
+11. **Atomic updates are implemented.** The forms nvcc 13.5 emits for the
+    atomic functions run and match the recorded RTX 3080 Ti results
+    (`validation/ampere/atom_golden.txt`). The integrated implementation also
+    accepts `red.add`, older default-scope spellings and `add.s32`. Review checks
+    enforce natural alignment, global f32 FTZ and shared race/async diagnostics.
+    Acquire/release, cluster scope and packed/half/vector forms remain
+    unsupported; see `docs/atomics.md`. The CLC probes still use single-writer
+    words.
 12. **NaN payloads and integer division by zero are nonportable.** PTX leaves f32
     arithmetic NaN encodings unspecified: `.ftz` results such as the simulator's
     `ffc00000` and the RTX 3080 Ti's `7fffffff` are equivalent for this validation.

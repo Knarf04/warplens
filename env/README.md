@@ -18,14 +18,20 @@ env/setup.sh --locked    # recreate exactly from the lock file
 conda activate warplens  # or: conda run -n warplens <command>
 ```
 
-CI uses `environment.yml`, whose compiler packages are pinned to the same exact
-patch as `remote/pins.env` and the committed predictions. A new CUDA patch release
-therefore does not change the compiler selected by CI.
+## Changing the toolkit
 
-To upgrade CUDA intentionally, update `cuda-version` and the three CUDA package
-pins in `environment.yml`, together with `remote/pins.env`, then run `env/setup.sh`.
-Its provenance check will fail until you regenerate both prediction suites with
-the new compiler (`validation/blackwell/predict.sh` and
-`validation/blackwell_timing/build.sh sim`, followed by
-`validation/blackwell_timing/predict.py`). Review the prediction and lock-file
-diffs, then rerun `env/check.sh` and the full test suite.
+`environment.yml` pins `cuda-nvcc`, `cuda-cudart-dev` and `cuda-nvrtc` to one exact
+version (13.5.37), the one the committed predictions were made with. CI's `full` job
+builds its env from that file, so a new conda-forge release does not reach CI by itself,
+and `check.sh` stays an error for any other nvcc: a rental run built by another compiler
+must not be compared silently. Moving to another toolkit is one commit that does all of:
+
+1. edit the three pins in `environment.yml` (and `cuda-version` for another release), and
+   `CUDA_NVCC`, `CUDA_CUDART_DEV`, `CUDA_NVRTC` (and `CUDA_VERSION`) in `remote/pins.env`;
+2. `env/setup.sh`: updates the env and rewrites `conda-linux-64.lock`; its closing
+   `check.sh` fails at this point, because the predictions still name the old nvcc;
+3. `validation/regenerate_predictions.sh --book <clone>`: rewrites the predictions,
+   `provenance.json` and `meta.json` with the new nvcc; read the diff, since a change of
+   compiler may change a prediction;
+4. `conda run -n warplens env/check.sh`, then the tests `regenerate_predictions.sh --help`
+   names. `tests/test_rental_harness.py` fails while the four files disagree.

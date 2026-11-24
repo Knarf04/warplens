@@ -18,7 +18,6 @@ Triton, and for the book TIRx and a clone in WARPLENS_BOOK. CI's `full` job has 
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -47,25 +46,32 @@ def have(module: str) -> bool:
         return False
 
 
-def key_lines(text: str) -> list[str]:
-    """Check successful programs and shapes, not platform-dependent error text.
-
-    The book runner already asserts allclose on every output. Its reported max
-    error depends on the host NumPy/BLAS implementation and need not be identical
-    on CI's CPU. Keep the raw values in artifacts and compare.py's display.
-    """
-    lines = [compare.SECONDS.sub(")", line.strip()) for line in text.splitlines() if compare.E2E_KEY.search(line)]
-    return [re.sub(r"^(hgemm_v\d+ \d+x\d+x\d+: matches NumPy) \(max error [0-9.eE+-]+\)$",
-                   r"\1", line) for line in lines]
+key_lines = compare.key_lines  # the lines compare.py shows for an end-to-end program, without the times
 
 
-def test_book_prediction_comparison_keeps_success_and_shape():
+@pytest.mark.parametrize("error", ["0", "0.0156", "1.56e-2", "1.56E-02"])
+def test_book_comparison_normalizes_only_finite_success_distances(error):
     first = "hgemm_v6 128x128x256: matches NumPy (max error 0.0078, 1.23 s)"
-    another_cpu = "hgemm_v6 128x128x256: matches NumPy (max error 0.0156, 2.34 s)"
-    assert key_lines(first) == key_lines(another_cpu)
-    assert key_lines(first) != key_lines(another_cpu.replace("128x128x256", "128x128x64"))
-    assert key_lines(first) != key_lines(another_cpu.replace("matches NumPy", "FAILED"))
-    assert key_lines(first) != key_lines(another_cpu.replace("0.0156", "nan"))
+    another_cpu = f"hgemm_v6 128x128x256: matches NumPy (max error {error}, 2.34 s)"
+    assert compare.claims(key_lines(first)) == compare.claims(key_lines(another_cpu))
+    assert compare.claims(key_lines(first)) != compare.claims(key_lines(
+        another_cpu.replace("128x128x256", "128x128x64")))
+    assert compare.claims(key_lines(first)) != compare.claims(key_lines(
+        another_cpu.replace("matches NumPy", "FAILED")))
+
+
+@pytest.mark.parametrize("error", ["nan", "NaN", "inf", "-inf", "1e999", "-0.0156", "1.2.3"])
+def test_book_comparison_retains_invalid_or_nonfinite_distances(error):
+    line = f"hgemm_v6 128x128x256: matches NumPy (max error {error})"
+    assert compare.claims([line]) == [line]
+    assert compare.claims([line]) != ["hgemm_v6 128x128x256: matches NumPy"]
+
+
+def test_book_comparison_does_not_rewrite_other_program_results():
+    lines = ["tutorial_01: matches NumPy (max error 0.0156)",
+             "hgemm_v6 128x128x256: FAILED (max error 0.0156)",
+             "hgemm_v6 128x128x256: matches NumPy (max error 0.0156) extra diagnostic"]
+    assert compare.claims(lines) == lines
 
 
 @pytest.fixture(scope="module")
@@ -231,8 +237,41 @@ def test_the_book_is_predicted(run):
     pytest.importorskip("cuda.bindings")
     _, predicted, _, statuses = run
     assert statuses["e2e/book_hgemm"] == "ok"
+    # Names, sizes and "matches NumPy" are compared; the max error is not, because it is
+    # measured against this machine's NumPy (see compare.MAX_ERROR).
     now = key_lines((predicted / "e2e" / "book_hgemm.txt").read_text())
-    assert len(now) == 9 and now == key_lines((COMMITTED / "e2e" / "book_hgemm.txt").read_text())
+    assert len(now) == 9 and all(": matches NumPy (max error " in line for line in now), now
+    assert compare.claims(now) == compare.claims(key_lines((COMMITTED / "e2e" / "book_hgemm.txt").read_text()))
+
+
+def test_a_max_error_is_not_part_of_what_is_compared(tmp_path):
+    """CI's runner printed 0.0156 where the committed prediction says 0.0078, for the same
+    kernel output: the reference is NumPy's float32 product, and its BLAS sums in an order
+    that depends on the CPU and the thread count."""
+    committed = key_lines((COMMITTED / "e2e" / "book_hgemm.txt").read_text())
+    elsewhere = [line.replace("max error 0.0078", "max error 0.0156") for line in committed]
+    assert elsewhere != committed and compare.claims(elsewhere) == compare.claims(committed)
+    assert compare.claims(committed)[5] == "hgemm_v6 128x128x256: matches NumPy"
+    # What is a claim still counts: another size, a failure, a missing kernel.
+    assert compare.claims([committed[5].replace("128x128x256", "128x128x64")]) != compare.claims([committed[5]])
+    assert compare.claims(["hgemm_v6: FAILED: AssertionError: Not equal to tolerance"]) != compare.claims([committed[5]])
+    assert compare.claims(committed[:8]) != compare.claims(committed)
+    # Other programs' result lines are compared as they are.
+    tutorial = key_lines((COMMITTED / "e2e" / "cutlass_tutorials.tutorial_01.txt").read_text())
+    assert tutorial and compare.claims(tutorial) == tutorial
+
+    # compare.py on a rental's results: both sets of lines are shown, and the note says why
+    # they are not a difference.
+    results = tmp_path / "results"
+    (results / "e2e").mkdir(parents=True)
+    text = (COMMITTED / "e2e" / "book_hgemm.txt").read_text().replace("max error 0.0078", "max error 0.0156")
+    (results / "e2e" / "book_hgemm.stdout").write_text(text)
+    (results / "status.tsv").write_text("name\tstatus\ne2e/book_hgemm\tok\n")
+    shown = subprocess.run([sys.executable, str(SUITE / "compare.py"), str(results)],
+                           capture_output=True, text=True, timeout=120).stdout
+    assert "    GPU: hgemm_v6 128x128x256: matches NumPy (max error 0.0156)" in shown
+    assert "    sim: hgemm_v6 128x128x256: matches NumPy (max error 0.0078)" in shown
+    assert "the same claims: a max error is the distance to NumPy's result" in shown
 
 
 def test_without_a_clone_the_book_step_says_skipped(tmp_path):

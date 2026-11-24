@@ -904,8 +904,9 @@ def _record_memory_banks(w, ins, space, addrs, mask, size: int) -> None:
     if shared is not None and shared.any():
         w.smem_waves += w.cta.smem_report.record(ins, w.program.fn.name, offsets[shared], size,
                                                  pc=w.stack.top.pc)
-    if in_global is not None and in_global.any() and ins.opcode == "ld":
-        w.global_accesses += 1  # for the timing model: a load makes the warp wait, a store does not
+    if in_global is not None and in_global.any() and ins.opcode in ("ld", "atom", "red"):
+        # For the timing model: a load makes the warp wait, a store does not; an atom loads.
+        w.global_accesses += 1
 
 
 def _fault_lanes(e: MemoryFault, mask: np.ndarray) -> None:

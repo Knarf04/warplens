@@ -302,3 +302,58 @@ def test_lanes_rejoin_where_they_do_on_a_real_gpu(sim):
         if kinds:
             problems.append(f"{name}: findings {kinds}")
     assert not problems, problems
+
+
+def test_atomic_updates_match_real_gpu(sim):
+    """atom_golden.txt is bin/atom_golden on an RTX 3080 Ti: 4 CTAs of 128 threads update the
+    same global words and each CTA's shared words with every atomic function (see
+    atom_probe.cu). The file starts with the values the words had before."""
+    rows = [(label, [int(x, 16) for x in values]) for label, *values in
+            (line.split() for line in (AMPERE / "atom_golden.txt").read_text().splitlines())]
+    init = dict(rows[:4])
+    assert list(init) == ["init32", "init64", "initf", "initd"]
+    ctas, block, n32, n64, nf = 4, 128, len(init["init32"]), len(init["init64"]), len(init["initf"])
+    assert (n32, n64, nf) == (64, 24, 4) and len(rows) == 4 + 6 + 5 * ctas
+
+    def unsigned(dtype):
+        return np.dtype(f"u{np.dtype(dtype).itemsize}")
+
+    def device_array(values, dtype, extra=0):  # the words, their initial values again, `extra` zeros
+        words = np.array(values + values + [0] * extra, dtype=unsigned(dtype))
+        return sim.from_numpy(words.view(dtype))
+
+    g32 = device_array(init["init32"], "u4", extra=2 * ctas)
+    g64, gf, gd = (device_array(init[k], t) for k, t in (("init64", "u8"), ("initf", "f4"), ("initd", "f8")))
+    ticket = sim.empty(2 * ctas * block, "u32")
+    shared = [sim.empty(ctas * count, ty) for count, ty in ((n32, "u32"), (n64, "u64"), (nf, "f32"), (nf, "f64"))]
+    stats = sim.launch(AMPERE / "atom_probe.ptx", "atom_probe", grid=ctas, block=block,
+                       args=[g32, g64, gf, gd, ticket, *shared, 1])
+    assert not stats.findings  # in particular no smem-race between the warps' atomic updates
+
+    def words(array, start, count, exchanged=()):
+        """As atom_golden.cu prints them: an exchanged word is added to the sum of what the
+        exchanges returned, which follows it, because which thread came last is not fixed."""
+        values = array.numpy()[start:start + count].copy()
+        for at in exchanged:
+            values[at:at + 1] += values[at + 1:at + 2]  # as arrays: integers wrap around
+            values[at + 1] = 0
+        return values.view(unsigned(values.dtype)).tolist()
+
+    tickets = ticket.numpy().reshape(ctas, block, 2)
+    got = [("g32", words(g32, 0, n32, [14])), ("g32_cta", words(g32, 2 * n32, 2 * ctas)),
+           ("g64", words(g64, 0, n64, [9])), ("gf", words(gf, 0, nf, [1])), ("gd", words(gd, 0, nf)),
+           ("ticket_g", sorted(tickets[:, :, 0].ravel().tolist()))]
+    for b in range(ctas):
+        got += [("s32", words(shared[0], b * n32, n32, [14])), ("s64", words(shared[1], b * n64, n64, [9, 14])),
+                ("sf", words(shared[2], b * nf, nf, [1])), ("sd", words(shared[3], b * nf, nf)),
+                ("ticket_s", sorted(tickets[b, :, 1].tolist()))]
+    assert [(label, len(v)) for label, v in rows[4:]] == [(name, len(v)) for name, v in got]
+    wrong = [f"{label} word {k}: gpu {e:x}, sim {g:x}" for (label, expect), (_, values) in zip(rows[4:], got)
+             for k, (e, g) in enumerate(zip(expect, values)) if e != g]
+    assert not wrong, f"{len(wrong)} values differ: {wrong[:8]}"
+    # What the recording itself must say, whatever order the GPU ran the threads in.
+    recorded = dict(rows[4:10])
+    total = ctas * block
+    assert recorded["ticket_g"] == list(range(total))  # 512 increments, each a different old value
+    assert recorded["g32"][0] == total and recorded["g32"][13] == 11 + 3 * total  # counter, CAS loop
+    assert recorded["g32"][11] == total % 100 and recorded["g32"][12] == 100 - total % 100  # inc, dec

@@ -371,9 +371,10 @@ Reported here; 2 and 3 have since been fixed in the model, the rest have not.
     writing the kernels).
 11. `docs/m4.md` says `tcgen05.wait` has a fixed cost; the code charges
     `tmem_access_clk` to `ld` and `st` only (noted by the matrix's author, TIM-19).
-12. `atom` (what `atomicAdd` compiles to: `atom.relaxed.gpu.global.add.u32`) is rejected
-    by the simulator, so `clc_latency` cannot sum over the clusters that start; it reports
-    the first cluster's ticks and request count instead.
+12. `atom` (what `atomicAdd` compiles to: `atom.relaxed.gpu.global.add.u32`) was rejected
+    by the simulator when this was written, so `clc_latency` does not sum over the clusters
+    that start; it reports the first cluster's ticks and request count instead. The
+    simulator runs `atom` now (branch `work/atom`); the kernel was left as it is.
 13. `warplens run --timing` cannot set `active_sms`, so the simulator's
     `pipelined_gemm/*/ctas=8` rows are predicted as if all 148 SMs shared HBM; the
     "8 SMs share HBM" row of `docs/m4.md` cannot be produced from a program.

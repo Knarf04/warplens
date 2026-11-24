@@ -121,14 +121,19 @@ class Timeline:
         """Advance `warp.time` past the instruction it just executed."""
         cfg = self.timing.config
         slot = self.slots[warp.warp_id % 4]
-        _, t = slot.reserve(warp.time, self.clk, 1)
-        if warp.smem_waves:
-            _, t = self.smem.reserve(t, warp.smem_waves * cfg["smem_wavefront_clk"] * self.clk,
-                                     warp.smem_waves)
-            warp.smem_waves = 0
-        if warp.global_accesses:
-            t += cfg["global_access_latency_clk"] * self.clk
-            warp.global_accesses = 0
+        t = warp.time
+        waves, waits = warp.smem_waves, warp.global_accesses
+        warp.smem_waves = warp.global_accesses = 0
+        # An `atom` or `red` is charged as the load and then the store it stands for: an issue slot
+        # each, the wait of a global load, and for shared memory its wavefronts twice
+        # (units/atomics.py:_atomic records them doubled). Assumed, not measured.
+        parts = ((waves // 2, waits), (waves // 2, 0)) if ins.opcode in ("atom", "red") else ((waves, waits),)
+        for waves, waits in parts:
+            _, t = slot.reserve(t, self.clk, 1)
+            if waves:
+                _, t = self.smem.reserve(t, waves * cfg["smem_wavefront_clk"] * self.clk, waves)
+            if waits:
+                t += cfg["global_access_latency_clk"] * self.clk
         if ins.opcode == "tcgen05" and ins.mods[:1] in (("ld",), ("st",)):
             t += cfg["tmem_access_clk"] * self.clk
         warp.time = t

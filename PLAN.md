@@ -431,11 +431,11 @@ Found by this work in the simulator, and fixed since unless marked open:
   credit. The simulator's true and the 3080 Ti's false result are informational.
   Likewise, integer zero divisors now produce a diagnostic; f32 NaN payloads
   and integer divide-by-zero values remain explicitly nonportable.
-- Scalar atomic addition was missing. Fixed: `atom.add`/`red.add` for
-  s32/u32/u64/f32/f64, global and CTA-local shared memory, generic pointers,
-  and relaxed cta/gpu/sys scope. CUDA-compiled `atomicAdd` regressions run
-  without a GPU. Other atomic operations and stronger memory ordering are
-  explicitly unsupported; see `docs/atomics.md`.
+- Atomic instructions were missing. The CUDA-emitted add, exchange, CAS,
+  bitwise, min/max and increment/decrement operations now run, with
+  `red.add`, generic pointers and relaxed cta/gpu/sys scope. Review fixes
+  add natural-alignment validation, f32 global FTZ and shared access diagnostics;
+  see `docs/atomics.md`. Stronger memory ordering remains unsupported.
 - CI uses the exact compiler patch named by the predictions and remote pins.
   The rental tests isolate fake-root environments, respect optional Triton,
   and compare successful book kernels without requiring identical host-BLAS

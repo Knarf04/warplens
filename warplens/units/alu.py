@@ -415,7 +415,14 @@ def _div_rem(w, ins, mask):
     ty, _ = _type(ins, kinds="iu")
     d, a, b = _operands(ins, 3)
     x, y = w.read(a, ty), w.read(b, ty)
-    y = np.where(y == 0, 1, y).astype(x.dtype)  # division by zero is undefined in PTX
+    zero_lanes = np.flatnonzero(mask & (y == 0))
+    if len(zero_lanes):
+        w.cta.findings.add(
+            "integer-divide-by-zero",
+            f"{ins.opcode}.{ty} has a zero divisor; PTX leaves the result unspecified and "
+            "machine-specific. The model uses divisor 1 as a nonportable fallback",
+            w, ins, zero_lanes)
+    y = np.where(y == 0, 1, y).astype(x.dtype)
     q = x // y
     r = x - q * y
     if x.dtype.kind == "i":

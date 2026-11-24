@@ -221,19 +221,55 @@ class Warp:
         np.copyto(raw, bits, where=mask)
 
     # -- execution -----------------------------------------------------------
-    def step(self) -> None:
-        """Execute one instruction on the lanes of the top SIMT stack entry."""
-        stack = self.stack
-        top = stack.top
-        pc, mask = top.pc, top.mask
-        prog = self.program
-        ins = prog.instrs[pc]
+    @staticmethod
+    def _needs_warp_rendezvous(ins) -> bool:
+        # Named CTA barriers wait for every non-exited lane of the warp,
+        # even the .arrive forms. tcgen05 .sync.aligned operations also rendezvous
+        # before the handler checks their stricter full-32-lane requirement.
+        if ins.opcode in ("bar", "barrier"):
+            return not any(m in ins.mods for m in ("warp", "cluster")) and any(
+                m in ins.mods for m in ("sync", "arrive"))
+        return ins.opcode == "tcgen05" and "sync" in ins.mods and "aligned" in ins.mods
 
-        if ins.pred is None:
-            active = mask
-        else:
-            p = self.regs[ins.pred.name]
-            active = mask & ~p if ins.pred_negated else mask & p
+    def step(self):
+        """Execute one instruction and return the instruction actually issued.
+
+        A warp rendezvous can select a pending SIMT path first, so the issued
+        instruction need not be the one that was at stack.top on entry.
+        """
+        stack = self.stack
+        prog = self.program
+        while True:
+            top = stack.top
+            pc, mask = top.pc, top.mask
+            ins = prog.instrs[pc]
+            if ins.pred is None:
+                active = mask
+            else:
+                p = self.regs[ins.pred.name]
+                active = mask & ~p if ins.pred_negated else mask & p
+            if (active.any() and self._needs_warp_rendezvous(ins)
+                    and not np.array_equal(active, self.live_lanes())
+                    # A predicated subset of a tcgen05 .aligned instruction is
+                    # invalid; leave that diagnostic to its collective handler.
+                    and (ins.opcode != "tcgen05" or np.array_equal(active, mask))):
+                if (ins.opcode in ("bar", "barrier")
+                        and (ins.opcode == "bar" or "aligned" in ins.mods)
+                        and not np.array_equal(active, mask)):
+                    self.cta.findings.add(
+                        "barrier-in-divergent-code",
+                        f"{ins.name} has a guard predicate that differs between running lanes; "
+                        "an aligned barrier requires identical conditional participation",
+                        self, ins, np.flatnonzero(active))
+                try:
+                    stack.rendezvous_at(pc, active)
+                except UnsupportedError as error:
+                    raise UnsupportedError(f"{ins.name}: {error}") from None
+                continue
+            # Once every remaining lane has arrived, ordinary divergence after
+            # this instruction may reuse the entry as a static reconvergence point.
+            top.rendezvous = False
+            break
 
         self.instructions += 1
         self.lane_instructions += int(np.count_nonzero(active))
@@ -263,6 +299,7 @@ class Warp:
             if self.blocked is None or not self.blocked.retry:
                 top.pc = pc + 1
         stack.settle()
+        return ins
 
     def _where(self, ins, active: np.ndarray, err: ExecutionError) -> str:
         lanes = err.lanes if isinstance(err, MemoryFault) and err.lanes else \

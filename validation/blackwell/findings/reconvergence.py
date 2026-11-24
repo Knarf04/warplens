@@ -1,32 +1,29 @@
-"""A simulator bug found while preparing the rental: lanes of one warp that reach the same
-instruction by different paths are not always brought together, and `bar.sync` then lets
-some of them through before the others arrive.
+"""Regression reproducer for warp rendezvous beyond a static reconvergence point.
 
     PYTHONPATH=<repo> python validation/blackwell/findings/reconvergence.py
 
-Each kernel is `if (tid == 0) shared = 7;` followed by code every lane reaches, in four
-layouts of the same control flow. All 32 lanes must end up reading 7 (with the barrier that
-is guaranteed; without it a GPU reconverges at the join all the same). On 2026-11-23 the
-simulator gives 32 of 32 for A and B and **1 of 32 for C and D, with or without bar.sync**:
-lanes 1 to 31 read the word before lane 0 has written it. Nothing is reported.
+Each kernel is `if (tid == 0) shared = 7;` followed by code every lane reaches,
+using four layouts of the same control flow. With bar.sync all 32 lanes must
+read 7. Without synchronization, PTX does not guarantee this communication;
+the simulator's deterministic scheduling order is not a hardware prediction.
 
 A  the join is the branch target (how nvcc 13.5 lays this out)
-B  the then-side jumps to the join; the other lanes fall into it from a block of their own
-C  as B, and the other lanes' block ends in a conditional branch that none of them takes.
-   nvcc 13.0 produces this from `if (tid == 0) {...} if (warp == 0) tmem_alloc(...)`: it
-   merges the two tests, lane 0 jumps to the allocation and lanes 1 to 31 fall into it. The
-   simulator then refuses the allocation ("requires all 32 lanes of the warp to execute
-   together; only 31 participate")
-D  the other lanes' block is at the END of the function and branches BACK to the join.
-   nvcc 13.0 produced this in cluster/clc_per_thread.cu, where lanes 1 to 3 then issued
-   their request before lane 0 had initialized the mbarrier, behind a __syncthreads()
+B  the then-side jumps to the join; other lanes fall into it from their own block
+C  as B, but that block ends in a conditional branch no lane actually takes
+D  the other lanes' block is at the end and branches backward to the join
 
-Consequence for the rental: with a toolkit other than the one the predictions were made
-with, a probe's code can take one of these shapes and the simulator's prediction for it is
-wrong or missing, although the program is correct. The probes now put a __syncthreads()
-between the two tests, which keeps a compiler from merging them; with that, nvcc 13.0.88 and
-nvcc 13.5.37 give identical predictions for all 98 predicted runs. The bug itself is not
-fixed here. tests/test_rental_harness.py has the four shapes as an expected failure.
+Before the rental-gap fix, C and D produced only 1 correct lane even with
+bar.sync: their static immediate postdominator lies beyond the barrier, and
+part of the warp was incorrectly counted as a whole-warp arrival. This also
+rejected tcgen05.alloc.sync.aligned in compiler-merged control flow.
+
+The executor now collects pending paths at named CTA barriers and tcgen05
+.sync.aligned operations before executing them. All four synchronized cases
+produce 32 correct lanes. Ordinary unsynchronized instructions keep the
+static reconvergence schedule; C and D without a barrier still produce 1.
+Tests cover forward/backward joins, multiple warps, bar.arrive, exited lanes,
+repeated phases, and timed execution. Divergent rendezvous at different
+instruction addresses or across recursive activations remains unsupported.
 """
 import numpy as np
 import warplens
@@ -68,7 +65,7 @@ SHAPES = {
 
 
 def lanes_reading_seven(shape: str, barrier: bool) -> int:
-    """How many of the 32 lanes read what lane 0 wrote (32 is right)."""
+    """How many lanes read lane 0's value (32 is required with a barrier)."""
     sim = warplens.Device("B200")
     out = sim.from_numpy(np.full(32, 99, dtype=np.uint32))
     module = warplens.parse_ptx(HEADER + SHAPES[shape].replace("BARRIER", "bar.sync 0;" if barrier else ""),

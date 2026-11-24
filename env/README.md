@@ -18,5 +18,14 @@ env/setup.sh --locked    # recreate exactly from the lock file
 conda activate warplens  # or: conda run -n warplens <command>
 ```
 
-To change the CUDA version, edit the `cuda-version` pin in `environment.yml`
-and rerun `env/setup.sh`.
+CI uses `environment.yml`, whose compiler packages are pinned to the same exact
+patch as `remote/pins.env` and the committed predictions. A new CUDA patch release
+therefore does not change the compiler selected by CI.
+
+To upgrade CUDA intentionally, update `cuda-version` and the three CUDA package
+pins in `environment.yml`, together with `remote/pins.env`, then run `env/setup.sh`.
+Its provenance check will fail until you regenerate both prediction suites with
+the new compiler (`validation/blackwell/predict.sh` and
+`validation/blackwell_timing/build.sh sim`, followed by
+`validation/blackwell_timing/predict.py`). Review the prediction and lock-file
+diffs, then rerun `env/check.sh` and the full test suite.

@@ -59,6 +59,9 @@ class SharedMemory:
         self._write_epoch = np.zeros(size, dtype=np.int32)
         self._reader = np.full(size, -1, dtype=np.int32)
         self._read_epoch = np.zeros(size, dtype=np.int32)
+        # Atomics must not erase an earlier ordinary access in the same epoch.
+        self._ordinary_writer = np.full(size, -1, dtype=np.int32)
+        self._ordinary_write_epoch = np.zeros(size, dtype=np.int32)
         # TMA (async proxy) shadow state; ids refer to Cta.async_ops.
         self.async_active = False  # stays False for kernels that never use TMA
         self.async_writer = np.zeros(size, dtype=np.int32)  # TMA load that last targeted the byte
@@ -74,7 +77,7 @@ class SharedMemory:
                 f"the CTA's {self.size} bytes of shared memory", bad, offsets[bad])
         return offsets.astype(np.intp)[:, None] + np.arange(size, dtype=np.intp)
 
-    def read(self, offsets: np.ndarray, dtype: np.dtype, warp: int):
+    def read(self, offsets: np.ndarray, dtype: np.dtype, warp: int, *, atomic: bool = False):
         """Returns (values, accesses that touched a never-written byte, accesses
         that race with another warp's write)."""
         idx = self._index(offsets, dtype.itemsize, "read")
@@ -82,19 +85,32 @@ class SharedMemory:
         writer = self._writer[idx]
         unwritten = np.flatnonzero((writer == -1).any(axis=1))
         racy = (writer >= 0) & (writer != warp) & (self._write_epoch[idx] == self.epoch)
-        self._reader[idx] = warp
-        self._read_epoch[idx] = self.epoch
+        if atomic:
+            ordinary = self._ordinary_writer[idx]
+            racy = (ordinary >= 0) & (ordinary != warp) & (self._ordinary_write_epoch[idx] == self.epoch)
+        else:
+            # An atomic read is immediately followed by its atomic write. Keep
+            # earlier ordinary readers so that the write can still diagnose them.
+            self._reader[idx] = warp
+            self._read_epoch[idx] = self.epoch
         return values, unwritten, np.flatnonzero(racy.any(axis=1))
 
-    def write(self, offsets: np.ndarray, values: np.ndarray, warp: int) -> np.ndarray:
+    def write(self, offsets: np.ndarray, values: np.ndarray, warp: int, *, atomic: bool = False) -> np.ndarray:
         """Returns the accesses that race with another warp's read or write."""
         size = values.dtype.itemsize
         idx = self._index(offsets, size, "write")
         writer, reader = self._writer[idx], self._reader[idx]
         racy = (writer >= 0) & (writer != warp) & (self._write_epoch[idx] == self.epoch)
-        racy |= (reader >= 0) & (reader != warp) & (self._read_epoch[idx] == self.epoch)
+        if atomic:
+            ordinary = self._ordinary_writer[idx]
+            racy = (ordinary >= 0) & (ordinary != warp) & (self._ordinary_write_epoch[idx] == self.epoch)
+        read_racy = (reader >= 0) & (reader != warp) & (self._read_epoch[idx] == self.epoch)
+        racy |= read_racy
         self.data[idx] = np.ascontiguousarray(values).view(np.uint8).reshape(len(offsets), size)
         self._writer[idx] = warp
+        if not atomic:
+            self._ordinary_writer[idx] = warp
+            self._ordinary_write_epoch[idx] = self.epoch
         self._write_epoch[idx] = self.epoch
         self.unfenced[idx] = True
         return np.flatnonzero(racy.any(axis=1))
@@ -119,8 +135,10 @@ class SharedMemory:
         # Non-bulk cp.async is a generic-proxy write, unlike a TMA load. A later
         # bulk copy/MMA still needs fence.proxy.async before consuming these bytes.
         self._writer[idx] = ASYNC_PROXY if writer_warp is None else writer_warp
+        self._ordinary_writer[idx] = self._writer[idx]
         if writer_warp is not None:
             self._write_epoch[idx] = self.epoch
+            self._ordinary_write_epoch[idx] = self.epoch
         self.unfenced[idx] = writer_warp is not None
 
     def fence_async(self, warp: int) -> None:

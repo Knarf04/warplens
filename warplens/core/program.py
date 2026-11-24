@@ -6,6 +6,7 @@ from ..errors import UnsupportedError
 from ..frontend.cfg import reconvergence_points
 from ..frontend.inline import inline_calls
 from ..frontend.ir import Function, Module
+from ..units import atomics as _atomics  # noqa: F401  (register atomic handlers)
 from ..units import barrier as _barrier  # noqa: F401  (these imports register handlers)
 from ..units import call as _call  # noqa: F401
 from ..units import clc as _clc  # noqa: F401

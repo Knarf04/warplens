@@ -781,11 +781,13 @@ Every kind, by area:
 
 | Kind | Meaning |
 | --- | --- |
+| **Integer arithmetic** | |
+| `integer-divide-by-zero` | an active integer `div` or `rem` lane has a zero divisor; its deterministic fallback is not a hardware prediction |
 | **Shared memory** | |
 | `smem-race` | two warps touched the same byte, at least one writing, with no barrier completing in between |
 | `smem-uninitialized-read` | a load, a TMA store or an MMA read shared memory this CTA never wrote |
 | **Barriers and shuffles** | |
-| `barrier-in-divergent-code` | a barrier reached by only some of a warp's running lanes |
+| `barrier-in-divergent-code` | an aligned CTA barrier has a divergent guard predicate, or a cluster barrier has partial warp participation |
 | `shfl-inactive-source` | a shuffle read a lane that was not executing it or was outside the member mask |
 | `shfl-membermask-mismatch` | a caller is absent from its own mask, or a named member is not executing with the same mask |
 | `warp-sync-membermask-mismatch` | the same, for `bar.warp.sync` (`__syncwarp()`): lanes on separate divergent paths do not wait for each other |
@@ -793,6 +795,7 @@ Every kind, by area:
 | `mbarrier-tx-mismatch` | completion bytes not balanced by `expect_tx` when the kernel returned or deadlocked |
 | `mbarrier-over-arrival` | more arrivals than the phase needed |
 | `mbarrier-init-race` | an mbarrier used by another warp with no barrier since its `init` |
+| `mbarrier-invalid-token` | a state token is outside the current or immediately preceding phase; it grants no synchronization credit |
 | **TMA and `cp.async`** | |
 | `tma-load-unsynchronized` | shared memory that a TMA load writes was read, written, stored or fed to an MMA without waiting on the load's mbarrier |
 | `tma-store-missing-fence` | a TMA store of bytes written by ordinary stores with no `fence.proxy.async` in between |

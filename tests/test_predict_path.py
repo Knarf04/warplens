@@ -18,6 +18,7 @@ Triton, and for the book TIRx and a clone in WARPLENS_BOOK. CI's `full` job has 
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -47,8 +48,24 @@ def have(module: str) -> bool:
 
 
 def key_lines(text: str) -> list[str]:
-    """The lines compare.py shows for an end-to-end program, without the times in them."""
-    return [compare.SECONDS.sub(")", line.strip()) for line in text.splitlines() if compare.E2E_KEY.search(line)]
+    """Check successful programs and shapes, not platform-dependent error text.
+
+    The book runner already asserts allclose on every output. Its reported max
+    error depends on the host NumPy/BLAS implementation and need not be identical
+    on CI's CPU. Keep the raw values in artifacts and compare.py's display.
+    """
+    lines = [compare.SECONDS.sub(")", line.strip()) for line in text.splitlines() if compare.E2E_KEY.search(line)]
+    return [re.sub(r"^(hgemm_v\d+ \d+x\d+x\d+: matches NumPy) \(max error [0-9.eE+-]+\)$",
+                   r"\1", line) for line in lines]
+
+
+def test_book_prediction_comparison_keeps_success_and_shape():
+    first = "hgemm_v6 128x128x256: matches NumPy (max error 0.0078, 1.23 s)"
+    another_cpu = "hgemm_v6 128x128x256: matches NumPy (max error 0.0156, 2.34 s)"
+    assert key_lines(first) == key_lines(another_cpu)
+    assert key_lines(first) != key_lines(another_cpu.replace("128x128x256", "128x128x64"))
+    assert key_lines(first) != key_lines(another_cpu.replace("matches NumPy", "FAILED"))
+    assert key_lines(first) != key_lines(another_cpu.replace("0.0156", "nan"))
 
 
 @pytest.fixture(scope="module")

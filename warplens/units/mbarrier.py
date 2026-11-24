@@ -107,6 +107,17 @@ def _mbarrier(w, ins, mask):
         for l, bar in bars(ops[1]):
             done = (bar.phase & 1) != (int(arg[l]) & 1) if parity else bar.phase != int(arg[l])
             result[l] = done
+            if not parity and int(arg[l]) not in (bar.phase, bar.phase - 1):
+                # PTX state tokens are valid only in their own phase and the next.
+                # Keep the model's deterministic predicate for exploratory kernels,
+                # but never acquire a different phase's completion knowledge.
+                cta.findings.add(
+                    "mbarrier-invalid-token",
+                    f"mbarrier token for phase {int(arg[l])} used in phase {bar.phase}; "
+                    "only the current or immediately preceding phase is valid. The "
+                    "predicate is a nonportable model fallback and grants no synchronization",
+                    w, ins, [l])
+                continue
             if done:
                 if "relaxed" not in ins.mods:
                     w.seen |= bar.completed_knowledge

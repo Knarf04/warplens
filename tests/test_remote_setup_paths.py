@@ -60,7 +60,10 @@ def setup(bare: Path, *args: str, root: bool = False, **env: str):
             pytest.skip("fakeroot is not installed")
         # fakeroot itself needs the real PATH to start; the script gets the bare one.
         command = [fakeroot, "env", *(f"{k}={v}" for k, v in full.items()), *command]
-        full = {**os.environ, **full, "PATH": os.environ["PATH"]}
+        # Give fakeroot a real PATH to start, but keep the simulated machine's
+        # environment isolated just as in the non-root case. GitHub runners set
+        # DEBIAN_FRONTEND, which must not leak into this bare-image fixture.
+        full = {**full, "PATH": os.environ["PATH"]}
     return subprocess.run(command, capture_output=True, text=True, env=full, timeout=120)
 
 
@@ -100,7 +103,9 @@ def test_root_installs_a_download_tool_and_the_checksum_is_verified(bare):
     assert not (bare / "remote" / "bin" / "micromamba").exists()      # the bad download was not installed
 
 
-def test_root_whose_apt_fails_gets_the_same_plain_message(bare):
+@pytest.mark.parametrize("frontend", ["noninteractive", "dialog"])
+def test_root_whose_apt_fails_gets_the_same_plain_message(bare, monkeypatch, frontend):
+    monkeypatch.setenv("DEBIAN_FRONTEND", frontend)
     fake_apt(bare, "exit 100\n")
     done = setup(bare, root=True)
     assert done.returncode == 1

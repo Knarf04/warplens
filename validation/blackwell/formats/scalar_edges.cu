@@ -12,7 +12,7 @@
 //   div, rem, mul.hi (s32, u32, s64, u64); shl (b32, b64); shr (s32, u32, s64, u64)
 //                          the limits of each type; shift amounts 0, 1, 31, 32, 33, 63, 64,
 //                          65, 2^31 and 2^32 - 1
-// Division and remainder by zero are executed too; PTX leaves their results undefined, so
+// Division and remainder by zero are executed too; PTX leaves their results unspecified and machine-specific, so
 // they go on "info:" lines and are never compared.
 //
 // Claims tested (docs/numerics.md; matrix rows NUM-11 and NUM-12):

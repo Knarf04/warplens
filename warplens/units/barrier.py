@@ -89,12 +89,6 @@ def _bar(w, ins, mask):
             raise ExecutionError("bar.arrive requires a non-zero barrier thread count")
         count = None  # zero encodes the all-CTA form, just like an omitted count
 
-    live = w.live_lanes()
-    if not np.array_equal(live, mask):
-        w.cta.findings.add(
-            "barrier-in-divergent-code",
-            f"{ins.name} reached by only {int(mask.sum())} of the warp's {int(live.sum())} running "
-            "lanes. CUDA only defines a barrier in conditional code when every thread takes the "
-            "same path; here the whole warp is counted as arrived",
-            w, ins, np.flatnonzero(mask))
+    # Warp.step has collected every non-exited lane before counting this warp.
+    # Reaching this instruction through different paths is not itself a violation.
     w.cta.arrive(barrier, w, ins, count, wait)

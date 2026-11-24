@@ -420,11 +420,25 @@ Found by this work in the simulator, and fixed since unless marked open:
 - The device query answered 148 SMs for a B300 and `warplens.numerics` encoded
   an E5M2 NaN as 0x7d where the `cvt` instructions give 0x7f. Fixed: 160 SMs,
   and 0x7f in both.
-- Open: lanes pass `bar.sync` before lane 0 arrives in two control-flow
-  layouts nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`);
-  a stale mbarrier token tests true where the 3080 Ti gives false; `atom` is
-  not implemented (`validation/blackwell/README.md`, "Found while writing the
-  probes").
+- Lanes passed `bar.sync` before lane 0 arrived in two control-flow layouts
+  nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`). Fixed:
+  warp-synchronizing instructions rendezvous pending SIMT paths before
+  counting the warp as arrived; unsynchronized code has no implicit ordering
+  guarantee.
+- State tokens older than the immediately preceding mbarrier phase are invalid
+  PTX use. They now report `mbarrier-invalid-token` and grant no synchronization
+  credit. The simulator's true and the 3080 Ti's false result are informational.
+  Likewise, integer zero divisors now produce a diagnostic; f32 NaN payloads
+  and integer divide-by-zero values remain explicitly nonportable.
+- Scalar atomic addition was missing. Fixed: `atom.add`/`red.add` for
+  s32/u32/u64/f32/f64, global and CTA-local shared memory, generic pointers,
+  and relaxed cta/gpu/sys scope. CUDA-compiled `atomicAdd` regressions run
+  without a GPU. Other atomic operations and stronger memory ordering are
+  explicitly unsupported; see `docs/atomics.md`.
+- CI uses the exact compiler patch named by the predictions and remote pins.
+  The rental tests isolate fake-root environments, respect optional Triton,
+  and compare successful book kernels without requiring identical host-BLAS
+  error magnitudes. The runners' numerical tolerance checks remain in place.
 - Documents that contradict the code are listed in
   `docs/validation-matrix.md`, "Discrepancies found".
 
@@ -439,5 +453,5 @@ Found by this work in the simulator, and fixed since unless marked open:
 
 - Done: a tutorial notebook that follows the book's GEMM chapters
   (`notebooks/book_tour.ipynb`) and a single user guide (`docs/guide.md`).
-  Jupyter is not in the env or in the package's extras.
+  The `jupyter` extra installs the notebook tools and TIRx dependencies.
 - Reserve the PyPI name.

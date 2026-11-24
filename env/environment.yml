@@ -12,9 +12,11 @@ dependencies:
   - numpy
   - pyyaml
   - pytest
-  # CUDA toolchain (compile-only). cuda-version pins every cuda-* package.
+  # Compile-only. cuda-version selects the release, not its compiler patch.
+  # Keep these exact builds aligned with remote/pins.env and both prediction
+  # provenance files; a new patch can emit different PTX.
   - cuda-version=13.5
-  - cuda-nvcc
-  - cuda-cudart-dev
+  - cuda-nvcc=13.5.37
+  - cuda-cudart-dev=13.5.37
   # NVRTC that knows sm_100a: TIRx compiles its kernels with it, in process.
-  - cuda-nvrtc
+  - cuda-nvrtc=13.5.37

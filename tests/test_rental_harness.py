@@ -247,6 +247,19 @@ def test_the_predictions_name_the_pinned_compiler():
     assert json.loads((TIMING / "predicted" / "meta.json").read_text())["nvcc_version"] == pinned
 
 
+def test_ci_and_remote_setup_select_the_same_compiler_patch():
+    """A cuda-version=major.minor pin alone floats to a new patch and makes CI
+    reject its own committed predictions before running any tests."""
+    import yaml
+
+    environment = yaml.safe_load((ROOT / "env" / "environment.yml").read_text())
+    dependencies = dict(item.split("=", 1) for item in environment["dependencies"] if "=" in item)
+    remote = pins()
+    for package, key in (("cuda-version", "CUDA_VERSION"), ("cuda-nvcc", "CUDA_NVCC"),
+                         ("cuda-cudart-dev", "CUDA_CUDART_DEV"), ("cuda-nvrtc", "CUDA_NVRTC")):
+        assert dependencies.get(package) == remote[key], f"{package} must pin the prediction compiler"
+
+
 def test_a_fallback_toolkit_is_flagged_everywhere(suite):
     for directory in ("bin", "bin-native"):
         (suite / directory / "toolkit.txt").write_text("nvcc_version=13.0.48\n")
@@ -372,9 +385,10 @@ def test_timing_runner_tells_a_failed_launch_from_a_failed_benchmark(tmp_path):
 def test_no_thread_test_runs_into_a_warp_wide_allocation():
     """`if (tid == 0) {...}` directly followed by `if (warp == 0) tmem_alloc(...)` lets a
     compiler merge the two tests, so that lane 0 reaches the allocation by a path of its own
-    (nvcc 13.0 does; nvcc 13.5 does not). The simulator mishandles that shape
-    (validation/blackwell/findings/reconvergence.py), which made 15 predictions depend on
-    the compiler. A __syncthreads() between the two keeps them apart."""
+    (nvcc 13.0 does; nvcc 13.5 does not). This once made 15 predictions depend on
+    the compiler; the rendezvous regression now covers that shape directly.
+    Keep the probe's explicit synchronization between initialization and allocation
+    so its memory-ordering intent remains clear."""
     alloc = re.compile(r"tmem_alloc\(|tcgen05\.alloc")
     thread_test = re.compile(r"if \((tid|threadIdx\.x) == 0\)")
     barrier = re.compile(r"__syncthreads\(\)|cluster_sync\(\)")
@@ -410,8 +424,6 @@ def test_lanes_reconverge_in_the_layouts_nvcc_13_5_emits(shape):
     assert reconvergence().lanes_reading_seven(shape, barrier=False) == 32
 
 
-@pytest.mark.xfail(reason="simulator bug, reported and not fixed on this branch: in these layouts lanes 1 to 31 pass "
-                          "bar.sync before lane 0 arrives (validation/blackwell/findings/reconvergence.py)", strict=False)
 @pytest.mark.parametrize("shape", ["C", "D"])
 def test_lanes_reconverge_in_the_layouts_nvcc_13_0_emits(shape):
     assert reconvergence().lanes_reading_seven(shape, barrier=True) == 32

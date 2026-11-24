@@ -302,9 +302,8 @@ as the claim in every case.
    `ld` and `st` (`warplens/timing/model.py:Timeline.charge`); a wait costs
    the one issue clock every instruction costs. TIM-19 states the code's
    behaviour.
-8. **`PLAN.md` section 11, "Solid"** says the simulator runs "two of the TIRx
-   GEMM kernels" of the book. Step A3 of the same section and `docs/m6.md`
-   say all nine run (`examples/08_book/run.py`).
+8. *(Resolved: `PLAN.md` said two of the book's GEMM kernels run; it now
+   says all nine.)*
 9. **Stale "Not implemented" lists.** `docs/m2.md` lists `.multicast::cluster`
    and `docs/m3.md` lists `cta_group::2`, multicast commit and MN-major
    operands as not implemented. Later milestones added them. These write-ups
@@ -312,10 +311,8 @@ as the claim in every case.
 10. **`docs/m3.md`, Design:** "reads A (M x K) and B (N x K) from shared
     memory in K-major layout". MN-major half precision has been supported
     since M6 (`docs/coverage.md`, `docs/m6.md`).
-11. **`PLAN.md` step A4** still says `clusterlaunchcontrol` "is the one planned
-    instruction family not implemented". It is implemented
-    (`warplens/units/clc.py:_clusterlaunchcontrol`, `docs/clc.md`). Nothing in
-    `docs/clc.md` was found to contradict the code.
+11. *(Resolved: `PLAN.md` step A4 now records `clusterlaunchcontrol` as
+    implemented.)* Nothing in `docs/clc.md` was found to contradict the code.
 
 ## Claims not turned into a probe
 

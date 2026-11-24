@@ -643,6 +643,31 @@ Measured on the development machine, into throwaway directories that were remove
     passed. With the system gdb 15.1 and with conda-forge's gdb 18.1.
   - `shellcheck` 0.11 on the five scripts, `predict_toolkit.sh` included: clean.
 
+Later on 2026-11-24, `run.sh --keep-going` with `PREFLIGHT_EXPECT_CAP=8.6` from an empty
+home, on the tree with the pre-rental gap work merged (118 probe runs), 32 min in all,
+exit status 1 as it must be on Ampere:
+
+- `setup.sh` took 208 s and fell back to nvcc 13.0.88 for this driver, so this was the
+  first whole run of the fallback path: `predict-toolkit` ran by itself before the GPU
+  stages (350 s) and wrote `out/predicted-toolkit/` with `DIFFERENCES.txt` into the archive.
+- With nvcc 13.0.88 two probe predictions differ and thirteen timing files do.
+  `formats/e8m0_ties` and `formats/special_inputs` end with `call.uni __assertfail`:
+  13.0's `__nv_cvt_float_to_e8m0` is an assertion in device code, so with a 13.0 toolkit
+  the UE8M0 encodings of rows NUM-04 and NUM-06 cannot be measured on the GPU either. A
+  13.0 driver on the day costs those lines; nothing else among the probes.
+- The self-test (2926 passed, 14 failed, 4 errors, 17 min) failed only where the compiler
+  or the dry run's own variable decides: the installed-compiler test, the two probes above,
+  four `tests/test_clc.py::test_the_kernels_assemble`, four `tests/test_guide.py` blocks
+  (instruction counts), four `tests/test_atomics.py::test_compiled_cuda_atomic_add_runs_without_a_gpu`
+  (nvcc 13.0 spells `atom` otherwise than the test expects), and three preflight tests that
+  read `PREFLIGHT_EXPECT_CAP`. With the pinned 13.5 env the same tree passes whole
+  (2969 passed, 8 skipped).
+- The probe run: 86 probes failed to launch and 28 had a host error, as on any GPU that is
+  not a B200; the rows without a probe ran (`ue4m3_ptxas` ok, both driver traces ok, RT-11
+  skipped for want of `sm_100`); the stage and `run.sh` reported the failure.
+- In the simulator, `e2e/run_e2e.py --mode sim` exits 0 with all eight steps `ok`, and
+  exits 1 with `e2e/book_hgemm` as `exit 1` when the book's runner is made to fail.
+
 Not tried, because there was no way to here:
 
 - Anything on a B200: every PASS path of the `tcgen05`, tensor-map, TMA and
@@ -670,7 +695,6 @@ Not tried, because there was no way to here:
   through `setup.sh`; conda-forge's gdb was installed by hand with the same package
   spec and ran the tracer.
 - The book's fetch commands of section 3 on this machine (they are CI's).
-- `predict_toolkit.sh` with a toolkit between 13.0 and 13.4: none is installed here
-  (section 2).
+- `predict_toolkit.sh` with a toolkit between 13.1 and 13.4 (13.0.88 was run, above).
 - A driver newer than the pinned toolkit, and a 12.x driver (only a 12.8
   *toolkit* on a 13.0 driver).

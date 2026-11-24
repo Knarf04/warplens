@@ -10,7 +10,7 @@ import numpy as np
 from ..check.report import Finding, Findings
 from ..core.cluster import Cluster
 from ..core.cta import Cta
-from ..core.engine import Engine
+from ..core.engine import Engine, Schedule
 from ..core.launch_queue import LaunchQueue
 from ..core.program import Program
 from ..core.warp import WARP_SIZE, Warp
@@ -128,7 +128,14 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, bytes]:
 
 def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace=None,
                max_steps: int | None = None, async_delay: int = 4, timing=None,
-               cluster=None, clc_limit: int | None = None) -> LaunchStats:
+               cluster=None, clc_limit: int | None = None, schedule=None) -> LaunchStats:
+    if timing is not None:
+        # A timed launch orders its events by the timing model.
+        if schedule is not None and Schedule.parse(schedule) != Schedule():
+            raise LaunchError("schedule applies to untimed launches; a timed launch is ordered "
+                              "by the timing model")
+    else:
+        schedule = Schedule.from_environment() if schedule is None else Schedule.parse(schedule)
     if clc_limit is not None and (not isinstance(clc_limit, (int, np.integer))
                                   or isinstance(clc_limit, (bool, np.bool_)) or clc_limit < 0):
         raise LaunchError(f"clc_limit must be None or a non-negative integer, got {clc_limit!r}")
@@ -178,7 +185,7 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                           CUDA_INVALID_CLUSTER_SIZE)
     output: list[str] = []
     if timing is None:
-        engine = Engine(max_steps)
+        engine = Engine(max_steps, schedule)
     else:
         from ..timing.engine import TimedEngine
         engine = TimedEngine(max_steps)

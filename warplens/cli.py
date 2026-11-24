@@ -442,6 +442,24 @@ def check_timing(runner, args) -> None:
                      f"of timing config `{config.name}`, got {args.active_sms}")
 
 
+def check_schedule(runner, args) -> dict:
+    """The environment that makes --schedule the schedule of every launch of this run: the
+    launches served here, and those of a Triton driver in the program's own process, read it
+    from there."""
+    if args.schedule is None:
+        return {}
+    from .core.engine import SCHEDULE_VARIABLE, Schedule
+    from .errors import LaunchError
+    try:
+        schedule = Schedule.parse(args.schedule)
+    except LaunchError as error:
+        runner.error(f"argument --schedule: {error}")
+    if args.timing or args.timing_config is not None or args.active_sms is not None:
+        runner.error("argument --schedule: not allowed with the timing model, which orders a "
+                     "launch itself")
+    return {SCHEDULE_VARIABLE: str(schedule)}
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="warplens", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -463,6 +481,11 @@ def main(argv=None) -> int:
                         help="cluster launch control: how many cancellations each cluster that starts is "
                              "granted before its requests fail; 0 makes every cluster start by itself. "
                              "Default: every request is granted while clusters are left")
+    runner.add_argument("--schedule", metavar="SPEC",
+                        help="the order in which runnable warps are stepped in untimed launches: "
+                             "round-robin (the default), a seed N for a pseudo-random order, adversarial, "
+                             "or adversarial:N. A kernel whose results change with it depends on an order "
+                             "that nothing guarantees. Sets WARPLENS_SCHEDULE for the run")
     runner.add_argument("--quiet", action="store_true", help="do not print the summary")
     runner.add_argument("program", help="a compiled CUDA executable, or a Python script (a .py file), "
                                         "which is run by this Python interpreter")
@@ -470,16 +493,24 @@ def main(argv=None) -> int:
     runner.set_defaults(handler=run)
     args = parser.parse_args(argv)
     check_timing(runner, args)
+    scheduled = check_schedule(runner, args)
     def terminate(signum, _frame):
         raise SystemExit(128 + signum)
 
     previous = signal.signal(signal.SIGTERM, terminate)
+    before = {name: os.environ.get(name) for name in scheduled}
+    os.environ.update(scheduled)
     try:
         return args.handler(args)
     except KeyboardInterrupt:
         return 130
     finally:
         signal.signal(signal.SIGTERM, previous)
+        for name, value in before.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
 
 
 if __name__ == "__main__":

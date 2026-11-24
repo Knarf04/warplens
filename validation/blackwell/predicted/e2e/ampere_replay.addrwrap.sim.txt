@@ -1,0 +1,8 @@
+status: ok
+warplens: 6 kernel launch(es) simulated on B200, 0 finding(s)
+  addrwrap_cxx_load: 1 CTA(s), 30 warp-instructions
+  addrwrap_cxx_store: 1 CTA(s), 30 warp-instructions
+  addrwrap_ptx_load: 1 CTA(s), 38 warp-instructions
+  addrwrap_ptx_store: 1 CTA(s), 42 warp-instructions
+  addrwrap_ptx_far: 1 CTA(s), 40 warp-instructions
+  addrwrap_ptx_back: 1 CTA(s), 40 warp-instructions

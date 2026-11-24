@@ -18,6 +18,10 @@
 //   ampere_replay callforms     structs by value, calls through function pointers, recursion
 //                               (RT-02)
 //   ampere_replay barrier_exit  __syncthreads() with exited threads, cases 0 and 1
+//   ampere_replay addrwrap      [reg+offset] on shared memory with a 32-bit register that
+//                               has wrapped below zero: a reversed index (`fixed[63 - tid]`)
+//                               as the compiler writes it, which is that form under nvcc
+//                               13.5 and so in this build, and the form as inline PTX
 //   ampere_replay vote          vote.sync all/any/uni/ballot in full and partial warps, with
 //                               lanes that returned or are on another branch, and member
 //                               masks that name lanes which do not vote (RT-16). Only the
@@ -70,6 +74,9 @@
 #define main replay_barrier_exit
 #include "../../ampere/barrier_exit_hw.cu"
 #undef main
+#define main replay_addrwrap
+#include "../../ampere/addrwrap_golden.cu"
+#undef main
 #define main replay_vote
 #include "../../ampere/vote_golden.cu"
 #undef main
@@ -91,7 +98,8 @@ int main(int argc, char** argv) {
         fflush(stdout);
         return status ? status : replay_barrier_exit(2, second);
     }
+    if (!strcmp(which, "addrwrap")) return replay_addrwrap();
     if (!strcmp(which, "vote")) return replay_vote(1, argv);
-    printf("HOST ERROR: usage: ampere_replay shfl|printf|ldmatrix|prmt|cpasync|call|callforms|barrier_exit|vote\n");
+    printf("HOST ERROR: usage: ampere_replay shfl|printf|ldmatrix|prmt|cpasync|call|callforms|barrier_exit|addrwrap|vote\n");
     return 2;
 }

@@ -244,6 +244,44 @@ def test_bfi_and_shf_match_real_gpu(sim):
     assert case[0xFFFFFFFF, 0, 256, 8][1:3] == [1, 0] and case[0xFFFFFFFF, 0, 0, 256][1:3] == [0x61C8864F, 0xFFFFFFFF]
 
 
+@pytest.mark.parametrize("ptx", ["addrwrap_probe.ptx", "addrwrap_probe_cuda12.ptx"])
+def test_offset_on_a_wrapped_32_bit_address_register_matches_real_gpu(sim, ptx):
+    """addrwrap_golden.txt is bin/addrwrap_golden on an RTX 3080 Ti: `[reg+offset]` on shared
+    memory with a 32-bit register that has wrapped below zero, so that the sum is the address
+    only when it wraps at 32 bits (see addrwrap_probe.cu). One CTA of 64 threads per kernel.
+
+    The probe runs as two toolkits compile it. In addrwrap_probe.ptx (nvcc 13.5, sm_100a) the
+    compiler writes that form itself for `fixed[63 - tid]`. In addrwrap_probe_cuda12.ptx
+    (nvcc 12.4, sm_86: the compiler and target of the GPU binary that made the recording) it
+    does not, and the form is there only as the inline PTX of the `ptx` kernels, which is the
+    same text in both files and is what the GPU executed."""
+    text = (AMPERE / ptx).read_text()
+    kernels = {name: body for name, body in re.findall(r"^\.visible \.entry (\w+)\((.*?)^}", text, re.M | re.S)}
+    with_offset = {name: re.findall(r"^\s*((?:ld|st)\.shared\.\w+)\s[^;]*\[(%\w+)\+(-?\d+)\]", body, re.M)
+                   for name, body in kernels.items()}
+    assert with_offset["addrwrap_ptx_load"] == [("ld.shared.b32", "%a", "252")]
+    assert with_offset["addrwrap_ptx_store"] == [("st.shared.b32", "%a", "252")]
+    assert with_offset["addrwrap_ptx_far"] == [("ld.shared.b32", "%a", "2147483644")]
+    assert with_offset["addrwrap_ptx_back"] == [("ld.shared.b32", "%a", "-4")]
+    compiled = [(instr, offset) for name in ("addrwrap_cxx_load", "addrwrap_cxx_store")
+                for instr, register, offset in with_offset[name] if re.fullmatch(r"%r\d+", register)]
+    if ptx == "addrwrap_probe.ptx":  # a 32-bit register (%r, not %rd) and the constant 4 * 63
+        assert compiled == [("ld.shared.b32", "252"), ("st.shared.b32", "252")]
+    else:
+        assert not compiled
+
+    lines = [line.split() for line in (AMPERE / "addrwrap_golden.txt").read_text().splitlines()]
+    assert [name for name, *_ in lines] == list(kernels) and len(lines) == 6
+    for name, *values in lines:
+        out = sim.from_numpy(np.full(64, -99, dtype=np.int32))  # as addrwrap_golden.cu fills it
+        stats = sim.launch(AMPERE / ptx, name, grid=1, block=64, args=[out])
+        assert out.numpy().tolist() == [int(v) for v in values], name
+        assert not stats.findings, name
+    # Every kernel reads or writes its array in reverse: the recording is 63 down to 0 on a base.
+    assert [[int(v) for v in values] for _, *values in lines] == [
+        list(range(base + 63, base - 1, -1)) for base in (1000, 2000, 3000, 4000, 5000, 6000)]
+
+
 def test_cp_async_with_a_source_size_matches_real_gpu(sim):
     """cpasync_golden.txt is bin/cpasync_golden on an RTX 3080 Ti: each lane copies 16 bytes
     but reads only its source size; the GPU zero-fills the rest."""

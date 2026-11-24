@@ -27,6 +27,7 @@ mkdir -p bin
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/minmax_cvt_golden minmax_cvt_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/atom_golden atom_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/bitfield_golden bitfield_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/addrwrap_golden addrwrap_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/mbarrier_token_golden mbarrier_token_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/nan_golden nan_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/intdiv_golden intdiv_golden.cu
@@ -50,6 +51,10 @@ $PTX_NVCC -arch=sm_100a -ptx atom_probe.cu -o atom_probe.ptx
 # (atom.global.add.u32) and uses red where a result is discarded.
 "$HW_NVCC" -arch="$HW_ARCH" -ptx atom_probe.cu -o atom_probe_cuda12.ptx
 $PTX_NVCC -arch=sm_100a -ptx bitfield_probe.cu -o bitfield_probe.ptx
+# [reg+offset] with a wrapped 32-bit register: nvcc 13.5 writes it for a reversed index into
+# shared memory, the GPU binary's compiler does not (the inline PTX is the same in both).
+$PTX_NVCC -arch=sm_100a -ptx addrwrap_probe.cu -o addrwrap_probe.ptx
+"$HW_NVCC" -arch="$HW_ARCH" -ptx addrwrap_probe.cu -o addrwrap_probe_cuda12.ptx
 # vote: as nvcc 13.5 writes it, as the GPU binary's compiler does, and the forms without .sync
 $PTX_NVCC -arch=sm_100a -ptx vote_probe.cu -o vote_probe.ptx
 "$HW_NVCC" -arch="$HW_ARCH" -ptx vote_probe.cu -o vote_probe_cuda12.ptx

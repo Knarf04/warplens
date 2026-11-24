@@ -49,6 +49,7 @@ REPLAYED = {
     "cpasync_golden.txt": ("e2e/ampere_replay.cpasync", "cpasync_golden.cu", _whole, _whole),
     "call_golden.txt": ("e2e/ampere_replay.call", "call_golden.cu", _whole, _whole),
     "callforms_golden.txt": ("e2e/ampere_replay.callforms", "callforms_golden.cu", _whole, _whole),
+    "addrwrap_golden.txt": ("e2e/ampere_replay.addrwrap", "addrwrap_golden.cu", _whole, _whole),
     "vote_golden.txt": ("e2e/ampere_replay.vote", "vote_golden.cu", _whole, _whole),
     "atom_golden.txt": ("e2e/ampere_atom", "atom_golden.cu", _whole, _whole),
     "reconvergence_golden.txt": ("e2e/ampere_reconvergence", "reconvergence_kernels.h", _whole, _whole),

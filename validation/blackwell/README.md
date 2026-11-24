@@ -78,7 +78,7 @@ validation/blackwell/compare.py validation/blackwell/results/gpu-<host>-<time>.t
 ```
 
 One command, no interaction. `run_all.py` builds (`build.sh --native`), records
-`nvidia-smi`, driver, toolkit and device, runs the 117 probe runs in manifest order, then the
+`nvidia-smi`, driver, toolkit and device, runs the 118 probe runs in manifest order, then the
 end-to-end programs, and writes `results/gpu-<host>-<time>.tar.gz` with every run's standard
 output, standard error and status (`status.tsv`), the build log and the environment. Bring
 the archive back; `compare.py` needs the pinned Python environment and this directory.
@@ -174,7 +174,7 @@ run is isolated for that reason.
 | `ampere_replay.ldmatrix` | `ampere_replay ldmatrix` | RT-01 | as on an RTX 3080 Ti (validation/ampere/ldmatrix_golden.txt): ldmatrix in six variants, and bfe | runs | - |
 | `ampere_replay.prmt` | `ampere_replay prmt` | RT-01 | as on an RTX 3080 Ti (validation/ampere/prmt_golden.txt): prmt.b32 | runs | - |
 | `ampere_replay.cpasync` | `ampere_replay cpasync` | RT-01 | as on an RTX 3080 Ti (validation/ampere/cpasync_golden.txt): cp.async with a source size | runs | - |
-| `ampere_replay.barrier_exit` | `ampere_replay barrier_exit` | RT-01 | as on an RTX 3080 Ti (validation/ampere/barrier_exit_hw.cu prints 'output ok'): __syncthreads() completes when some threads have exited | runs (1 finding(s)) | - |
+| `ampere_replay.barrier_exit` | `ampere_replay barrier_exit` | RT-01 | as on an RTX 3080 Ti (validation/ampere/barrier_exit_hw.cu prints 'output ok'): __syncthreads() completes when some threads have exited | runs | - |
 | `ampere_replay.vote` | `ampere_replay vote` | RT-16 | as on an RTX 3080 Ti (validation/ampere/vote_golden.txt): vote.sync all, any, uni and ballot in full and partial warps, with lanes that returned or are on another branch, and member masks that name lanes which do not vote | runs | - |
 | `ampere_replay.call` | `ampere_replay call` | RT-02 | as on an RTX 3080 Ti (validation/ampere/call_golden.txt): calls to device functions | runs | - |
 | `ampere_replay.callforms` | `ampere_replay callforms` | RT-02 | as on an RTX 3080 Ti (validation/ampere/callforms_golden.txt): structs passed and returned by value, calls through function pointers, recursion | runs | - |

@@ -464,6 +464,14 @@ Found by this work in the simulator, and fixed since unless marked open:
   `callforms_golden` as a case of `e2e/ampere_replay`. Each prediction is the
   Ampere golden file (`tests/test_ampere_replay.py`), so a mismatch on the
   B200 is a difference between the two architectures.
+- The offset of `[reg+offset]` was added in 64 bits whatever the register's
+  width. nvcc 13.5 compiles a reversed index into shared memory
+  (`fixed[N - 1 - threadIdx.x]`) to a 32-bit register that has wrapped below
+  zero plus a positive offset, which the simulator reported as a memory fault.
+  Fixed: with a 32-bit register the sum wraps at 32 bits, as measured on the
+  RTX 3080 Ti with hand-written PTX
+  (`tests/test_sim_bug_regressions.py`). No golden file or B200 replay records
+  it yet.
 - Open: `cvt` with `.ftz` is not implemented, so the 44 such lines of
   `nan_golden.txt` are rerun without a prediction
   (`formats/ampere_replay.nan_cvt_ftz`). The launch-error recordings

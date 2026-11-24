@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
-from ..frontend.ir import B128, Instr, Mem, NP_TYPES, Pair, Sym, UINT_BY_SIZE, Vec
+from ..frontend.ir import B128, Instr, Mem, NP_TYPES, Pair, Reg, Sym, UINT_BY_SIZE, Vec
 from .floating import fused_multiply_add
 from .smem import (CLUSTER_STRIDE, CLUSTER_WINDOW, GENERIC_WINDOW, MAX_SMEM_BYTES,
                    local_shared_offset)
@@ -754,7 +754,16 @@ def _address(w, ins, mem) -> np.ndarray:
     if not isinstance(mem, Mem):
         raise unsupported(ins, "expected a [address] operand")
     base = w.read_address(mem.base)
-    return base + np.uint64(mem.offset % (1 << 64)) if mem.offset else base
+    if not mem.offset:
+        return base
+    address = base + np.uint64(mem.offset % (1 << 64))
+    # [reg+offset] is summed in the register's width. nvcc 13.5 relies on it for shared
+    # memory: `fixed[N - 1 - tid]` becomes `sub.s32 %r, fixed, 4 * tid` and `[%r+4*(N-1)]`,
+    # where %r has wrapped below zero. An RTX 3080 Ti reads the wrapped address
+    # (tests/test_sim_bug_regressions.py).
+    if type(mem.base) is Reg and w.regs[mem.base.name].itemsize == 4:
+        address &= np.uint64(0xFFFFFFFF)
+    return address
 
 
 LOCAL_WINDOW = 0x1_4000_0000  # where per-thread local memory appears in the generic space

@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 import warplens
+from warplens.frontend.ptx_parser import parse_ptx
 from warplens.units.smem import DEFAULT_SMEM_BYTES, MAX_SMEM_BYTES
 
 from conftest import HEADER
@@ -188,3 +189,49 @@ def test_the_triton_driver_reports_the_same_limit():
     source = (SHIM.parent / "triton_driver.py").read_text()
     assert '"max_shared_mem": MAX_SMEM_BYTES' in source
     assert "from .units.smem import MAX_SMEM_BYTES" in source
+
+
+# -- [reg+offset] with a 32-bit register ---------------------------------------------------
+
+def reversed_shared_read(offset):
+    """What nvcc 13.5 makes of `fixed[tid] = 100 + tid; __syncthreads(); out[tid] = fixed[31 - tid];`
+    for a shared `int fixed[32]`: the address register is `fixed - 4 * tid`, below zero in 32
+    bits for every lane but lane 0, and the constant 124 is the instruction's offset."""
+    return parse_ptx(HEADER + f"""
+.visible .entry k(.param .u64 out)
+{{
+	.reg .b32 	%r<8>;
+	.reg .b64 	%rd<5>;
+	.shared .align 4 .b8 fixed[128];
+	ld.param.u64 	%rd1, [out];
+	mov.u32 	%r1, %tid.x;
+	add.s32 	%r2, %r1, 100;
+	shl.b32 	%r3, %r1, 2;
+	mov.b32 	%r4, fixed;
+	add.s32 	%r5, %r4, %r3;
+	st.shared.b32 	[%r5], %r2;
+	bar.sync 	0;
+	sub.s32 	%r6, %r4, %r3;
+	ld.shared.b32 	%r7, [%r6+{offset}];
+	mul.wide.u32 	%rd3, %r1, 4;
+	add.s64 	%rd4, %rd1, %rd3;
+	st.global.b32 	[%rd4], %r7;
+	ret;
+}}
+""")
+
+
+def test_an_offset_is_added_to_a_32_bit_address_register_in_32_bits(sim):
+    """Measured on an RTX 3080 Ti (driver 580.173.02, 2026-11-24) with this kernel under
+    `.version 7.8`, `.target sm_86`: out = 131, 130, ..., 100. The simulator added the offset
+    in 64 bits and reported a read at offset 2^32 + 120."""
+    out = sim.empty(32, np.int32)
+    stats = sim.launch(reversed_shared_read(124), "k", grid=1, block=32, args=[out])
+    assert out.numpy().tolist() == list(range(131, 99, -1))
+    assert not stats.findings
+
+
+def test_a_wrapped_address_outside_shared_memory_is_still_a_fault(sim):
+    out = sim.empty(32, np.int32)
+    with pytest.raises(warplens.MemoryFault, match="outside the CTA's"):
+        sim.launch(reversed_shared_read(120), "k", grid=1, block=32, args=[out])

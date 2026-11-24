@@ -420,9 +420,15 @@ Found by this work in the simulator, and fixed since unless marked open:
 - The device query answered 148 SMs for a B300 and `warplens.numerics` encoded
   an E5M2 NaN as 0x7d where the `cvt` instructions give 0x7f. Fixed: 160 SMs,
   and 0x7f in both.
-- Open: lanes pass `bar.sync` before lane 0 arrives in two control-flow
-  layouts nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`);
-  a stale mbarrier token tests true where the 3080 Ti gives false; `atom` is
+- Lanes passed `bar.sync` before lane 0 arrived in two control-flow layouts
+  nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`): the
+  sides of a branch were only joined at its post-dominator, which there is
+  past the join. Fixed: diverged groups that meet earlier are joined where
+  they meet, as the 3080 Ti does
+  (`validation/ampere/reconvergence_golden.py`, `core/warp.py:_regroup`). The
+  `__syncthreads()` workaround in the probes is no longer needed and is kept
+  because the predictions were made with it.
+- Open: a stale mbarrier token tests true where the 3080 Ti gives false; `atom` is
   not implemented (`validation/blackwell/README.md`, "Found while writing the
   probes").
 - Documents that contradict the code are listed in

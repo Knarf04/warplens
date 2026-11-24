@@ -372,9 +372,10 @@ def test_timing_runner_tells_a_failed_launch_from_a_failed_benchmark(tmp_path):
 def test_no_thread_test_runs_into_a_warp_wide_allocation():
     """`if (tid == 0) {...}` directly followed by `if (warp == 0) tmem_alloc(...)` lets a
     compiler merge the two tests, so that lane 0 reaches the allocation by a path of its own
-    (nvcc 13.0 does; nvcc 13.5 does not). The simulator mishandles that shape
+    (nvcc 13.0 does; nvcc 13.5 does not). The simulator mishandled that shape
     (validation/blackwell/findings/reconvergence.py), which made 15 predictions depend on
-    the compiler. A __syncthreads() between the two keeps them apart."""
+    the compiler. A __syncthreads() between the two keeps them apart; the simulator no longer
+    needs it, and the probes keep it because their predictions were made with it."""
     alloc = re.compile(r"tmem_alloc\(|tcgen05\.alloc")
     thread_test = re.compile(r"if \((tid|threadIdx\.x) == 0\)")
     barrier = re.compile(r"__syncthreads\(\)|cluster_sync\(\)")
@@ -404,14 +405,10 @@ def reconvergence():
     return module
 
 
-@pytest.mark.parametrize("shape", ["A", "B"])
-def test_lanes_reconverge_in_the_layouts_nvcc_13_5_emits(shape):
+@pytest.mark.parametrize("shape", ["A", "B", "C", "D"])
+def test_lanes_reconverge_in_the_layouts_nvcc_13_5_and_13_0_emit(shape):
+    """A and B are what nvcc 13.5 emits, C and D what nvcc 13.0 does. In C and D lanes 1 to 31
+    passed the join, and a `bar.sync` there, before lane 0 arrived, until the warp learned to
+    bring lanes together that meet before their branch's post-dominator (core/warp.py)."""
     assert reconvergence().lanes_reading_seven(shape, barrier=True) == 32
     assert reconvergence().lanes_reading_seven(shape, barrier=False) == 32
-
-
-@pytest.mark.xfail(reason="simulator bug, reported and not fixed on this branch: in these layouts lanes 1 to 31 pass "
-                          "bar.sync before lane 0 arrives (validation/blackwell/findings/reconvergence.py)", strict=False)
-@pytest.mark.parametrize("shape", ["C", "D"])
-def test_lanes_reconverge_in_the_layouts_nvcc_13_0_emits(shape):
-    assert reconvergence().lanes_reading_seven(shape, barrier=True) == 32

@@ -134,6 +134,26 @@ def immediate_post_dominators(succs: list[list[int]], exit_node: int) -> list[in
     return [ipdom.get(b, exit_node) for b in range(exit_node)]
 
 
+def block_reachability(cfg: CFG) -> list[int]:
+    """For every block, the set of blocks that some path of one or more edges leads to from
+    it, as a bit set (bit b for block b). The virtual exit has the last entry and reaches
+    nothing; a block is in its own set only when it is on a cycle."""
+    n = cfg.exit
+    reach = [0] * (n + 1)
+    changed = True
+    while changed:
+        changed = False
+        for b in range(n - 1, -1, -1):
+            new = reach[b]
+            for s in cfg.succs[b]:
+                if s != n:
+                    new |= (1 << s) | reach[s]
+            if new != reach[b]:
+                reach[b] = new
+                changed = True
+    return reach
+
+
 def reconvergence_points(fn: Function) -> dict[int, int]:
     """Map the pc of every predicated branch to the pc where its lanes rejoin.
     A value of len(fn.instrs) means they only rejoin by leaving the function."""

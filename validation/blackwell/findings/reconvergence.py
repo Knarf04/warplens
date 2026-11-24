@@ -1,14 +1,17 @@
-"""A simulator bug found while preparing the rental: lanes of one warp that reach the same
-instruction by different paths are not always brought together, and `bar.sync` then lets
-some of them through before the others arrive.
+"""A simulator bug found while preparing the rental, fixed since (branch work/reconvergence):
+lanes of one warp that reach the same instruction by different paths were not always brought
+together, and `bar.sync` then let some of them through before the others arrived.
 
     PYTHONPATH=<repo> python validation/blackwell/findings/reconvergence.py
 
 Each kernel is `if (tid == 0) shared = 7;` followed by code every lane reaches, in four
 layouts of the same control flow. All 32 lanes must end up reading 7 (with the barrier that
-is guaranteed; without it a GPU reconverges at the join all the same). On 2026-11-23 the
-simulator gives 32 of 32 for A and B and **1 of 32 for C and D, with or without bar.sync**:
-lanes 1 to 31 read the word before lane 0 has written it. Nothing is reported.
+is guaranteed; without it a GPU reconverges at the join all the same: an RTX 3080 Ti gives
+32 of 32 for all four either way, validation/ampere/reconvergence_golden.py). On 2026-11-23
+the simulator gave 32 of 32 for A and B and **1 of 32 for C and D, with or without bar.sync**:
+lanes 1 to 31 read the word before lane 0 had written it. This script did not look at the
+findings; with the barrier there was a `barrier-in-divergent-code` finding, on a program that
+has no barrier in divergent code. It gives 32 of 32 for all eight now.
 
 A  the join is the branch target (how nvcc 13.5 lays this out)
 B  the then-side jumps to the join; the other lanes fall into it from a block of their own
@@ -25,8 +28,10 @@ Consequence for the rental: with a toolkit other than the one the predictions we
 with, a probe's code can take one of these shapes and the simulator's prediction for it is
 wrong or missing, although the program is correct. The probes now put a __syncthreads()
 between the two tests, which keeps a compiler from merging them; with that, nvcc 13.0.88 and
-nvcc 13.5.37 give identical predictions for all 98 predicted runs. The bug itself is not
-fixed here. tests/test_rental_harness.py has the four shapes as an expected failure.
+nvcc 13.5.37 give identical predictions for all 98 predicted runs. The cause was that the
+sides of a branch were only joined at its immediate post-dominator, which in C and D is past
+the join; warplens/core/warp.py (`_regroup`) now joins them where they meet.
+tests/test_rental_harness.py runs the four shapes.
 """
 import numpy as np
 import warplens

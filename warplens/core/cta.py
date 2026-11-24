@@ -64,6 +64,7 @@ class Cta:
         self.cluster = None  # core.cluster.Cluster this CTA belongs to
         self.rank = 0  # position in the cluster
         self.retired = False  # its warps exited; peers may still be running
+        self.clc_failed = False  # a thread saw a clusterlaunchcontrol.try_cancel fail
         self.smem = SharedMemory(smem_bytes)
         self.smem_report = smem_report
         self.findings = findings
@@ -197,6 +198,7 @@ class Cta:
                 "store": ("tma-store-not-waited", "TMA store", "cp.async.bulk.wait_group"),
                 "load": ("tma-load-not-waited", "TMA load", "its mbarrier"),
                 "copy": ("cp-async-not-waited", "cp.async copy", "cp.async.wait_group"),
+                "clc": ("clc-not-waited", "clusterlaunchcontrol.try_cancel request", "its mbarrier"),
             }.get(operation.kind, ("tcgen05-not-waited", f"tcgen05.{operation.kind}",
                                    "a tcgen05.commit and its mbarrier"))
             self.findings.add(kind, f"CTA {self.id} returned while this {what} was still in flight; "

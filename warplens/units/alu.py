@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
-from ..frontend.ir import Instr, Mem, NP_TYPES, Pair, Sym, UINT_BY_SIZE, Vec
+from ..frontend.ir import B128, Instr, Mem, NP_TYPES, Pair, Sym, UINT_BY_SIZE, Vec
 from .floating import fused_multiply_add
 from .smem import (CLUSTER_STRIDE, CLUSTER_WINDOW, GENERIC_WINDOW, MAX_SMEM_BYTES,
                    local_shared_offset)
@@ -129,8 +129,22 @@ def _mul_hi(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 @op("mov")
 def _mov(w, ins, mask):
-    ty, _ = _type(ins, kinds="iufb")
+    ty, _ = _type(ins, kinds="iufbV")
     d, a = _operands(ins, 2)
+    if ty == "b128" and (isinstance(a, Vec) or isinstance(d, Vec)):
+        # nvcc builds a 128-bit value as `mov.b128 %rq1, {%rd3, %rd4}`, low half first.
+        elems = (a if isinstance(a, Vec) else d).elems
+        if isinstance(a, Vec) and isinstance(d, Vec) or len(elems) != 2:
+            raise unsupported(ins, "mov.b128 packs or unpacks two 64-bit halves")
+        if isinstance(a, Vec):
+            value = np.zeros(len(mask), dtype=B128)
+            value["lo"], value["hi"] = w.read(elems[0], "b64"), w.read(elems[1], "b64")
+            w.write(d, value, mask)
+        else:
+            value = w.read(a, ty)
+            for e, half in zip(elems, ("lo", "hi")):
+                w.write(e, np.ascontiguousarray(value[half]), mask)
+        return
     if isinstance(a, Vec) or isinstance(d, Vec):
         # Pack {lo, ..., hi} into one register, or unpack one register into several.
         # The first element is the least significant (checked on real hardware).
@@ -603,12 +617,25 @@ def route(address: int) -> tuple[str, int]:
     return "global", address
 
 
+_SCOPES = ("cta", "cluster", "gpu", "sys")
+
+
 def _space(ins: Instr):
     """(type, address space, vector length) of a load or store."""
     spaces = {"global", "shared", "param", "local", "shared::cta", "shared::cluster"}
+    ordering = set()
     if ins.opcode == "ld":
         spaces.add("const")
-    ty, extra = _type(ins, allowed=spaces | {"v2", "v4", "nc"})
+        ordering = {"weak", "relaxed", "acquire", *_SCOPES}
+    ty, extra = _type(ins, allowed=spaces | ordering | {"v2", "v4", "nc"}, kinds="iufV")
+    # ld.weak, ld.relaxed.scope and ld.acquire.scope say how the load is ordered against other
+    # threads' accesses. Loads here happen one at a time in program order, which satisfies each.
+    if extra[:1] == ["weak"]:
+        del extra[:1]
+    elif extra[:1] in (["relaxed"], ["acquire"]) and extra[1:2] and extra[1] in _SCOPES:
+        del extra[:2]
+    if ordering & set(extra):
+        raise unsupported(ins, "expected ld.weak, ld.relaxed.<scope> or ld.acquire.<scope>")
     if "nc" in extra:  # ld.global.nc: a read-only cache hint, with no functional effect
         if ins.opcode != "ld" or "global" not in extra:
             raise unsupported(ins, "modifier .nc")
@@ -766,6 +793,11 @@ def _async_check(w, ins, s, offsets, size: int, what: str, writing: bool) -> Non
         operation = cta.async_ops[op_id]
         state = "is still in flight" if not operation.done else \
             "has completed, but this warp never waited on its mbarrier"
+        if operation.kind == "clc":
+            cta.findings.add("clc-response-unsynchronized",
+                             f"{what} the response that the clusterlaunchcontrol.try_cancel at line "
+                             f"{operation.ins.line} writes; that request {state}", w, ins, hit)
+            continue
         cta.findings.add("tma-load-unsynchronized",
                          f"{what} shared memory that the TMA load at line {operation.ins.line} "
                          f"writes; that load {state}", w, ins, hit)

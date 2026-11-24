@@ -129,7 +129,9 @@ class Warp:
         if kind is Imm:
             return self._immediate(operand, dt, ty)
         if kind is Special:
-            value = self.specials[operand.name]
+            value = self.specials.get(operand.name)
+            if value is None:
+                value = self.clock(operand.name)
             if dt.kind not in "iu" or dt.itemsize < 4:
                 raise ExecutionError(f"%{operand.name} cannot be read as .{ty}")
             return value.astype(UINT_BY_SIZE[dt.itemsize]).view(dt)
@@ -138,6 +140,31 @@ class Warp:
                 raise ExecutionError(f"address of `{operand.name}` cannot be read as .{ty}")
             return np.full(WARP_SIZE, self._symbol(operand), dtype=UINT_BY_SIZE[dt.itemsize]).view(dt)
         raise ExecutionError(f"operand {operand!r} cannot be used as a .{ty} value")
+
+    def clock(self, name: str) -> np.ndarray:
+        """%clock64, and its halves %clock (low) and %clock_hi: a cycle counter.
+
+        A real GPU counts clock cycles from an arbitrary start, so only differences mean
+        anything. Here the counter is deterministic, and every lane of the warp reads the
+        same value:
+
+          * in a timed run, the model's time when the instruction issues, in whole clocks
+            (nanoseconds times `clock_ghz`);
+          * otherwise, the number of scheduling rounds since the launch began. In a round
+            every warp that can run executes one instruction, so the counter advances by one
+            per instruction this warp executes, and also while it waits and others run.
+        """
+        line = self.cta.timeline
+        if line is not None:
+            cycles = int(line.now / line.clk + 1e-6)
+        else:
+            cycles = self.cta.cluster.clock
+        cycles = np.uint64(cycles % (1 << 64))
+        if name == "clock":
+            cycles &= np.uint64(0xFFFF_FFFF)
+        elif name == "clock_hi":
+            cycles >>= np.uint64(32)
+        return np.full(WARP_SIZE, cycles, dtype=np.uint64)
 
     @staticmethod
     def _immediate(imm: Imm, dt: np.dtype, ty: str) -> np.ndarray:

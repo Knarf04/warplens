@@ -22,6 +22,7 @@ class Engine:
     def __init__(self, max_steps: int | None = None):
         self.max_steps = max_steps
         self.steps = 0
+        self.clock = 0  # scheduling rounds so far in this launch; what %clock64 reads
 
     def run(self, group) -> None:
         """`group` is a core.cluster.Cluster."""
@@ -37,12 +38,14 @@ class Engine:
                 if group.release_barriers() or group.complete_next_async():
                     continue
                 raise deadlock(group)
+            group.clock = self.clock
             for w in runnable:
                 w.step()
                 # Reset a completed phase before another warp can arrive. A
                 # counted barrier can complete more than once in one round.
                 group.release_barriers()
             group.tick_async()
+            self.clock += 1
             self.steps += len(runnable)
             if limit is not None and self.steps > limit:
                 raise ExecutionError(

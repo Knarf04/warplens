@@ -623,19 +623,24 @@ _SCOPES = ("cta", "cluster", "gpu", "sys")
 def _space(ins: Instr):
     """(type, address space, vector length) of a load or store."""
     spaces = {"global", "shared", "param", "local", "shared::cta", "shared::cluster"}
-    ordering = set()
+    ordering = {"volatile"}
     if ins.opcode == "ld":
         spaces.add("const")
-        ordering = {"weak", "relaxed", "acquire", *_SCOPES}
+        ordering |= {"weak", "relaxed", "acquire", *_SCOPES}
     ty, extra = _type(ins, allowed=spaces | ordering | {"v2", "v4", "nc"}, kinds="iufV")
     # ld.weak, ld.relaxed.scope and ld.acquire.scope say how the load is ordered against other
     # threads' accesses. Loads here happen one at a time in program order, which satisfies each.
-    if extra[:1] == ["weak"]:
+    # ld.volatile and st.volatile (a C++ `volatile` object) ask that the access is neither
+    # removed nor reordered; every access here is executed as written, so they are plain ones.
+    if extra[:1] == ["volatile"]:
+        del extra[:1]
+    elif extra[:1] == ["weak"]:
         del extra[:1]
     elif extra[:1] in (["relaxed"], ["acquire"]) and extra[1:2] and extra[1] in _SCOPES:
         del extra[:2]
     if ordering & set(extra):
-        raise unsupported(ins, "expected ld.weak, ld.relaxed.<scope> or ld.acquire.<scope>")
+        raise unsupported(ins, "expected .volatile, ld.weak, ld.relaxed.<scope> or "
+                               "ld.acquire.<scope>, before the address space")
     if "nc" in extra:  # ld.global.nc: a read-only cache hint, with no functional effect
         if ins.opcode != "ld" or "global" not in extra:
             raise unsupported(ins, "modifier .nc")
@@ -975,6 +980,22 @@ _LANES = np.arange(32, dtype=np.int64)
 
 # -- warp shuffle ------------------------------------------------------------------
 
+def membermask_check(w, member, mask):
+    """For a `.sync` instruction with a member mask (`shfl.sync`, `bar.warp.sync`): returns
+    (members[lane, j]: lane names lane j; named: each lane names itself; mismatch: executing
+    lanes whose mask is broken).
+
+    Each caller must name itself, and its non-exited members must participate
+    with the same membermask. Exited/unlaunched lanes may remain in the mask;
+    distinct groups can execute the same instruction together on sm_70+."""
+    member_values = w.read(member, "u32")
+    members = ((member_values[:, None] >> _LANES.astype(np.uint32)) & 1).astype(bool)
+    named = members[_LANES, _LANES]
+    same_group = mask[None, :] & (member_values[:, None] == member_values[None, :])
+    missing = (members & w.live_lanes()[None, :] & ~same_group).any(axis=1)
+    return members, named, mask & (~named | missing)
+
+
 @op("shfl")
 def _shfl(w, ins, mask):
     """shfl.sync.{up,down,bfly,idx}.b32 d[|p], a, b, c, membermask
@@ -1011,15 +1032,7 @@ def _shfl(w, ins, mask):
         raise unsupported(ins, f"shuffle mode .{mode}")
     j = np.where(valid, j, _LANES)
 
-    member_values = w.read(member, "u32")
-    members = ((member_values[:, None] >> _LANES.astype(np.uint32)) & 1).astype(bool)
-    # Each caller must name itself, and its non-exited members must participate
-    # with the same membermask. Exited/unlaunched lanes may remain in the mask;
-    # distinct groups can execute the same instruction together on sm_70+.
-    named = members[_LANES, _LANES]
-    same_group = mask[None, :] & (member_values[:, None] == member_values[None, :])
-    missing = (members & w.live_lanes()[None, :] & ~same_group).any(axis=1)
-    mismatch = mask & (~named | missing)
+    members, named, mismatch = membermask_check(w, member, mask)
     if mismatch.any():
         w.cta.findings.add(
             "shfl-membermask-mismatch",

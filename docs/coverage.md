@@ -39,9 +39,10 @@ that names the instruction and its PTX line.
 | Async copy | `cp.async.{ca,cg}.shared.global` with optional source size, `cp.async.commit_group`, `cp.async.wait_group` | zero-fill past the source size checked on a GPU |
 | Compare | `setp` with `eq ne lt le gt ge lo ls hi hs`, unordered `equ neu ltu leu gtu geu`, `num`, `nan`; `selp` | no combined-predicate or paired-destination forms |
 | Convert | `cvt` int↔int, int↔float, float↔float, float→int with `.rni/.rzi/.rmi/.rpi` (saturating); `cvt.{rna,rn,rz}.tf32.f32` | no `.sat` on int→int |
-| Memory | `ld.param`, `ld.const`, `st.param` (call arguments), `ld`/`st` with `.global`, `.shared`, `.local` or no space (generic), scalar or `.v2`/`.v4` | parameter pointers can be loaded through `.param`, `.global` or generic addresses; `.b128` loads and stores; `ld.weak`, `ld.relaxed.<scope>` and `ld.acquire.<scope>` load like a plain `ld` |
+| Memory | `ld.param`, `ld.const`, `st.param` (call arguments), `ld`/`st` with `.global`, `.shared`, `.local` or no space (generic), scalar or `.v2`/`.v4` | parameter pointers can be loaded through `.param`, `.global` or generic addresses; `.b128` loads and stores; `ld.weak`, `ld.relaxed.<scope>` and `ld.acquire.<scope>` load like a plain `ld`; `ld.volatile` and `st.volatile` (a C++ `volatile` object) behave like the plain forms |
 | Election | `elect.sync d\|p, membermask` | the lowest participating lane is elected |
 | Barriers | `bar.sync a[, count]`, `bar.arrive a, count`; also spelled `barrier` and `.cta`, including `barrier[.cta].{sync,arrive}.aligned` | no `bar.red`; sync count zero means the whole CTA |
+| Warp barrier | `bar.warp.sync membermask` (`__syncwarp()`) | nothing to wait for when the named lanes execute it together; no rendezvous across divergent paths, which is reported as `warp-sync-membermask-mismatch` |
 | Shuffle | `shfl.sync.{up,down,bfly,idx}.b32` with optional predicate destination | no rendezvous across divergent paths; see `m1.md` |
 | mbarrier | `mbarrier.init`, `.arrive` (with count), `.arrive.expect_tx`, `.expect_tx`, `.complete_tx`, `.test_wait`, `.try_wait` (both with `.parity`), `.inval` | no `arrive_drop`, `.noComplete`, `pending_count` |
 | TMA | `cp.async.bulk.tensor.{1..5}d` load (`shared <- global`, `.mbarrier::complete_tx::bytes`) and store (`global <- shared`, `.bulk_group`), tile mode; `cp.async.bulk` without a tensor map; `.commit_group`, `.wait_group[.read]`; `prefetch.tensormap` and `cp.async.bulk.prefetch` (no-ops) | no multicast, im2col, `cp.reduce`, `tensormap.replace`; `.L2::cache_hint` ignored |
@@ -55,6 +56,14 @@ that names the instruction and its PTX line.
 `%warpid`, `%nwarpid`; for clusters `%clusterid`, `%nclusterid`,
 `%cluster_ctaid`, `%cluster_nctaid` (each with `.x/.y/.z`), `%cluster_ctarank`,
 `%cluster_nctarank`, `%is_explicit_cluster`.
+
+`%clock64`, with its halves `%clock` and `%clock_hi` (`clock64()` and `clock()`
+both compile to `%clock64`). The counter is deterministic and is the simulator's
+own, not a prediction of what a GPU would read: in a timed run it is the model's
+time when the instruction issues, in whole clocks (nanoseconds times
+`clock_ghz`); otherwise it is the number of scheduling rounds since the launch
+began, where in each round every warp that can run executes one instruction.
+Every lane of a warp reads the same value.
 
 ## Clusters
 

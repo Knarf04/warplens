@@ -755,6 +755,7 @@ Every kind, by area:
 | `barrier-in-divergent-code` | a barrier reached by only some of a warp's running lanes |
 | `shfl-inactive-source` | a shuffle read a lane that was not executing it or was outside the member mask |
 | `shfl-membermask-mismatch` | a caller is absent from its own mask, or a named member is not executing with the same mask |
+| `warp-sync-membermask-mismatch` | the same, for `bar.warp.sync` (`__syncwarp()`): lanes on separate divergent paths do not wait for each other |
 | **mbarrier** | |
 | `mbarrier-tx-mismatch` | completion bytes not balanced by `expect_tx` when the kernel returned or deadlocked |
 | `mbarrier-over-arrival` | more arrivals than the phase needed |

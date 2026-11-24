@@ -76,7 +76,7 @@ validation/blackwell/compare.py validation/blackwell/results/gpu-<host>-<time>.t
 ```
 
 One command, no interaction. `run_all.py` builds (`build.sh --native`), records
-`nvidia-smi`, driver, toolkit and device, runs the 109 probe runs in manifest order, then the
+`nvidia-smi`, driver, toolkit and device, runs the 117 probe runs in manifest order, then the
 end-to-end programs, and writes `results/gpu-<host>-<time>.tar.gz` with every run's standard
 output, standard error and status (`status.tsv`), the build log and the environment. Bring
 the archive back; `compare.py` needs nothing but Python and this directory.
@@ -131,7 +131,7 @@ To keep the predictions' compiler on such a machine: `env/remote/run.sh --toolki
 The driver then refuses the PTX and the machine-code programs run (`bin-native/`).
 
 **Expected run time** (estimated; nothing here has been timed on a B200): the build takes a
-few minutes (55 programs, three compilations each with `--native`). Most runs take well
+few minutes (60 programs, three compilations each with `--native`). Most runs take well
 under a second of GPU time plus process start-up. Runs that hang are killed at their
 timeout, 30 s each; 12 runs are allowed to hang, and two of them (`mbarrier/expect_tx_large`,
 `tmem/alloc_blocks`) are expected to. So the probes take between 3 and 10 minutes. The

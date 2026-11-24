@@ -110,12 +110,41 @@ Target users:
 | Area | PTX |
 | --- | --- |
 | Core | int/fp ALU, `cvt`, `setp`, `selp`, `bra`, `ret`, `ld/st.{global,shared,param,local}`, `atom`/`red` (global, shared, generic), `shfl.sync`, `vote`, `elect.sync`, `bar.sync`/`bar.arrive` (named barriers), special registers (`%tid`, `%ctaid`, `%clusterid`, `%cluster_ctarank`, …) |
-| mbarrier | `init`, `arrive`(`.expect_tx`, count), `expect_tx`, `complete_tx`, `test_wait`/`try_wait`(`.parity`), `inval` |
+| mbarrier | `init`, `arrive`(`.expect_tx`, count), `expect_tx`, `complete_tx`, `test_wait`/`try_wait`(`.parity`; `try_wait` blocks, see below), `inval` |
 | TMA | `cp.async.bulk.tensor.{1..5}d` load (tile mode, OOB fill) and store, `cp.async.bulk` (non-tensor), `.multicast::cluster` (M5), `cp.async.bulk.commit_group`/`wait_group(.read)`, `prefetch.tensormap` |
 | Fences / proxies | `fence.proxy.async`, `fence.mbarrier_init`, `fence.acq_rel` (modeled as checker events) |
-| tcgen05 | `alloc`/`dealloc`/`relinquish_alloc_permit`, `mma` (`kind::f16`, `kind::tf32` first; `f8f6f4` and block-scaled later; `cta_group::1` first), `commit` (incl. `.multicast`), `ld`/`st` (32x32b, 16x64b, 16x128b, 16x256b shapes), `wait::ld/st`, `fence::before/after_thread_sync`, `cp` (M5) |
-| Descriptors | SMEM matrix descriptor (start, LBO, SBO, swizzle mode, base offset), instruction descriptor (dtypes, M, N, major-ness, negate/transposes), decoded exactly as the PTX ISA specifies |
+| tcgen05 | `alloc`/`dealloc`/`relinquish_alloc_permit`, `mma` (`kind::f16`, `kind::tf32` first; `f8f6f4` and block-scaled later; `cta_group::1` first), `commit` (incl. `.multicast`), `ld`/`st` (32x32b, 16x64b, 16x128b, 16x256b shapes), `wait::ld/st`, `fence::before/after_thread_sync` |
+| Descriptors | SMEM matrix descriptor (start, LBO, SBO, swizzle mode; base offset 0 only, see below), instruction descriptor (dtypes, M, N, major-ness, negate/transposes), decoded exactly as the PTX ISA specifies |
 | Clusters (M5) | `barrier.cluster.arrive/wait`, `mapa`, DSMEM `ld/st.shared::cluster`, remote mbarrier arrive, `cta_group::2` (Layouts A/B for the M=256/128 pair), CLC `clusterlaunchcontrol.try_cancel` |
+
+**v1 instruction scope (frozen 2026-11-24).** The table above, as implemented and listed
+form by form in `docs/coverage.md`, is the v1 surface. Nothing is added to it before v1.0;
+a result from the B200 run can change how an instruction in it behaves, not which
+instructions are in it. Anything outside it is a hard error that names the instruction,
+never something else run in its place. Three points that were open are settled as follows:
+
+- **Descriptor base offset: 0 only.** The 3-bit matrix base offset of the shared-memory
+  descriptor (bits 49-51) must be 0; a non-zero field is refused. CUTLASS and CuTe never set
+  it (`make_umma_desc`), so no target kernel is affected. What v1 does claim is what an
+  operand reads when the field is 0 and its start is not on a swizzle period: the swizzle
+  of the absolute shared address. That claim is matrix row MMA-12, tested on the B200 by
+  `validation/blackwell/mma/base_offset`; its `field` case records what a non-zero field
+  selects, as the specification for supporting it after v1.
+- **`mbarrier.try_wait` blocks; no non-blocking fallback.** PTX lets `try_wait` return false
+  after a system-dependent time limit. v1 treats the limit as unbounded: `try_wait` blocks
+  the warp until the phase completes and never returns false. That is exact for the wait
+  loop all target kernels use and makes a hopeless wait a deadlock report. A kernel that
+  does other work when `try_wait` fails is out of scope and is reported as a deadlock;
+  `test_wait` is the non-blocking form and is modeled. `validation/blackwell/mbarrier/try_wait`
+  records what a single `try_wait` returns on the B200 and after how long (MB-11).
+- **`tcgen05.cp` is v2**, with the block-scaled formats it serves (section 10). It was
+  listed here for M5 and never implemented; it is refused by name.
+  `validation/blackwell/tmem/cp.cu` records what the one-CTA forms copy, for that later work.
+
+Also out of v1, as before (`docs/coverage.md`, `docs/guide.md` "Instructions not
+implemented"): MMA kinds other than `f16` and `tf32`, operand A from tensor memory,
+`tcgen05.shift`, `.pack`/`.unpack`, mbarrier `arrive_drop` / `.noComplete` /
+`pending_count`, TMA im2col mode, memory orderings stronger than relaxed for atomics.
 
 **Numerics:** the MMA computes in fp32 with documented input rounding; a bit-exact accumulation order is not promised. Report max abs/rel error vs NumPy.
 
@@ -241,6 +270,7 @@ Suggested order of public visibility: announce after **M3**. "Run the CUTLASS Bl
 
 - Multi-GPU: NVLink / NVL72 domain, NVSHMEM and NCCL-style collectives, copy engines, multimem / NVLS.
 - Structured sparsity, block-scaled formats (MXFP8/FP4, NVFP4) and `tcgen05.cp` scale-factor paths.
+- A non-zero descriptor base offset, and `mbarrier.try_wait` returning false (a non-blocking fallback): both wait for the B200 recordings named in section 3.5.
 - Interactive web visualizer; Jupyter widgets.
 - Hopper (sm_90a) mode: wgmma, the same TMA/mbarrier engine. This is cheap once M2 exists and broadens the audience.
 - Optional SASS-level input via `nvdisasm` for timing studies.
@@ -368,7 +398,7 @@ nothing Blackwell-specific has run on a GPU.
 | Steps | Where | State |
 | --- | --- | --- |
 | B5, B6, F23 | `docs/validation-matrix.md` | one row per claim with its probe, prediction and pass criterion; a test keeps its citations valid |
-| C7 to C13, D15 to D18 | `validation/blackwell/` | 55 probe programs, 109 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 22 runs also match the 3080 Ti. Every matrix row outside timing has a run except NUM-05, RT-10 and RT-11 (its README says why). Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
+| C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 117 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 22 runs also match the 3080 Ti. Every matrix row outside timing has a run except NUM-05, RT-10 and RT-11 (its README says why). Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
 | C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema, predictions committed; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
 | E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
 | F24 | | still to decide: the budget for a second rental |

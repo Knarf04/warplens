@@ -59,11 +59,11 @@ Conventions used in the probes:
 | numerics and small formats | `NUM-nn` | 13 |
 | launch and runtime | `RT-nn` | 15 |
 | timing | `TIM-nn` | 20 |
-| **total** | | 119 |
+| **total** | | 120 |
 
 | Pass criterion | Rows |
 | --- | --- |
-| bit-exact | 72 |
+| bit-exact | 73 |
 | tolerance | 10 |
 | informational | 37 |
 

@@ -1186,6 +1186,7 @@ PTX is [coverage.md](coverage.md); anything not in it raises
   (no bf16, integer, FP8/FP6/FP4 or block-scaled MMAs), MN-major TF32
   operands, float16 accumulators, sparsity, the `16x32bx2` transfer shape,
   `.pack`/`.unpack`, `tcgen05.cp`, `tcgen05.shift`, `.exclusive` allocation,
+  a non-zero base offset in a shared-memory descriptor,
   partial commits. The FP8/FP4 formats exist as `cvt` conversions and in
   `warplens.numerics`, not as MMA kinds.
 

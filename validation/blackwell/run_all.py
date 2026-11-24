@@ -13,7 +13,8 @@ or faulted, which for some probes is the predicted outcome); launch-failed (the 
 printed LAUNCH FAILED: the driver could not load its kernels, e.g. PTX newer than the
 driver; nothing was tested); host-error (a host-side CUDA call failed); timeout; exit N or
 signal N (the program itself died); not built. In GPU mode the exit status is 1 when any
-probe is launch-failed, host-error or not built, and the summary says so in capitals.
+required run fails, times out unexpectedly, or lacks build/capture artifacts. Faults and
+hangs explicitly declared in the manifest remain observations, not collection failures.
 
 The toolkit that built the programs is compared with the one the committed predictions
 were made with (predicted/provenance.json). When they differ the run is flagged: a banner
@@ -64,6 +65,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 sys.path.insert(0, str(HERE))
+from provenance import archive_probes
 from manifest import PROBES, Probe  # noqa: E402
 from probe_process import forward_interrupts, run_process  # noqa: E402
 
@@ -179,11 +181,20 @@ def record_toolkit(out: Path, binaries: Path) -> dict[str, str]:
 def classify(status: str, stdout: bytes) -> str:
     """Name the two failures that are not results of a test: the program said it could not
     load its kernels, or a host-side CUDA call failed."""
-    if status.startswith("exit") and (stdout.startswith(b"LAUNCH FAILED") or b"\nLAUNCH FAILED" in stdout):
+    if (stdout.startswith(b"LAUNCH FAILED:") or b"\nLAUNCH FAILED:" in stdout):
         return "launch-failed"
-    if status.startswith("exit") and (stdout.startswith(b"HOST ERROR") or b"\nHOST ERROR" in stdout):
+    if (stdout.startswith(b"HOST ERROR:") or b"\nHOST ERROR:" in stdout):
         return "host-error"
     return status
+
+
+def expected_outcome(probe: Probe, status: str, stdout: bytes) -> bool:
+    """Only the manifest may allow a hardware fault or timeout as an observation."""
+    if status == "ok":
+        return b"KERNEL FAILED" not in stdout
+    if status == "timeout":
+        return probe.risk == "hang"
+    return status == "exit 3" and b"KERNEL FAILED" in stdout and bool(probe.risk)
 
 
 def choose_binaries(which: str, out: Path) -> Path:
@@ -320,6 +331,12 @@ def main() -> int:
     if args.mode == "predict":
         write_provenance(partial=bool(args.only))
 
+    artifact_errors = archive_probes(out, HERE, binaries, probes, mode=args.mode)
+    if artifact_errors:
+        infrastructure_failures += 1
+        (out / "PROVENANCE-ERRORS.txt").write_text("\n".join(artifact_errors) + "\n")
+        print("Incomplete probe provenance: " + "; ".join(artifact_errors), flush=True)
+
     rows = []
 
     def one(probe: Probe):
@@ -334,6 +351,8 @@ def main() -> int:
     with concurrent.futures.ThreadPoolExecutor(workers) as pool:
         for probe, status, seconds, stdout, stderr in pool.map(one, probes):
             if status.startswith(("not built", "not run")):
+                infrastructure_failures += 1
+            if args.mode == "gpu" and not expected_outcome(probe, status, stdout):
                 infrastructure_failures += 1
             save(out, probe.name, stdout, stderr)
             command = " ".join([probe.program, *probe.args])

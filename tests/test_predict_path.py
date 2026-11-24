@@ -207,7 +207,8 @@ def test_the_gpu_steps_that_use_tvm_get_the_cuda_runtime_on_their_library_path(t
         sys.path.remove(str(SUITE / "e2e"))
     text = (SUITE / "e2e" / "run_e2e.py").read_text()
     assert 'uses_tvm = ("e2e/unchanged_scripts.tirx", "e2e/book_hgemm")' in text
-    assert "env=tvm_env if name in uses_tvm else env" in text
+    assert "step_env = dict(tvm_env if name in uses_tvm else env)" in text
+    assert "env=step_env" in text
     prefix = tmp_path / "env"
     (prefix / "lib").mkdir(parents=True)
     monkeypatch.setattr(sys, "prefix", str(prefix))

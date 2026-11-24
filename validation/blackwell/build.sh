@@ -26,6 +26,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 NVCC="${NVCC:-nvcc}"
+PYTHON="${PYTHON:-python3}"
 native=0
 ampere=0
 # What an Ampere GPU can run: mbarrier.init / arrive / test_wait, the host-only program, the
@@ -63,7 +64,7 @@ if [[ "$ampere" == 1 ]]; then
   record_toolkit bin-ampere "$HW_NVCC"
   for probe in "${AMPERE_PROBES[@]}"; do
     mkdir -p "bin-ampere/$(dirname "$probe")"
-    "$HW_NVCC" -std=c++17 -O2 -w -arch="${HW_ARCH:-sm_86}" -DPROBE_AMPERE "$probe.cu" -o "bin-ampere/$probe"
+    "$PYTHON" provenance.py --output "bin-ampere/$probe" --source "$probe.cu" -- "$HW_NVCC" -std=c++17 -O2 -w -arch="${HW_ARCH:-sm_86}" -DPROBE_AMPERE "$probe.cu" -o "bin-ampere/$probe"
     echo "built bin-ampere/$probe"
   done
   exit 0
@@ -76,19 +77,19 @@ command -v "$NVCC" >/dev/null || { echo "error: $NVCC not found" >&2; exit 1; }
 build_one() {
   local probe="$1" native="$2" flags="-std=c++17 -O2 -w"
   mkdir -p "bin/$(dirname "$probe")"
-  "$NVCC" $flags -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared \
+  "$PYTHON" provenance.py --output "bin/$probe" --source "$probe.cu" -- "$NVCC" $flags -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared \
     "$probe.cu" -o "bin/$probe" || { echo "FAILED (PTX program): $probe"; return 1; }
   "$NVCC" $flags -gencode arch=compute_100a,code=sm_100a -c "$probe.cu" -o "bin/$probe.o" \
     || { echo "FAILED (ptxas for sm_100a): $probe"; return 1; }
   if [[ "$native" == 1 ]]; then
     mkdir -p "bin-native/$(dirname "$probe")"
-    "$NVCC" $flags -gencode arch=compute_100a,code=sm_100a --cudart shared "$probe.cu" -o "bin-native/$probe" \
+    "$PYTHON" provenance.py --output "bin-native/$probe" --source "$probe.cu" -- "$NVCC" $flags -gencode arch=compute_100a,code=sm_100a --cudart shared "$probe.cu" -o "bin-native/$probe" \
       || { echo "FAILED (native program): $probe"; return 1; }
   fi
   echo "built $probe"
 }
 export -f build_one
-export NVCC
+export NVCC PYTHON
 record_toolkit bin "$NVCC"
 [[ "$native" == 1 ]] && record_toolkit bin-native "$NVCC"
 

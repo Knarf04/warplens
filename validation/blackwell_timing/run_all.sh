@@ -48,7 +48,8 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 [[ -n "$OUT" ]] || OUT="results_$(hostname -s 2>/dev/null || echo host)_$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "$OUT"
+mkdir -p "$OUT/artifacts/binaries"
+: > "$OUT/artifacts/SHA256SUMS"
 
 if [[ ! -x "$BIN/launch" ]]; then
   echo "run_all: $BIN is not built; building" >&2
@@ -112,6 +113,13 @@ run_one() {  # name, program, extra arguments...
     echo "$name: missing program $program" | tee -a "$OUT/status.txt" >&2
     failed=$((failed + 1)); return
   fi
+  # Keep the exact program and invocation with the raw trial samples. The frozen
+  # source tree in the outer rental archive supplies its build script and sources.
+  mkdir -p "$OUT/artifacts/binaries" || { failed=$((failed + 1)); return; }
+  cp "$program" "$OUT/artifacts/binaries/$name" || { failed=$((failed + 1)); return; }
+  (cd "$OUT/artifacts" && sha256sum "binaries/$name") >> "$OUT/artifacts/SHA256SUMS"
+  printf '%q ' "$program" --trials "$TRIALS" --scale "$SCALE" "$@" > "$OUT/artifacts/$name.command"
+  printf '\n' >> "$OUT/artifacts/$name.command"
   local start=$SECONDS code
   timeout --kill-after=10 "$TIMEOUT" "$program" --trials "$TRIALS" --scale "$SCALE" "$@" \
     > "$OUT/$name.out" 2> "$OUT/$name.err"

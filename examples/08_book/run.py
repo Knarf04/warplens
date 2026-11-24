@@ -13,8 +13,11 @@ run in the simulator. And the target asks for PTX, which the simulator needs and
 Needs: pip install apache-tvm-tirx cuda-bindings
 """
 
+import hashlib
 import linecache
+import os
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -49,17 +52,26 @@ def kernels(book: Path) -> dict:
     return found
 
 
-def run(name: str, build, device, M: int, N: int, K: int) -> None:
+def run(name: str, build, device, M: int, N: int, K: int, *, book_provenance=None) -> None:
     target = tvm_tirx.target.Target({"kind": "cuda", "backend_config": {"cuda": {"target_format": "ptx"}}})
     executable = tvm_tirx.tirx.compile(tvm_tirx.IRModule({"main": build(M, N, K)}), target=target)
     rng = np.random.default_rng(0)
     a = rng.standard_normal((M, K)).astype(np.float16)
     b = rng.standard_normal((N, K)).astype(np.float16)
     A, B = tvm_tirx.runtime.tensor(a, device=device), tvm_tirx.runtime.tensor(b, device=device)
-    D = tvm_tirx.runtime.tensor(np.zeros((M, N), dtype=np.float16), device=device)
+    initial = np.zeros((M, N), dtype=np.float16)
+    D = tvm_tirx.runtime.tensor(initial, device=device)
     start = time.perf_counter()
     executable.mod(A, B, D)
     got = D.numpy()
+    if os.environ.get("WARPLENS_CAPTURE_DIR"):
+        from validation.blackwell.frontend_capture import tvm_case
+        tvm_case(f"book_hgemm_{name}", executable,
+                 inputs={"a": a, "b": b, "d": initial}, outputs={"d": got},
+                 comparison={"kind": "ulp", "max_ulp": 1},
+                 metadata={"dimensions": [M, N, K], "version": name, "book": book_provenance,
+                           "backend_config": {"cuda": {"target_format": "ptx"}},
+                           "numpy_self_check": {"rtol": 2e-2, "atol": 1e-2}})
     reference = (a.astype(np.float32) @ b.astype(np.float32).T).astype(np.float16)
     np.testing.assert_allclose(got, reference, rtol=2e-2, atol=1e-2)  # the book's tolerances
     error = float(np.abs(got.astype(np.float32) - reference.astype(np.float32)).max())
@@ -70,7 +82,15 @@ def run(name: str, build, device, M: int, N: int, K: int) -> None:
 def main(argv: list[str]) -> int:
     if not argv or not (Path(argv[0]) / CHAPTERS[0] / "index.md").is_file():
         sys.exit(__doc__)
-    found = kernels(Path(argv[0]))
+    book = Path(argv[0]).resolve()
+    found = kernels(book)
+    book_provenance = None
+    if os.environ.get("WARPLENS_CAPTURE_DIR"):
+        revision = subprocess.run(["git", "-C", str(book), "rev-parse", "HEAD"],
+                                  capture_output=True, text=True, check=True).stdout.strip()
+        book_provenance = {"commit": revision, "chapters": {
+            chapter: hashlib.sha256((book / chapter / "index.md").read_bytes()).hexdigest()
+            for chapter in CHAPTERS}}
     wanted = argv[1:] or sorted(found, key=lambda v: int(v[1:]))
     device = tvm_tirx.cuda(0)
     failed = 0
@@ -78,7 +98,8 @@ def main(argv: list[str]) -> int:
         if name not in found:
             sys.exit(f"no hgemm_{name} in the book; it has {', '.join(sorted(found))}")
         try:
-            run(name, found[name], device, *SIZES.get(name, (128, 128, 64)))
+            run(name, found[name], device, *SIZES.get(name, (128, 128, 64)),
+                book_provenance=book_provenance)
         except Exception as error:  # report every kernel, then fail
             failed += 1
             first = str(error).strip().splitlines()

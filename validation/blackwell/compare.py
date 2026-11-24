@@ -49,6 +49,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from manifest import E2E, PROBES  # noqa: E402
+from e2e_checks import EXPECTED_CASES, completion_errors
+from provenance import validate_probe_archive
+from capture import validate_capture_tree  # noqa: E402
 
 HEX_WORD = re.compile(r"^[0-9a-f]{8}$")
 E2E_KEY = re.compile(r"Relative error|Execution is|max abs error|matches NumPy|FAILED|SKIPPED|rror")
@@ -209,7 +212,8 @@ def main() -> int:
         if args.require_same_toolkit:
             return 3
 
-    rows, details, bad, unverified = [], [], 0, 0
+    artifact_errors = validate_probe_archive(results, {p.program for p in PROBES})
+    rows, details, bad, unverified = [], artifact_errors, int(bool(artifact_errors)), 0
     for probe in PROBES:
         status = statuses.get(probe.name)
         got_text = read(results / (probe.name + ".stdout"))
@@ -275,14 +279,21 @@ def main() -> int:
 
     for name in E2E:
         status = statuses.get(name)
+        text = read(results / (name + ".stdout"))
+        errors = completion_errors(name, status, text)
+        if status == "ok":
+            errors.extend(validate_capture_tree(results / "captures" / name.removeprefix("e2e/"), EXPECTED_CASES[name]))
+        bad += bool(errors)
         if status is None:
-            rows.append((name, "not run", ""))
+            rows.append((name, "not run", "missing required end-to-end run"))
             continue
         got, want = key_lines(read(results / (name + ".stdout"))), key_lines(read(predicted / (name + ".txt")))
         verdict = {"ok": "informational", "timeout": "timed out"}.get(status, "crashed")
         if status.startswith("skipped"):
             verdict = "not run"
-        rows.append((name, verdict, status if status != "ok" else f"{len(got)} result line(s), below"))
+        elif errors and status == "ok":
+            verdict = "verification failed"
+        rows.append((name, verdict, "; ".join(errors) if errors else f"{len(got)} result line(s), below"))
         details += [f"{name}: result lines, GPU then simulator"] + ["    GPU: " + l[:160] for l in got[:12]] + \
                    ["    sim: " + l[:160] for l in want[:12]]
         if got != want and claims(got) == claims(want):

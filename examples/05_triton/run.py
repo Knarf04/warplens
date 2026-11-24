@@ -8,6 +8,7 @@ Triton compiles each kernel for sm_100a on this machine and warplens executes th
 For the matmul, Triton emits a tcgen05 MMA: the same tensor core the CUTLASS examples use.
 """
 
+import os
 import warnings
 
 import numpy as np
@@ -15,6 +16,11 @@ import triton
 import triton.language as tl
 
 import warplens.triton_driver as wt
+
+
+def capturing():
+    return bool(os.environ.get("WARPLENS_CAPTURE_DIR"))
+
 
 warnings.filterwarnings("ignore", module="triton")
 
@@ -56,20 +62,43 @@ def matmul_kernel(a_ptr, b_ptr, c_ptr, M, N, K, stride_am, stride_ak, stride_bk,
 def vector_add(gpu, n=1000, block=128):
     rng = np.random.default_rng(0)
     a, b = rng.standard_normal(n).astype(np.float32), rng.standard_normal(n).astype(np.float32)
-    out = gpu.empty(n, "float32")
-    add_kernel[(triton.cdiv(n, block),)](gpu.tensor(a), gpu.tensor(b), out, n, BLOCK=block)
-    return out.numpy(), a + b, gpu.last_stats
+    initial = np.zeros(n, dtype=np.float32)
+    out = gpu.tensor(initial) if capturing() else gpu.empty(n, "float32")
+    grid = (triton.cdiv(n, block),)
+    compiled = add_kernel[grid](gpu.tensor(a), gpu.tensor(b), out, n, BLOCK=block)
+    got = out.numpy()
+    if capturing():
+        from validation.blackwell.frontend_capture import triton_case
+        triton_case("triton_vector_add", compiled, values={"n": n},
+                    pointers={"x_ptr": "a", "y_ptr": "b", "out_ptr": "out"}, grid=grid,
+                    inputs={"a": a, "b": b, "out": initial}, outputs={"out": got},
+                    comparison={"kind": "exact"})
+    np.testing.assert_array_equal(got, a + b)
+    return got, a + b, gpu.last_stats
 
 
 def matmul(gpu, M=256, N=128, K=96, block=(128, 64, 32)):
     rng = np.random.default_rng(1)
     a = rng.uniform(-1, 1, (M, K)).astype(np.float16)
     b = rng.uniform(-1, 1, (K, N)).astype(np.float16)
-    c = gpu.empty((M, N), "float32")
+    initial = np.zeros((M, N), dtype=np.float32)
+    c = gpu.tensor(initial) if capturing() else gpu.empty((M, N), "float32")
     grid = (triton.cdiv(M, block[0]), triton.cdiv(N, block[1]))
-    matmul_kernel[grid](gpu.tensor(a), gpu.tensor(b), c, M, N, K, K, 1, N, 1, N, 1,
+    compiled = matmul_kernel[grid](gpu.tensor(a), gpu.tensor(b), c, M, N, K, K, 1, N, 1, N, 1,
                         BLOCK_M=block[0], BLOCK_N=block[1], BLOCK_K=block[2])
-    return c.numpy(), a.astype(np.float32) @ b.astype(np.float32), gpu.last_stats
+    got = c.numpy()
+    reference = a.astype(np.float32) @ b.astype(np.float32)
+    tolerance = float(1e-5 * np.abs(reference).max())
+    if capturing():
+        from validation.blackwell.frontend_capture import triton_case
+        triton_case("triton_matmul", compiled,
+                    values={"M": M, "N": N, "K": K, "stride_am": K, "stride_ak": 1,
+                            "stride_bk": N, "stride_bn": 1, "stride_cm": N, "stride_cn": 1},
+                    pointers={"a_ptr": "a", "b_ptr": "b", "c_ptr": "c"}, grid=grid,
+                    inputs={"a": a, "b": b, "c": initial}, outputs={"c": got},
+                    comparison={"kind": "allclose", "rtol": 0, "atol": tolerance})
+    np.testing.assert_allclose(got, reference, rtol=0, atol=tolerance)
+    return got, reference, gpu.last_stats
 
 
 if __name__ == "__main__":

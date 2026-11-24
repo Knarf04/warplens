@@ -79,7 +79,7 @@ One command, no interaction. `run_all.py` builds (`build.sh --native`), records
 `nvidia-smi`, driver, toolkit and device, runs the 109 probe runs in manifest order, then the
 end-to-end programs, and writes `results/gpu-<host>-<time>.tar.gz` with every run's standard
 output, standard error and status (`status.tsv`), the build log and the environment. Bring
-the archive back; `compare.py` needs nothing but Python and this directory.
+the archive back; `compare.py` needs the pinned Python environment and this directory.
 
 Useful options: `--no-e2e` (probes only), `--only 'tmem/*'` (repeatable), `--no-build`,
 `--timeout-scale 2`, `--binaries native`.
@@ -162,8 +162,8 @@ run is isolated for that reason.
 | --- | --- | --- | --- | --- | --- |
 | `device_attributes` | `device_attributes` | RT-03 | the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives | runs | - |
 | `smem_limit` | `smem_limit` | RT-04 | a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory | runs | - |
-| `smem_optin` | `smem_optin` | RT-13 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
-| `smem_static` | `smem_static` | RT-13 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
+| `smem_optin` | `smem_optin` | RT-15 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
+| `smem_static` | `smem_static` | RT-15 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
 | `elect` | `elect` | RT-05 | elect.sync elects the lowest lane of the member mask; every executing lane gets its id | runs | - |
 | `elect.all` | `elect all` | RT-05 | lanes outside the member mask execute elect.sync too: the lowest lane of the mask is elected | runs | fault |
 | `elect.partial` | `elect partial` | RT-05 | the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected | runs | fault |
@@ -299,6 +299,7 @@ run is isolated for that reason.
 | `scalar_edges` | `scalar_edges` | NUM-11, NUM-12 | min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, rem, mul.hi and shifts at theirs | runs (8 finding(s)) | - |
 | `ampere_replay.minmax_cvt` | `ampere_replay minmax_cvt` | NUM-11 | as on an RTX 3080 Ti (validation/ampere/minmax_cvt_golden.txt): min/max over zeros, infinities and NaNs, and cvt to s32, u32, s64, u64 in four rounding modes, with the bits of NaN results | runs | - |
 | `ampere_replay.intdiv` | `ampere_replay intdiv` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/intdiv_golden.txt): div and rem on 16, 32 and 64 bits; by zero (unspecified in PTX) both give all ones, the minimum over -1 gives the minimum and 0 | runs (12 finding(s)) | - |
+| `ampere_replay.bitfield` | `ampere_replay bitfield` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/bitfield_golden.txt): bfi.b32, bfi.b64 and shf.{l,r}.{wrap,clamp}.b32 over positions and lengths up to and past the register width | runs | - |
 | `ampere_replay.nan` | `ampere_replay nan` | NUM-13 | as on an RTX 3080 Ti (validation/ampere/nan_golden.txt without its 44 cvt.ftz lines): the bits of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt, f32 and f64 | runs | - |
 | `ampere_replay.nan_cvt_ftz` | `ampere_replay nan_cvt_ftz` | NUM-13 | none: cvt.ftz.f64.f32 and cvt.rn.ftz.f32.f64 of NaNs, which the simulator does not implement; the 44 lines are to be read against the same lines of validation/ampere/nan_golden.txt | not run (no prediction) | - |
 <!-- end of tables -->
@@ -629,3 +630,29 @@ and SIGTERM stop the detached probe processes before the collector exits.
 Do not let a test on one thread (`if (tid == 0) {...}`) run straight into a warp-wide
 instruction (`tcgen05.alloc`, anything `.sync.aligned`) or into code that depends on what
 that thread did: put a `__syncthreads()` between them. Finding 16 says why.
+
+
+### Complete capture and collection failures
+
+A full collection fails after archiving when any required end-to-end program is missing,
+skipped, times out, returns a failure, or omits its numerical success result or complete
+capture cases. CUTLASS's exit-zero failure messages do not count as success. Each frontend
+step writes its exact expected cases under `captures/<step>/`; array bytes, PTX, launch ABI
+and checksums are checked before the step passes. The CUTLASS steps run host-instrumented
+copies of the pinned tutorials, with unchanged kernels, to expose buffers and descriptor
+arguments. Their capture builds and raw dumps stay in the archive. Unmodified tutorial
+acceptance remains covered by the ordinary example tests.
+
+Probe faults and hangs remain valid observations only when the manifest explicitly permits
+them. Unexpected timeouts, process failures and launch/host errors fail collection. Every
+result and failure log is retained before returning nonzero.
+
+`probe-artifacts/` stores the manifest and case arguments, executed ELF programs, PTX
+extracted from those exact programs, build commands, compiler version and build-time local
+source/include snapshots with SHA-256 hashes. `build.sh` creates the required `.build.json`
+sidecars; old binaries without them must be rebuilt. The native fallback archives a separate
+PTX executable built from identical local sources and compiler version. This is a reproducible
+simulator input, **not proof that the native backend consumed that PTX**. Toolkit headers and
+compiler binaries are identified by the recorded environment rather than copied. The remote
+archive separately includes a frozen tracked simulator source tree. `compare.py` rejects
+missing or changed probe artifacts and incomplete frontend captures.

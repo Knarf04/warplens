@@ -173,3 +173,15 @@ def test_flush_to_zero_arithmetic_matches_real_gpu(sim):
         assert not len(wrong), (f"{body} {len(wrong)} of {n} differ, e.g. " +
                                 "; ".join(f"{cases[i, 1]:08x} {cases[i, 2]:08x} {cases[i, 3]:08x} -> gpu "
                                           f"{expect[i]:08x}, sim {got[i]:08x}" for i in wrong[:6]))
+
+
+def test_device_function_calls_match_real_gpu(sim):
+    """call_golden.txt is bin/call_golden on an RTX 3080 Ti: 256 threads each call functions the
+    compiler did not inline (early returns, nested calls, a local array, mixed argument types,
+    a store through a pointer, and a call only some lanes make)."""
+    expect = np.loadtxt(AMPERE / "call_golden.txt", dtype=np.int64).astype(np.int32)
+    assert expect.shape == (256, 5)
+    out = sim.empty(5 * 256, "s32")
+    stats = sim.launch(AMPERE / "call_probe.ptx", "call_probe", grid=4, block=64, args=[out])
+    assert not stats.findings
+    np.testing.assert_array_equal(out.numpy().reshape(256, 5), expect)

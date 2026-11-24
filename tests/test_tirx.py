@@ -24,6 +24,7 @@ def test_tirx_script_compiles_for_blackwell_and_launches_in_the_simulator():
     done = run()
     assert done.returncode == 0, done.stdout[-1500:] + done.stderr[-1500:]
     assert "on compute capability 10.0: matches NumPy" in done.stdout
+    assert "the last thread is 63 of block 3" in done.stdout  # through a call to a device function
     assert "1 kernel launch(es) simulated on B200, 0 finding(s)" in done.stderr
     assert "saxpy_kernel: 4 CTA(s)" in done.stderr
 

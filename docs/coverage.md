@@ -23,7 +23,8 @@ that names the instruction and its PTX line.
 | `.global` / `.const` variables with numeric initializers, `.local` variables (one copy per thread) | yes |
 | structs passed by value (`.param .align 8 .b8 name[24]`, read with `ld.param` at an offset) | yes; pass bytes, a NumPy record or a ctypes structure |
 | `.extern .func` declarations and `call` | only `vprintf` (device `printf`); its text is returned in `stats.output` |
-| `.func` definitions, calls to other functions, `.tex` | no |
+| `.func` definitions and calls to them | yes, with scalar parameters and results (see Control below); they are in `module.device_functions`, apart from the kernels |
+| `.tex` | no |
 
 ## Instructions
 
@@ -46,7 +47,7 @@ that names the instruction and its PTX line.
 | TMA | `cp.async.bulk.tensor.{1..5}d` load (`shared <- global`, `.mbarrier::complete_tx::bytes`) and store (`global <- shared`, `.bulk_group`), tile mode; `cp.async.bulk` without a tensor map; `.commit_group`, `.wait_group[.read]`; `prefetch.tensormap` and `cp.async.bulk.prefetch` (no-ops) | no multicast, im2col, `cp.reduce`, `tensormap.replace`; `.L2::cache_hint` ignored |
 | tcgen05 | `tcgen05.alloc`, `.dealloc`, `.relinquish_alloc_permit` (`cta_group::1`); `.mma` `kind::f16` / `kind::tf32` with K-major shared-memory operands, plus MN-major for `kind::f16`, and float32 accumulators, M = 64 or 128, optional accumulator scaling; per-thread `.commit` to an mbarrier; `.ld` / `.st` shapes `32x32b`, `16x64b`, `16x128b`, `16x256b` with supported power-of-two `.xN`; `.wait::ld/st` and `.fence::*` | no `cta_group::2`, TMEM operand A, TF32 MN-major (requires the unimplemented 128B swizzle with 32B atomicity), other kinds, `16x32bx2`, `.pack`/`.unpack`, `.cp`, `.shift`, `.exclusive`, or partial commits; wait/fence model limitations are in `m3.md` |
 | Fences | `fence.proxy.async[.global/.shared::cta/.shared::cluster]`; `fence.mbarrier_init.release.cluster`, `fence.{acq_rel,sc}.{cta,cluster,gpu,sys}`, `fence.proxy.alias` | only async fences affecting shared memory change checker state; other proxy modes are unsupported |
-| Control | `bra`, `bra.uni`, `ret`, `exit` | no `brx.idx`, no `call` |
+| Control | `bra`, `bra.uni`, `ret`, `exit`; `call` to a `.func` defined in the module, with scalar arguments and results | calls are inlined before the kernel runs, each call site getting its own copy of the callee's locals; checked on a GPU. No `brx.idx`, recursion, indirect calls, calls under a predicate, or by-value struct arguments |
 
 ## Special registers
 

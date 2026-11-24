@@ -57,8 +57,8 @@ def test_errors_name_the_line():
 def test_unsupported_constructs_are_hard_errors():
     with pytest.raises(warplens.UnsupportedError, match=r"`\.tex`"):
         kernel(".tex .u64 sampler;")
-    with pytest.raises(warplens.UnsupportedError, match=r"module-level directive `\.func`"):
-        warplens.parse_ptx(HEADER + ".func helper () { ret; }")
+    with pytest.raises(warplens.UnsupportedError, match=r"module-level directive `\.tex`"):
+        warplens.parse_ptx(HEADER + ".tex .u64 sampler;")
 
 
 @pytest.mark.parametrize("literal", [

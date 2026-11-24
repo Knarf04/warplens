@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from ..errors import UnsupportedError
 from ..frontend.cfg import reconvergence_points
+from ..frontend.inline import inline_calls
 from ..frontend.ir import Function, Module
 from ..units import barrier as _barrier  # noqa: F401  (these imports register handlers)
 from ..units import call as _call  # noqa: F401
@@ -20,6 +21,7 @@ def _align_up(x: int, align: int) -> int:
 class Program:
     def __init__(self, module: Module, fn: Function, global_symbols: dict[str, int] | None = None):
         self.module = module
+        fn = inline_calls(module, fn)  # calls to the module's own device functions disappear here
         self.fn = fn
         self.instrs = fn.instrs
         self.exit_pc = len(fn.instrs)

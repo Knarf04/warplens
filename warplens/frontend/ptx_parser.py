@@ -207,24 +207,37 @@ class _Parser:
             elif t.value == ".entry":
                 fn = self.function(t)
                 mod.functions[fn.name] = fn
+            elif t.value == ".func":  # a device function; a declaration without a body is skipped
+                fn = self.function(t, device=True)
+                if fn is not None:
+                    mod.device_functions[fn.name] = fn
             else:
                 what = "directive" if t.value.startswith(".") else "token"
                 raise self.unsupported(t, f"unsupported module-level {what} `{t.value}`")
         return mod
 
-    def function(self, entry_tok: _Tok) -> Function:
-        fn = Function(name=self.expect_kind("word", "a function name").value, line=entry_tok.line)
+    def param_list(self) -> list[Param]:
+        """`(.param ..., .param ...)`, with the opening parenthesis already consumed."""
+        params = []
+        if not self.accept(")"):
+            while True:
+                params.append(self.param())
+                if self.accept(")"):
+                    break
+                self.expect(",")
+        return params
+
+    def function(self, entry_tok: _Tok, device: bool = False) -> Function | None:
+        rets = self.param_list() if device and self.accept("(") else []  # `.func (ret) name (params)`
+        fn = Function(name=self.expect_kind("word", "a function name").value, rets=rets, line=entry_tok.line)
         if self.accept("("):
-            if not self.accept(")"):
-                while True:
-                    fn.params.append(self.param())
-                    if self.accept(")"):
-                        break
-                    self.expect(",")
+            fn.params = self.param_list()
         # Performance-tuning directives (.maxntid, .reqntid, ...) sit before the body.
         while self.peek().value != "{":
             t = self.next()
             if t.value == ";":
+                if device:
+                    return None
                 raise self.unsupported(entry_tok, "entry declarations without a body are not supported yet")
             if t.kind == "eof":
                 raise self.syntax(t, f"function `{fn.name}` has no body")

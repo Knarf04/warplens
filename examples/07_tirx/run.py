@@ -10,9 +10,6 @@ reports a compute capability of 10.0, so TIRx compiles for sm_100a. The one thin
 has to ask for is PTX: by default TIRx hands the driver machine code, which only a real GPU
 can run. A GPU accepts PTX as well, as long as its driver is at least as new as the NVRTC
 that wrote the PTX.
-
-Not here: `T.cuda.printf`. TIRx compiles it to a device function that is called rather than
-inlined, and warplens does not run calls to device functions yet.
 """
 
 import numpy as np
@@ -28,6 +25,8 @@ def saxpy(x: T.Tensor((N,), "float32"), y: T.Tensor((N,), "float32")):
     with T.device_entry(launch=T.cuda.LaunchConfig(grid=N // BLOCK, block=BLOCK), backend_config=PTX):
         i = T.cuda.block_idx("x") * BLOCK + T.cuda.thread_idx("x")
         y[i] = T.float32(2.5) * x[i] + y[i]
+        if i == N - 1:  # TIRx makes printf a device function, called rather than inlined
+            T.cuda.printf("the last thread is %d of block %d\n", T.cuda.thread_idx("x"), T.cuda.block_idx("x"))
 
 
 executable = tvm_tirx.tirx.compile(tvm_tirx.IRModule({"main": saxpy}), target="cuda")

@@ -128,6 +128,7 @@ class GlobalVar:
 class Function:
     name: str
     params: list[Param] = field(default_factory=list)
+    rets: list[Param] = field(default_factory=list)  # return values of a `.func`
     regs: dict[str, str] = field(default_factory=dict)  # name -> PTX type
     instrs: list[Instr] = field(default_factory=list)
     labels: dict[str, int] = field(default_factory=dict)  # name -> instruction index
@@ -143,7 +144,8 @@ class Module:
     version: str = ""
     target: str = ""
     address_size: int = 64
-    functions: dict[str, Function] = field(default_factory=dict)
+    functions: dict[str, Function] = field(default_factory=dict)  # the kernels (`.entry`)
+    device_functions: dict[str, Function] = field(default_factory=dict)  # `.func` with a body
     shared: list[SharedVar] = field(default_factory=list)
     globals: list[GlobalVar] = field(default_factory=list)
     extern_funcs: set[str] = field(default_factory=set)

@@ -18,5 +18,20 @@ env/setup.sh --locked    # recreate exactly from the lock file
 conda activate warplens  # or: conda run -n warplens <command>
 ```
 
-To change the CUDA version, edit the `cuda-version` pin in `environment.yml`
-and rerun `env/setup.sh`.
+## Changing the toolkit
+
+`environment.yml` pins `cuda-nvcc`, `cuda-cudart-dev` and `cuda-nvrtc` to one exact
+version (13.5.37), the one the committed predictions were made with. CI's `full` job
+builds its env from that file, so a new conda-forge release does not reach CI by itself,
+and `check.sh` stays an error for any other nvcc: a rental run built by another compiler
+must not be compared silently. Moving to another toolkit is one commit that does all of:
+
+1. edit the three pins in `environment.yml` (and `cuda-version` for another release), and
+   `CUDA_NVCC`, `CUDA_CUDART_DEV`, `CUDA_NVRTC` (and `CUDA_VERSION`) in `remote/pins.env`;
+2. `env/setup.sh`: updates the env and rewrites `conda-linux-64.lock`; its closing
+   `check.sh` fails at this point, because the predictions still name the old nvcc;
+3. `validation/regenerate_predictions.sh --book <clone>`: rewrites the predictions,
+   `provenance.json` and `meta.json` with the new nvcc; read the diff, since a change of
+   compiler may change a prediction;
+4. `conda run -n warplens env/check.sh`, then the tests `regenerate_predictions.sh --help`
+   names. `tests/test_rental_harness.py` fails while the four files disagree.

@@ -164,8 +164,8 @@ run is isolated for that reason.
 | --- | --- | --- | --- | --- | --- |
 | `device_attributes` | `device_attributes` | RT-03 | the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives | runs | - |
 | `smem_limit` | `smem_limit` | RT-04 | a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory | runs | - |
-| `smem_optin` | `smem_optin` | RT-13 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
-| `smem_static` | `smem_static` | RT-13 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
+| `smem_optin` | `smem_optin` | RT-15 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
+| `smem_static` | `smem_static` | RT-15 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
 | `elect` | `elect` | RT-05 | elect.sync elects the lowest lane of the member mask; every executing lane gets its id | runs | - |
 | `elect.all` | `elect all` | RT-05 | lanes outside the member mask execute elect.sync too: the lowest lane of the mask is elected | runs | fault |
 | `elect.partial` | `elect partial` | RT-05 | the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected | runs | fault |
@@ -301,6 +301,7 @@ run is isolated for that reason.
 | `scalar_edges` | `scalar_edges` | NUM-11, NUM-12 | min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, rem, mul.hi and shifts at theirs | runs (8 finding(s)) | - |
 | `ampere_replay.minmax_cvt` | `ampere_replay minmax_cvt` | NUM-11 | as on an RTX 3080 Ti (validation/ampere/minmax_cvt_golden.txt): min/max over zeros, infinities and NaNs, and cvt to s32, u32, s64, u64 in four rounding modes, with the bits of NaN results | runs | - |
 | `ampere_replay.intdiv` | `ampere_replay intdiv` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/intdiv_golden.txt): div and rem on 16, 32 and 64 bits; by zero (unspecified in PTX) both give all ones, the minimum over -1 gives the minimum and 0 | runs (12 finding(s)) | - |
+| `ampere_replay.bitfield` | `ampere_replay bitfield` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/bitfield_golden.txt): bfi.b32, bfi.b64 and shf.{l,r}.{wrap,clamp}.b32 over positions and lengths up to and past the register width | runs | - |
 | `ampere_replay.nan` | `ampere_replay nan` | NUM-13 | as on an RTX 3080 Ti (validation/ampere/nan_golden.txt without its 44 cvt.ftz lines): the bits of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt, f32 and f64 | runs | - |
 | `ampere_replay.nan_cvt_ftz` | `ampere_replay nan_cvt_ftz` | NUM-13 | none: cvt.ftz.f64.f32 and cvt.rn.ftz.f32.f64 of NaNs, which the simulator does not implement; the 44 lines are to be read against the same lines of validation/ampere/nan_golden.txt | not run (no prediction) | - |
 <!-- end of tables -->

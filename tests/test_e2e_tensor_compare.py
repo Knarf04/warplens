@@ -386,3 +386,77 @@ def test_ulp_distance_crosses_zero_and_signs():
     assert compare_tensors(np.append(two, a[4]).astype("<f2"), a, criterion)[0]
     assert compare_tensors(a[:2], a[:3], criterion)[0]  # another shape
     assert compare_tensors(a[:0], a[:0], criterion)[0]  # nothing to compare is not a pass
+
+
+# e2e/triton_gpu.py asserts RT-07's criterion itself; PyTorch and the GPU are stood in for.
+
+class FakeTensor:
+    def __init__(self, array):
+        self.array = array
+
+    def cuda(self):
+        return self
+
+    def cpu(self):
+        return self
+
+    def numpy(self):
+        return self.array
+
+
+class FakeKernel:
+    def __init__(self, compute):
+        self.compute = compute
+
+    def __getitem__(self, grid):
+        return lambda *args, **constants: self.compute(*args)
+
+
+def triton_gpu_with(monkeypatch, add_error, matmul_error):
+    """Load e2e/triton_gpu.py with kernels that are exact except for one element."""
+    from types import ModuleType, SimpleNamespace
+    torch = ModuleType("torch")
+    torch.__version__, torch.float32 = "fake", "float32"
+    torch.from_numpy = lambda array: FakeTensor(array.copy())
+    torch.empty = lambda shape, dtype, device: FakeTensor(np.zeros(shape, np.float32))
+    torch.cuda = SimpleNamespace(is_available=lambda: True, get_device_name=lambda i: "fake", synchronize=lambda: None,
+                                 get_device_capability=lambda i: (10, 0), get_arch_list=lambda: ["sm_100"])
+    triton = ModuleType("triton")
+    triton.__version__, triton.cdiv = "fake", lambda a, b: -(-a // b)
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "triton", triton)
+    monkeypatch.delenv("WARPLENS_CAPTURE_DIR", raising=False)
+
+    def add(a, b, out, n):
+        out.array[:] = a.array + b.array
+        out.array[5] = add_error(out.array[5])
+
+    def matmul(a, b, c, *sizes):
+        c.array[:] = a.array.astype(np.float32) @ b.array.astype(np.float32)
+        c.array[9, 9] += np.float32(matmul_error * np.abs(c.array).max())
+
+    example = SimpleNamespace(add_kernel=FakeKernel(add), matmul_kernel=FakeKernel(matmul))
+    module = load("triton_gpu_under_test", SUITE / "e2e" / "triton_gpu.py")
+    monkeypatch.setattr(module.importlib.util, "spec_from_file_location",
+                        lambda *args: SimpleNamespace(loader=SimpleNamespace(exec_module=lambda m: None)))
+    monkeypatch.setattr(module.importlib.util, "module_from_spec", lambda spec: example)
+    return module
+
+
+@pytest.mark.parametrize("add_error,matmul_error,passes", [
+    (lambda x: x, 0.0, True),
+    (lambda x: x, 4e-6, True),                                  # inside 1e-5 * max|C|
+    (lambda x: x, 3e-5, False),                                 # outside it
+    (lambda x: x, float("nan"), False),
+    (lambda x: np.nextafter(x, np.float32(np.inf)), 0.0, False),  # the vector add must be identical
+    (lambda x: np.float32(np.nan), 0.0, False),
+])
+def test_triton_gpu_asserts_the_rt07_tolerance(monkeypatch, capsys, add_error, matmul_error, passes):
+    module = triton_gpu_with(monkeypatch, add_error, matmul_error)
+    if passes:
+        assert module.main() == 0
+        assert "matmul: max abs error vs NumPy" in capsys.readouterr().out
+    else:
+        with pytest.raises(AssertionError):
+            module.main()
+        assert "matmul: max abs error" not in capsys.readouterr().out

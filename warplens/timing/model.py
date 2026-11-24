@@ -182,6 +182,11 @@ class Timeline:
             label = "cp.async copy" if operation.kind == "copy" else f"TMA {operation.kind}"
             self.slice("TMA engine", label, start, done, bytes=nbytes,
                        from_hbm=int(fresh), issued_ns=issued, line=operation.ins.line)
+        elif operation.kind == "clc":
+            # A clusterlaunchcontrol.try_cancel response. How long the launch takes to answer
+            # is not known, so it is not modeled: the response lands as it is issued.
+            self.end = max(self.end, issued)
+            return issued
         elif operation.kind == "mma":
             flops = work.get("flops", 0.0)
             rate = self.flop_rate[work.get("kind", "f16")]

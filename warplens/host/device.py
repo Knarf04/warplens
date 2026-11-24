@@ -112,7 +112,8 @@ class Device:
 
     def launch(self, ptx, entry: str, *, grid, block, args=(), smem: int = 0, trace=None,
                max_steps: int | None = None, async_delay: int = 4, timing=False,
-               active_sms: int | None = None, cluster=None) -> LaunchStats:
+               active_sms: int | None = None, cluster=None,
+               clc_limit: int | None = None) -> LaunchStats:
         """Run kernel `entry` from `ptx` (a path or a parsed Module) to completion.
 
         `smem` is the dynamic shared memory per CTA in bytes, as passed to a
@@ -125,6 +126,12 @@ class Device:
         other parameters. `active_sms` is how many SMs are assumed to share the
         memory bandwidth (default: all of them). Without timing, `async_delay` is how
         many scheduling rounds a TMA copy takes to complete after it is issued.
+
+        Clusters start one at a time. A kernel that uses cluster launch control
+        (`clusterlaunchcontrol.try_cancel`) can cancel those that have not started and do
+        their work itself. `clc_limit` is how many cancellations each cluster that starts is
+        granted before its requests fail: None for as many as there are clusters left, 0 for
+        none, so that every cluster starts by itself. See docs/clc.md.
 
         `trace`, if given, is called as trace(warp, pc, instr, active_mask)
         before every instruction.
@@ -144,7 +151,7 @@ class Device:
         return run_kernel(self._programs[key], self.memory, grid=grid, block=block,
                           args=args, smem=smem, trace=trace, max_steps=max_steps,
                           async_delay=async_delay, timing=self._timing(timing, active_sms),
-                          cluster=cluster)
+                          cluster=cluster, clc_limit=clc_limit)
 
     def _timing(self, timing, active_sms):
         if timing is None or timing is False:

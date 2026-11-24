@@ -19,6 +19,11 @@ NP_TYPES: dict[str, np.dtype] = {
     "pred": np.dtype(np.bool_),
 }
 
+# A 128-bit register holds two 64-bit halves. Nothing computes with one: it is loaded, stored,
+# moved, and handed to `clusterlaunchcontrol.query_cancel`.
+B128 = np.dtype([("lo", "<u8"), ("hi", "<u8")])
+NP_TYPES["b128"] = B128
+
 UINT_BY_SIZE = {1: np.dtype(np.uint8), 2: np.dtype(np.uint16),
                 4: np.dtype(np.uint32), 8: np.dtype(np.uint64)}
 INT_BY_SIZE = {1: np.dtype(np.int8), 2: np.dtype(np.int16),
@@ -28,7 +33,7 @@ INT_BY_SIZE = {1: np.dtype(np.int8), 2: np.dtype(np.int16),
 def storage_dtype(ty: str) -> np.dtype:
     """Registers hold raw bits; the instruction type decides how to read them."""
     dt = NP_TYPES[ty]
-    return dt if dt.kind == "b" else UINT_BY_SIZE[dt.itemsize]
+    return dt if dt.kind in "bV" else UINT_BY_SIZE[dt.itemsize]
 
 
 @dataclass(frozen=True, slots=True)

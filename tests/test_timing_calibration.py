@@ -340,3 +340,46 @@ def test_clc_latency_needs_a_prediction_of_the_same_loop(tmp_path):
     assert "clc_latency_ns" not in {q["key"] for q in params}
     assert any(name == "clc_latency_ns" and "has no clc_latency_ns entry" in note for name, _, _, note in diag)
 
+
+# -- the active-SM assumption of the predictions, against the run ------------------------------
+
+def test_report_shows_the_assumed_active_sms_and_what_the_run_contradicts(tmp_path):
+    predicted = predicted_slopes()
+    cold = "tma/load/cold/bytes=16384/ctas={}"
+    lines = slope_lines("alu_chain/warps=1", predicted["alu_chain/warps=1"])
+    lines += slope_lines(cold.format(8), 190.0, "bytes=16384 nctas=8")
+    lines += slope_lines(cold.format("allsm"), 700.0, "bytes=16384 nctas=148")
+    result = fit.run(write_results(tmp_path / "same", lines), out=tmp_path / "fit_same")
+    assert not result["problems"]
+    table = [line for line in result["report"].splitlines() if line.startswith(f"| {cold.format(8)} |")]
+    assert table[-1].split("|")[5].strip() == "8"
+    with (result["out"] / "comparison.csv").open() as handle:
+        rows = {row.split(",")[0]: row.split(",") for row in handle.read().splitlines()}
+    assert rows["id"][4] == "predicted_active_sms"
+    assert (rows[cold.format(8)][4], rows[cold.format("allsm")][4], rows["alu_chain/warps=1"][4]) == ("8", "148", "1")
+
+    # Another GPU: 58 SMs, other per-SM limits, and "all SMs" is a grid of 58.
+    device = ("DEVICE bench=tma name=Other_GPU cc=10.0 sm_count=58 total_mem_bytes=1 synthetic=0 "
+              "smem_per_sm_bytes=102400 max_threads_per_sm=1536 max_blocks_per_sm=32")
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "tma.out").write_text("\n".join([device, *slope_lines(cold.format(8), 190.0, "bytes=16384 nctas=8"),
+                                              *slope_lines(cold.format("allsm"), 700.0, "bytes=16384 nctas=58")]) + "\n")
+    problems = "\n".join(fit.run(other, out=tmp_path / "fit_other")["problems"])
+    assert "the device has 58 SMs and the predictions place launches on 148" in problems
+    assert "smem_per_sm_bytes = 102400" in problems and "max_threads_per_sm = 1536" in problems
+    assert "max_blocks_per_sm" not in problems
+    assert "1 configuration(s) were launched with a grid" in problems
+    assert f"`{cold.format('allsm')}` (58 CTAs launched, 58 SMs; predicted for 148)" in problems
+
+
+def test_predictions_without_an_active_sm_assumption_are_flagged(tmp_path):
+    predicted = tmp_path / "predicted"
+    predicted.mkdir()
+    old = [" ".join(t for t in line.split() if not t.startswith(("sim_active_sms", "sim_ctas_per_sm", "sim_resident")))
+           for line in (PREDICTED / "alu_chain.out").read_text().splitlines()]
+    (predicted / "alu_chain.out").write_text("\n".join(old) + "\n")
+    lines = slope_lines("alu_chain/warps=1", 2.5)
+    result = fit.run(write_results(tmp_path / "r", lines), predicted=predicted, out=tmp_path / "fit")
+    assert any("record no active-SM assumption" in problem for problem in result["problems"])
+    assert result["params"]["clock_ghz"]["value"] == pytest.approx(1.5)

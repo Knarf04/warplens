@@ -15,7 +15,8 @@ Writes into --out (default RESULTS_DIR/fit):
   calibrated.yaml       the config given by --config with those entries replaced; loads with
                         warplens.timing.config.GpuConfig.load(path)
   comparison.csv    (c) per configuration: measured, the simulator's prediction with the
-                        current config (from --predicted, written by predict.py), the ratio
+                        current config (from --predicted, written by predict.py), the ratio,
+                        and how many SMs the prediction assumed the launch keeps busy
   report.md             all of the above as text; also printed
 
 Everything is a slope. A configuration is launched with two repetition counts; "ns per
@@ -456,6 +457,48 @@ def fmt(x, digits=4) -> str:
     return f"{x:.{digits}g}"
 
 
+def placement_problems(device: dict, placement: dict, meas: dict, pred: dict) -> list[str]:
+    """Where the run contradicts the active-SM assumption its predictions were made with
+    (predict.py: meta.json `placement`, and sim_active_sms on every predicted launch)."""
+    out = []
+    if not placement:
+        if pred and any("sim_active_sms" not in info["row"] for info in pred.values()):
+            out.append("the predictions record no active-SM assumption (an older predict.py made them): every "
+                       "launch was timed as if all SMs were busy")
+        return out
+    sms = device.get("sm_count")
+    try:
+        sms = float(sms) if sms else None
+    except ValueError:
+        sms = None
+    if sms and placement.get("sm_count") and sms != placement["sm_count"]:
+        out.append(f"the device has {sms:.0f} SMs and the predictions place launches on {placement['sm_count']}: "
+                   "every configuration that fills the device was predicted for another number of active SMs")
+    for key, assumed in (placement.get("limits") or {}).items():
+        try:
+            reported = float(device.get(key) or 0)
+        except ValueError:
+            continue
+        if reported and reported != assumed:
+            out.append(f"the device reports {key} = {reported:.0f}; the predictions' active-SM assumption used "
+                       f"{assumed}: CTAs per SM, and with them the CTAs resident at once, were computed for other limits")
+    if sms and placement.get("mode") == "launch":
+        differ = []
+        for ident, info in meas.items():
+            row, predicted = info["row"], pred.get(ident, {}).get("row", {})
+            # `nctas` is the grid of the launch, except in clc_latency/succeed/*, where it is the cluster size.
+            if ident in CLC_SUCCEED or "nctas" not in row or "sim_active_sms" not in predicted:
+                continue
+            implied = min(row["nctas"], sms)
+            if implied != predicted["sim_active_sms"]:
+                differ.append(f"`{ident}` ({row['nctas']:.0f} CTAs launched, {implied:.0f} SMs; predicted for "
+                              f"{predicted['sim_active_sms']:.0f})")
+        if differ:
+            out.append(f"{len(differ)} configuration(s) were launched with a grid that keeps another number of SMs "
+                       "busy than their prediction assumed, e.g. " + ", ".join(differ[:3]))
+    return out
+
+
 def build_report(device, meas, pred, params, diag, cfg, problems, warnings, pred_status) -> str:
     out = ["# Timing calibration report", ""]
     out += [f"**WARNING: {w}**" for w in warnings] + ([""] if warnings else [])
@@ -487,8 +530,11 @@ def build_report(device, meas, pred, params, diag, cfg, problems, warnings, pred
     out += ["", "Other measured quantities:", "", "| quantity | value | unit | note |", "|---|---|---|---|"]
     out += [f"| {name} | {fmt(val, 5) if not isinstance(val, str) else val} | {unit} | {note} |" for name, val, unit, note in diag]
     out += ["", "## (c) Measured against the simulator's current prediction", "",
-            "Prediction: `warplens run --timing` on the same program (predict.py), ns per repetition.", "",
-            "| configuration | measured | predicted | measured / predicted |", "|---|---|---|---|"]
+            "Prediction: `warplens run --timing` on the same program (predict.py), ns per repetition. "
+            "\"SMs assumed\" is how many SMs the prediction took the launch to keep busy (they share HBM in "
+            "the model); it comes from the launch's shape, and nothing in a run measures it directly. What a "
+            "run can contradict is listed under \"Problems in the results\".", "",
+            "| configuration | measured | predicted | measured / predicted | SMs assumed |", "|---|---|---|---|---|"]
     for ident, info in meas.items():
         pi = pred.get(ident)
         if "ns_per_rep" in info:
@@ -503,7 +549,8 @@ def build_report(device, meas, pred, params, diag, cfg, problems, warnings, pred
             ratio = "n/a: the model predicts no cost"
         else:
             ratio = fmt(a / b)
-        out.append(f"| {ident}{unit} | {fmt(a)} | {fmt(b)} | {ratio} |")
+        assumed = (pi or {}).get("row", {}).get("sim_active_sms")
+        out.append(f"| {ident}{unit} | {fmt(a)} | {fmt(b)} | {ratio} | {'' if assumed is None else f'{assumed:.0f}'} |")
     if any(i in meas for i in CLC_SUCCEED):
         out += ["", "`clc_latency/succeed/*`: on a GPU many clusters start at once, so these two slopes are not "
                 "round trips and their ratios mean nothing; the kernel's own count is under \"Other measured "
@@ -522,6 +569,13 @@ def load_config_values(path: Path) -> dict:
     import yaml
     raw = yaml.safe_load(Path(path).read_text())
     return {k: float(v["value"]) for k, v in raw.items() if isinstance(v, dict) and "value" in v}
+
+
+def load_placement(path: Path) -> dict:
+    """The active-SM assumption recorded with the predictions in `path`; {} if there is none."""
+    import json
+    meta = Path(path) / "meta.json"
+    return (json.loads(meta.read_text()).get("placement") or {}) if meta.exists() else {}
 
 
 def load_predicted(path: Path) -> tuple[dict, dict, dict]:
@@ -543,6 +597,7 @@ def run(results: Path, predicted: Path = DEFAULT_PREDICTED, config: Path = DEFAU
     if pred_cfg and any(abs(pred_cfg.get(k, v) - v) > 1e-12 * abs(v) for k, v in cfg.items()):
         problems.append(f"the predictions in {predicted} were made with a config that differs from {config}; "
                         "the derived parameters use the predictions' config")
+    problems += placement_problems(device, load_placement(predicted), meas, pred)
     cfg_used = {**cfg, **pred_cfg}
     params, diag = derive(meas, pred, cfg_used, device, stat)
     _, warnings = provenance(device, results.name)
@@ -561,12 +616,15 @@ def run(results: Path, predicted: Path = DEFAULT_PREDICTED, config: Path = DEFAU
         writer.writerows(meas.values())
     with (out / "comparison.csv").open("w", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["id", "measured_ns_per_rep", "predicted_ns_per_rep", "measured_over_predicted"])
+        writer.writerow(["id", "measured_ns_per_rep", "predicted_ns_per_rep", "measured_over_predicted",
+                         "predicted_active_sms"])
         for ident, info in meas.items():
             a = info.get("ns_per_rep", info["launch_min_ns"])
             pi = pred.get(ident, {})
             b = pi.get("ns_per_rep", pi.get("launch_min_ns")) if "ns_per_rep" in info else pi.get("launch_min_ns")
-            writer.writerow([ident, a, "" if b is None else b, a / b if b and b > 0 else ""])
+            assumed = pi.get("row", {}).get("sim_active_sms")
+            writer.writerow([ident, a, "" if b is None else b, a / b if b and b > 0 else "",
+                             "" if assumed is None else int(assumed)])
     return {"device": device, "measured": meas, "predicted": pred, "params": {q["key"]: q for q in params},
             "diagnostics": diag, "report": report, "out": out, "problems": problems}
 

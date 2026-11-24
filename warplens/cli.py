@@ -3,14 +3,17 @@
     warplens run [options] program [arguments...]
 
 runs a program with its GPU work executed by the simulator. `program` is either a
-compiled CUDA executable, or a Python script that uses Triton (a `.py` file).
+compiled CUDA executable, or a Python script (a `.py` file) that uses Triton, TIRx or the
+CuTe DSL; `warplens run script.py` is `warplens run python script.py` with this interpreter.
 """
 
 from __future__ import annotations
 
 import argparse
+import atexit
 import fcntl
 import hashlib
+import json
 import os
 import shutil
 import signal
@@ -21,6 +24,9 @@ import tempfile
 from pathlib import Path
 
 SHIM_DIR = Path(__file__).resolve().parent / "shim"
+# What `warplens run` tells the Python programs it starts, as JSON: the model, the launch
+# options, and the file to report the launches of a Triton driver in. See `child_options`.
+RUN_OPTIONS = "WARPLENS_RUN_OPTIONS"
 
 BUILD_HINT = """\
 The program must carry PTX and use the shared CUDA runtime. Build it like this:
@@ -130,31 +136,87 @@ def short(name: str, width: int = 64) -> str:
     return name if len(name) <= width else name[:width - 3] + "..."
 
 
-def summary(launches, model: str) -> None:
+def launch_lines(name: str, stats) -> list[str]:
+    """The lines of the summary for one launch: what ran, then its findings."""
+    line = f"  {short(name)}: {stats.ctas} CTA(s), {stats.instructions} warp-instructions"
+    if stats.canceled_ctas:  # cluster launch control: their work was done by CTAs that did start
+        line = line.replace(" CTA(s)", f" CTA(s) of which {stats.canceled_ctas} canceled before starting")
+    if stats.timing is not None:
+        line += f", {stats.timing.time_ns:,.0f} ns simulated ({stats.timing.bottleneck}-bound)"
+    return [line, *("    " + str(finding).replace("\n", "\n    ") for finding in stats.findings)]
+
+
+def summary(launches, model: str, reported=()) -> None:
+    """`launches` are (kernel name, LaunchStats) of this process. `reported` are the launches
+    of a Triton driver in the program, as it wrote them: {"lines": [...], "findings": count}."""
     out = sys.stderr
-    findings = sum(len(s.findings) for _, s in launches)
-    print(f"warplens: {len(launches)} kernel launch(es) simulated on {model}, "
+    findings = sum(len(s.findings) for _, s in launches) + sum(r["findings"] for r in reported)
+    print(f"warplens: {len(launches) + len(reported)} kernel launch(es) simulated on {model}, "
           f"{findings} finding(s)", file=out)
     for name, stats in launches:
-        line = f"  {short(name)}: {stats.ctas} CTA(s), {stats.instructions} warp-instructions"
-        if stats.canceled_ctas:  # cluster launch control: their work was done by CTAs that did start
-            line = line.replace(" CTA(s)", f" CTA(s) of which {stats.canceled_ctas} canceled before starting")
-        if stats.timing is not None:
-            line += f", {stats.timing.time_ns:,.0f} ns simulated ({stats.timing.bottleneck}-bound)"
-        print(line, file=out)
-        for finding in stats.findings:
-            print("    " + str(finding).replace("\n", "\n    "), file=out)
+        print(*launch_lines(name, stats), sep="\n", file=out)
+    for launch in reported:
+        print(*launch["lines"], sep="\n", file=out)
+
+
+def launch_options(timing=False, timing_config=None, active_sms=None, clc_limit=None) -> dict:
+    """The keyword arguments of `Device.launch` that the options of `warplens run` stand for.
+    A timing config or an SM count asks for the timing model by itself."""
+    options = {}
+    if timing_config is not None:
+        from .timing.config import GpuConfig
+        options["timing"] = GpuConfig.load(timing_config)
+    elif timing or active_sms is not None:
+        options["timing"] = True
+    if active_sms is not None:
+        options["active_sms"] = active_sms
+    if clc_limit is not None:
+        options["clc_limit"] = clc_limit
+    return options
+
+
+def child_options(args) -> dict:
+    """The options of this run in the form that crosses to a Python program (RUN_OPTIONS)."""
+    config = getattr(args, "timing_config", None)
+    return {"model": args.model, "timing": bool(args.timing),
+            "timing_config": None if config is None else str(config),
+            "active_sms": getattr(args, "active_sms", None), "clc_limit": getattr(args, "clc_limit", None)}
+
+
+def install_triton_driver() -> None:
+    """In a Python program under `warplens run`, once it has imported Triton (called by
+    warplens/shim/python/sitecustomize.py): make Triton target the simulator with the options
+    of the run, and report the launches to `warplens run` when the program ends."""
+    from . import triton_driver
+    options = json.loads(os.environ.get(RUN_OPTIONS) or "{}")
+    report = options.pop("report", None)
+    options.pop("package", None)
+    driver = triton_driver.install(options.pop("model", "B200"), **launch_options(**options))
+
+    def tell() -> None:
+        launches = [{"lines": launch_lines(name, stats), "findings": len(stats.findings)}
+                    for name, stats in driver.launches]
+        if report and launches:
+            try:
+                with open(report, "a") as file:  # one line per process that launched
+                    file.write(json.dumps(launches) + "\n")
+            except OSError as error:
+                print(f"warplens: could not report the Triton launches: {error}", file=sys.stderr)
+
+    atexit.register(tell)
 
 
 def run_script(args) -> int:
-    """A Python script: make Triton target the simulator, then run the script in this process.
+    """A Python script, where the shim libraries cannot be had: make Triton target the
+    simulator, then run the script in this process. Only its Triton kernels are simulated.
     The script creates its tensors with `triton.runtime.driver.active.tensor(...)`."""
     import runpy
     try:
         from . import triton_driver
     except ImportError as exc:
         sys.exit(f"warplens: {exc}")
-    driver = triton_driver.install(args.model, **({"timing": True} if args.timing else {}))
+    options = child_options(args)
+    driver = triton_driver.install(options.pop("model"), **launch_options(**options))
     previous_argv, previous_path = sys.argv, sys.path[:]
     sys.argv = [args.program, *args.arguments]
     # run_path does not add a plain script's directory to the import path as
@@ -186,15 +248,35 @@ def run(args) -> int:
     if not Path(program).exists():
         sys.exit(f"warplens: no such program: {args.program}")
     program = str(Path(program).absolute())
-    if program.endswith(".py"):
+    # A Python script is run by this interpreter, like `warplens run python script.py`: under
+    # the shim, which serves TIRx and the CuTe DSL, and with the start-up hook that installs
+    # the Triton driver if the script imports Triton. One command for the three of them.
+    script = program.endswith(".py")
+    try:
+        lib = shim_libraries()
+    except SystemExit as failure:
+        if not script:
+            raise
+        # Triton needs neither a C compiler nor the CUDA headers, and must not start to.
+        print(f"{failure}\nwarplens: running {args.program} without the shim libraries: its Triton "
+              "kernels are simulated, but a TIRx or CuTe DSL script will not find a device",
+              file=sys.stderr)
+        lib = None
+    if lib is None:  # outside the handler, so that the script's own errors are not chained to it
         args.program = program
         return run_script(args)
-    lib = shim_libraries()
+    command = [sys.executable, program] if script else [program]
+    options = child_options(args)
+    launch = launch_options(**{k: v for k, v in options.items() if k != "model"})
     ours, theirs = socket.socketpair()
     env = dict(os.environ, WARPLENS_SHIM_FD=str(theirs.fileno()), WARPLENS_MODEL=args.model)
     scratch = tempfile.TemporaryDirectory(prefix="warplens_kept_ptx_")
-    server = ShimServer(args.model, timing=args.timing,
-                        kept_ptx=frontend_environment(env, args.model, lib, Path(scratch.name)))
+    handle, report = tempfile.mkstemp(prefix="warplens_triton_launches_")
+    os.close(handle)
+    env[RUN_OPTIONS] = json.dumps({**options, "report": report,
+                                   "package": str(Path(__file__).resolve().parent.parent)})
+    server = ShimServer(args.model, kept_ptx=frontend_environment(env, args.model, lib, Path(scratch.name)),
+                        **{"timing": False, **launch})
     env["LD_LIBRARY_PATH"] = f"{lib}:{env.get('LD_LIBRARY_PATH', '')}".rstrip(":")
     # Preload as well: a program built with an RPATH would otherwise find the real runtime first.
     shims = [str(p) for p in sorted(lib.glob("libcudart.so.*")) + [lib / "libcuda.so.1"]]
@@ -202,7 +284,7 @@ def run(args) -> int:
     child = None
     try:
         try:
-            child = subprocess.Popen([program, *args.arguments], env=env, pass_fds=[theirs.fileno()])
+            child = subprocess.Popen([*command, *args.arguments], env=env, pass_fds=[theirs.fileno()])
         except OSError as error:
             sys.exit(f"warplens: cannot execute {args.program}: {error.strerror}")
         theirs.close()
@@ -223,32 +305,85 @@ def run(args) -> int:
                     child.kill()
             child.wait()
         scratch.cleanup()
+        reported = []  # by the Triton driver of a Python program: see install_triton_driver
+        try:
+            for line in Path(report).read_text().splitlines():
+                reported += json.loads(line)
+        except (OSError, ValueError):
+            pass
+        Path(report).unlink(missing_ok=True)
 
     if not args.quiet:
         out = sys.stderr
-        if not server.launches:
+        if reported:
+            summary(server.launches, args.model, reported)
+        elif server.launches:  # two arguments: validation/blackwell_timing/predict.py replaces it
+            summary(server.launches, args.model)
+        elif script:
+            print("warplens: the script launched no kernels", file=out)
+        else:
             print("warplens: the program launched no kernels", file=out)
             if not server.machine_code and (server.needs_ptx or not server.modules):
                 print(BUILD_HINT, file=out)
-        else:
-            summary(server.launches, args.model)
     return code if code >= 0 else 128 - code
+
+
+def count(least: int):
+    """An argparse type: an integer that is at least `least`."""
+    def parse(text: str) -> int:
+        try:
+            value = int(text)
+        except ValueError:
+            value = None
+        if value is None or value < least:
+            raise argparse.ArgumentTypeError(f"must be an integer that is at least {least}, got {text!r}")
+        return value
+    return parse
+
+
+def check_timing(runner, args) -> None:
+    """Refuse a timing config or an SM count that no launch could use, before anything runs."""
+    if args.timing_config is None and args.active_sms is None:
+        return
+    from .errors import LaunchError
+    from .timing.config import GpuConfig
+    try:
+        config = GpuConfig.load(args.model if args.timing_config is None else args.timing_config)
+    except LaunchError as error:
+        runner.error(f"argument --timing-config: {error}")
+    if args.active_sms is not None and args.active_sms > config["sm_count"]:
+        runner.error(f"argument --active-sms: must be from 1 to {int(config['sm_count'])}, the SM count "
+                     f"of timing config `{config.name}`, got {args.active_sms}")
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="warplens", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
-    runner = commands.add_parser("run", help="run a compiled CUDA program or a Triton script in the simulator",
+    runner = commands.add_parser("run", help="run a compiled CUDA program, or a Triton, TIRx or CuTe DSL "
+                                             "script, in the simulator",
                                  epilog=BUILD_HINT, formatter_class=argparse.RawDescriptionHelpFormatter)
     runner.add_argument("--model", default="B200", choices=["B200", "B300"], help="GPU to simulate")
     runner.add_argument("--timing", action="store_true",
                         help="also run the approximate timing model (uncalibrated)")
+    runner.add_argument("--timing-config", metavar="CONFIG",
+                        help="the parameters of the timing model: a YAML file like warplens/configs/b200.yaml, "
+                             "or the name of a built-in config (b200, b300). Implies --timing. "
+                             "Default: the config of --model")
+    runner.add_argument("--active-sms", type=count(1), metavar="N",
+                        help="how many SMs the timing model assumes to share the memory bandwidth, from 1 to "
+                             "the SM count of the timing config. Implies --timing. Default: all of them")
+    runner.add_argument("--clc-limit", type=count(0), metavar="N",
+                        help="cluster launch control: how many cancellations each cluster that starts is "
+                             "granted before its requests fail; 0 makes every cluster start by itself. "
+                             "Default: every request is granted while clusters are left")
     runner.add_argument("--quiet", action="store_true", help="do not print the summary")
-    runner.add_argument("program")
+    runner.add_argument("program", help="a compiled CUDA executable, or a Python script (a .py file), "
+                                        "which is run by this Python interpreter")
     runner.add_argument("arguments", nargs=argparse.REMAINDER)
     runner.set_defaults(handler=run)
     args = parser.parse_args(argv)
+    check_timing(runner, args)
     def terminate(signum, _frame):
         raise SystemExit(128 + signum)
 

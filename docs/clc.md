@@ -123,8 +123,9 @@ That is what the manual calls undefined, so it is reported.
 - Clusters never run concurrently, so a kernel cannot be shown racing a cluster that is
   about to start, and the mix of started and canceled clusters comes from `clc_limit`,
   not from timing.
-- `clc_limit` is the only control, and only through the Python API. `warplens run` always
-  grants every request.
+- `clc_limit` is the only control: the `clc_limit` argument of `Device.launch`, or
+  `warplens run --clc-limit N` for every launch of a program. Without it every request is
+  granted while clusters are left.
 - The manual's example ends an iteration with
   `fence.proxy.async::generic.release.sync_restrict::shared::cta.cluster` and its
   `.acquire` counterpart. Those two fences are not implemented (they are rejected, not

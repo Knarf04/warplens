@@ -127,7 +127,7 @@ file checked in under `examples/`. The other ways in need more:
 | --- | --- |
 | Compile your own CUDA C++ to PTX | `nvcc` from CUDA 12.8 or newer (it must know `sm_100a`). No GPU or driver. |
 | `warplens run` on a compiled program, a TIRx script or a CuTe DSL script | Linux, a C compiler, and the CUDA toolkit headers. Two small shim libraries are compiled on first use (see below). |
-| Triton | `pip install -e ".[triton]"` (Triton 3.9 is what is tested). No shim. |
+| Triton | `pip install -e ".[triton]"` (Triton 3.9 is what is tested). No shim: where it cannot be built, `warplens run script.py` says so and runs the script in its own process, with only the Triton driver. |
 | TIRx | `pip install apache-tvm-tirx cuda-bindings`, and an NVRTC library that knows `sm_100a` (CUDA 12.8 or newer; the conda env has 13.5). |
 | The CuTe DSL | `pip install nvidia-cutlass-dsl` (4.8.1 is what is tested). |
 | The tutorial notebook | Jupyter (`pip install notebook`, or `nbclient` and `ipykernel` to execute it from a script), the TIRx packages, and a clone of the book. |
@@ -188,14 +188,17 @@ Python (5.1), or the program's own host code with its CUDA calls redirected
 | a `.ptx` file, or CUDA C++ you can compile to one | `warplens.Device` in Python | 5.1 |
 | a CUDA C++ program with its own `main` | `warplens run ./program` | 5.2 |
 | a Triton script | `warplens run script.py` | 5.3 |
-| a TIRx script | `warplens run python script.py` | 5.4 |
-| a CuTe DSL script | `warplens run python script.py` | 5.5 |
+| a TIRx script | `warplens run script.py` | 5.4 |
+| a CuTe DSL script | `warplens run script.py` | 5.5 |
 
-Note the difference in the last three rows: **`warplens run script.py` is for
-Triton only.** It runs the script in the `warplens` process with a Triton
-driver installed. TIRx and the CuTe DSL launch through the CUDA runtime, so
-they need `warplens run python script.py`, which starts `python` as a child
-process with the shim in front of it.
+The last three rows are one command. A program whose name ends in `.py` is
+run by the Python interpreter that runs `warplens`, as a child process with
+the shim in front of it: `warplens run script.py` is
+`warplens run python script.py`, which is the way to pass options to the
+interpreter or to choose another one. TIRx and the CuTe DSL launch through
+the CUDA runtime, which the shim replaces. Triton launches through its own
+driver, and warplens's is installed in the child when the script imports
+Triton.
 
 ### 5.1 A PTX file through the Python API
 
@@ -401,9 +404,23 @@ warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
   can stand in for it. The default is a static runtime, which cannot be
   replaced.
 
-`warplens run [--model B200|B300] [--timing] [--quiet] program [arguments...]`
-starts the program with the shim libraries preloaded and executes its runtime
-calls in the simulator:
+`warplens run [options] program [arguments...]` starts the program with the
+shim libraries preloaded and executes its runtime calls in the simulator.
+The options come before the program; what follows it is the program's own.
+They apply to every launch the program makes, whichever of 5.2 to 5.6 it is:
+
+| Option | Meaning | `Device.launch` |
+| --- | --- | --- |
+| `--model B200\|B300` | the GPU to simulate (default B200) | `Device(model)` |
+| `--timing` | also run the timing model (6.6) | `timing=True` |
+| `--timing-config CONFIG` | the parameters of the timing model: a YAML file like `warplens/configs/b200.yaml`, or the name of a built-in config (`b200`, `b300`). Implies `--timing`. Default: the config of `--model` | `timing=GpuConfig.load(CONFIG)` |
+| `--active-sms N` | how many SMs the timing model assumes to share the memory bandwidth, from 1 to the SM count of the timing config. Implies `--timing`. Default: all of them | `active_sms=N` |
+| `--clc-limit N` | cluster launch control ([clc.md](clc.md)): how many cancellations each cluster that starts is granted; 0 makes every cluster start by itself. Default: every request is granted while clusters are left | `clc_limit=N` |
+| `--quiet` | do not print the summary | |
+
+A value that cannot be used (a negative count, more SMs than the config has, a
+config file that is missing or incomplete) is refused before the program
+starts, with exit status 2. This is what the program's calls become:
 
 | What the program does | What happens |
 | --- | --- |
@@ -448,7 +465,8 @@ other.
 
 Triton compiles for `sm_100a` with its own bundled toolchain and needs no GPU
 for that. warplens supplies a Triton driver that launches into the simulator.
-`warplens run script.py` installs it and runs the script:
+`warplens run script.py` runs the script and installs the driver when the
+script imports Triton:
 
 <!-- test: run needs=triton -->
 ```bash
@@ -511,12 +529,12 @@ True 8 CTAs, 0 findings
 ### 5.4 TIRx
 
 TIRx (`apache-tvm-tirx`, the language of the book in 5.6) compiles with NVRTC
-in process and launches through the CUDA driver, so it runs under
-`warplens run python`:
+in process and launches through the CUDA driver, which `warplens run`
+replaces:
 
 <!-- test: run needs=tirx,shim -->
 ```bash
-warplens run python examples/07_tirx/run.py
+warplens run examples/07_tirx/run.py
 ```
 
 <!-- test: output -->
@@ -543,12 +561,12 @@ allocate through the shared CUDA runtime and so land in simulated memory.
 ### 5.5 The CuTe DSL
 
 The CuTe DSL (`nvidia-cutlass-dsl`, the Python front end of CUTLASS) compiles
-host code that launches through the CUDA runtime. `warplens run python`
+host code that launches through the CUDA runtime. `warplens run`
 arranges what that needs through the DSL's own environment variables: the
 target architecture, a copy of the DSL's runtime library linked against the
 shim (built on first use), and the PTX of each kernel, which the DSL is asked
 to keep because the module it loads holds only machine code. The script is not
-involved:
+involved. Here `python` is spelled out to pass it an option:
 
 <!-- test: run needs=cute_dsl,shim -->
 ```bash
@@ -1132,6 +1150,8 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 **`warplens run`**
 
 - Linux only. Compiled programs need the build flags of 5.2.
+- The options (`--timing-config`, `--active-sms`, `--clc-limit`) are for the
+  whole run: a program cannot give one launch a different value.
 - The shim implements about sixty runtime and driver functions: what the four
   CUTLASS tutorials, TVM's runtime and the CuTe DSL call. A program that calls
   anything else fails to start with an unresolved symbol, or reaches the real
@@ -1213,19 +1233,30 @@ warplens: the program launched no kernels
 The script itself then stops with `CUDA_ERROR_NOT_FOUND` from
 `cuModuleGetFunction`.
 
-**A TIRx or CuTe DSL script fails although it works with `python`.** Check
-that the command is `warplens run python script.py`. Without `python`,
-`warplens run script.py` treats the script as a Triton script and runs it in
-process, with no shim; it then fails where it first needs a device:
+**A TIRx or CuTe DSL script fails although it works with `python`.** Look
+for this line in what `warplens run script.py` printed:
 
-<!-- test: run needs=tirx,triton -->
+```text
+warplens: running script.py without the shim libraries: its Triton kernels are simulated, but a TIRx or CuTe DSL script will not find a device
+```
+
+The shim libraries could not be built (the reason is printed above that line;
+see "could not build the shim libraries" below). A Triton script does not
+need them, so the script was run in the `warplens` process with only the
+Triton driver, and a TIRx or CuTe DSL script then fails where it first needs
+a device, for TIRx with `ValueError: CUDA compilation requires an explicit
+backend_config arch or Target arch when no CUDA device is available`. With
+the shim, the three kinds of script take the same command:
+
+<!-- test: run needs=tirx,shim -->
 ```bash
-(warplens run examples/07_tirx/run.py 2>&1 || true) | tail -n 1
+warplens run examples/07_tirx/run.py 2>&1 | tail -n 2
 ```
 
 <!-- test: output -->
 ```text
-ValueError: CUDA compilation requires an explicit backend_config arch or Target arch when no CUDA device is available
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  saxpy_kernel: 4 CTA(s), 159 warp-instructions
 ```
 
 **TIRx fails to compile with an error about the architecture `sm_100a`.**

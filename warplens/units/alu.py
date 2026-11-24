@@ -559,6 +559,10 @@ def _cvt(w, ins, mask):
         d, a = _operands(ins, 2)
         w.write(d, to_tf32(w.read(a, "b32"), ins.mods[0]), mask)
         return
+    from . import small_formats
+    if small_formats.is_small_format_cvt(ins.mods):  # FP8, FP4 and E8M0, two values at a time
+        small_formats.convert(w, ins, mask, unsupported)
+        return
     if len(ins.mods) < 2 or ins.mods[-1] not in NP_TYPES or ins.mods[-2] not in NP_TYPES:
         raise unsupported(ins, "expected cvt[.round].dtype.atype")
     *extra, dty, aty = ins.mods

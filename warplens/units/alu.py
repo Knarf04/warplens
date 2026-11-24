@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from ..errors import ExecutionError, MemoryFault, UnsupportedError
-from ..frontend.ir import B128, Instr, Mem, NP_TYPES, Pair, Reg, Sym, UINT_BY_SIZE, Vec
+from ..frontend.ir import B128, Instr, Mem, NP_TYPES, Not, Pair, Reg, Sym, UINT_BY_SIZE, Vec
 from .floating import fused_multiply_add
 from .smem import (CLUSTER_STRIDE, CLUSTER_WINDOW, GENERIC_WINDOW, MAX_SMEM_BYTES,
                    local_shared_offset)
@@ -1225,6 +1225,66 @@ def membermask_check(w, member, mask):
     same_group = mask[None, :] & (member_values[:, None] == member_values[None, :])
     missing = (members & w.live_lanes()[None, :] & ~same_group).any(axis=1)
     return members, named, mask & (~named | missing)
+
+
+_VOTES = frozenset({("all", "pred"), ("any", "pred"), ("uni", "pred"), ("ballot", "b32")})
+
+
+@op("vote")
+def _vote(w, ins, mask):
+    """vote.sync.{all,any,uni}.pred d, {!}a, membermask;  vote.sync.ballot.b32 d, {!}a, membermask
+    (`__all_sync`, `__any_sync`, `__uni_sync`, `__ballot_sync`), and the forms without `.sync`
+    and without a mask (`vote.all.pred d, {!}a`), which ptxas refuses for sm_70 and newer.
+
+    Each lane's result is over the lanes that execute the instruction with it and, with
+    `.sync`, are named in its member mask: whether the predicate is true for all of them, for
+    any of them, the same for all of them, or (ballot) a word with bit j set when it is true
+    for lane j. A lane that has returned, is on another path or does not exist has no vote
+    and no bit, whatever the mask says. Without a voter, `all` and `uni` are true and `any`
+    is false.
+
+    This is what an RTX 3080 Ti returns (validation/ampere/vote_golden.txt,
+    vote_legacy_golden.txt), including several groups with different masks at one instruction.
+
+    `vote.sync` waits until every lane of the mask that has not returned has arrived:
+    `Warp._vote_waits` lets the other paths run first, to this instruction or to their end. A
+    lane of the mask that cannot do either without waiting itself (it is at another
+    `vote.sync` that names the voters, say) is an error there; on the GPU such a kernel did
+    not return (validation/ampere/vote_other_3080ti.txt). A caller that is not in its own
+    mask, which PTX does not allow, is reported as `vote-membermask-mismatch`; the GPU
+    answered some such launches like this model and ended others with an illegal-instruction
+    error."""
+    sync = ins.mods[:1] == ("sync",)
+    form = ins.mods[1:] if sync else ins.mods
+    if form not in _VOTES:
+        raise unsupported(ins, "expected vote[.sync].{all,any,uni}.pred or vote[.sync].ballot.b32")
+    d, a, *member = _operands(ins, 3 if sync else 2)
+    negated = isinstance(a, Not)
+    said = w.read(a.reg if negated else a, "pred")
+    if negated:
+        said = ~said
+    voters = np.broadcast_to(mask, (len(mask), len(mask)))  # voters[lane, j]: j votes with lane
+    if sync:
+        members, _, mismatch = membermask_check(w, member[0], mask)
+        if mismatch.any():
+            w.cta.findings.add(
+                "vote-membermask-mismatch",
+                "vote.sync caller is absent from its member mask, or a non-exited member is not "
+                "executing with the same member mask; PTX leaves the result undefined, and a GPU "
+                "may end the kernel with an illegal-instruction error",
+                w, ins, np.flatnonzero(mismatch))
+        voters = voters & members
+    yes = voters & said[None, :]
+    count, agree = voters.sum(axis=1), yes.sum(axis=1)
+    if form[0] == "ballot":
+        result = (yes.astype(np.uint32) << _LANES.astype(np.uint32)).sum(axis=1, dtype=np.uint32)
+    elif form[0] == "all":
+        result = agree == count
+    elif form[0] == "any":
+        result = agree > 0
+    else:
+        result = (agree == count) | (agree == 0)
+    w.write(d, result, mask)
 
 
 @op("shfl")

@@ -15,7 +15,7 @@ import numpy as np
 from pathlib import Path
 
 from ..errors import PtxSyntaxError, UnsupportedError
-from .ir import (Function, GlobalVar, Imm, Instr, Mem, Module, NP_TYPES, Pair, Param, Reg,
+from .ir import (Function, GlobalVar, Imm, Instr, Mem, Module, NP_TYPES, Not, Pair, Param, Reg,
                  SharedVar, Special, Sym, TensorRef, Vec)
 
 _TOKEN = re.compile(
@@ -569,6 +569,11 @@ class _Parser:
                         break
                     self.expect(",")
             return Vec(tuple(elems))
+        if t.value == "!":  # a negated source predicate, as in `vote.sync.all.pred %p1, !%p2, %r1`
+            source = self.operand(fn)
+            if not isinstance(source, Reg) or fn.regs[source.name] != "pred":
+                raise self.syntax(t, "`!` needs a .pred register")
+            return Not(source)
         if t.kind != "word":
             raise self.syntax(t, f"expected an operand, found {t.value!r}")
         # Registers and memory variables can shadow each other. Resolve them

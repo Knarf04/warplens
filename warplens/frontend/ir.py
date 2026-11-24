@@ -76,13 +76,19 @@ class Pair:
 
 
 @dataclass(frozen=True, slots=True)
+class Not:
+    """A negated source predicate, `!%p1`, which `vote` accepts."""
+    reg: Reg
+
+
+@dataclass(frozen=True, slots=True)
 class TensorRef:
     """A TMA tensor operand: `[tensor_map, {c0, c1, ...}]`."""
     base: Reg | Sym | Imm
     coords: tuple
 
 
-Operand = Reg | Special | Imm | Sym | Mem | Vec | Pair | TensorRef
+Operand = Reg | Special | Imm | Sym | Mem | Vec | Pair | Not | TensorRef
 
 
 @dataclass(slots=True)

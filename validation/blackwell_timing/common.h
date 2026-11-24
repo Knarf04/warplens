@@ -101,10 +101,14 @@ inline Opts bench_init(int argc, char** argv, const char* bench) {
     o.sm_count = p.multiProcessorCount;
     std::string name = p.name;
     for (char& c : name) if (c == ' ') c = '_';
+    // The three per-SM limits are what predict.py's active-SM assumption is computed from
+    // (warplens/timing/placement.py); fit.py compares them with the ones the predictions used.
     printf("DEVICE bench=%s name=%s cc=%d.%d sm_count=%d total_mem_bytes=%zu free_mem_bytes=%zu "
-           "bench_clock=%d sim=%d trials=%d scale=%g synthetic=0\n",
+           "bench_clock=%d sim=%d trials=%d scale=%g synthetic=0 "
+           "smem_per_sm_bytes=%zu max_threads_per_sm=%d max_blocks_per_sm=%d\n",
            bench, name.c_str(), p.major, p.minor, o.sm_count, total, o.free_mem, BENCH_CLOCK,
-           (int)o.sim, o.trials, o.scale);
+           (int)o.sim, o.trials, o.scale, (size_t)p.sharedMemPerMultiprocessor,
+           p.maxThreadsPerMultiProcessor, p.maxBlocksPerMultiProcessor);
     CHECK(cudaMalloc(&o.d_out, OUT_WORDS * sizeof(uint64_t)));
     CHECK(cudaMemset(o.d_out, 0, OUT_WORDS * sizeof(uint64_t)));
     if (!o.sim) {

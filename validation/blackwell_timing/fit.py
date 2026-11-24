@@ -39,7 +39,7 @@ HERE = Path(__file__).resolve().parent
 DEFAULT_CONFIG = HERE.parent.parent / "warplens" / "configs" / "b200.yaml"
 DEFAULT_PREDICTED = HERE / "predicted"
 NUMERIC = ("reps", "trial", "event_ns", "wall_ns", "clk", "check", "norm", "bytes", "m", "n", "k",
-           "batch", "nctas", "sim_ns", "sim_instr")
+           "batch", "nctas", "sim_ns", "sim_instr", "sim_active_sms", "sim_ctas_per_sm", "sim_resident_ctas")
 
 
 # -- reading ------------------------------------------------------------------------------

@@ -166,7 +166,8 @@ def test_committed_predictions_match_the_simulator(tmp_path):
     predict = load("predict")
     meta = predict.predict(tmp_path / "now", benches=FAST, quiet=True)
     assert all(entry["status"] == "ok" for entry in meta["benchmarks"].values()), meta["benchmarks"]
-    keys = ("id", "reps", "sim_ns", "sim_instr", "sim_bound", "check")
+    keys = ("id", "reps", "sim_ns", "sim_instr", "sim_bound", "check", "sim_active_sms", "sim_ctas_per_sm",
+            "sim_resident_ctas")
     for bench in FAST:
         now = [tuple(r.get(k) for k in keys) for r in fit.read_dir(tmp_path / "now")[1] if r["file"] == bench]
         committed = [tuple(r.get(k) for k in keys) for r in fit.read_dir(PREDICTED)[1] if r["file"] == bench]
@@ -174,3 +175,7 @@ def test_committed_predictions_match_the_simulator(tmp_path):
         for a, b in zip(now, committed):
             assert a[:2] == b[:2] and a[3:] == b[3:], (bench, a, b)
             assert a[2] == pytest.approx(b[2], rel=1e-9), (bench, a, b)
+            assert a[6] is not None, (bench, a)  # every launch says how many SMs it was timed with
+        assert meta["benchmarks"][bench]["active_sms"] == \
+            json.loads((PREDICTED / "meta.json").read_text())["benchmarks"][bench]["active_sms"], bench
+

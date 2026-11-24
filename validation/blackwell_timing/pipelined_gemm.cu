@@ -19,10 +19,10 @@
 // 0x3C3C (about 1.0586) everywhere; after each configuration D[0][0] is checked against
 // K * 0x3C3C^2 and a wrong result is reported as a BENCH_ERROR line.
 //
-// Prediction caveat: `warplens run --timing` always assumes all 148 SMs share HBM, so the
-// simulator's ctas=8 numbers are the "whole device busy" row of docs/m4.md, not its "8 SMs
-// share HBM" row; that needs `active_sms=8`, which only the Python API has
-// (examples/04_pipelined_gemm/run.py).
+// Prediction: predict.py times each launch with the active SMs of its shape, so the ctas=8
+// numbers are predicted with 8 SMs sharing HBM (the "8 SMs share HBM" case of docs/m4.md)
+// and the ctas=allsm numbers with all 148. That the 8 CTAs run on 8 different SMs is an
+// assumption about the scheduler (warplens/timing/placement.py).
 // Not verified on a B200: the kernel declares 98 KiB of STATIC shared memory and never calls
 // cudaFuncSetAttribute. ptxas accepts that for sm_100a (up to 227 KiB; 48 KiB for sm_100), and
 // an RTX 3080 Ti launches static shared memory above its 48 KiB default without opt-in

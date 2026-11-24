@@ -83,7 +83,7 @@ def synthesize(out: Path, small: bool = False, trials: int = 3) -> None:
         first = info["row"]
         extra = " ".join(f"{k}={first[k]:g}" if isinstance(first[k], float) else f"{k}={first[k]}"
                          for k in first if k not in ("id", "reps", "trial", "event_ns", "wall_ns", "clk", "check",
-                                                     "file", "sim_ns", "sim_instr", "sim_bound", "sim_findings"))
+                                                     "file") and not k.startswith("sim_"))
         bench = lines.setdefault(info["bench"], [])
         mine = [r for r in rows if r["id"] == ident]
         if "ns_per_rep" in info:

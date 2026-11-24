@@ -3,15 +3,16 @@
 #include <cstdio>
 #include <vector>
 #include <cuda_runtime.h>
+#include "host_check.h"
 #include "ldmatrix_probe.cu"
 
 int main() {
     unsigned* d_out;
     std::vector<unsigned> h(6 * 32 * 4);
-    cudaMalloc(&d_out, h.size() * 4);
+    CHECK(cudaMalloc(&d_out, h.size() * 4));
     ldmatrix_probe<<<1, 32>>>(d_out);
-    if (cudaDeviceSynchronize() != cudaSuccess) { fprintf(stderr, "ldmatrix failed\n"); return 1; }
-    cudaMemcpy(h.data(), d_out, h.size() * 4, cudaMemcpyDeviceToHost);
+    CHECK_LAUNCH();
+    CHECK(cudaMemcpy(h.data(), d_out, h.size() * 4, cudaMemcpyDeviceToHost));
     for (int v = 0; v < 6; ++v)
         for (int l = 0; l < 32; ++l)
             printf("L %d %d %x %x %x %x\n", v, l, h[(v * 32 + l) * 4], h[(v * 32 + l) * 4 + 1],
@@ -27,13 +28,13 @@ int main() {
     int n = (int)a.size();
     std::vector<unsigned> out(2 * n);
     unsigned *da, *dp, *dl, *dout;
-    cudaMalloc(&da, n * 4); cudaMalloc(&dp, n * 4); cudaMalloc(&dl, n * 4); cudaMalloc(&dout, 2 * n * 4);
-    cudaMemcpy(da, a.data(), n * 4, cudaMemcpyHostToDevice);
-    cudaMemcpy(dp, pos.data(), n * 4, cudaMemcpyHostToDevice);
-    cudaMemcpy(dl, len.data(), n * 4, cudaMemcpyHostToDevice);
+    CHECK(cudaMalloc(&da, n * 4)); CHECK(cudaMalloc(&dp, n * 4)); CHECK(cudaMalloc(&dl, n * 4)); CHECK(cudaMalloc(&dout, 2 * n * 4));
+    CHECK(cudaMemcpy(da, a.data(), n * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(dp, pos.data(), n * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(dl, len.data(), n * 4, cudaMemcpyHostToDevice));
     bfe_probe<<<(n + 255) / 256, 256>>>(da, dp, dl, dout, n);
-    if (cudaDeviceSynchronize() != cudaSuccess) { fprintf(stderr, "bfe failed\n"); return 1; }
-    cudaMemcpy(out.data(), dout, 2 * n * 4, cudaMemcpyDeviceToHost);
+    CHECK_LAUNCH();
+    CHECK(cudaMemcpy(out.data(), dout, 2 * n * 4, cudaMemcpyDeviceToHost));
     for (int i = 0; i < n; ++i) printf("B %x %x %x %x %x\n", a[i], pos[i], len[i], out[i], out[n + i]);
     return 0;
 }

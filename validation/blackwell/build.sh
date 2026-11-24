@@ -29,7 +29,8 @@ NVCC="${NVCC:-nvcc}"
 native=0
 ampere=0
 # What an Ampere GPU can run: mbarrier.init / arrive / test_wait, and the host-only program.
-AMPERE_PROBES=(mbarrier/script mbarrier/lane_arrivals e2e/device_attributes)
+AMPERE_PROBES=(mbarrier/script mbarrier/lane_arrivals e2e/device_attributes mbarrier/arrive_token
+               formats/fma formats/scalar_edges formats/ftz e2e/ampere_replay)
 jobs="$(nproc 2>/dev/null || echo 4)"
 probes=()
 while [[ $# -gt 0 ]]; do
@@ -42,8 +43,22 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+# Which compiler built a directory of programs: <dir>/toolkit.txt, key=value. run_all.py
+# compares it with predicted/provenance.json (the compiler whose PTX the simulator ran to
+# make the committed predictions) and flags the run when they differ.
+record_toolkit() {  # record_toolkit DIR NVCC
+  local version
+  version="$("$2" --version 2>/dev/null | sed -n 's/^Cuda compilation tools, release [0-9.]*, V\([0-9.]*\).*/\1/p' | head -n 1)"
+  mkdir -p "$1"
+  {
+    echo "nvcc_version=${version:-unknown}"
+    echo "nvcc_command=$2"
+    echo "built_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  } > "$1/toolkit.txt"
+}
 if [[ "$ampere" == 1 ]]; then
   HW_NVCC="${HW_NVCC:-/usr/local/cuda/bin/nvcc}"
+  record_toolkit bin-ampere "$HW_NVCC"
   for probe in "${AMPERE_PROBES[@]}"; do
     mkdir -p "bin-ampere/$(dirname "$probe")"
     "$HW_NVCC" -std=c++17 -O2 -w -arch="${HW_ARCH:-sm_86}" -DPROBE_AMPERE "$probe.cu" -o "bin-ampere/$probe"
@@ -72,6 +87,8 @@ build_one() {
 }
 export -f build_one
 export NVCC
+record_toolkit bin "$NVCC"
+[[ "$native" == 1 ]] && record_toolkit bin-native "$NVCC"
 
 status=0
 printf '%s\n' "${probes[@]}" | xargs -P "$jobs" -I{} bash -c 'build_one "$1" "$2"' _ {} "$native" || status=$?

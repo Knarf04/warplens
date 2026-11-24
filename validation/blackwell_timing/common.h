@@ -33,10 +33,33 @@
 #define BENCH_NOW() ((uint64_t)0)
 #endif
 
+// Errors that say the driver never had a kernel to run: it could not compile or load what
+// the program carries, or there is no usable device. Reported as class=launch-failed with
+// exit status 4, so that run_all.sh and fit.py can tell "did not launch" from "ran and
+// failed" (class=failed, exit status 1). The same list as validation/blackwell/common.h.
+inline bool bench_is_load_error(cudaError_t error) {
+    switch (error) {
+        case cudaErrorUnsupportedPtxVersion: case cudaErrorInvalidPtx: case cudaErrorJitCompilerNotFound:
+        case cudaErrorJitCompilationDisabled: case cudaErrorInvalidSource: case cudaErrorInvalidKernelImage:
+        case cudaErrorNoKernelImageForDevice: case cudaErrorInvalidDeviceFunction: case cudaErrorSymbolNotFound:
+        case cudaErrorFileNotFound: case cudaErrorSharedObjectSymbolNotFound:
+        case cudaErrorSharedObjectInitFailed: case cudaErrorInsufficientDriver:
+        case cudaErrorCallRequiresNewerDriver: case cudaErrorSystemDriverMismatch:
+        case cudaErrorCompatNotSupportedOnDevice: case cudaErrorStubLibrary: case cudaErrorInitializationError:
+        case cudaErrorNoDevice: case cudaErrorInvalidDevice: case cudaErrorDevicesUnavailable:
+            return true;
+        default:
+            return false;
+    }
+}
+
 #define CHECK(call) do { cudaError_t e_ = (call); if (e_ != cudaSuccess) { \
-    printf("BENCH_ERROR where=\"%s\" error=%s\n", #call, cudaGetErrorName(e_)); \
+    bool load_ = bench_is_load_error(e_); \
+    printf("BENCH_ERROR where=\"%s\" error=%s class=%s\n", #call, cudaGetErrorName(e_), \
+           load_ ? "launch-failed" : "failed"); \
     fflush(stdout); \
-    fprintf(stderr, "%s failed: %s\n", #call, cudaGetErrorString(e_)); exit(1); } } while (0)
+    fprintf(stderr, "%s%s failed: %s\n", load_ ? "LAUNCH FAILED (the driver could not load the kernels): " : "", \
+            #call, cudaGetErrorString(e_)); exit(load_ ? 4 : 1); } } while (0)
 
 // What every kernel reports through its `out` buffer.
 enum { OUT_CLK = 0, OUT_CHECK = 1, OUT_WORDS = 4 };
@@ -86,6 +109,7 @@ inline Opts bench_init(int argc, char** argv, const char* bench) {
     CHECK(cudaMemset(o.d_out, 0, OUT_WORDS * sizeof(uint64_t)));
     if (!o.sim) {
         bench_spin_kernel<<<o.sm_count, 128>>>(40000000, o.d_out);
+        CHECK(cudaGetLastError());  // the first launch of the program: where a module that does not load shows
         CHECK(cudaDeviceSynchronize());
     }
     return o;
@@ -115,6 +139,7 @@ void timed_launch(const Opts& o, const std::string& id, const std::string& extra
     CHECK(cudaEventRecord(stop));
     CHECK(cudaEventSynchronize(stop));
     CHECK(cudaDeviceSynchronize());
+    CHECK(cudaGetLastError());  // a fault inside the kernel that the synchronize did not return
     auto w1 = std::chrono::steady_clock::now();
     float ms = 0;
     CHECK(cudaEventElapsedTime(&ms, start, stop));

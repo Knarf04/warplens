@@ -3,10 +3,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cuda_runtime.h>
+#include "host_check.h"
 #include "shfl_probe.cu"
-
-#define CHECK(call) do { cudaError_t e = (call); if (e != cudaSuccess) { \
-    fprintf(stderr, "%s failed: %s\n", #call, cudaGetErrorString(e)); exit(1); } } while (0)
 
 int main() {
     int* d_out;
@@ -19,7 +17,7 @@ int main() {
             for (int k = 0; k < 32 + 4; ++k) {
                 int b = k < 32 ? k : extra_b[k - 32];
                 shfl_probe<<<1, 32>>>(d_out, mode, b, width);
-                CHECK(cudaGetLastError());
+                CHECK_LAUNCH();
                 CHECK(cudaMemcpy(h_out, d_out, sizeof(h_out), cudaMemcpyDeviceToHost));
                 printf("%d %d %d", mode, b, width);
                 for (int v : h_out) printf(" %d", v);

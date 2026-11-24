@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <vector>
 #include <cuda_runtime.h>
+#include "host_check.h"
 
 __global__ void prmt_probe(const unsigned* a, const unsigned* b, const unsigned* c, unsigned* out, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -30,13 +31,13 @@ int main() {
     int n = (int)a.size();
     std::vector<unsigned> out(n);
     unsigned *da, *db, *dc, *dout;
-    cudaMalloc(&da, n * 4); cudaMalloc(&db, n * 4); cudaMalloc(&dc, n * 4); cudaMalloc(&dout, n * 4);
-    cudaMemcpy(da, a.data(), n * 4, cudaMemcpyHostToDevice);
-    cudaMemcpy(db, b.data(), n * 4, cudaMemcpyHostToDevice);
-    cudaMemcpy(dc, c.data(), n * 4, cudaMemcpyHostToDevice);
+    CHECK(cudaMalloc(&da, n * 4)); CHECK(cudaMalloc(&db, n * 4)); CHECK(cudaMalloc(&dc, n * 4)); CHECK(cudaMalloc(&dout, n * 4));
+    CHECK(cudaMemcpy(da, a.data(), n * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(db, b.data(), n * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(dc, c.data(), n * 4, cudaMemcpyHostToDevice));
     prmt_probe<<<(n + 255) / 256, 256>>>(da, db, dc, dout, n);
-    if (cudaDeviceSynchronize() != cudaSuccess) { fprintf(stderr, "kernel failed\n"); return 1; }
-    cudaMemcpy(out.data(), dout, n * 4, cudaMemcpyDeviceToHost);
+    CHECK_LAUNCH();
+    CHECK(cudaMemcpy(out.data(), dout, n * 4, cudaMemcpyDeviceToHost));
     for (int i = 0; i < n; ++i) printf("%x %x %x %x\n", a[i], b[i], c[i], out[i]);
     return 0;
 }

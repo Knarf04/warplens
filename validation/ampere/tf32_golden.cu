@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <vector>
 #include <cuda_runtime.h>
+#include "host_check.h"
 #include "tf32_probe.cu"
 
 int main() {
@@ -24,11 +25,11 @@ int main() {
     int n = (int)in.size();
     std::vector<unsigned> out(n);
     unsigned *d_in, *d_out;
-    cudaMalloc(&d_in, n * 4); cudaMalloc(&d_out, n * 4);
-    cudaMemcpy(d_in, in.data(), n * 4, cudaMemcpyHostToDevice);
+    CHECK(cudaMalloc(&d_in, n * 4)); CHECK(cudaMalloc(&d_out, n * 4));
+    CHECK(cudaMemcpy(d_in, in.data(), n * 4, cudaMemcpyHostToDevice));
     tf32_probe<<<(n + 255) / 256, 256>>>(d_in, d_out, n);
-    if (cudaDeviceSynchronize() != cudaSuccess) { fprintf(stderr, "kernel failed\n"); return 1; }
-    cudaMemcpy(out.data(), d_out, n * 4, cudaMemcpyDeviceToHost);
+    CHECK_LAUNCH();
+    CHECK(cudaMemcpy(out.data(), d_out, n * 4, cudaMemcpyDeviceToHost));
     for (int i = 0; i < n; ++i) printf("%08x %08x\n", in[i], out[i]);
     return 0;
 }

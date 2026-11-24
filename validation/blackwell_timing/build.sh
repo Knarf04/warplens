@@ -17,8 +17,8 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 NVCC="${NVCC:-conda run -n warplens nvcc}"
 HW_NVCC="${HW_NVCC:-/usr/local/cuda/bin/nvcc}"
 HW_ARCH="${HW_ARCH:-sm_86}"
-ALL=(launch alu_chain smem_wavefronts global_load gstream cp_async mbar tma mma_rate tmem_access)
-AMPERE=(launch alu_chain smem_wavefronts global_load gstream cp_async)   # no mbarrier, TMA or tcgen05 before sm_90 / sm_100
+ALL=(launch alu_chain smem_wavefronts global_load gstream cp_async mbar tma mma_rate tmem_access clc_latency cluster_costs pipelined_gemm ncu_banks)
+AMPERE=(launch alu_chain smem_wavefronts global_load gstream cp_async ncu_banks)   # no mbarrier, TMA, tcgen05 or clusters before sm_90 / sm_100
 FLAGS=(-O3 -std=c++17 -w)
 if [[ -n "${BENCHES:-}" ]]; then
   read -r -a wanted <<< "$BENCHES"
@@ -28,18 +28,30 @@ if [[ -n "${BENCHES:-}" ]]; then
   AMPERE=("${kept[@]}")
 fi
 
+# <dir>/toolkit.txt: which nvcc built the programs there. run_all.sh compares it with the
+# nvcc recorded in predicted/meta.json and flags a run built by another one.
+record_toolkit() {  # record_toolkit DIR COMPILER...
+  local dir="$1" version; shift
+  version="$("$@" --version 2>/dev/null | sed -n 's/^Cuda compilation tools, release [0-9.]*, V\([0-9.]*\).*/\1/p' | head -n 1)"
+  printf 'nvcc_version=%s\nnvcc_command=%s\n' "${version:-unknown}" "$*" > "$dir/toolkit.txt"
+}
+
 targets=("$@")
 [[ ${#targets[@]} -gt 0 ]] || targets=(hw sim)
 for target in "${targets[@]}"; do
   case "$target" in
     hw)
       mkdir -p bin/hw
+      # shellcheck disable=SC2086
+      record_toolkit bin/hw $NVCC
       for b in "${ALL[@]}"; do
         $NVCC "${FLAGS[@]}" -gencode arch=compute_100a,code=sm_100a -DBENCH_CLOCK=1 "$b.cu" -o "bin/hw/$b"
         echo "built bin/hw/$b"
       done ;;
     sim)
       mkdir -p bin/sim
+      # shellcheck disable=SC2086
+      record_toolkit bin/sim $NVCC
       for b in "${ALL[@]}"; do
         $NVCC "${FLAGS[@]}" -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared \
           -DBENCH_CLOCK=0 "$b.cu" -o "bin/sim/$b"
@@ -47,6 +59,7 @@ for target in "${targets[@]}"; do
       done ;;
     ampere)
       mkdir -p bin/ampere
+      record_toolkit bin/ampere "$HW_NVCC"
       for b in "${AMPERE[@]}"; do
         "$HW_NVCC" "${FLAGS[@]}" -arch="$HW_ARCH" -DBENCH_CLOCK=1 "$b.cu" -o "bin/ampere/$b"
         echo "built bin/ampere/$b"

@@ -15,8 +15,15 @@
 # status.txt (exit code and seconds per benchmark), env.txt, ncu/ (run_ncu.sh), fit/
 # (fit.py, if Python with PyYAML is there), and <dir>.tar.gz of all of it.
 # Exit status: the number of benchmarks that failed.
+#
+# status.txt tells apart a benchmark that ran and failed ("FAILED") from one whose kernels
+# the driver could not load ("LAUNCH FAILED": exit status 4 and a BENCH_ERROR line with
+# class=launch-failed; see common.h). TOOLKIT.txt records the driver, the nvcc that built
+# the programs and the nvcc the committed predictions (predicted/meta.json) were made with;
+# when the last two differ it and status.txt say "BUILT WITH FALLBACK TOOLKIT - PREDICTIONS
+# NOT COMPARABLE": the predicted instruction counts are those of another compiler's code.
 set -uo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")"
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
 
 BIN=bin/hw
 OUT=""
@@ -25,10 +32,10 @@ TRIALS=5
 SCALE=1
 NCU=1
 FIT=1
-BENCHES=(launch alu_chain smem_wavefronts global_load gstream cp_async mbar tma mma_rate tmem_access)
+BENCHES=(launch alu_chain smem_wavefronts global_load gstream cp_async mbar tma mma_rate tmem_access clc_latency cluster_costs pipelined_gemm ncu_banks)
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --ampere) BIN=bin/ampere; BENCHES=(launch alu_chain smem_wavefronts global_load gstream cp_async) ;;
+    --ampere) BIN=bin/ampere; BENCHES=(launch alu_chain smem_wavefronts global_load gstream cp_async ncu_banks) ;;
     --bin) BIN="$2"; shift ;;
     --out) OUT="$2"; shift ;;
     --timeout) TIMEOUT="$2"; shift ;;
@@ -69,6 +76,33 @@ fi
 
 failed=0
 : > "$OUT/status.txt"
+
+# Which toolkit built the programs, against the one of the committed predictions.
+built_nvcc="$(sed -n 's/^nvcc_version=//p' "$BIN/toolkit.txt" 2>/dev/null | head -n 1)"
+predicted_nvcc="$(sed -n 's/.*"nvcc_version": *"\([^"]*\)".*/\1/p' predicted/meta.json 2>/dev/null | head -n 1)"
+{
+  echo "driver_version=$(nvidia-smi --query-gpu=driver_version --format=csv,noheader 2>/dev/null | head -n 1)"
+  echo "driver_cuda=$(nvidia-smi 2>/dev/null | sed -n 's/.*CUDA Version: *\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' | head -n 1)"
+  echo "bin=$BIN"
+  echo "built_nvcc_version=${built_nvcc:-unknown}"
+  echo "predictions_nvcc_version=${predicted_nvcc:-unknown}"
+  if [[ "$BIN" == bin/ampere ]]; then
+    echo "predictions_comparable=no"
+    echo "reason=the Ampere dry-run build: another compiler and target; the predictions are for a B200"
+  elif [[ -z "$built_nvcc" || "$built_nvcc" == unknown || -z "$predicted_nvcc" ]]; then
+    echo "predictions_comparable=unknown"
+    echo "reason=TOOLKIT NOT RECORDED: $BIN/toolkit.txt (build.sh) or predicted/meta.json (predict.py) does not name an nvcc"
+  elif [[ "$built_nvcc" != "$predicted_nvcc" ]]; then
+    echo "predictions_comparable=no"
+    echo "reason=BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE: programs built by nvcc $built_nvcc, predictions made from the code of nvcc $predicted_nvcc"
+  else
+    echo "predictions_comparable=yes"
+    echo "reason=nvcc $built_nvcc as for the predictions"
+  fi
+} > "$OUT/TOOLKIT.txt"
+if ! grep -q '^predictions_comparable=yes' "$OUT/TOOLKIT.txt"; then
+  echo "toolkit: $(sed -n 's/^reason=//p' "$OUT/TOOLKIT.txt")" | tee -a "$OUT/status.txt" >&2
+fi
 run_one() {  # name, program, extra arguments...
   local name="$1" program="$2"; shift 2
   if [[ ! -x "$program" ]]; then
@@ -82,6 +116,9 @@ run_one() {  # name, program, extra arguments...
   local note="ok"
   [[ $code -eq 0 ]] || note="FAILED"
   [[ $code -ne 124 && $code -ne 137 ]] || note="TIMED OUT after ${TIMEOUT}s"
+  if [[ $code -eq 4 ]] || grep -q 'class=launch-failed' "$OUT/$name.out" 2>/dev/null; then
+    note="LAUNCH FAILED (the driver could not load the kernels: $(sed -n 's/.* error=\([A-Za-z0-9_]*\).*/\1/p' "$OUT/$name.out" | head -n 1))"
+  fi
   echo "$name: exit=$code seconds=$((SECONDS - start)) lines=$(grep -c '^BENCH ' "$OUT/$name.out") $note" \
     | tee -a "$OUT/status.txt" >&2
   [[ $code -eq 0 ]] || failed=$((failed + 1))

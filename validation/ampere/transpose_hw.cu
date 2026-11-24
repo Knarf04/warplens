@@ -5,10 +5,8 @@
 #include <cstdlib>
 #include <vector>
 #include <cuda_runtime.h>
+#include "host_check.h"
 #include "../../examples/01_smem_transpose/transpose.cu"
-
-#define CHECK(call) do { cudaError_t e = (call); if (e != cudaSuccess) { \
-    fprintf(stderr, "%s failed: %s\n", #call, cudaGetErrorString(e)); exit(1); } } while (0)
 
 typedef void (*Kernel)(const float*, float*);
 
@@ -28,7 +26,7 @@ int main(int argc, char** argv) {
     for (int k = 0; k < 3; ++k) {
         CHECK(cudaMemset(d_out, 0, n * sizeof(float)));
         kernels[k]<<<ctas, dim3(TILE, TILE)>>>(d_in, d_out);
-        CHECK(cudaGetLastError());
+        CHECK_LAUNCH();
         CHECK(cudaMemcpy(out.data(), d_out, n * sizeof(float), cudaMemcpyDeviceToHost));
         size_t wrong = 0;
         for (int c = 0; c < ctas; ++c)

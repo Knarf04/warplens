@@ -6,6 +6,7 @@
 #include <cstring>
 #include <vector>
 #include <cuda_runtime.h>
+#include "host_check.h"
 
 __global__ void ftz_probe(const int* op, const float* a, const float* b, const float* c, float* out, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -25,7 +26,10 @@ __global__ void ftz_probe(const int* op, const float* a, const float* b, const f
 static float from_bits(unsigned u) { float f; memcpy(&f, &u, 4); return f; }
 static unsigned to_bits(float f) { unsigned u; memcpy(&u, &f, 4); return u; }
 
-int main() {
+// With `nan_as_text`, a NaN result is printed as the word "nan" and its bits go on a separate
+// "info:" line. validation/blackwell/formats/ftz.cu uses that: the simulator's NaNs have
+// another payload than a GPU's, and nothing claims otherwise.
+static int ftz_run(bool nan_as_text) {
     const unsigned values[] = {
         0x00000000, 0x80000000,              // zeros
         0x00000001, 0x80000001, 0x00400000,  // subnormals
@@ -60,16 +64,27 @@ int main() {
     int n = (int)op.size();
     std::vector<float> out(n);
     int* dop; float *da, *db, *dc, *dout;
-    cudaMalloc(&dop, n * 4); cudaMalloc(&da, n * 4); cudaMalloc(&db, n * 4); cudaMalloc(&dc, n * 4);
-    cudaMalloc(&dout, n * 4);
-    cudaMemcpy(dop, op.data(), n * 4, cudaMemcpyHostToDevice);
-    cudaMemcpy(da, a.data(), n * 4, cudaMemcpyHostToDevice);
-    cudaMemcpy(db, b.data(), n * 4, cudaMemcpyHostToDevice);
-    cudaMemcpy(dc, c.data(), n * 4, cudaMemcpyHostToDevice);
+    CHECK(cudaMalloc(&dop, n * 4)); CHECK(cudaMalloc(&da, n * 4)); CHECK(cudaMalloc(&db, n * 4)); CHECK(cudaMalloc(&dc, n * 4));
+    CHECK(cudaMalloc(&dout, n * 4));
+    CHECK(cudaMemcpy(dop, op.data(), n * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(da, a.data(), n * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(db, b.data(), n * 4, cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(dc, c.data(), n * 4, cudaMemcpyHostToDevice));
     ftz_probe<<<(n + 255) / 256, 256>>>(dop, da, db, dc, dout, n);
-    if (cudaDeviceSynchronize() != cudaSuccess) { fprintf(stderr, "kernel failed\n"); return 1; }
-    cudaMemcpy(out.data(), dout, n * 4, cudaMemcpyDeviceToHost);
-    for (int i = 0; i < n; ++i)
-        printf("%d %08x %08x %08x %08x\n", op[i], to_bits(a[i]), to_bits(b[i]), to_bits(c[i]), to_bits(out[i]));
+    CHECK_LAUNCH();
+    CHECK(cudaMemcpy(out.data(), dout, n * 4, cudaMemcpyDeviceToHost));
+    for (int i = 0; i < n; ++i) {
+        unsigned result = to_bits(out[i]);
+        if (nan_as_text && (result & 0x7fffffffu) > 0x7f800000u) {
+            printf("%d %08x %08x %08x nan\n", op[i], to_bits(a[i]), to_bits(b[i]), to_bits(c[i]));
+            printf("info: case %d NaN bits %08x\n", i, result);
+        } else {
+            printf("%d %08x %08x %08x %08x\n", op[i], to_bits(a[i]), to_bits(b[i]), to_bits(c[i]), result);
+        }
+    }
     return 0;
 }
+
+#ifndef FTZ_NO_MAIN
+int main() { return ftz_run(false); }
+#endif

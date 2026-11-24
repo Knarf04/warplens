@@ -21,6 +21,7 @@ mkdir -p bin
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/cpasync_golden cpasync_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/ftz_golden ftz_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/call_golden call_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/prmt_golden prmt_golden.cu
 $PTX_NVCC -arch=sm_100a -ptx shfl_probe.cu -o shfl_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx barrier_exit_hw.cu -o barrier_exit.ptx
 $PTX_NVCC -arch=sm_100a -ptx printf_probe.cu -o printf_probe.ptx

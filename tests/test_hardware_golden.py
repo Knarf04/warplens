@@ -54,8 +54,37 @@ def test_bank_conflict_counters_match_ncu(sim):
         assert counters[prefix] == stats.smem.conflicts
         assert counters[prefix + "_op_ld"] == by_op["ld"][1]
         assert counters[prefix + "_op_st"] == by_op["st"][1]
-        # Known gap: hardware reports a constant 4160 more wavefronts than the model.
+        # Hardware also counts two wavefronts per warp and one per CTA per barrier
+        # (see test_wavefront_offset_rule): 2 * 64 * 32 + 64 = 4160 here.
         assert counters["l1tex__data_pipe_lsu_wavefronts_mem_shared"] - stats.smem.wavefronts == 4160
+
+
+def test_wavefront_offset_rule():
+    """wavefront_probe_ncu_3080ti.csv is `ncu --csv` output for bin/wavefront_probe.
+
+    In every launch the hardware counter is the model's count (one per
+    conflict-free shared access) plus two per warp plus one per CTA per barrier.
+    """
+    import csv
+
+    lines = (AMPERE / "wavefront_probe_ncu_3080ti.csv").read_text().splitlines()
+    start = next(i for i, l in enumerate(lines) if l.startswith('"ID"'))
+    hw: dict[int, dict[str, float]] = {}
+    for row in csv.DictReader(lines[start:]):
+        try:
+            hw.setdefault(int(row["ID"]), {})[row["Metric Name"].removesuffix(".sum")] = float(
+                row["Metric Value"].replace(",", ""))
+        except ValueError:
+            pass
+    configs = list(csv.DictReader((AMPERE / "wavefront_probe_configs_3080ti.csv").open()))
+    assert len(configs) == len(hw) == 59
+    for c in configs:
+        h = hw[int(c["launch"])]
+        grid, threads = int(c["grid"]), int(c["bx"]) * int(c["by"])
+        warps = grid * -(-threads // 32)
+        accesses = h["smsp__inst_executed_op_shared_ld"] + h["smsp__inst_executed_op_shared_st"]
+        assert h["l1tex__data_bank_conflicts_pipe_lsu_mem_shared"] == 0
+        assert h["l1tex__data_pipe_lsu_wavefronts_mem_shared"] == accesses + 2 * warps + grid * int(c["n_bar"]), c
 
 
 def test_printf_struct_param_and_local_array_match_real_gpu(sim):

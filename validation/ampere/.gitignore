@@ -1,2 +1,5 @@
 bin/
 ncu_*.csv
+ncu_metrics_available.txt
+wavefront_probe_ncu.csv
+wavefront_probe_configs.csv

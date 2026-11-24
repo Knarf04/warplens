@@ -407,9 +407,10 @@ Found by this work in the simulator and not yet fixed:
 
 ### Can be done now, without a B200
 
-- The unexplained 4160-wavefront offset in the `ncu` comparison (M1) can be
-  narrowed down on the 3080 Ti with a probe that varies the block shape.
-  Settling it first means the Blackwell `ncu` run tests one thing, not two.
+- Done: the 4160-wavefront offset in the `ncu` comparison (M1) is explained
+  on the 3080 Ti. `ncu` also counts two wavefronts per warp and one per CTA
+  per `__syncthreads()` (`validation/README.md`, "The wavefront offset"). The
+  Blackwell `ncu` run now only has to check that the same rule holds there.
 
 ### Still owed for v1.0 besides the above
 

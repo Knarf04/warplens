@@ -257,7 +257,7 @@ def test_require_hardware_rejects_simulator_results(tree, monkeypatch, capsys):
         (sim / name).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(gpu / (name + ".stdout"), sim / (name + ".stdout"))
     status, out = run(monkeypatch, capsys, sim, "--require-hardware")
-    assert status == 1 and "not hardware" in out, out
+    assert status == 1 and "not hardware" in out and " NOT HARDWARE " in row(out, "e2e/triton"), out
 
 
 @pytest.mark.parametrize("status_word,verdict", [("exit 1", "crashed"), ("signal 11", "crashed"),

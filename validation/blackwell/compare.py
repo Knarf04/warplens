@@ -32,6 +32,7 @@ simulator's, with the tolerance its matrix row states (e2e_compare.py has the ta
     NOT COMPARED      there is no simulator result to hold a tensor against. Counted as a failure
     verification failed  the program did not pass its own check, or a capture is missing,
                       incomplete or altered
+    NOT HARDWARE      with --require-hardware: the captures are labelled as a simulator's
 
 The simulator's tensors come from --sim-captures DIR (the output directory of
 `e2e/run_e2e.py --mode sim`, or its captures/), for each case in which the simulator ran the
@@ -330,7 +331,8 @@ def main() -> int:
                 replay_out=Path(args.replay_out) / name.removeprefix("e2e/") if args.replay_out else None,
                 require_hardware=args.require_hardware)
             if errors:
-                verdict = "DIFFERS" if any("NOT COMPARED" not in e for e in errors) else "NOT COMPARED"
+                verdict = "NOT HARDWARE" if all("not hardware" in e for e in errors) else \
+                    "DIFFERS" if any("NOT COMPARED" not in e for e in errors) else "NOT COMPARED"
             elif len(numeric) != len(EXPECTED_CASES[name]):  # nothing passes by not being looked at
                 errors, verdict = [f"{len(numeric)} of {len(EXPECTED_CASES[name])} case(s) compared"], "NOT COMPARED"
             else:

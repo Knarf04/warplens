@@ -336,11 +336,14 @@ A NaN or an infinity on either side fails. The simulator's tensors are, per case
 ran the same PTX with the same launch on bit-identical initial buffers; otherwise, and
 always without `--sim-captures`, the GPU's own capture is replayed in the simulator (its
 PTX, its buffers; about a minute for all 17) and that is the simulator's result. That is
-what RT-07 asks for when the two environments compiled different PTX. `--no-replay` forbids
+what RT-07 asks for when the two environments compiled different PTX, and it is always the
+case for the CUTLASS tutorials unless both runs built them at the same path: nvcc names
+internal symbols (`_INTERNAL_<hash>_...`) after the source file's path, so two builds of the
+same source differ in those names. `--no-replay` forbids
 it, `--replay-out DIR` keeps the replayed tensors, `--require-hardware` fails captures that
 are labelled as a simulator's. Verdicts: `bit-identical`, `within tolerance`, `DIFFERS`,
 `NOT COMPARED` (no simulator result for a tensor: a failure, e.g. a kernel the simulator
-refuses), `verification failed` (the program's own check, or a missing, incomplete or
+refuses), `NOT HARDWARE` (`--require-hardware`, simulator-labelled captures), `verification failed` (the program's own check, or a missing, incomplete or
 altered capture), and `crashed`, `timed out`, `not run`. Only the first two pass.
 
 The printed result lines are still shown, GPU next to simulator, but decide nothing. The

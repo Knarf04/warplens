@@ -57,7 +57,7 @@ def suite(tmp_path):
     refuses and whose bin-native/ holds one that prints the committed prediction."""
     root = tmp_path / "validation" / "blackwell"
     root.mkdir(parents=True)
-    for name in ("manifest.py", "run_all.py", "compare.py", "probe_process.py", "capture.py", "e2e_checks.py", "provenance.py"):
+    for name in ("manifest.py", "run_all.py", "compare.py", "probe_process.py", "capture.py", "e2e_checks.py", "e2e_compare.py", "provenance.py"):
         shutil.copy(SUITE / name, root / name)
     (root / "provenance.py").write_text("def archive_probes(*args, **kwargs): return []\ndef validate_probe_archive(*args, **kwargs): return []\n")
     shutil.copytree(SUITE / "predicted", root / "predicted")

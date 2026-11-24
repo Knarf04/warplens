@@ -13,7 +13,7 @@ import pytest
 
 from conftest import HEADER, cuda_include
 
-from warplens.host.shim_server import REGISTER_FUNCTION, REGISTER_PTX, ShimServer
+from warplens.host.shim_server import REGISTER_FUNCTION, REGISTER_MODULE, ShimServer
 
 ROOT = Path(__file__).resolve().parent.parent
 PTX = HEADER + """
@@ -115,6 +115,48 @@ int main(int argc, char **argv) {
     CHECK(cudaMemGetInfo(&free_bytes, &total) == cudaSuccess && total >= ((size_t)192 << 30) && free_bytes == total);
     return 0;
   }
+  if (!strcmp(argv[1], "library")) {  /* the runtime's module API, handed machine code */
+    static const unsigned char cubin[64] = {0x7f, 'E', 'L', 'F', 2, 1, 1};
+    cudaLibrary_t library; cudaKernel_t kernel, missing;
+    int value = -1;
+    CHECK(cudaLibraryLoadData(&library, cubin, NULL, NULL, 0, NULL, NULL, 0) == cudaSuccess);
+    CHECK(cudaLibraryGetKernel(&kernel, library, "scale") == cudaSuccess);
+    CHECK(cudaLibraryGetKernel(&missing, library, "absent") == cudaErrorSymbolNotFound);
+    CHECK(cudaGetLastError() == cudaErrorSymbolNotFound);
+    CHECK(cuKernelGetAttribute(&value, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, (CUkernel)kernel, 0) == CUDA_SUCCESS);
+    CHECK(value == 0);
+    CHECK(cudaKernelSetAttributeForDevice(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 4096, 0) == cudaSuccess);
+    unsigned input[N], output[N], factor = 7, *source, *target;
+    for (unsigned i = 0; i < N; ++i) input[i] = i + 1;
+    CHECK(cudaMalloc((void **)&source, sizeof input) == cudaSuccess);
+    CHECK(cudaMalloc((void **)&target, sizeof output) == cudaSuccess);
+    CHECK(cudaMemcpy(source, input, sizeof input, cudaMemcpyHostToDevice) == cudaSuccess);
+    void *arguments[3] = {&source, &target, &factor};
+    cudaLaunchConfig_t config;
+    memset(&config, 0, sizeof config);
+    config.gridDim.x = N / 32; config.gridDim.y = 1; config.gridDim.z = 1;
+    config.blockDim.x = 32; config.blockDim.y = 1; config.blockDim.z = 1;
+    CHECK(cudaLaunchKernelExC(&config, kernel, arguments) == cudaSuccess);
+    CHECK(cudaMemcpy(output, target, sizeof output, cudaMemcpyDeviceToHost) == cudaSuccess);
+    for (unsigned i = 0; i < N; ++i) CHECK(output[i] == (i + 1) * factor);
+    CHECK(cudaLibraryUnload(library) == cudaSuccess);
+    return 0;
+  }
+  if (!strcmp(argv[1], "lookup")) {  /* how cuda-python's driver module finds functions */
+    void *found = NULL;
+    CUdriverProcAddressQueryResult status;
+    int version = 0;
+    CUdevice device = -1;
+    CHECK(cuGetProcAddress("cuInit", &found, 13000, 0, &status) == CUDA_SUCCESS);
+    CHECK(found == (void *)cuInit && status == CU_GET_PROC_ADDRESS_SUCCESS);
+    CHECK(cuGetProcAddress("cuGetProcAddress", &found, 13000, 0, NULL) == CUDA_SUCCESS && found);
+    CHECK(cuGetProcAddress("cuMemAllocManaged", &found, 13000, 0, &status) == CUDA_ERROR_NOT_FOUND);
+    CHECK(found == NULL && status == CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND);
+    CHECK(cuDriverGetVersion(&version) == CUDA_SUCCESS && version == CUDA_VERSION);
+    CHECK(cuDeviceGet(&device, 0) == CUDA_SUCCESS && device == 0);
+    CHECK(cuDeviceGet(&device, 1) == CUDA_ERROR_INVALID_DEVICE);
+    return 0;
+  }
   if (!strcmp(argv[1], "tokens")) {  /* streams, events and host memory, as TVM's runtime uses them */
     cudaStream_t stream; cudaEvent_t start, end;
     float elapsed = -1.0f;
@@ -200,9 +242,30 @@ def test_streams_events_and_host_memory_are_accepted(client):
     run_client(client, "tokens")
 
 
+def test_runtime_library_of_machine_code_takes_its_kernels_from_kept_ptx(client, tmp_path):
+    """What the CuTe DSL does: the module it loads is machine code, and the PTX is on disk."""
+    (tmp_path / "older.ptx").write_text(PTX.replace("mul.lo.u32 %v, %v, %f;", "mov.u32 %v, 0;"))
+    newest = tmp_path / "newest.ptx"
+    newest.write_text(PTX)
+    os.utime(tmp_path / "older.ptx", (1, 1))
+    (tmp_path / "other.ptx").write_text(PTX.replace("scale", "rescale"))
+    server, _ = run_client(client, "library", server=ShimServer(kept_ptx=tmp_path))
+    assert [name for name, _ in server.launches] == ["scale"]
+    assert server.kept == {0} and server.machine_code  # the lookup of `absent` failed
+
+
+def test_runtime_library_of_machine_code_is_refused_without_kept_ptx(client):
+    with pytest.raises(AssertionError, match="machine code for a real GPU"):
+        run_client(client, "library")
+
+
+def test_driver_functions_are_found_by_name(client):
+    run_client(client, "lookup")
+
+
 def test_server_registers_ptx_text_as_a_module():
     import struct
     server = ShimServer()
-    (module,) = struct.unpack("<I", server.handle(REGISTER_PTX, PTX.encode()))
+    (module,) = struct.unpack("<I", server.handle(REGISTER_MODULE, PTX.encode()))
     function, count, *sizes = struct.unpack("<5I", server.handle(REGISTER_FUNCTION, struct.pack("<I", module) + b"scale"))
     assert (function, count, sizes) == (0, 3, [8, 8, 4])

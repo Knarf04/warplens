@@ -1,5 +1,7 @@
 /* A stand-in for libcuda (the driver API): only the calls programs make directly. A runtime
  * that loads its own kernels (TVM's, for TIRx) does so through the module and launch calls. */
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,11 +38,48 @@ CUresult cuTensorMapEncodeTiled(CUtensorMap *tensorMap, CUtensorMapDataType tens
 
 CUresult cuInit(unsigned int flags) { return flags ? CUDA_ERROR_INVALID_VALUE : CUDA_SUCCESS; }
 
+CUresult cuDriverGetVersion(int *version) {
+  if (!version) return CUDA_ERROR_INVALID_VALUE;
+  *version = CUDA_VERSION;  /* that of the headers this was built against */
+  return CUDA_SUCCESS;
+}
+
+/* How cuda-python's driver module finds every function it wraps: by name, here. One that is
+ * not implemented is reported as not found, and fails in the caller only if it is used. */
+CUresult cuGetProcAddress_v2(const char *symbol, void **pfn, int cudaVersion, cuuint64_t flags,
+                             CUdriverProcAddressQueryResult *symbolStatus) {
+  (void)cudaVersion; (void)flags;
+  if (!symbol || !pfn) return CUDA_ERROR_INVALID_VALUE;
+  static void *self;
+  if (!self) {
+    Dl_info info;
+    if (dladdr((void *)cuInit, &info)) self = dlopen(info.dli_fname, RTLD_NOW | RTLD_NOLOAD);
+  }
+  static const char *const suffixes[] = {"", "_v2", "_v3"};  /* the name is asked for unversioned */
+  char name[128];
+  void *found = NULL;
+  for (int i = 0; self && i < 3 && !found; ++i) {
+    snprintf(name, sizeof name, "%s%s", symbol, suffixes[i]);
+    found = dlsym(self, name);
+  }
+  *pfn = found;
+  if (symbolStatus)
+    *symbolStatus = found ? CU_GET_PROC_ADDRESS_SUCCESS : CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND;
+  return found ? CUDA_SUCCESS : CUDA_ERROR_NOT_FOUND;
+}
+
 /* -- the device ------------------------------------------------------------------------ */
 
 CUresult cuDeviceGetAttribute(int *pi, CUdevice_attribute attrib, CUdevice dev) {
   if (!pi || dev != 0) return pi ? CUDA_ERROR_INVALID_DEVICE : CUDA_ERROR_INVALID_VALUE;
   *pi = warplens_device_attribute((int)attrib);
+  return CUDA_SUCCESS;
+}
+
+CUresult cuDeviceGet(CUdevice *device, int ordinal) {
+  if (!device) return CUDA_ERROR_INVALID_VALUE;
+  if (ordinal != 0) return CUDA_ERROR_INVALID_DEVICE;
+  *device = 0;
   return CUDA_SUCCESS;
 }
 
@@ -75,57 +114,17 @@ CUresult cuGetErrorString(CUresult error, const char **pStr) {
 
 /* -- modules and kernels --------------------------------------------------------------- */
 
-/* A CUmodule is one of these; a CUfunction is one of its kernels, whose address is the key
- * the launch is registered under. */
-struct kernel { struct kernel *next; char name[]; };
-struct module { uint32_t id; struct kernel *kernels; };
-
 CUresult cuModuleLoadData(CUmodule *module, const void *image) {
   if (!module || !image) return CUDA_ERROR_INVALID_VALUE;
-  const unsigned char *bytes = image;
-  struct wl_part part;
-  uint32_t op = WL_REGISTER_PTX;
-  if (memcmp(bytes, "\x7f" "ELF", 4) == 0) {  /* machine code: the server explains and takes note */
-    part.data = bytes; part.size = 4;
-    warplens_call(op, &part, 1, NULL, 0, NULL);
-    return CUDA_ERROR_INVALID_IMAGE;
-  }
-  if (memcmp(bytes, "\x50\xed\x55\xba", 4) == 0) {  /* a fat binary: header size, then body size */
-    uint16_t header; uint64_t body;
-    memcpy(&header, bytes + 6, sizeof header);
-    memcpy(&body, bytes + 8, sizeof body);
-    part.data = bytes; part.size = (size_t)header + body;
-    op = WL_REGISTER_FATBIN;
-  } else {
-    part.data = bytes; part.size = strlen((const char *)bytes);
-  }
-  struct module *loaded = calloc(1, sizeof *loaded);
-  if (!loaded) return CUDA_ERROR_OUT_OF_MEMORY;
-  if (warplens_call(op, &part, 1, &loaded->id, sizeof loaded->id, NULL)) {
-    free(loaded);
-    return CUDA_ERROR_INVALID_IMAGE;
-  }
-  *module = (CUmodule)loaded;
-  return CUDA_SUCCESS;
+  *module = (CUmodule)warplens_load_module(image);
+  return *module ? CUDA_SUCCESS : CUDA_ERROR_INVALID_IMAGE;
 }
 
 CUresult cuModuleGetFunction(CUfunction *function, CUmodule module, const char *name) {
-  struct module *loaded = (struct module *)module;
   if (!function || !name) return CUDA_ERROR_INVALID_VALUE;
-  if (!loaded) return CUDA_ERROR_INVALID_HANDLE;
-  for (struct kernel *k = loaded->kernels; k; k = k->next)
-    if (strcmp(k->name, name) == 0) { *function = (CUfunction)k; return CUDA_SUCCESS; }
-  struct kernel *k = malloc(sizeof *k + strlen(name) + 1);
-  if (!k) return CUDA_ERROR_OUT_OF_MEMORY;
-  strcpy(k->name, name);
-  if (warplens_register_function(loaded->id, name, k)) {
-    free(k);
-    return CUDA_ERROR_NOT_FOUND;
-  }
-  k->next = loaded->kernels;
-  loaded->kernels = k;
-  *function = (CUfunction)k;
-  return CUDA_SUCCESS;
+  if (!module) return CUDA_ERROR_INVALID_HANDLE;
+  *function = (CUfunction)warplens_module_kernel(module, name);
+  return *function ? CUDA_SUCCESS : CUDA_ERROR_NOT_FOUND;
 }
 
 /* The server keeps the parsed module, and kernels stay launchable, as handles to them may
@@ -142,6 +141,12 @@ CUresult cuFuncGetAttribute(int *pi, CUfunction_attribute attrib, CUfunction fun
     default: *pi = 0; break;  /* sizes of the compiled kernel, which PTX does not fix */
   }
   return CUDA_SUCCESS;
+}
+
+/* A kernel from the runtime's cudaLibrary calls is the same handle. */
+CUresult cuKernelGetAttribute(int *pi, CUfunction_attribute attrib, CUkernel kernel, CUdevice dev) {
+  if (dev != 0) return CUDA_ERROR_INVALID_DEVICE;
+  return cuFuncGetAttribute(pi, attrib, (CUfunction)kernel);
 }
 
 CUresult cuFuncSetAttribute(CUfunction function, CUfunction_attribute attrib, int value) {

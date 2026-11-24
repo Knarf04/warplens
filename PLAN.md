@@ -272,8 +272,9 @@ Weak:
   it; expect more of that kind.
 - The timing model is uncalibrated and several parameters are assumptions.
 - `main` is still the initial commit; work is on stacked branches.
-- TIRx and CuTe DSL kernels compile to PTX that runs, but their launch has to be
-  repeated by hand.
+- TIRx and CuTe DSL scripts launch through `warplens run` unchanged, but only
+  with arrays that work without a GPU: TVM's own for TIRx, none yet for the
+  DSL. PyTorch tensors, which the book and the DSL's examples use, do not.
 
 ### Steps before renting
 
@@ -283,10 +284,19 @@ Weak:
 2. Done: CI's `full` job builds the CUTLASS tutorials and the shim libraries,
    installs Triton and the CuTe DSL, and runs the whole suite with
    `WARPLENS_NO_SKIPS=1`, under which a skipped test fails the run.
-3. Finish the launch path for TIRx and CuTe DSL, so one script runs unchanged
-   in the simulator and on the GPU. Preferred route: extend the `libcuda` shim
-   to the driver calls both runtimes make. First measure which calls those are,
-   and whether CuTe DSL hands the driver PTX or machine code.
+3. Mostly done: one script runs unchanged in the simulator and on the GPU, for
+   TIRx (`examples/07_tirx`) and the CuTe DSL (`examples/06_cute_dsl`). What
+   was measured and how each is reached is in `docs/m6.md`. TIRx goes through
+   the `libcuda` shim as planned, and its script must ask for PTX. The DSL
+   hands the driver machine code through a CUDA runtime of its own, so it gets
+   a runtime library relinked against the shim and its PTX is taken from disk.
+   Left:
+   - arrays for DSL scripts, probably cuda-python buffers over new driver
+     memory calls; the example passes a scalar only;
+   - calls to device functions (`.func`), which TIRx's `printf` and possibly
+     the book's larger kernels need;
+   - the book's `hgemm` kernels and a DSL kernel with TMA and tcgen05, run
+     through this path instead of from hand-compiled PTX.
 4. Decide whether `clusterlaunchcontrol` is in scope. It is the one planned
    instruction family not implemented.
 

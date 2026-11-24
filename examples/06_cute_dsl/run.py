@@ -1,24 +1,16 @@
-"""CuTe DSL (the Python front end of CUTLASS) to warplens, by way of a PTX file.
+"""A CuTe DSL kernel (the Python front end of CUTLASS) that runs unchanged on a GPU and in warplens.
 
     pip install nvidia-cutlass-dsl
-    python examples/06_cute_dsl/run.py
+    python examples/06_cute_dsl/run.py                 # on the GPU in this machine
+    warplens run python examples/06_cute_dsl/run.py    # in the simulator, as a B200
 
-The DSL compiles for sm_100a without a GPU when told the architecture, and keeps the PTX
-it generated when asked. warplens then runs that PTX. This is a spike, not an
-integration: the DSL's own launch path talks to the CUDA driver, which warplens does not
-emulate, so the grid, block and arguments are repeated by hand below.
+The DSL compiles `host` to machine code that loads the kernel and launches it through the
+CUDA runtime. Under `warplens run` those calls reach the simulator, and the DSL is told to
+compile for sm_100a and to keep the PTX it generates, because the module it loads holds only
+machine code. Nothing in this script knows about any of that.
 """
 
-import os
 import sys
-import tempfile
-from pathlib import Path
-
-work = Path(tempfile.mkdtemp(prefix="warplens_cute_dsl_"))
-os.environ.update(CUTE_DSL_ARCH="sm_100a",       # compile for Blackwell, whatever GPU is present
-                  CUTE_DSL_KEEP="ptx",           # keep the generated PTX ...
-                  CUTE_DSL_DUMP_DIR=str(work),   # ... in this directory
-                  CUDA_VISIBLE_DEVICES="")       # and prove no GPU is needed
 
 try:
     import cutlass
@@ -26,28 +18,19 @@ try:
 except ImportError:
     sys.exit("this example needs the CuTe DSL: pip install nvidia-cutlass-dsl")
 
-import warplens  # noqa: E402
-
 
 @cute.kernel
 def kernel(n: cutlass.Int32):
     tidx, _, _ = cute.arch.thread_idx()
+    bidx, _, _ = cute.arch.block_idx()
     if tidx < 3:
-        cute.printf("thread %d says n = %d\n", tidx, n)
+        cute.printf("thread %d of block %d says n = %d\n", tidx, bidx, n)
 
 
 @cute.jit
 def host(n: cutlass.Int32):
-    kernel(n).launch(grid=(1, 1, 1), block=(32, 1, 1))
+    kernel(n).launch(grid=(2, 1, 1), block=(32, 1, 1))
 
 
-cute.compile(host, 7)  # compiles; never launched through the DSL
-(ptx,) = work.glob("*.ptx")
-print(f"CuTe DSL wrote {ptx.name} ({len(ptx.read_text().splitlines())} lines of PTX)")
-
-sim = warplens.Device("B200")
-module = sim.load_ptx(ptx)
-(name,) = module.functions
-stats = sim.launch(module, name, grid=1, block=32, args=[7])  # the launch, repeated by hand
-print(f"warplens ran `{name}`; the kernel printed:")
-print(stats.output, end="")
+host(7)
+print("launched 2 blocks of 32 threads")

@@ -116,9 +116,8 @@ def driver_shim(tmp_path_factory):
             return 0;
         }
         /* The module and launch calls of the driver shim are not exercised here. */
-        int warplens_register_function(uint32_t module, const char *name, const void *key) {
-            (void)module; (void)name; (void)key; return 1;
-        }
+        void *warplens_load_module(const void *image) { (void)image; return 0; }
+        void *warplens_module_kernel(void *module, const char *name) { (void)module; (void)name; return 0; }
         int warplens_launch(const void *key, const uint32_t grid[3], const uint32_t block[3],
                             const uint32_t cluster[3], uint64_t shared_memory, void **arguments) {
             (void)key; (void)grid; (void)block; (void)cluster; (void)shared_memory; (void)arguments;

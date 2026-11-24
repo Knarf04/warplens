@@ -23,7 +23,7 @@ include = ["warplens*"]
 
 [tool.setuptools.package-data]
 "warplens.configs" = ["*.yaml"]
-"warplens.shim" = ["*.c", "*.h", "build.sh"]
+"warplens.shim" = ["*.c", "*.h", "*.sh", "python/*.py"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

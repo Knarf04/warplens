@@ -17,6 +17,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 SHIM_DIR = Path(__file__).resolve().parent / "shim"
@@ -67,6 +68,62 @@ def shim_libraries() -> Path:
     except OSError as error:
         sys.exit(f"warplens: could not build the shim libraries: {error}")
     return lib
+
+
+def cute_dsl_runtime(shims: Path) -> Path | None:
+    """A runtime library for the CuTe DSL that calls the shims, built on first use from the
+    wrapper archive in the installed `nvidia-cutlass-dsl`. None when the DSL is not installed."""
+    import importlib.util
+    try:
+        spec = importlib.util.find_spec("nvidia_cutlass_dsl")
+    except (ImportError, ValueError):
+        spec = None
+    if spec is None or not spec.submodule_search_locations:
+        return None
+    archives = sorted(Path(root).glob("cu*/lib/libcuda_dialect_runtime_static.a")
+                      for root in spec.submodule_search_locations)
+    archives = [a for found in archives for a in found]
+    if not archives:
+        return None
+    archive = archives[-1]
+    digest = hashlib.sha256((SHIM_DIR / "build_cute_dsl.sh").read_bytes())
+    for part in (archive, *sorted(shims.glob("libcudart.so.*"))):
+        stat = part.stat()
+        digest.update(f"{part}\0{stat.st_size}\0{stat.st_mtime_ns}".encode())
+    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    out = (cache / "warplens" / "cute_dsl" / digest.hexdigest()).absolute()
+    library = out / "libcute_dsl_runtime.so"
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with out.with_suffix(".lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if not library.is_file():
+                done = subprocess.run([str(SHIM_DIR / "build_cute_dsl.sh"), str(archive), str(shims), str(out)],
+                                      capture_output=True, text=True)
+                if done.returncode or not library.is_file():
+                    print(f"warplens: could not build the CuTe DSL runtime; its launches will not be "
+                          f"simulated:\n{done.stdout}{done.stderr}", file=sys.stderr)
+                    return None
+    except OSError as error:
+        print(f"warplens: could not build the CuTe DSL runtime: {error}", file=sys.stderr)
+        return None
+    return library
+
+
+def frontend_environment(env: dict, model: str, shims: Path, kept: Path) -> Path:
+    """Point the compilers that run inside the program at the simulator: the architecture to
+    compile for, and, for the CuTe DSL, the runtime library to launch through and the request
+    to keep its PTX. Settings the user made win. Returns the directory the PTX is kept in."""
+    env.setdefault("CUTE_DSL_ARCH", "sm_103a" if model == "B300" else "sm_100a")
+    if "CUTE_DSL_LIBS" not in env and (runtime := cute_dsl_runtime(shims)):
+        env["CUTE_DSL_LIBS"] = str(runtime)
+    tokens = [t.strip() for t in env.get("CUTE_DSL_KEEP", "").split(",") if t.strip()]
+    if not {"ptx", "all"} & {t.lower() for t in tokens}:
+        env["CUTE_DSL_KEEP"] = ",".join([*tokens, "ptx"])
+    kept = Path(env.setdefault("CUTE_DSL_DUMP_DIR", str(kept)))
+    # A Python program gets warplens/shim/python/sitecustomize.py.
+    env["PYTHONPATH"] = os.pathsep.join([str(SHIM_DIR / "python"), *filter(None, [env.get("PYTHONPATH")])])
+    return kept
 
 
 def short(name: str, width: int = 64) -> str:
@@ -131,9 +188,11 @@ def run(args) -> int:
         args.program = program
         return run_script(args)
     lib = shim_libraries()
-    server = ShimServer(args.model, timing=args.timing)
     ours, theirs = socket.socketpair()
     env = dict(os.environ, WARPLENS_SHIM_FD=str(theirs.fileno()), WARPLENS_MODEL=args.model)
+    scratch = tempfile.TemporaryDirectory(prefix="warplens_kept_ptx_")
+    server = ShimServer(args.model, timing=args.timing,
+                        kept_ptx=frontend_environment(env, args.model, lib, Path(scratch.name)))
     env["LD_LIBRARY_PATH"] = f"{lib}:{env.get('LD_LIBRARY_PATH', '')}".rstrip(":")
     # Preload as well: a program built with an RPATH would otherwise find the real runtime first.
     shims = [str(p) for p in sorted(lib.glob("libcudart.so.*")) + [lib / "libcuda.so.1"]]
@@ -161,6 +220,7 @@ def run(args) -> int:
                 except subprocess.TimeoutExpired:
                     child.kill()
             child.wait()
+        scratch.cleanup()
 
     if not args.quiet:
         out = sys.stderr

@@ -3,6 +3,7 @@ program in the simulator. See warplens/shim/protocol.h for the wire format."""
 
 from __future__ import annotations
 
+import re
 import struct
 
 import numpy as np
@@ -13,10 +14,12 @@ from . import tensor_map
 from .device import Device
 
 (REGISTER_FATBIN, REGISTER_FUNCTION, MALLOC, FREE, WRITE, READ, COPY, FILL, LAUNCH,
- TENSOR_MAP, REGISTER_PTX) = range(1, 12)
+ TENSOR_MAP, REGISTER_MODULE) = range(1, 12)
 LAUNCH_FAILURE = 719  # cudaErrorLaunchFailure
 INVALID_VALUE = 1  # cudaErrorInvalidValue
 MEMORY_ALLOCATION = 2  # cudaErrorMemoryAllocation
+MACHINE_CODE = ("the module is machine code for a real GPU, and the simulator runs PTX. Ask the "
+                'compiler for PTX (TIRx: backend_config={"cuda": {"target_format": "ptx"}})')
 
 
 def _read_exact(stream, size: int) -> bytes:
@@ -68,7 +71,7 @@ def ptx_from_fatbin(blob: bytes) -> list[str]:
 class ShimServer:
     """Serves one program. `kernels` records every launch for the summary."""
 
-    def __init__(self, model: str = "B200", timing: bool = False):
+    def __init__(self, model: str = "B200", timing: bool = False, kept_ptx=None):
         self.device = Device(model)
         self.timing = timing
         self.modules: list = []
@@ -76,6 +79,8 @@ class ShimServer:
         self.launches: list[tuple[str, object]] = []  # (kernel name, LaunchStats)
         self.needs_ptx = False
         self.machine_code = False  # a runtime handed over a compiled module instead of PTX
+        self.kept_ptx = kept_ptx  # the directory where a compiler keeps the PTX of such modules
+        self.kept: set[int] = set()  # the modules whose kernels are looked up there
         import os
         self.debug = bool(os.environ.get("WARPLENS_SHIM_DEBUG"))  # log every request
 
@@ -102,6 +107,40 @@ class ShimServer:
                           file=sys.stderr)
                 _write_all(stream, struct.pack("<iI", status, len(reply)) + reply)
 
+    def load_module(self, data: bytes) -> list:
+        """A module a program loads itself: PTX text, a fat binary, or machine code. Machine
+        code cannot be simulated; its module starts empty and takes each kernel from the PTX
+        that the compiler kept in `kept_ptx`, when that is known."""
+        name = f"module{len(self.modules)}.ptx"
+        texts = None
+        if data.startswith(b"\x50\xed\x55\xba"):
+            texts = ptx_from_fatbin(data)
+        elif not data.startswith(b"\x7fELF"):
+            try:
+                texts = [data.decode()]
+            except UnicodeDecodeError:
+                raise WarplensError("the module is not PTX text") from None
+            if ".version" not in texts[0][:4096]:
+                raise WarplensError("the module is not PTX text (no .version directive)")
+        if texts:
+            return [parse_ptx(text, name=name) for text in texts]
+        if self.kept_ptx is None:
+            self.machine_code = True
+            raise WarplensError(MACHINE_CODE)
+        self.kept.add(len(self.modules))
+        return []
+
+    def find_kept(self, kernel: str):
+        """The newest PTX file in `kept_ptx` that defines `kernel`, parsed."""
+        entry = re.compile(rf"\.entry\s+{re.escape(kernel)}\s*\(")
+        files = sorted(self.kept_ptx.glob("*.ptx"), key=lambda p: p.stat().st_mtime, reverse=True)
+        for path in files:
+            text = path.read_text(errors="replace")
+            if entry.search(text):
+                return parse_ptx(text, name=path.name)
+        self.machine_code = True
+        raise WarplensError(f"kernel `{kernel}`: {MACHINE_CODE}")
+
     def handle(self, op: int, data: bytes) -> bytes:
         sizes = {MALLOC: 8, FREE: 8, READ: 16, COPY: 24, FILL: 20, TENSOR_MAP: 140}
         minimum = {REGISTER_FUNCTION: 4, WRITE: 8, LAUNCH: 48}
@@ -118,19 +157,8 @@ class ShimServer:
                     "nvcc -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared")
             self.modules.append([parse_ptx(t, name=f"module{len(self.modules)}.ptx") for t in texts])
             return struct.pack("<I", len(self.modules) - 1)
-        if op == REGISTER_PTX:
-            if data.startswith(b"\x7fELF"):
-                self.machine_code = True
-                raise WarplensError(
-                    "the module is machine code for a real GPU, and the simulator runs PTX. Ask the "
-                    'compiler for PTX (TIRx: backend_config={"cuda": {"target_format": "ptx"}})')
-            try:
-                text = data.decode()
-            except UnicodeDecodeError:
-                raise WarplensError("the module is not PTX text") from None
-            if ".version" not in text[:4096]:
-                raise WarplensError("the module is not PTX text (no .version directive)")
-            self.modules.append([parse_ptx(text, name=f"module{len(self.modules)}.ptx")])
+        if op == REGISTER_MODULE:
+            self.modules.append(self.load_module(data))
             return struct.pack("<I", len(self.modules) - 1)
         if op == REGISTER_FUNCTION:
             (module,) = struct.unpack_from("<I", data)
@@ -140,6 +168,8 @@ class ShimServer:
                 name = data[4:].decode()
             except UnicodeDecodeError:
                 raise WarplensError("kernel name is not UTF-8") from None
+            if module in self.kept and not any(name in p.functions for p in self.modules[module]):
+                self.modules[module].append(self.find_kept(name))
             for index, parsed in enumerate(self.modules[module]):
                 if name in parsed.functions:
                     self.functions.append((module, index, name))

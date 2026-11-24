@@ -137,7 +137,7 @@ void __cudaRegisterVar(void **handle, char *hostVar, char *deviceAddress, const 
   (void)ext; (void)size; (void)constant; (void)global;
 }
 
-int warplens_register_function(uint32_t module, const char *name, const void *key) {
+static int register_function(uint32_t module, const char *name, const void *key) {
   struct wl_part parts[2] = {{&module, sizeof module}, {name, strlen(name)}};
   uint32_t reply[2 + MAX_PARAMS];
   size_t length = 0;
@@ -158,7 +158,82 @@ void __cudaRegisterFunction(void **handle, const char *hostFun, char *deviceFun,
                             const char *deviceName, int thread_limit, uint3 *tid, uint3 *bid,
                             dim3 *bDim, dim3 *gDim, int *wSize) {
   (void)deviceFun; (void)thread_limit; (void)tid; (void)bid; (void)bDim; (void)gDim; (void)wSize;
-  if (warplens_register_function(*(uint32_t *)handle, deviceName, hostFun)) _exit(70);
+  if (register_function(*(uint32_t *)handle, deviceName, hostFun)) _exit(70);
+}
+
+/* -- modules a program loads itself ------------------------------------------------------ */
+
+struct kernel { struct kernel *next; char name[]; };
+struct module { uint32_t id; struct kernel *kernels; };
+static pthread_mutex_t module_lock = PTHREAD_MUTEX_INITIALIZER;
+
+void *warplens_load_module(const void *image) {
+  const unsigned char *bytes = image;
+  struct wl_part part = {bytes, 0};
+  if (memcmp(bytes, "\x7f" "ELF", 4) == 0) {
+    part.size = 4;  /* machine code: the server only needs to know that it is */
+  } else if (memcmp(bytes, "\x50\xed\x55\xba", 4) == 0) {
+    const struct fat_header *header = image;
+    part.size = header->header_size + header->size;
+  } else {
+    part.size = strlen((const char *)bytes);
+  }
+  struct module *loaded = calloc(1, sizeof *loaded);
+  if (!loaded) die("out of memory");
+  if (warplens_call(WL_REGISTER_MODULE, &part, 1, &loaded->id, sizeof loaded->id, NULL)) {
+    free(loaded);
+    return NULL;
+  }
+  return loaded;
+}
+
+void *warplens_module_kernel(void *module, const char *name) {
+  struct module *loaded = module;
+  pthread_mutex_lock(&module_lock);
+  struct kernel *k = loaded->kernels;
+  while (k && strcmp(k->name, name) != 0) k = k->next;
+  if (!k) {
+    k = malloc(sizeof *k + strlen(name) + 1);
+    if (!k) die("out of memory");
+    strcpy(k->name, name);
+    if (register_function(loaded->id, name, k)) {
+      free(k);
+      k = NULL;
+    } else {
+      k->next = loaded->kernels;
+      loaded->kernels = k;
+    }
+  }
+  pthread_mutex_unlock(&module_lock);
+  return k;
+}
+
+/* The runtime's own module API (CUDA 12.x on), which the CuTe DSL's host code uses. Options
+ * steer the driver's compiler and loader; there is nothing for them to steer here. */
+cudaError_t cudaLibraryLoadData(cudaLibrary_t *library, const void *code,
+                                enum cudaJitOption *jitOptions, void **jitOptionsValues,
+                                unsigned int numJitOptions, enum cudaLibraryOption *libraryOptions,
+                                void **libraryOptionValues, unsigned int numLibraryOptions) {
+  (void)jitOptions; (void)jitOptionsValues; (void)numJitOptions;
+  (void)libraryOptions; (void)libraryOptionValues; (void)numLibraryOptions;
+  if (!library || !code) return result(cudaErrorInvalidValue);
+  *library = (cudaLibrary_t)warplens_load_module(code);
+  return result(*library ? cudaSuccess : cudaErrorInvalidKernelImage);
+}
+
+cudaError_t cudaLibraryGetKernel(cudaKernel_t *kernel, cudaLibrary_t library, const char *name) {
+  if (!kernel || !library || !name) return result(cudaErrorInvalidValue);
+  *kernel = (cudaKernel_t)warplens_module_kernel(library, name);
+  return result(*kernel ? cudaSuccess : cudaErrorSymbolNotFound);
+}
+
+/* The server keeps the parsed module, and its kernels stay launchable. */
+cudaError_t cudaLibraryUnload(cudaLibrary_t library) { (void)library; return cudaSuccess; }
+
+cudaError_t cudaKernelSetAttributeForDevice(cudaKernel_t kernel, enum cudaFuncAttribute attr,
+                                            int value, int device) {
+  (void)kernel; (void)attr; (void)value;  /* as cudaFuncSetAttribute: always allowed */
+  return result(device == 0 ? cudaSuccess : cudaErrorInvalidDevice);
 }
 
 static struct function *find_function(const void *host) {

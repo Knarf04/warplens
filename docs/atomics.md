@@ -1,22 +1,35 @@
 # Scalar atomics
 
-The simulator executes scalar atomic read/modify/write operations and `red.add`
-for ordinary CUDA kernels. `atom` returns the value before the update; `red` and
+The simulator executes scalar atomic read/modify/write operations (`atom`) and
+reductions (`red`) for ordinary CUDA kernels. `atom` returns the value before the update; `red` and
 an `atom` destination of `_` update memory without keeping that value.
 
 | Operation | Supported types |
 | --- | --- |
 | `atom.add`, `red.add` | `u32`, `s32`, `u64`, `f32`, `f64` |
-| `atom.and`, `atom.or`, `atom.xor`, `atom.exch`, `atom.cas` | `b32`, `b64` |
-| `atom.inc`, `atom.dec` | `u32` |
-| `atom.min`, `atom.max` | `s32`, `u32`, `s64`, `u64` |
+| `atom.and`, `atom.or`, `atom.xor`, and the same three for `red` | `b32`, `b64` |
+| `atom.exch`, `atom.cas` (PTX has no `red.exch` or `red.cas`) | `b32`, `b64` |
+| `atom.inc`, `atom.dec`, `red.inc`, `red.dec` | `u32` |
+| `atom.min`, `atom.max`, `red.min`, `red.max` | `s32`, `u32`, `s64`, `u64` |
 
 Supported spaces are `.global`, `.shared`, `.shared::cta`, and generic addresses
 into global or shared memory. Generic shared pointers can address a peer CTA in
 the cluster. Ordering may be omitted or `.relaxed`; scope may be omitted (PTX
 defaults to `.gpu`), `.cta`, `.gpu`, or `.sys`. `add.noftz.f32` preserves subnormal
-values. Compiler-emitted variants such as `atom.relaxed.gpu.global.add.u32`,
-`atom.relaxed.gpu.shared.add.u64`, and `red.global.add.f32` are accepted.
+values.
+
+Two generations of compiler spell the same functions differently, and both run:
+
+| | nvcc 13.5, `-arch=sm_100a` | nvcc 12.4, `-arch=sm_80` / `sm_86` (and 13.5 for those targets) |
+| --- | --- | --- |
+| `atomicAdd(p, v)`, result used | `atom.relaxed.gpu.global.add.u32`, `atom.relaxed.gpu.shared.add.u32`; `atom.relaxed.gpu.add.u32` when the compiler cannot tell which memory `p` is in | `atom.global.add.u32`, `atom.shared.add.u32`, `atom.add.u32` |
+| `_block`, `_system` | `atom.global.cta.add.u32`, `atom.shared.sys.add.u32`, `atom.cta.add.u32`, ... | the same |
+| result discarded | the same `atom` | nvcc 12.4 only: `red.global.add.u32`, `red.shared.min.s64`, `red.or.b32`, `red.global.cta.xor.b32`, ... for every function but `atomicExch` and `atomicCAS`, which stay `atom` |
+
+The short forms are not a different instruction: PTX defines an omitted ordering
+as `.relaxed` and an omitted scope as `.gpu`, and `red` as the `atom` update
+without a destination. `tests/test_atom.py` runs every spelling in this table for
+every operation and type.
 
 Every active lane performs a complete read/modify/write before the next lane,
 in increasing lane order. Other warps cannot interleave within that operation.
@@ -47,7 +60,7 @@ natural alignment and valid active-lane addresses; destination and address
 validation precede memory changes. Masked lanes do not access memory.
 
 Acquire, release and acquire-release atomics, cluster scope, explicit
-`.shared::cluster`, reductions other than `red.add`, half/bfloat and packed/vector
+`.shared::cluster`, `red.exch` and `red.cas` (which PTX does not define), `sub`, half/bfloat and packed/vector
 forms, and cache-policy modifiers are rejected explicitly. Accepted scopes
 describe a functional execution with serialized accesses. The simulator does
 not explore weak-memory outcomes, prove sufficient scope, or model concurrent
@@ -64,8 +77,11 @@ accesses. Atomic throughput has not been calibrated on hardware.
 `tests/test_atom.py` covers the operation/type matrix, race diagnostics, remote
 shared addressing, and the assumed timing model. The checked-in RTX 3080 Ti
 atomic capture supplies order-independent integer/bit-operation reference
-results in `tests/test_hardware_golden.py`. `tests/test_atomics.py` additionally
+results in `tests/test_hardware_golden.py`, which runs the probe twice: as nvcc
+13.5 compiles it for `sm_100a` (`atom_probe.ptx`) and as nvcc 12.4, the compiler of
+the GPU binary, compiles it for `sm_86` (`atom_probe_cuda12.ptx`, legacy `atom`
+spellings and `red`). `tests/test_atomics.py` additionally
 compiles CUDA 13.5 integer, float, double and shared unsigned-long-long
-`atomicAdd` kernels and executes their PTX without a GPU, and checks flushing,
+`atomicAdd` kernels for `sm_100a` and for `sm_86` and executes their PTX without a GPU, and checks flushing,
 masking, validation and proxy-fence regressions. Those compiler and simulator
 checks are not a Blackwell hardware comparison.

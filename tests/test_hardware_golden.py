@@ -4,9 +4,11 @@ validation/ampere/shfl_golden.txt was produced by running shfl_probe on an
 RTX 3080 Ti (see validation/README.md). Each line is "mode b width r0..r31".
 """
 
+import re
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 AMPERE = Path(__file__).resolve().parent.parent / "validation" / "ampere"
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
@@ -126,6 +128,30 @@ def test_ldmatrix_and_bfe_match_real_gpu(sim):
     wrong = [(hex(a), int(p), int(l), hex(u), hex(gu), hex(s), hex(gs))
              for (a, p, l, u, s), gu, gs in zip(cases, got[:n], got[n:]) if (u, s) != (gu, gs)]
     assert not wrong, f"{len(wrong)} of {n} differ, e.g. (a, pos, len, unsigned, got, signed, got): {wrong[:4]}"
+
+
+def test_bfi_and_shf_match_real_gpu(sim):
+    """bitfield_golden.txt is bin/bitfield_golden on an RTX 3080 Ti: bfi.b32, bfi.b64 and
+    shf.{l,r}.{wrap,clamp}.b32 over 2925 combinations of operands, positions and lengths,
+    including positions and lengths past the register and past 255."""
+    rows = np.array([[int(x, 16) for x in line.split()]
+                     for line in (AMPERE / "bitfield_golden.txt").read_text().splitlines()], dtype=np.uint32)
+    n = len(rows)
+    assert rows.shape == (2925, 11)
+    out = sim.empty(7 * n, "u32")
+    stats = sim.launch(AMPERE / "bitfield_probe.ptx", "bitfield_probe", grid=-(-n // 256), block=256,
+                       args=[*(sim.from_numpy(rows[:, k].copy()) for k in range(4)), out, n])
+    assert not stats.findings
+    got = out.numpy().reshape(n, 7)
+    names = ["bfi.b32", "bfi.b64 low", "bfi.b64 high", "shf.l.wrap", "shf.r.wrap", "shf.l.clamp", "shf.r.clamp"]
+    wrong = [f"{names[k]} a={rows[i, 0]:x} b={rows[i, 1]:x} pos={rows[i, 2]:x} len={rows[i, 3]:x}: "
+             f"gpu {rows[i, 4 + k]:x}, sim {got[i, k]:x}" for i, k in np.argwhere(got != rows[:, 4:])]
+    assert not wrong, f"{len(wrong)} values differ: {wrong[:6]}"
+    # What the recording says where PTX leaves it open: bfi.b32 keeps only the low 8 bits of
+    # pos and len (256 acts as 0), bfi.b64 does not (a pos of 256 inserts nothing).
+    case = {(int(a), int(b), int(p), int(l)): r for a, b, p, l, *r in rows.tolist()}
+    assert case[0xFFFFFFFF, 0, 256, 8][0] == 0xFF and case[0xFFFFFFFF, 0, 0, 256][0] == 0
+    assert case[0xFFFFFFFF, 0, 256, 8][1:3] == [1, 0] and case[0xFFFFFFFF, 0, 0, 256][1:3] == [0x61C8864F, 0xFFFFFFFF]
 
 
 def test_cp_async_with_a_source_size_matches_real_gpu(sim):
@@ -304,10 +330,24 @@ def test_lanes_rejoin_where_they_do_on_a_real_gpu(sim):
     assert not problems, problems
 
 
-def test_atomic_updates_match_real_gpu(sim):
+@pytest.mark.parametrize("ptx", ["atom_probe.ptx", "atom_probe_cuda12.ptx"])
+def test_atomic_updates_match_real_gpu(sim, ptx):
     """atom_golden.txt is bin/atom_golden on an RTX 3080 Ti: 4 CTAs of 128 threads update the
     same global words and each CTA's shared words with every atomic function (see
-    atom_probe.cu). The file starts with the values the words had before."""
+    atom_probe.cu). The file starts with the values the words had before.
+
+    The probe runs as two toolkits compile it. atom_probe.ptx is nvcc 13.5 for sm_100a
+    (`atom.relaxed.gpu.global.add.u32`). atom_probe_cuda12.ptx is nvcc 12.4 for sm_86, the
+    compiler and target of the GPU binary that made the recording: no ordering or scope
+    (`atom.global.cas.b32`), and `red` wherever the result is discarded (`red.shared.min.s64`)."""
+    spellings = set(re.findall(r"^\s*((?:atom|red)\.[\w.]+)", (AMPERE / ptx).read_text(), re.M))
+    if ptx == "atom_probe_cuda12.ptx":  # the forms this file is here for
+        assert not [s for s in spellings if "relaxed" in s]
+        assert {"atom.global.add.u32", "atom.shared.exch.b64", "atom.cas.b32", "red.global.min.s64",
+                "red.shared.and.b32", "red.global.inc.u32", "red.shared.dec.u32", "red.max.u32",
+                "red.global.cta.xor.b32", "red.global.sys.or.b64", "red.shared.sys.add.f64"} <= spellings
+    else:
+        assert "atom.relaxed.gpu.global.add.u32" in spellings and not [s for s in spellings if s.startswith("red")]
     rows = [(label, [int(x, 16) for x in values]) for label, *values in
             (line.split() for line in (AMPERE / "atom_golden.txt").read_text().splitlines())]
     init = dict(rows[:4])
@@ -326,7 +366,7 @@ def test_atomic_updates_match_real_gpu(sim):
     g64, gf, gd = (device_array(init[k], t) for k, t in (("init64", "u8"), ("initf", "f4"), ("initd", "f8")))
     ticket = sim.empty(2 * ctas * block, "u32")
     shared = [sim.empty(ctas * count, ty) for count, ty in ((n32, "u32"), (n64, "u64"), (nf, "f32"), (nf, "f64"))]
-    stats = sim.launch(AMPERE / "atom_probe.ptx", "atom_probe", grid=ctas, block=block,
+    stats = sim.launch(AMPERE / ptx, "atom_probe", grid=ctas, block=block,
                        args=[g32, g64, gf, gd, ticket, *shared, 1])
     assert not stats.findings  # in particular no smem-race between the warps' atomic updates
 

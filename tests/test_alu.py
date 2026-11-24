@@ -224,6 +224,31 @@ def test_unsupported_modifier_is_an_error(sim):
         run_lanes(sim, "cvt.s32.f32 %d, %a0;", ["f32"], "s32", [f32(1)])
 
 
+def test_bfi_and_shf_as_nvcc_12_emits_them(sim):
+    """`(u64)hi << 32 | lo` and a 32-bit rotation; tests/test_hardware_golden.py has the GPU's
+    results for the edge cases."""
+    u32 = lambda *v: np.array(v, np.uint32)
+    hi, lo = np.array([0x11223344, 0xFFFFFFFF], np.uint64), np.array([0xAABBCCDDEEFF0011, 5], np.uint64)
+    out = run_lanes(sim, "bfi.b64 %d, %a0, %a1, 32, 32;", ["b64", "b64"], "b64", [hi, lo])
+    assert out.tolist() == [0x11223344EEFF0011, 0xFFFFFFFF00000005]
+    out = run_lanes(sim, "bfi.b32 %d, %a0, %a1, 8, 4;", ["b32", "b32"], "b32", [u32(0xFFFFFFFF, 0x5), u32(0, 0xFFFFFFFF)])
+    assert out.tolist() == [0x00000F00, 0xFFFFF5FF]
+    x, n = u32(0x80000001, 0x12345678, 0xDEADBEEF), u32(1, 36, 0)
+    out = run_lanes(sim, "shf.l.wrap.b32 %d, %a0, %a0, %a1;", ["b32", "u32"], "b32", [x, n])
+    assert out.tolist() == [0x00000003, 0x23456781, 0xDEADBEEF]
+    out = run_lanes(sim, "shf.r.clamp.b32 %d, %a0, %a1, %a2;", ["b32", "b32", "u32"], "b32",
+                    [u32(0x000000F0, 7), u32(0x0000000A, 9), u32(4, 99)])  # b:a >> n, n at most 32
+    assert out.tolist() == [0xA000000F, 9]
+
+
+@pytest.mark.parametrize("instruction", ["bfi.u32 %d, %a0, %a0, 0, 1;", "bfi.b16 %d, %a0, %a0, 0, 1;",
+                                         "shf.l.b32 %d, %a0, %a0, 1;", "shf.l.wrap.b64 %d, %a0, %a0, 1;",
+                                         "shf.wrap.b32 %d, %a0, %a0, 1;"])
+def test_other_bfi_and_shf_forms_are_refused(sim, instruction):
+    with pytest.raises(warplens.UnsupportedError, match="unsupported instruction"):
+        run_lanes(sim, instruction, ["b32"], "b32", [np.zeros(2, np.uint32)])
+
+
 def test_unimplemented_opcode_is_rejected_before_running(sim):
     mod = kernel(".reg .b32 %r;\npopc.b32 %r, %r;\nret;")
     with pytest.raises(warplens.UnsupportedError, match=r"does not implement yet: popc\n.*test.ptx:7"):

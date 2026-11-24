@@ -545,6 +545,60 @@ def _not(w, ins, mask):
     w.write(d, ~w.read(a, ty), mask)
 
 
+@op("bfi")
+def _bfi(w, ins, mask):
+    """bfi.{b32,b64} d, a, b, pos, len: `b` with its bits pos .. pos+len-1 replaced by the
+    low `len` bits of `a`; bits that would land above the top of `b` are dropped.
+
+    PTX restricts `pos` and `len` to 0..255. Checked on real hardware (bitfield_golden.txt)
+    beyond that: bfi.b32 uses only their low 8 bits, as `bfe` does; bfi.b64 does not wrap at
+    256, so a `pos` of 256 inserts nothing and a `len` of 256 is the whole register. The
+    recording has 256, 257, 0x108, 0x120 and 0xFFFFFFFF; the model takes all 32 bits.
+
+    nvcc 12.4 emits bfi.b64 for `(u64)hi << 32 | lo`.
+    """
+    if tuple(ins.mods) not in (("b32",), ("b64",)):
+        raise unsupported(ins, "expected bfi.b32 or bfi.b64")
+    ty = ins.mods[0]
+    d, a, b, pos, length = _operands(ins, 5)
+    field, base = w.read(a, ty), w.read(b, ty)
+    width = base.dtype.itemsize * 8
+    unsigned = UINT_BY_SIZE[base.dtype.itemsize]
+    p, n = w.read(pos, "u32"), w.read(length, "u32")
+    if width == 32:
+        p, n = p & np.uint32(0xFF), n & np.uint32(0xFF)
+    full = (1 << width) - 1
+    source, target = field.view(unsigned).astype(object), base.view(unsigned).astype(object)
+    out = np.zeros(len(mask), dtype=object)
+    for i in np.flatnonzero(mask):
+        start, count = min(int(p[i]), width), min(int(n[i]), width)
+        bits = (((1 << count) - 1) << start) & full  # the bits of b that are replaced
+        out[i] = (int(target[i]) & ~bits & full) | ((int(source[i]) << start) & bits)
+    w.write(d, out.astype(unsigned).view(base.dtype), mask)
+
+
+@op("shf")
+def _shf(w, ins, mask):
+    """shf.{l,r}.{clamp,wrap}.b32 d, a, b, n: 32 bits of the 64-bit value b:a (b on top)
+    shifted by n. `.l` gives the upper half of (b:a << n), `.r` the lower half of
+    (b:a >> n). `.wrap` uses n mod 32, `.clamp` min(n, 32). Checked on real hardware
+    (bitfield_golden.txt).
+
+    nvcc 12.4 emits `shf.l.wrap.b32 d, a, a, n` for a 32-bit rotation.
+    """
+    if len(ins.mods) != 3 or ins.mods[0] not in ("l", "r") or ins.mods[1] not in ("clamp", "wrap") \
+            or ins.mods[2] != "b32":
+        raise unsupported(ins, "expected shf.{l,r}.{clamp,wrap}.b32")
+    d, a, b, c = _operands(ins, 4)
+    low = w.read(a, "u32").astype(np.uint64)
+    high = w.read(b, "u32").astype(np.uint64)
+    amount = w.read(c, "u32")
+    n = (np.minimum(amount, 32) if ins.mods[1] == "clamp" else amount & np.uint32(31)).astype(np.uint64)
+    both = (high << np.uint64(32)) | low
+    r = (both << n) >> np.uint64(32) if ins.mods[0] == "l" else both >> n
+    w.write(d, (r & np.uint64(0xFFFFFFFF)).astype(np.uint32), mask)
+
+
 @op("shl", "shr")
 def _shift(w, ins, mask):
     ty, _ = _type(ins, kinds="iu")

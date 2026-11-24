@@ -26,6 +26,7 @@ mkdir -p bin
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/prmt_golden prmt_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/minmax_cvt_golden minmax_cvt_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/atom_golden atom_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/bitfield_golden bitfield_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/mbarrier_token_golden mbarrier_token_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/nan_golden nan_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/intdiv_golden intdiv_golden.cu
@@ -40,5 +41,9 @@ $PTX_NVCC -arch=sm_100a -ptx cpasync_probe.cu -o cpasync_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx call_probe.cu -o call_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx callforms_probe.cu -o callforms_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx atom_probe.cu -o atom_probe.ptx
+# The same probe as the GPU binary's compiler spells it: CUDA 12.x writes no ordering or scope
+# (atom.global.add.u32) and uses red where a result is discarded.
+"$HW_NVCC" -arch="$HW_ARCH" -ptx atom_probe.cu -o atom_probe_cuda12.ptx
+$PTX_NVCC -arch=sm_100a -ptx bitfield_probe.cu -o bitfield_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx mbarrier_token_probe.cu -o mbarrier_token_probe.ptx
 echo "built bin/{shfl_golden,transpose_hw,barrier_exit_hw}, shfl_probe.ptx, barrier_exit.ptx"

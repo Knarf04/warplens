@@ -83,8 +83,8 @@ The details are in [validation/README.md](../validation/README.md).
 | Area | Evidence | Status |
 | --- | --- | --- |
 | `shfl.sync`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive) | recorded outputs of the real GPU, replayed in `tests/test_hardware_golden.py` | match exactly |
-| `cvt.rna.tf32.f32`, `ldmatrix`, `bfe`, `prmt`, `.ftz` arithmetic, `cp.async` zero fill | the same, bit for bit | match exactly |
-| Atomic updates (`atom`): every atomic function on 32- and 64-bit integers, `atomicAdd` on `float` and `double`, in global and shared memory | the same, for results that do not depend on the order of the threads | match exactly |
+| `cvt.rna.tf32.f32`, `ldmatrix`, `bfe`, `bfi`, `shf`, `prmt`, `.ftz` arithmetic, `cp.async` zero fill | the same, bit for bit | match exactly |
+| Atomic updates (`atom`, `red`): every atomic function on 32- and 64-bit integers, `atomicAdd` on `float` and `double`, in global and shared memory, as compiled by nvcc 13.5 and by nvcc 12.4 (which writes `atom.global.add.u32` and `red`) | the same, for results that do not depend on the order of the threads | match exactly |
 | Shared-memory bank conflicts | Nsight Compute counters on the transpose example | conflict counters match exactly; the total wavefront counter matches once two per warp and one per CTA per barrier, which hardware also counts, are added |
 | TMA, tensor maps, mbarriers | PTX specification, CUDA headers, CUTLASS sources; real kernels give right answers | **not compared with hardware** |
 | `tcgen05.mma`, tensor memory, descriptors | the same | **not compared with hardware** |

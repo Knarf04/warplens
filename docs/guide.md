@@ -161,7 +161,7 @@ python examples/00_vecadd/run.py
 <!-- test: output -->
 ```text
 matches NumPy: True
-LaunchStats(ctas=4, warps=32, threads=1024, instructions=704, lane_instructions=21264, divergent_branches=1, max_simt_depth=2, smem_bytes=0)
+LaunchStats(ctas=4, canceled_ctas=0, warps=32, threads=1024, instructions=704, lane_instructions=21264, divergent_branches=1, max_simt_depth=2, smem_bytes=0)
 ```
 
 The kernel was compiled once by `nvcc` for `sm_100a`
@@ -220,7 +220,7 @@ print(stats)
 
 <!-- test: output -->
 ```text
-LaunchStats(ctas=4, warps=32, threads=1024, instructions=704, lane_instructions=21264, divergent_branches=1, max_simt_depth=2, smem_bytes=0)
+LaunchStats(ctas=4, canceled_ctas=0, warps=32, threads=1024, instructions=704, lane_instructions=21264, divergent_branches=1, max_simt_depth=2, smem_bytes=0)
 ```
 
 `Device.launch(ptx, entry, *, grid, block, args=(), smem=0, cluster=None,
@@ -586,7 +586,7 @@ warplens run python examples/08_book/run.py "$WARPLENS_BOOK" v1 v7
 <!-- test: output unchecked -->
 ```text
 hgemm_v1 128x128x64: matches NumPy (max error 0.0156, 0.2 s)
-hgemm_v7 128x128x256: matches NumPy (max error 0.0078, 1.5 s)
+hgemm_v7 128x128x256: matches NumPy (max error 0.0078, 1.6 s)
 warplens: 2 kernel launch(es) simulated on B200, 1 finding(s)
   kernel_kernel: 1 CTA(s), 5010 warp-instructions
   kernel_kernel: 148 CTA(s), 48255 warp-instructions

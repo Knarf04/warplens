@@ -258,11 +258,12 @@ Solid:
 - All six milestones are built. The simulator runs real code from three
   independent code generators without modification: the four CUTLASS Blackwell
   tutorials (including 16-CTA clusters and the two-SM MMA), a Triton matmul,
-  and two of the TIRx GEMM kernels from the book *Modern GPU Programming for
+  and all nine TIRx GEMM kernels from the book *Modern GPU Programming for
   MLSys*. Their agreement is the strongest evidence there is.
 - Everything Ampere shares with Blackwell has been checked bit for bit on an
   RTX 3080 Ti: shuffles, barriers, `printf`, TF32 conversion, `ldmatrix`,
-  `bfe`, `prmt`, `cp.async`, and the bank-conflict counters.
+  `bfe`, `prmt`, `cp.async`, `.ftz` arithmetic, calls to device functions,
+  and the bank-conflict counters.
 
 Weak:
 
@@ -271,7 +272,6 @@ Weak:
   exercise. The TMEM lane rule was wrong until the book's kernels contradicted
   it; expect more of that kind.
 - The timing model is uncalibrated and several parameters are assumptions.
-- `main` is still the initial commit; work is on stacked branches.
 - TIRx and CuTe DSL scripts launch through `warplens run` unchanged, with
   arrays that work without a GPU (TVM's, or driver memory), not PyTorch's.
   A DSL kernel that uses TMA does not run: the DSL writes real tensor-map
@@ -281,7 +281,7 @@ Weak:
 
 **A. Stabilize the code**
 
-1. Merge the branch stack into `main`.
+1. Done: the branch stack is on `main`.
 2. Done: CI's `full` job builds the CUTLASS tutorials and the shim libraries,
    installs Triton and the CuTe DSL, and runs the whole suite with
    `WARPLENS_NO_SKIPS=1`, under which a skipped test fails the run.
@@ -295,8 +295,9 @@ Weak:
      the driver's encoder, which only encodes on a GPU that has TMA. Step 7
      now includes that sweep; the decoder can be written from its output
      without a GPU.
-4. Decide whether `clusterlaunchcontrol` is in scope. It is the one planned
-   instruction family not implemented.
+4. Done: `clusterlaunchcontrol` is implemented (`docs/clc.md`,
+   `examples/09_clc`). Which cluster a request cancels and when requests fail
+   are assumptions; they are rows of the validation matrix.
 
 **B. Write down every claim to test**
 
@@ -359,6 +360,51 @@ kernels, a host program that prints results, a comparison script)
 24. Budget for a second, shorter rental. The first run will surface
     discrepancies, and fixing them needs re-checking.
 
+### Status of steps B to F (2026-11-23)
+
+Everything below was prepared without Blackwell hardware. The PASS path of
+nothing Blackwell-specific has run on a GPU.
+
+| Steps | Where | State |
+| --- | --- | --- |
+| B5, B6, F23 | `docs/validation-matrix.md` | one row per claim with its probe, prediction and pass criterion; a test keeps its citations valid |
+| C7 to C13, D15 to D18 | `validation/blackwell/` | 24 probe programs, 59 runs, predictions committed, dry-run in the simulator; three mbarrier runs also match the 3080 Ti. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs. Matrix rows with no probe are listed in its README |
+| C14 | `validation/blackwell_timing/` | ten microbenchmarks, a fit to the config schema, predictions committed; six ran on the 3080 Ti. The `ncu` path is untested (needs root here) |
+| E19 to E22 | `env/remote/` | pinned setup, preflight, one `run.sh`, a runbook. Tested in throwaway envs and against the 3080 Ti (which it correctly refuses as not a B200) |
+| F24 | | still to decide: the budget for a second rental |
+
+To settle before renting:
+
+- The driver on the rented machine will probably be older than toolkit 13.5,
+  and such a driver refuses the toolkit's PTX (measured here: `.version 9.5`
+  on a 9.0 driver). `setup.sh` then falls back to a matching toolkit, so the
+  programs are not built by the nvcc that produced the committed PTX. A
+  program that carries PTX and does not check its launch error fails silently
+  in that case.
+- PyTorch is not in the pinned environment. Triton on a real GPU needs it, and
+  so does `validation/blackwell/e2e/triton_gpu.py`, which has never run.
+
+Found by this work in the simulator and not yet fixed:
+
+- `bar.warp.sync` (`__syncwarp()`), `.volatile` loads and stores, and
+  `%clock64` are not supported; ordinary CUDA C++ emits the first two.
+- The FP8 and FP4 `cvt` forms of `cuda_fp8.h` and `cuda_fp4.h` are not
+  implemented, although the formats are (`warplens.numerics`).
+- After more arrivals than an mbarrier's count, the pending count stays
+  negative and every later arrival completes a phase.
+- An M = 64 MMA accepts any destination lane offset; `docs/m3.md` allows 0
+  and 16.
+- A launch accepts 228 KB of shared memory, and the shim reports an opt-in
+  maximum of 227 KB.
+- Timing model: TMA stores and `cp.async` are always charged to HBM;
+  `warplens run` cannot set the number of active SMs or the config; B300
+  timing equals B200; utilization is averaged over CTAs that do no work.
+- `warplens run script.py` without `python` takes the Triton path and fails
+  confusingly for a TIRx or CuTe DSL script. `clc_limit` is not reachable from
+  `warplens run`.
+- Documents that contradict the code are listed in
+  `docs/validation-matrix.md`, "Discrepancies found".
+
 ### Can be done now, without a B200
 
 - The unexplained 4160-wavefront offset in the `ncu` comparison (M1) can be
@@ -367,9 +413,7 @@ kernels, a host program that prints results, a comparison script)
 
 ### Still owed for v1.0 besides the above
 
-- A tutorial notebook that follows the book's chapters. The book's kernels are
-  TIRx; step 3 decides whether the notebook can run them directly. The book's
-  repository has no license file, so its code should be fetched from the
-  reader's clone or from pip, not copied here.
-- A single user guide; `docs/` currently has one write-up per milestone.
+- Done: a tutorial notebook that follows the book's GEMM chapters
+  (`notebooks/book_tour.ipynb`) and a single user guide (`docs/guide.md`).
+  Jupyter is not in the env or in the package's extras.
 - Reserve the PyPI name.

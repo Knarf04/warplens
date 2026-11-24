@@ -12,6 +12,7 @@ from .errors import (
 from .frontend.ptx_parser import parse_ptx, parse_ptx_file
 from .host.device import Device, DeviceArray, TensorMap
 from .host.launch import LaunchStats
+from .host.program import ProgramLaunch, ProgramRun, run_program
 
 __version__ = "0.0.1"
 
@@ -23,10 +24,13 @@ __all__ = [
     "LaunchError",
     "LaunchStats",
     "MemoryFault",
+    "ProgramLaunch",
+    "ProgramRun",
     "PtxSyntaxError",
     "TensorMap",
     "UnsupportedError",
     "WarplensError",
     "parse_ptx",
     "parse_ptx_file",
+    "run_program",
 ]

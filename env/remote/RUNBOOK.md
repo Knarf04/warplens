@@ -202,12 +202,13 @@ scp '<user>@<host>:warplens-remote/results/warplens-b200-*' .
 sha256sum -c warplens-b200-*.tar.gz.sha256
 ```
 
-The pinned setup does **not** install PyTorch or fetch the book. A full run now
-checks both before starting the suites: provide a compatible **CUDA-enabled**
-PyTorch installation in the remote environment and set `WARPLENS_BOOK` to the
-book clone (or pass `--book` through `WARPLENS_BLACKWELL_RUN_ARGS`). A CPU-only
-PyTorch wheel does not satisfy the native Triton path. No PyTorch/toolkit pair
-has been validated for this rental yet; resolve that environment before renting.
+The pinned setup installs a separate CUDA-enabled PyTorch environment by default
+when the driver supports its CUDA major release; `--no-torch` disables it. It does
+not fetch the book: set `WARPLENS_BOOK` to your clone (or pass `--book` through
+`WARPLENS_BLACKWELL_RUN_ARGS`). A full run checks both prerequisites before starting
+the suites. A missing installation, a CPU-only PyTorch wheel, or an environment
+that cannot see the GPU does not satisfy the native Triton path. This setup has
+been rehearsed on the development GPU, but has not been validated on a B200.
 For a deliberately narrower run of the hardware probes without end-to-end programs:
 
 ```bash
@@ -281,10 +282,11 @@ Contents:
 | `suite-dirs/` | result directories a suite created inside its own directory |
 | `SHA256SUMS` | a checksum for every file above |
 
-Expected size: small. Measured 30 kB for a run in which every benchmark failed
-at once; a real run is text output of a few hundred probes, so a guess is under
-10 MB. `scp` or `rsync` over the ssh connection you already have is enough; no
-object storage is needed.
+The archive includes executables, full tensor buffers and a source snapshot as
+well as text logs. The 17-case CPU-only end-to-end capture occupied 73 MB before
+compression; a full rental adds probe artifacts, timing results and the frozen
+source tree. Check the reported archive size and allow space for two copies.
+Transfer it with `scp` or `rsync` over the existing SSH connection.
 
 ## 7. When preflight fails
 
@@ -295,7 +297,7 @@ object storage is needed.
 | `driver` FAIL | driver older than CUDA 12.8 | Cannot run `sm_100a`. Release, or pick another image with a newer driver. |
 | `driver` WARN | driver older than the pinned toolkit | `setup.sh` matches the toolkit to it by default, and the results are then flagged as not comparable with the predictions. Decide between that and `--toolkit pinned`: section 2, "Driver older than the toolkit". |
 | `predictions` WARN | the nvcc in the env is not the one the predictions were made with (`BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE`), or the driver refuses its PTX and machine code will run | The first: `env/remote/run.sh --toolkit pinned --redo setup` builds with the predictions' compiler; or go on and read every verdict with the flag in mind. The second needs nothing. `run.sh --strict-toolkit` stops instead of going on. |
-| `torch` WARN | no PyTorch env, or it does not see the GPU | Only the Triton-on-GPU step is lost (recorded as `skipped`). `env/remote/setup.sh` again retries the install; with a 12.x driver there is no PyTorch to install (pins.env). |
+| `torch` WARN | no PyTorch env, or it does not see the GPU | A full run fails its native E2E prerequisite check; a skipped Triton step also fails collection. Retry `env/remote/setup.sh` or fix GPU visibility. With a 12.x driver the pinned PyTorch cannot be installed; choose a compatible driver or deliberately use `--no-e2e`. |
 | `gpu-memory` / `gpu-idle` WARN | something else is on the GPU | If it is yours, stop it. If not, the card is shared: functional results are fine, timing is not. Ask for a dedicated GPU or note it. |
 | `disk` FAIL | under 18 GB (2 GB once installed) | `export WARPLENS_REMOTE_HOME=/path/on/the/big/disk` and start again. `setup.sh --no-torch` needs 12 GB. |
 | `cpu` / `ram` WARN | small host | Builds are slower; nothing else. |
@@ -315,10 +317,11 @@ A stage of `run.sh` that fails prints the end of its log and the run goes on.
 Archive or checksum failures return a nonzero status; preserve the raw run directory
 and retry `--collect-only` after fixing the storage problem. Fix, then run `env/remote/run.sh` again.
 
-`run-blackwell` fails when any probe did not launch (`launch-failed`: the driver
-could not load its kernels), had a host error or was not built; its log ends
-with the count in capitals. That is different from probes whose kernel faulted
-or whose output differs, which do not fail the stage: those are results.
+`run-blackwell` fails for missing programs or artifacts, launch or host errors,
+unexpected process failures or timeouts, and incomplete or failed E2E captures.
+Probe faults and hangs remain valid observations only when the manifest permits
+them. Differences in the output of a completed probe remain results to assess
+with `compare.py`; they do not by themselves fail collection.
 `validation/blackwell/README.md`, "When probes do not launch", says what to do.
 In the timing suite the same thing is `LAUNCH FAILED` in `status.txt`.
 

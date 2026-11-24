@@ -147,7 +147,10 @@ def one(program: str, record: str, config: str | None, model: str, placement: st
 
 
 def placement_fields(sim: dict) -> str:
-    """What is appended to a BENCH line about the placement of its launch."""
+    """What is appended to a BENCH line about the placement of its launch. Nothing, if the
+    launch record does not say how many SMs it was timed with."""
+    if sim.get("active_sms") is None:
+        return ""
     shape = sim.get("placement") or {}
     text = f" sim_active_sms={sim['active_sms']}"
     if shape:
@@ -163,7 +166,7 @@ def assumption(sim: dict) -> dict:
     if shape:
         shape["spread_sms"] = shape.pop("active_sms")
         shape.pop("sm_count", None)
-    return {"active_sms": sim["active_sms"], **shape}
+    return {"active_sms": sim.get("active_sms"), **shape}
 
 
 def predict(out: Path, benches=None, config: Path | None = None, bin_dir: Path | None = None,
@@ -207,7 +210,7 @@ def predict(out: Path, benches=None, config: Path | None = None, bin_dir: Path |
                     # one was placed on another number of SMs, the entry lists them all.
                     ident = fit.parse_line(line).get("id", "")
                     entry = assumed.setdefault(ident, assumption(sim))
-                    if sim["active_sms"] != entry["active_sms"]:
+                    if sim.get("active_sms") not in (None, entry["active_sms"]):
                         entry["active_sms_of_other_launches"] = sorted(
                             {*entry.get("active_sms_of_other_launches", []), sim["active_sms"]})
                 at += 1

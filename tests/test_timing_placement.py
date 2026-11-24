@@ -195,6 +195,9 @@ def test_prediction_lines_and_metadata_carry_the_assumption():
     assert (entry["active_sms"], entry["spread_sms"], entry["packed_sms"], entry["limited_by"]) == \
         (8, 8, 4, "shared memory")
     assert "sm_count" not in entry
+    # A launch record that does not say (written by another runner): no fields, no failure.
+    bare = {"time_ns": 1.0, "instructions": 2, "bound": "latency", "findings": 0}
+    assert predict.placement_fields(bare) == "" and predict.assumption(bare) == {"active_sms": None}
     # fit.py reads the fields as numbers, and its tables show them.
     row = fit.parse_line("BENCH id=x reps=1" + predict.placement_fields(sim))
     assert {k: row[k] for k in ("sim_active_sms", "sim_ctas_per_sm", "sim_resident_ctas")} == \

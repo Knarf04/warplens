@@ -428,9 +428,17 @@ Found by this work in the simulator, and fixed since unless marked open:
   (`validation/ampere/reconvergence_golden.py`, `core/warp.py:_regroup`). The
   `__syncthreads()` workaround in the probes is no longer needed and is kept
   because the predictions were made with it.
-- Open: a stale mbarrier token tests true where the 3080 Ti gives false; `atom` is
-  not implemented (`validation/blackwell/README.md`, "Found while writing the
-  probes").
+- `atom` was not implemented. Fixed: the forms nvcc 13.5 emits
+  for `atomicAdd`, `Sub`, `Exch`, `Min`, `Max`, `And`, `Or`, `Xor`, `CAS`,
+  `Inc`, `Dec` and their `_block` / `_system` variants, on global, shared and
+  generic addresses (`docs/coverage.md`), agreeing with the 3080 Ti
+  (`validation/ampere/atom_golden.txt`). Lanes of a warp on one address apply
+  in lane order; atoms of different warps are not an `smem-race` with each
+  other; the timing model charges an atom as a load and a store (assumed).
+  The CLC probes still avoid atomics with single-writer words and no longer
+  need to.
+- Open: a stale mbarrier token tests true where the 3080 Ti gives false
+  (`validation/blackwell/README.md`, "Found while writing the probes").
 - Documents that contradict the code are listed in
   `docs/validation-matrix.md`, "Discrepancies found".
 

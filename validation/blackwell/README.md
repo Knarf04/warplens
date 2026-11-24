@@ -461,9 +461,12 @@ Those marked "fixed since" were fixed on other branches.
     `mbarrier/arrive_token stale`, also built by `build.sh --ampere`. `docs/m2.md` and matrix
     row MB-03 say "true once that phase has completed", which hardware contradicts for older
     phases.
-11. **`atom` is not implemented.** A kernel with `atomicAdd(uint32_t*, 1u)`
-    (`atom.relaxed.gpu.global.add.u32`) stops with "uses instructions warplens does not
-    implement yet: atom". The CLC probes use single-writer words instead.
+11. **`atom` was not implemented** (fixed since, on branch `work/atom`). A kernel with
+    `atomicAdd(uint32_t*, 1u)` (`atom.relaxed.gpu.global.add.u32`) stopped with "uses
+    instructions warplens does not implement yet: atom". The forms nvcc 13.5 emits for the
+    atomic functions run now (`docs/coverage.md`, "Atomic updates") and agree with the
+    RTX 3080 Ti (`validation/ampere/atom_golden.txt`). The CLC probes still use
+    single-writer words, which they no longer need to.
 12. **NaN payloads, and division by zero.** For `.ftz` results the simulator's NaN is
     `ffc00000` where the 3080 Ti gave `7fffffff`; `min`/`max` of two NaNs returns an input
     NaN in the simulator and `7fffffff` on the GPU; `div.s32 x, 0` gives `x` in the

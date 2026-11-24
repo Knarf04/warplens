@@ -110,6 +110,19 @@ def _try_cancel(w, ins, mask) -> None:
                 w, ins, [lane])
         idx = np.arange(start, start + RESPONSE_BYTES, dtype=np.intp)
         for target in targets:
+            for op_id in np.unique(target.smem.async_reader[idx]):
+                if op_id > 0 and int(op_id) not in w.seen:
+                    previous = target.async_ops[int(op_id)]
+                    if previous.kind == "mma":
+                        kind, producer, wait = "mma-operand-overwritten", "tcgen05.mma", \
+                            "its tcgen05.commit mbarrier"
+                    else:
+                        kind, producer, wait = "tma-store-source-overwritten", "TMA store", \
+                            "cp.async.bulk.wait_group.read"
+                    cta.findings.add(
+                        kind, f"try_cancel overwrites shared memory in CTA {target.id} that the "
+                        f"{producer} at line {previous.ins.line} reads, without waiting on {wait}",
+                        w, ins, [lane])
             for op_id in np.unique(target.smem.async_writer[idx]):
                 if op_id > 0 and int(op_id) not in w.seen:
                     previous = target.async_ops[int(op_id)]

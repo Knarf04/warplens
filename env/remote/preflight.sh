@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Is this machine worth the rental? Run before anything else.
 #
-#   env/remote/preflight.sh [--quick] [--out FILE] [--status FILE]
+#   env/remote/preflight.sh [--quick] [--e2e] [--book PATH] [--out FILE] [--status FILE]
 #
 # Prints one line per check, PASS, WARN, FAIL, INFO or SKIP, then a summary.
 # Exit status 1 if any check FAILed, 0 otherwise.
@@ -12,6 +12,8 @@
 #   (default)      also compile and run kernels on the GPU, encode a tensor map
 #                  and read a performance counter with ncu. Needs the env from
 #                  env/remote/setup.sh. About a minute.
+#   --e2e          also require native Triton (CUDA PyTorch) and WARPLENS_BOOK
+#   --book PATH    book clone for --e2e (default WARPLENS_BOOK)
 #   --out FILE     also write the report to FILE
 #   --status FILE  write "check STATUS" lines to FILE, for run.sh
 #
@@ -37,11 +39,15 @@ if [[ "${1:-}" == --choose-toolkit ]]; then
 fi
 
 quick=0
+with_e2e=0
+book="${WARPLENS_BOOK:-}"
 out_file=""
 status_file=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick) quick=1 ;;
+    --e2e) with_e2e=1 ;;
+    --book) book="${2:?--book needs a path}"; shift ;;
     --out) out_file="${2:?--out needs a file}"; shift ;;
     --status) status_file="${2:?--status needs a file}"; shift ;;
     -h|--help) sed -n '2,25p' "${BASH_SOURCE[0]}"; exit 0 ;;
@@ -250,6 +256,15 @@ elif ! env_installed; then
   for check in $gpu_checks; do skip "$check" "no env"; done
 else
   pass env "${WARPLENS_ENV_RUN:-$ENV_PREFIX}"
+  if (( with_e2e )); then
+    if out="$(env_run timeout --kill-after=5 60 python "$REMOTE_DIR/check_env.py" e2e "$book" 2>&1)"; then
+      pass native-e2e "CUDA PyTorch, Triton and the book clone are available"
+    else
+      fail native-e2e "native end-to-end prerequisites are missing: $(tr '\n' ' ' <<<"$out")"
+      note "Install compatible CUDA PyTorch and set WARPLENS_BOOK before a full run."
+      note "For a probe-only run: WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e env/remote/run.sh"
+    fi
+  fi
   work="$(mktemp -d)"
   arch="$(arch_for_cap "$expect_cap")"
   blackwell_arch=sm_100a
@@ -312,7 +327,11 @@ else
         warn ptx-jit "the driver (CUDA ${driver_cuda:-?}) refuses PTX .version $ptx_version from nvcc $nvcc_version: $(field error "$out")"
         note "Programs that carry PTX will not load. Either rerun env/remote/setup.sh --toolkit auto --force"
         note "(installs the toolkit that matches the driver), or build with machine code"
-        note "(validation/blackwell/build.sh --native). run.sh does the second by itself."
+        note "(validation/blackwell/build.sh --native). run.sh does the second for probes only."
+        if (( with_e2e )); then
+          fail e2e-ptx "the end-to-end programs still require PTX JIT; --native only covers the probe binaries"
+          note "Use a driver-compatible toolkit (--toolkit auto), or select --no-e2e for a probe-only run."
+        fi
       else
         fail ptx-jit "the driver did not run PTX from nvcc $nvcc_version: $(field error "$out")"
       fi

@@ -29,7 +29,7 @@ command -v "$NCU" > /dev/null 2>&1 || finish "ncu not run: \`$NCU\` is not insta
 [[ -x "$BIN/launch" ]] || finish "ncu not run: $BIN/launch is not built"
 
 # 1. Can counters be read? One empty kernel, one counter.
-"$NCU" --csv --metrics smsp__inst_executed.sum "$BIN/launch" --trials 1 --only ctas=1 \
+timeout --kill-after=10 60 "$NCU" --csv --metrics smsp__inst_executed.sum "$BIN/launch" --trials 1 --only ctas=1 \
   > "$OUT/probe.csv" 2> "$OUT/probe.err"
 code=$?
 if grep -q "ERR_NVGPUCTRPERM" "$OUT/probe.csv" "$OUT/probe.err"; then
@@ -49,14 +49,17 @@ ok=0; bad=0
 profile() {  # name, metrics, program, arguments...
   local name="$1" metrics="$2"; shift 2
   [[ -x "$1" ]] || { echo "$name: $1 is not built; skipped" >&2; return; }
-  if ! timeout --kill-after=10 1200 "$NCU" --csv --metrics "$metrics" "$@" > "$OUT/$name.csv" 2> "$OUT/$name.err" \
-      || ! grep -q '^"ID"' "$OUT/$name.csv"; then
+  local code
+  timeout --kill-after=10 1200 "$NCU" --csv --metrics "$metrics" "$@" > "$OUT/$name.csv" 2> "$OUT/$name.err"
+  code=$?
+  if [[ $code -ne 0 ]] || ! grep -q '^"ID"' "$OUT/$name.csv"; then
     # A counter name this GPU or ncu version does not have fails the whole run: retry with one.
     echo "$name: failed with the full counter list, retrying with smsp__inst_executed.sum only" >&2
     cp "$OUT/$name.csv" "$OUT/$name.first_attempt.csv" 2>/dev/null
     timeout --kill-after=10 1200 "$NCU" --csv --metrics smsp__inst_executed.sum "$@" > "$OUT/$name.csv" 2>> "$OUT/$name.err"
+    code=$?
   fi
-  if grep -q '^"ID"' "$OUT/$name.csv"; then
+  if [[ $code -eq 0 ]] && grep -q '^"ID"' "$OUT/$name.csv"; then
     ok=$((ok + 1))
     # The program's own lines are mixed into ncu's stdout before the table; keep them apart too.
     grep -E '^(DEVICE|BENCH) ' "$OUT/$name.csv" > "$OUT/$name.out"

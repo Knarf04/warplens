@@ -38,9 +38,7 @@ import argparse
 import concurrent.futures
 import fnmatch
 import os
-import signal
 import socket
-import subprocess
 import sys
 import tarfile
 import time
@@ -50,31 +48,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 sys.path.insert(0, str(HERE))
 from manifest import PROBES, Probe  # noqa: E402
+from probe_process import forward_interrupts, run_process  # noqa: E402
 
 SIM_TIMEOUT = 600  # seconds for one probe in the simulator
-
-
-def run_process(command, timeout, env=None, cwd=None):
-    """Run one command in its own process group. Returns (status, seconds, stdout, stderr);
-    status is "ok", "exit N", "signal N" or "timeout"."""
-    start = time.monotonic()
-    try:
-        child = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, cwd=cwd,
-                                 start_new_session=True)
-    except OSError as error:
-        return f"not run ({error.strerror})", 0.0, b"", str(error).encode()
-    try:
-        out, err = child.communicate(timeout=timeout)
-        code = child.returncode
-        status = "ok" if code == 0 else f"exit {code}" if code > 0 else f"signal {-code}"
-    except subprocess.TimeoutExpired:
-        try:
-            os.killpg(child.pid, signal.SIGKILL)  # the program and anything it started
-        except ProcessLookupError:
-            pass
-        out, err = child.communicate()
-        status = "timeout"
-    return status, time.monotonic() - start, out, err
 
 
 def simulator_command(binary: Path, args) -> list[str]:
@@ -202,6 +178,7 @@ def main() -> int:
     out = Path(args.out) if args.out else HERE / "results" / f"{args.mode}-{socket.gethostname()}-{stamp}"
     out.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
+    infrastructure_failures = 0
 
     if not args.no_build:
         command = [str(HERE / "build.sh")] + (["--native"] if args.mode == "gpu" else [])
@@ -209,6 +186,7 @@ def main() -> int:
         (out / "build.log").write_bytes(stdout + stderr)
         print(f"build: {status} ({seconds:.0f} s)", flush=True)
         if status != "ok":
+            infrastructure_failures += 1
             # Keep going: whatever did build still runs, and the log says what did not.
             print((stdout + stderr).decode(errors="replace")[-3000:], flush=True)
 
@@ -230,6 +208,8 @@ def main() -> int:
     workers = 1 if args.mode == "gpu" else max(1, args.jobs)
     with concurrent.futures.ThreadPoolExecutor(workers) as pool:
         for probe, status, seconds, stdout, stderr in pool.map(one, probes):
+            if status.startswith(("not built", "not run")):
+                infrastructure_failures += 1
             save(out, probe.name, stdout, stderr)
             command = " ".join([probe.program, *probe.args])
             rows.append(f"{probe.name}\t{status}\t{seconds:.1f}\t{command}")
@@ -241,12 +221,15 @@ def main() -> int:
 
     if not args.no_e2e and not args.only:
         command = [sys.executable, str(HERE / "e2e" / "run_e2e.py"), "--mode", "gpu" if args.mode == "gpu" else "sim",
-                   "--out", str(out)]
+                   "--out", str(out), "--timeout-scale", str(args.timeout_scale)]
         if args.book:
             command += ["--book", args.book]
         if args.mode == "predict":
             command += ["--predicted", str(HERE / "predicted")]
-        subprocess.run(command)
+        status, _, stdout, stderr = run_process(command, 7 * 3600 * args.timeout_scale)
+        (out / "e2e-runner.log").write_bytes(stdout + stderr)
+        print(f"end-to-end runner: {status}", flush=True)
+        infrastructure_failures += status != "ok"
 
     (out / "manifest.py").write_bytes((HERE / "manifest.py").read_bytes())
     (out / "elapsed.txt").write_text(f"{time.monotonic() - started:.0f} seconds\n")
@@ -261,8 +244,9 @@ def main() -> int:
     print(f"results in {out}\narchive    {archive}")
     if args.mode == "gpu":
         print(f"compare with: python {HERE / 'compare.py'} {archive}")
-    return 0
+    return 1 if infrastructure_failures else 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    with forward_interrupts():
+        sys.exit(main())

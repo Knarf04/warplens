@@ -185,7 +185,10 @@ PYTHONPATH=<repo> python predict.py --out again --config results_x/fit/calibrate
 
 `predicted/<bench>.out` holds each launch's BENCH line with the simulator's
 numbers appended (`sim_ns`, `sim_instr`, `sim_bound`); `predictions.md` is the
-table; `meta.json` has the config used and what was not simulated.
+table; `meta.json` has the config used and what was not simulated. `--model B300`
+selects the matching B300 config unless `--config` explicitly overrides it; the child
+process and recorded metadata use that same selection. Prediction subprocesses are
+bounded and cleaned up on SIGINT/SIGTERM, including detached native children.
 The second command re-predicts with a calibrated config; `fit.py --predicted
 again --config .../calibrated.yaml` then shows ratios near 1 where the model can
 reproduce the measurements, and the remaining ratios are what no parameter fixes.

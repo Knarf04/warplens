@@ -11,6 +11,10 @@
 
 #include "protocol.h"
 
+/* Export each context-creation ABI explicitly, independent of cuda.h's default alias. */
+#undef cuCtxCreate
+#undef cuGetProcAddress
+
 CUresult cuTensorMapEncodeTiled(CUtensorMap *tensorMap, CUtensorMapDataType tensorDataType,
                                 cuuint32_t tensorRank, void *globalAddress,
                                 const cuuint64_t *globalDim, const cuuint64_t *globalStrides,
@@ -49,8 +53,8 @@ CUresult cuDriverGetVersion(int *version) {
  * not implemented is reported as not found, and fails in the caller only if it is used. */
 CUresult cuGetProcAddress_v2(const char *symbol, void **pfn, int cudaVersion, cuuint64_t flags,
                              CUdriverProcAddressQueryResult *symbolStatus) {
-  (void)cudaVersion; (void)flags;
-  if (!symbol || !pfn) return CUDA_ERROR_INVALID_VALUE;
+  if (!symbol || !pfn || cudaVersion < 0 || cudaVersion > CUDA_VERSION || flags > 2)
+    return CUDA_ERROR_INVALID_VALUE;
   static void *self;
   if (!self) {
     Dl_info info;
@@ -59,14 +63,34 @@ CUresult cuGetProcAddress_v2(const char *symbol, void **pfn, int cudaVersion, cu
   static const char *const suffixes[] = {"", "_v2", "_v3", "_v4"};  /* the name is asked for unversioned */
   char name[128];
   void *found = NULL;
-  for (int i = 0; self && i < 4 && !found; ++i) {
+  /* These APIs changed their argument lists. Returning whichever exported suffix is
+   * found first calls through an incompatible function pointer (notably cuda-python's
+   * older cuCtxCreate signature against a CUDA 13 build). See cudaTypedefs.h. */
+  const char *exact = NULL;
+  if (!strcmp(symbol, "cuCtxCreate"))
+    exact = cudaVersion >= 12050 ? "cuCtxCreate_v4" : cudaVersion >= 11040 ? "cuCtxCreate_v3"
+            : cudaVersion >= 3020 ? "cuCtxCreate_v2" : "cuCtxCreate";
+  else if (!strcmp(symbol, "cuGetProcAddress"))
+    exact = cudaVersion >= 12000 ? "cuGetProcAddress_v2" : "cuGetProcAddress";
+  else if (!strcmp(symbol, "cuCtxGetDevice"))
+    exact = cudaVersion >= 13000 ? "cuCtxGetDevice_v2" : "cuCtxGetDevice";
+  else if (!strcmp(symbol, "cuCtxSynchronize"))
+    exact = cudaVersion >= 13000 ? "cuCtxSynchronize_v2" : "cuCtxSynchronize";
+  if (exact) {
+    if (self) found = dlsym(self, exact);
+  } else for (int i = 0; self && i < 4 && !found; ++i) {
     snprintf(name, sizeof name, "%s%s", symbol, suffixes[i]);
     found = dlsym(self, name);
   }
   *pfn = found;
   if (symbolStatus)
     *symbolStatus = found ? CU_GET_PROC_ADDRESS_SUCCESS : CU_GET_PROC_ADDRESS_SYMBOL_NOT_FOUND;
-  return found ? CUDA_SUCCESS : CUDA_ERROR_NOT_FOUND;
+  return CUDA_SUCCESS;  /* v2 reports lookup failure through pfn and symbolStatus */
+}
+
+CUresult cuGetProcAddress(const char *symbol, void **pfn, int cudaVersion, cuuint64_t flags) {
+  CUresult status = cuGetProcAddress_v2(symbol, pfn, cudaVersion, flags, NULL);
+  return status == CUDA_SUCCESS && !*pfn ? CUDA_ERROR_NOT_FOUND : status;
 }
 
 /* -- the device ------------------------------------------------------------------------ */
@@ -196,21 +220,38 @@ CUresult cuLaunchKernelEx(const CUlaunchConfig *config, CUfunction f, void **ker
  * it. Memory goes through the runtime shim, whose error numbers the driver shares. */
 
 static int the_context;
-static __thread int current;
+/* All supported handles identify this one context, so its per-thread stack needs only
+ * a depth. Push/create add an entry, set replaces the top, and pop restores the old top. */
+static __thread size_t context_depth;
 
-#if CUDA_VERSION >= 13000
-CUresult cuCtxCreate(CUcontext *pctx, CUctxCreateParams *params, unsigned int flags, CUdevice dev) {
-  (void)params;
-#else
-CUresult cuCtxCreate(CUcontext *pctx, unsigned int flags, CUdevice dev) {
-#endif
+static CUresult create_context(CUcontext *pctx, unsigned int flags, CUdevice dev) {
   (void)flags;
   if (!pctx) return CUDA_ERROR_INVALID_VALUE;
   if (dev != 0) return CUDA_ERROR_INVALID_DEVICE;
   *pctx = (CUcontext)&the_context;
-  current = 1;
+  ++context_depth;
   return CUDA_SUCCESS;
 }
+CUresult cuCtxCreate(CUcontext *pctx, unsigned int flags, CUdevice dev) {
+  return create_context(pctx, flags, dev);
+}
+CUresult cuCtxCreate_v2(CUcontext *pctx, unsigned int flags, CUdevice dev) {
+  return create_context(pctx, flags, dev);
+}
+#if CUDA_VERSION >= 11040
+CUresult cuCtxCreate_v3(CUcontext *pctx, CUexecAffinityParam *params, int count,
+                        unsigned int flags, CUdevice dev) {
+  (void)params;
+  if (count) return CUDA_ERROR_NOT_SUPPORTED;
+  return create_context(pctx, flags, dev);
+}
+#endif
+#if CUDA_VERSION >= 12050
+CUresult cuCtxCreate_v4(CUcontext *pctx, CUctxCreateParams *params, unsigned int flags, CUdevice dev) {
+  if (params) return CUDA_ERROR_NOT_SUPPORTED;
+  return create_context(pctx, flags, dev);
+}
+#endif
 CUresult cuDevicePrimaryCtxRetain(CUcontext *pctx, CUdevice dev) {
   if (!pctx) return CUDA_ERROR_INVALID_VALUE;
   if (dev != 0) return CUDA_ERROR_INVALID_DEVICE;
@@ -218,26 +259,53 @@ CUresult cuDevicePrimaryCtxRetain(CUcontext *pctx, CUdevice dev) {
   return CUDA_SUCCESS;
 }
 CUresult cuDevicePrimaryCtxRelease(CUdevice dev) { return dev == 0 ? CUDA_SUCCESS : CUDA_ERROR_INVALID_DEVICE; }
-CUresult cuCtxDestroy(CUcontext ctx) { (void)ctx; current = 0; return CUDA_SUCCESS; }
-CUresult cuCtxSetCurrent(CUcontext ctx) { current = ctx != NULL; return CUDA_SUCCESS; }
-CUresult cuCtxPushCurrent(CUcontext ctx) { current = ctx != NULL; return CUDA_SUCCESS; }
+CUresult cuCtxDestroy(CUcontext ctx) {
+  if (ctx != (CUcontext)&the_context) return CUDA_ERROR_INVALID_CONTEXT;
+  if (context_depth) --context_depth;
+  return CUDA_SUCCESS;
+}
+CUresult cuCtxSetCurrent(CUcontext ctx) {
+  if (ctx && ctx != (CUcontext)&the_context) return CUDA_ERROR_INVALID_CONTEXT;
+  if (!ctx) { if (context_depth) --context_depth; }
+  else if (!context_depth) context_depth = 1;
+  return CUDA_SUCCESS;
+}
+CUresult cuCtxPushCurrent(CUcontext ctx) {
+  if (ctx != (CUcontext)&the_context) return CUDA_ERROR_INVALID_CONTEXT;
+  ++context_depth;
+  return CUDA_SUCCESS;
+}
 CUresult cuCtxPopCurrent(CUcontext *pctx) {
-  if (pctx) *pctx = current ? (CUcontext)&the_context : NULL;
-  current = 0;
+  if (!context_depth) return CUDA_ERROR_INVALID_CONTEXT;
+  if (pctx) *pctx = (CUcontext)&the_context;
+  --context_depth;
   return CUDA_SUCCESS;
 }
 CUresult cuCtxGetCurrent(CUcontext *pctx) {
   if (!pctx) return CUDA_ERROR_INVALID_VALUE;
-  *pctx = current ? (CUcontext)&the_context : NULL;
+  *pctx = context_depth ? (CUcontext)&the_context : NULL;
   return CUDA_SUCCESS;
 }
 CUresult cuCtxGetDevice(CUdevice *device) {
   if (!device) return CUDA_ERROR_INVALID_VALUE;
-  if (!current) return CUDA_ERROR_INVALID_CONTEXT;
+  if (!context_depth) return CUDA_ERROR_INVALID_CONTEXT;
   *device = 0;
   return CUDA_SUCCESS;
 }
 CUresult cuCtxSynchronize(void) { return (CUresult)cudaDeviceSynchronize(); }
+#if CUDA_VERSION >= 13000
+CUresult cuCtxGetDevice_v2(CUdevice *device, CUcontext ctx) {
+  if (!ctx) return cuCtxGetDevice(device);
+  if (!device) return CUDA_ERROR_INVALID_VALUE;
+  if (ctx != (CUcontext)&the_context) return CUDA_ERROR_INVALID_CONTEXT;
+  *device = 0;
+  return CUDA_SUCCESS;
+}
+CUresult cuCtxSynchronize_v2(CUcontext ctx) {
+  if (ctx && ctx != (CUcontext)&the_context) return CUDA_ERROR_INVALID_CONTEXT;
+  return cuCtxSynchronize();
+}
+#endif
 
 CUresult cuDeviceGetCount(int *count) {
   if (!count) return CUDA_ERROR_INVALID_VALUE;

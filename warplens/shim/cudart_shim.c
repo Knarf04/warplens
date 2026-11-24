@@ -208,7 +208,8 @@ void *warplens_module_kernel(void *module, const char *name) {
   return k;
 }
 
-/* The runtime's own module API (CUDA 12.x on), which the CuTe DSL's host code uses. Options
+#if CUDART_VERSION >= 12080
+/* The runtime's own module API (CUDA 12.8 on), which the CuTe DSL's host code uses. Options
  * steer the driver's compiler and loader; there is nothing for them to steer here. */
 cudaError_t cudaLibraryLoadData(cudaLibrary_t *library, const void *code,
                                 enum cudaJitOption *jitOptions, void **jitOptionsValues,
@@ -229,6 +230,7 @@ cudaError_t cudaLibraryGetKernel(cudaKernel_t *kernel, cudaLibrary_t library, co
 
 /* The server keeps the parsed module, and its kernels stay launchable. */
 cudaError_t cudaLibraryUnload(cudaLibrary_t library) { (void)library; return cudaSuccess; }
+#endif
 
 cudaError_t cudaKernelSetAttributeForDevice(cudaKernel_t kernel, enum cudaFuncAttribute attr,
                                             int value, int device) {

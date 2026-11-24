@@ -116,8 +116,11 @@ env/remote/run.sh 2>&1 | tee ~/run.log       # everything; prints the archive pa
   everything as root, so that `ncu` may read counters. Decide this before the
   first command: the env lives under `$HOME` of whoever runs `setup.sh`.
 - Again after any failure or interruption: the same `env/remote/run.sh`.
-  Finished stages are skipped. `--redo STAGE` repeats one, `--skip STAGE` leaves
-  one out, `--keep-going` continues past a failed preflight.
+  Finished stages are skipped only for the same commit, pins and run configuration.
+  Changing `--toolkit` or suite arguments reruns the stages. `--redo STAGE` repeats
+  one and invalidates dependent results: rebuilding a suite reruns that suite;
+  rerunning setup repeats preflight, builds and runs. `--skip STAGE` leaves one
+  out; `--keep-going` continues past a failed preflight.
 
 Back on your own machine (section 6):
 
@@ -125,6 +128,22 @@ Back on your own machine (section 6):
 scp '<user>@<host>:warplens-remote/results/warplens-b200-*' .
 sha256sum -c warplens-b200-*.tar.gz.sha256
 ```
+
+The pinned setup does **not** install PyTorch or fetch the book. A full run now
+checks both before starting the suites: provide a compatible **CUDA-enabled**
+PyTorch installation in the remote environment and set `WARPLENS_BOOK` to the
+book clone (or pass `--book` through `WARPLENS_BLACKWELL_RUN_ARGS`). A CPU-only
+PyTorch wheel does not satisfy the native Triton path. No PyTorch/toolkit pair
+has been validated for this rental yet; resolve that environment before renting.
+For a deliberately narrower run of the hardware probes without end-to-end programs:
+
+```bash
+WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e env/remote/run.sh
+```
+
+A standalone `preflight.sh` checks the GPU and probes; add `--e2e` to check these
+full-suite prerequisites. `run.sh` selects that check automatically unless the
+Blackwell suite is skipped or restricted with `--no-e2e` / `--only`.
 
 ## 4. What each stage takes
 
@@ -184,7 +203,7 @@ Contents:
 | `resolved/` | what `setup.sh` installed: every conda package with its hash, `pip freeze`, `versions.txt`, `drift.txt` (differences from the pins) |
 | `pins.env` | what was asked for |
 | `nvidia-smi.txt`, `nvidia-smi-q.txt` | the GPU as the driver describes it |
-| `logs/<stage>.log` | everything each stage printed |
+| `logs/<stage>.log` | latest output of each stage; earlier attempts are preserved in `logs/history/` |
 | `out/blackwell/`, `out/timing/` | the suites' raw outputs (`WARPLENS_RESULTS_DIR`) |
 | `suite-dirs/` | result directories a suite created inside its own directory |
 | `SHA256SUMS` | a checksum for every file above |
@@ -210,14 +229,16 @@ object storage is needed.
 | `compile` FAIL | nvcc cannot build for `sm_100a` | The env is broken: `env/remote/setup.sh --force`. |
 | `driver-api` FAIL | the driver API disagrees with `nvidia-smi` | Several GPUs in a different order: `export CUDA_VISIBLE_DEVICES=<index of the B200>`. |
 | `run-trivial` FAIL | `sm_100a` machine code does not run | With `gpu-identity` PASS this should not happen. Read the error; try `env/remote/setup.sh --toolkit <the driver's CUDA Version> --force`. If it persists the machine is unusable. |
-| `ptx-jit` WARN | the driver refuses the toolkit's PTX | Only when the toolkit was forced newer than the driver. `run.sh` builds the Blackwell probes with `--native` then. Better: `env/remote/setup.sh --toolkit auto --force`, then `run.sh --redo preflight`. |
+| `ptx-jit` WARN | the driver refuses the toolkit's PTX | `--native` covers the probes only. Full end-to-end runs also fail `e2e-ptx`; use a driver-compatible toolkit (`--toolkit auto`) or deliberately select `--no-e2e`. |
+| `native-e2e` FAIL | native Triton or book prerequisites are unavailable | Provide CUDA-enabled PyTorch and the book clone, then retry. For probes only, set `WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e`. |
 | `tcgen05` / `tensor-map` / `tma` FAIL | a Blackwell feature is not exposed | On a real B200 these must pass. Keep the report (it is in the archive) and stop: this is a finding about the machine or a bug in the preflight kernel, not something to debug on the clock. `--keep-going` runs the suites anyway if the failure is confined to one feature. |
 | `nvrtc` WARN | NVRTC cannot compile for `sm_100a` | TIRx kernels will not build. Expected only with a 12.x toolkit. |
 | `ncu` WARN, `ERR_NVGPUCTRPERM` | no permission to read counters | In order: run everything as root (`sudo -i`, then the commands of section 3). On a VM as root, if it still fails: `modprobe nvidia NVreg_RestrictProfilingToAdminUsers=0` needs the module reloaded, which is rarely possible with the GPU in use. In a container: only the provider can grant it (`--cap-add=SYS_ADMIN`). If none works, go on: only the counter comparison is lost. |
 | `ncu` WARN, other | ncu ran but gave no counter | The report shows its last lines. An ncu too old to know the B200 says so there; `setup.sh` installs one that matches the toolkit unless `--no-ncu` was given. |
 
 A stage of `run.sh` that fails prints the end of its log and the run goes on.
-The archive is written regardless. Fix, then run `env/remote/run.sh` again.
+Archive or checksum failures return a nonzero status; preserve the raw run directory
+and retry `--collect-only` after fixing the storage problem. Fix, then run `env/remote/run.sh` again.
 
 ## 8. The last minutes before releasing the instance
 

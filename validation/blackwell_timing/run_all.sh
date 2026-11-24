@@ -71,6 +71,9 @@ failed=0
 : > "$OUT/status.txt"
 run_one() {  # name, program, extra arguments...
   local name="$1" program="$2"; shift 2
+  # A repeated --out must not let an absent program reuse an old measurement.
+  : > "$OUT/$name.out"
+  : > "$OUT/$name.err"
   if [[ ! -x "$program" ]]; then
     echo "$name: missing program $program" | tee -a "$OUT/status.txt" >&2
     failed=$((failed + 1)); return

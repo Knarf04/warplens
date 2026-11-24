@@ -214,7 +214,7 @@ GPU next to the simulator's.
 ```
 probe                              verdict                     detail
 tma/swizzle_misaligned             identical
-mma/accumulation_order             rounding                    812 of 2968 float32 words differ, by at most 2 ulp
+mma/accumulation_order             unverified                    812 of 2968 float32 words differ, by at most 2 ulp
 tmem/lane_window.16                informational               the GPU ran what the simulator refuses (...)
 mbarrier/expect_tx_large           timed out (by design)
 tmem/alloc_increasing              kernel failed (by design)   ...
@@ -222,9 +222,12 @@ tma/oob_fill                       DIFFERS
 ```
 
 (The lines above illustrate the format; they are not results.) `identical`: the claim held.
-`DIFFERS`: it did not; the first differing lines follow the table, with the claim. `rounding`:
-only for `mma/accumulation_order`, which the simulator does not claim to match bit for bit
-(`docs/numerics.md`). `informational`: no prediction; read the output. A run that is refused
+`DIFFERS`: it did not; the first differing lines follow the table, with the claim. `unverified`:
+finite values differ in `mma/accumulation_order`, which the simulator does not claim to match
+bit for bit (`docs/numerics.md`). The reported ULP distance is an observation, not an accepted
+tolerance or proof that rounding explains the difference. Unequal infinities or NaNs are
+`DIFFERS`. The comparison exits 1 for failures, 2 for unverified numeric differences without
+other failures, and 0 otherwise. `informational`: no prediction; read the output. A run that is refused
 in the simulator and *also* fails on the GPU counts as `identical`: both print the same
 `KERNEL FAILED` line. The error names differ (`info:` lines) and are in the archive.
 
@@ -332,3 +335,8 @@ claim; put anything that may fault or hang behind a command-line case. Add the r
 `manifest.py`, run `./predict.sh --only '<area>/<name>*'`, read the prediction, and commit it
 with the source. `tests/test_blackwell_probes.py` checks that every source is in the manifest
 and every run has its prediction.
+
+The collectors finish and archive results even when a probe faults or times out. A collector
+returns nonzero for missing required binaries, build failures, or an E2E runner that could
+not complete; this reports incomplete collection rather than a hardware verdict. SIGINT
+and SIGTERM stop the detached probe processes before the collector exits.

@@ -33,14 +33,98 @@ The program must carry PTX and use the shared CUDA runtime. Build it like this:
   nvcc -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared prog.cu -o prog"""
 
 
-def shim_libraries() -> Path:
-    """The directory holding the shim libraries, building them on first use."""
-    def complete(lib):
-        return (lib / "libcuda.so.1").is_file() and any(p.is_file() for p in lib.glob("libcudart.so.*"))
+SHIM_STAMP = "warplens-shim.stamp"  # written by warplens/shim/build.sh next to the libraries
+SHIM_HEADERS = ("cuda_runtime_api.h", "cuda.h")
 
-    # A manual build remains usable without a compiler or installed CUDA headers.
-    if complete(SHIM_DIR / "lib"):
-        return SHIM_DIR / "lib"
+
+def _digest(directory: Path, names) -> str:
+    """A digest of files of one directory: of the lines `sha256sum` prints for them, which
+    is how warplens/shim/build.sh computes the same number."""
+    lines = "".join(f"{hashlib.sha256((directory / name).read_bytes()).hexdigest()}  {name}\n" for name in names)
+    return hashlib.sha256(lines.encode()).hexdigest()
+
+
+def shim_stamp(include: Path | None = None) -> dict:
+    """What build.sh records about a build made now: `sources`, a digest of the shim's C
+    sources, protocol.h and build.sh; and with `include` (a CUDA include directory) a digest
+    of the CUDA headers there that the shim is compiled against."""
+    names = sorted(p.name for p in SHIM_DIR.iterdir() if p.suffix in {".c", ".h"} or p.name == "build.sh")
+    stamp = {"sources": _digest(SHIM_DIR, names)}
+    if include is not None:
+        stamp["headers"] = _digest(include, [name for name in SHIM_HEADERS if (include / name).is_file()])
+    return stamp
+
+
+def shim_complete(lib: Path) -> bool:
+    return (lib / "libcuda.so.1").is_file() and any(p.is_file() for p in lib.glob("libcudart.so.*"))
+
+
+def _recorded_stamp(lib: Path) -> dict | None:
+    """The stamp build.sh left in `lib`: `sources`, `headers` and `include`. None without one."""
+    try:
+        lines = (lib / SHIM_STAMP).read_text().splitlines()
+    except OSError:
+        return None
+    return dict(line.split(" ", 1) for line in lines if " " in line)
+
+
+def shim_staleness(lib: Path, sources: str | None = None) -> str | None:
+    """Why the libraries in `lib` must not be used with the shim sources of this package, or
+    None when they were built from exactly these sources (and from the CUDA headers that are
+    still where they were). Costs a hash of the sources and two headers: called once for
+    every `warplens run`, never for a launch."""
+    if not shim_complete(lib):
+        return "holds no complete pair of shim libraries"
+    recorded = _recorded_stamp(lib)
+    if recorded is None:
+        return (f"has no {SHIM_STAMP}: the libraries were built by an older build.sh, or a build was "
+                "interrupted, and nothing says which sources they are from")
+    if recorded.get("sources") != (sources or shim_stamp()["sources"]):
+        return "was built from other shim sources (cudart_shim.c, cuda_shim.c, protocol.h or build.sh changed since)"
+    # A build made by hand stays usable where the CUDA headers are not installed any more.
+    include = Path(recorded.get("include", ""))
+    if recorded.get("include") and (include / SHIM_HEADERS[0]).is_file() \
+            and shim_stamp(include)["headers"] != recorded.get("headers"):
+        return f"was built against the CUDA headers in {include}, which have changed since"
+    return None
+
+
+def _rebuild_local_shim(lib: Path, sources: str) -> None:
+    """Rebuild a build made by hand (warplens/shim/lib) whose sources changed, or stop: a
+    stale library must never be loaded as if it were current."""
+    try:
+        with (lib / ".lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            why = shim_staleness(lib, sources)
+            if why is None:  # another run rebuilt it meanwhile
+                return
+            print(f"warplens: {lib} {why}; rebuilding it", file=sys.stderr)
+            # Against the headers it was built with, if they are still there; else nvcc's.
+            include = (_recorded_stamp(lib) or {}).get("include", "")
+            if not include or not (Path(include) / SHIM_HEADERS[0]).is_file():
+                include = ""
+            done = subprocess.run([str(SHIM_DIR / "build.sh"), include, str(lib)], capture_output=True, text=True)
+            failure = (f"{done.stdout}{done.stderr}".strip() or f"build.sh exited with status {done.returncode}"
+                       if done.returncode else shim_staleness(lib, sources))
+    except OSError as error:
+        why, failure = shim_staleness(lib, sources), str(error)
+    if failure is not None:
+        sys.exit(f"warplens: {lib} {why}, and it could not be rebuilt:\n{failure}\n"
+                 f"The stale libraries are not used. Run {SHIM_DIR / 'build.sh'} <CUDA include directory> by "
+                 f"hand, or remove {lib} to have them built in the user cache.")
+
+
+def shim_libraries() -> Path:
+    """The directory holding the shim libraries, building them on first use, and again when
+    the sources they were built from are not the ones here (`shim_staleness`)."""
+    sources = shim_stamp()["sources"]
+    # A manual build remains usable without a compiler or installed CUDA headers, as long as
+    # it is a build of these sources.
+    local = SHIM_DIR / "lib"
+    if shim_complete(local):
+        if shim_staleness(local, sources) is not None:
+            _rebuild_local_shim(local, sources)
+        return local
     digest = hashlib.sha256()
     for source in sorted(SHIM_DIR.iterdir()):
         if source.suffix in {".c", ".h"} or source.name == "build.sh":
@@ -64,11 +148,13 @@ def shim_libraries() -> Path:
         # Concurrent first runs share the build, rather than loading half of it.
         with lib.with_suffix(".lock").open("a") as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
-            if not complete(lib):
+            # The cache directory is named after the sources and the toolkit; the stamp says
+            # that what is in it is a finished build of them.
+            if shim_staleness(lib, sources) is not None:
                 print("warplens: building the shim libraries (first run)", file=sys.stderr)
                 done = subprocess.run([str(SHIM_DIR / "build.sh"), "", str(lib)],
                                       capture_output=True, text=True)
-                if done.returncode or not complete(lib):
+                if done.returncode or shim_staleness(lib, sources) is not None:
                     sys.exit(f"warplens: could not build the shim libraries:\n{done.stdout}{done.stderr}\n"
                              f"Run {SHIM_DIR / 'build.sh'} <CUDA include directory> by hand.")
     except OSError as error:

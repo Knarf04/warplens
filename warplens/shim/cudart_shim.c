@@ -237,14 +237,6 @@ cudaError_t cudaLibraryGetKernel(cudaKernel_t *kernel, cudaLibrary_t library, co
 cudaError_t cudaLibraryUnload(cudaLibrary_t library) { (void)library; return cudaSuccess; }
 #endif
 
-cudaError_t cudaKernelSetAttributeForDevice(cudaKernel_t kernel, enum cudaFuncAttribute attr,
-                                            int value, int device) {
-  (void)kernel;
-  TRACE("cudaKernelSetAttributeForDevice(%d, %d, device %d)", (int)attr, value, device);
-  if (device != 0) return result(cudaErrorInvalidDevice);
-  return result(wl_function_attribute_is_valid((int)attr, value) ? cudaSuccess : cudaErrorInvalidValue);
-}
-
 static struct function *find_function(const void *host) {
   struct function *found = NULL;
   pthread_mutex_lock(&function_lock);
@@ -252,6 +244,40 @@ static struct function *find_function(const void *host) {
     if (functions[i].host == host) found = &functions[i];
   pthread_mutex_unlock(&function_lock);
   return found;
+}
+
+/* -- the shared memory a kernel may be launched with -------------------------------------
+ * A kernel may use WL_DEFAULT_SMEM_BYTES of shared memory; a launch with more dynamic shared
+ * memory than that leaves is refused (cudaErrorInvalidValue from the launch call) unless the
+ * program raised the kernel's maximum first. The server keeps the maximum of each kernel and
+ * knows its static shared memory: see `default_max_dynamic` in warplens/units/smem.py for the
+ * rule, which was measured on an RTX 3080 Ti (validation/README.md, "Launch errors"). */
+
+int warplens_set_function_attribute(const void *key, int attribute, int value) {
+  struct function *f = find_function(key);
+  if (!f) return cudaErrorInvalidDeviceFunction;
+  if (!wl_function_attribute_is_valid(attribute, value)) return cudaErrorInvalidValue;
+  if (attribute != WL_ATTRIBUTE_MAX_DYNAMIC_SMEM) return cudaSuccess;
+  int32_t body[3] = {(int32_t)f->id, attribute, value};
+  struct wl_part part = {body, sizeof body};
+  return warplens_call(WL_SET_ATTRIBUTE, &part, 1, NULL, 0, NULL);
+}
+
+int warplens_function_shared_memory(const void *key, int *fixed, int *max_dynamic) {
+  struct function *f = find_function(key);
+  if (!f) return cudaErrorInvalidDeviceFunction;
+  uint32_t reply[2] = {0, 0};
+  struct wl_part part = {&f->id, sizeof f->id};
+  int status = warplens_call(WL_GET_ATTRIBUTES, &part, 1, reply, sizeof reply, NULL);
+  *fixed = (int)reply[0]; *max_dynamic = (int)reply[1];
+  return status;
+}
+
+cudaError_t cudaKernelSetAttributeForDevice(cudaKernel_t kernel, enum cudaFuncAttribute attr,
+                                            int value, int device) {
+  TRACE("cudaKernelSetAttributeForDevice(%d, %d, device %d)", (int)attr, value, device);
+  if (device != 0) return result(cudaErrorInvalidDevice);
+  return result(warplens_set_function_attribute((const void *)kernel, (int)attr, value));
 }
 
 cudaError_t __cudaGetKernel(cudaKernel_t *kernel, const void *hostFun) {
@@ -528,7 +554,7 @@ int warplens_device_attribute(int attribute) {
     case cudaDevAttrMaxBlockDimZ: return 64;
     case cudaDevAttrMaxGridDimX: return 2147483647;
     case cudaDevAttrMaxGridDimY: case cudaDevAttrMaxGridDimZ: return 65535;
-    case cudaDevAttrMaxSharedMemoryPerBlock: return 48 * 1024;
+    case cudaDevAttrMaxSharedMemoryPerBlock: return WL_DEFAULT_SMEM_BYTES;
     case cudaDevAttrMaxSharedMemoryPerBlockOptin: return WL_MAX_SMEM_BYTES;
     case cudaDevAttrMaxSharedMemoryPerMultiprocessor: return 228 * 1024;
     case cudaDevAttrMaxRegistersPerBlock: case cudaDevAttrMaxRegistersPerMultiprocessor: return 65536;
@@ -579,23 +605,27 @@ cudaError_t cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
   return cudaSuccess;
 }
 
+/* A function that is no kernel of the program has no attributes (cudaErrorInvalidDevice-
+ * Function, measured). */
 cudaError_t cudaFuncGetAttributes(struct cudaFuncAttributes *attr, const void *func) {
   TRACE("cudaFuncGetAttributes(%p)", func);
+  int fixed = 0, max_dynamic = 0;
   memset(attr, 0, sizeof *attr);
+  int status = warplens_function_shared_memory(func, &fixed, &max_dynamic);
+  if (status) return result(status);
+  attr->sharedSizeBytes = (size_t)fixed;
   attr->maxThreadsPerBlock = 1024;
-  attr->maxDynamicSharedSizeBytes = WL_MAX_SMEM_BYTES;
+  attr->maxDynamicSharedSizeBytes = max_dynamic;
   attr->ptxVersion = 100;  /* the compute architecture (compute_100), which thrust dispatches on */
   attr->binaryVersion = 100;
   return cudaSuccess;
 }
 
-/* Opting in to more dynamic shared memory than the default 48 KB. A launch is not held to
- * what was asked for here (the simulator allows WL_MAX_SMEM_BYTES without the opt-in a GPU
- * requires), but a value the device could never give is refused as a GPU refuses it. */
+/* Opting in to more dynamic shared memory than the default leaves, which later launches of
+ * the kernel are held to; or any other maximum, a smaller one included. */
 cudaError_t cudaFuncSetAttribute(const void *func, enum cudaFuncAttribute attr, int value) {
-  (void)func;
   TRACE("cudaFuncSetAttribute(%p, %d, %d)", func, (int)attr, value);
-  return result(wl_function_attribute_is_valid((int)attr, value) ? cudaSuccess : cudaErrorInvalidValue);
+  return result(warplens_set_function_attribute(func, (int)attr, value));
 }
 
 /* -- driver API entry points ----------------------------------------------------------- */

@@ -30,6 +30,24 @@ PTX = HEADER + """
     st.global.u32 [%pd], %v;
     ret;
 }
+
+.visible .entry with_static(.param .u64 src, .param .u64 dst, .param .u32 factor)
+{
+    .shared .align 1 .b8 fixed[40960];
+    .reg .b32 %v;
+    mov.u32 %v, %tid.x;
+    st.shared.u8 [fixed+40959], %v;
+    ret;
+}
+
+.visible .entry mostly_static(.param .u64 src, .param .u64 dst, .param .u32 factor)
+{
+    .shared .align 1 .b8 fixed[61440];
+    .reg .b32 %v;
+    mov.u32 %v, %tid.x;
+    st.shared.u8 [fixed+61439], %v;
+    ret;
+}
 """
 CLIENT = r"""
 #include <cuda.h>
@@ -354,6 +372,74 @@ int main(int argc, char **argv) {
     CHECK(cudaDeviceSynchronize() == cudaSuccess && cudaGetLastError() == cudaSuccess);
     return 0;
   }
+  if (!strcmp(argv[1], "optin")) {  /* the shared memory a launch may use, as an RTX 3080 Ti decides it */
+    CUmodule module; CUfunction kernel, fixed, large;
+    struct cudaFuncAttributes attributes;
+    unsigned *source, *target, factor = 2;
+    int plain = 0, limit = 0, value = -1;
+    CHECK(cuInit(0) == CUDA_SUCCESS && cuModuleLoadData(&module, ptx) == CUDA_SUCCESS);
+    CHECK(cuModuleGetFunction(&kernel, module, "scale") == CUDA_SUCCESS);
+    CHECK(cuModuleGetFunction(&fixed, module, "with_static") == CUDA_SUCCESS);
+    CHECK(cuModuleGetFunction(&large, module, "mostly_static") == CUDA_SUCCESS);
+    CHECK(cudaMalloc((void **)&source, 4096) == cudaSuccess && cudaMalloc((void **)&target, 4096) == cudaSuccess);
+    void *arguments[3] = {&source, &target, &factor};
+    dim3 grid = {1, 1, 1}, block = {32, 1, 1};
+    CHECK(cudaDeviceGetAttribute(&plain, cudaDevAttrMaxSharedMemoryPerBlock, 0) == cudaSuccess && plain == 48 * 1024);
+    CHECK(cudaDeviceGetAttribute(&limit, cudaDevAttrMaxSharedMemoryPerBlockOptin, 0) == cudaSuccess);
+
+    /* without opt-in: the default, and one byte more is refused by the launch call itself */
+    CHECK(cudaFuncGetAttributes(&attributes, kernel) == cudaSuccess);
+    CHECK(attributes.sharedSizeBytes == 0 && attributes.maxDynamicSharedSizeBytes == plain);
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, (size_t)plain, NULL) == cudaSuccess);
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, (size_t)plain + 1, NULL) == cudaErrorInvalidValue);
+    CHECK(cudaPeekAtLastError() == cudaErrorInvalidValue && cudaDeviceSynchronize() == cudaSuccess);
+    CHECK(cudaGetLastError() == cudaErrorInvalidValue && cudaGetLastError() == cudaSuccess);
+    CHECK(cuLaunchKernel(kernel, 1, 1, 1, 32, 1, 1, (unsigned)plain + 16, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cuCtxSynchronize() == CUDA_SUCCESS);
+    (void)cudaGetLastError();
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, 0, NULL) == cudaSuccess);  /* the context is usable */
+
+    /* opted in through the runtime: exactly that much, through either API */
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 60000) == cudaSuccess);
+    CHECK(cudaFuncGetAttributes(&attributes, kernel) == cudaSuccess && attributes.maxDynamicSharedSizeBytes == 60000);
+    CHECK(cuFuncGetAttribute(&value, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, kernel) == CUDA_SUCCESS && value == 60000);
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, 60000, NULL) == cudaSuccess);
+    CHECK(cuLaunchKernel(kernel, 1, 1, 1, 32, 1, 1, 60000, NULL, arguments, NULL) == CUDA_SUCCESS);
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, 60001, NULL) == cudaErrorInvalidValue);
+    CHECK(cuLaunchKernel(kernel, 1, 1, 1, 32, 1, 1, 60001, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
+    /* through the driver, and to less than the default */
+    CHECK(cuFuncSetAttribute(kernel, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 1024) == CUDA_SUCCESS);
+    CHECK(cuLaunchKernel(kernel, 1, 1, 1, 32, 1, 1, 1024, NULL, arguments, NULL) == CUDA_SUCCESS);
+    CHECK(cuLaunchKernel(kernel, 1, 1, 1, 32, 1, 1, 1040, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, (size_t)plain, NULL) == cudaErrorInvalidValue);
+    (void)cudaGetLastError();
+
+    /* static shared memory counts against the default, and against what may be opted in to */
+    CHECK(cuFuncGetAttribute(&value, CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES, fixed) == CUDA_SUCCESS && value == 40960);
+    CHECK(cuFuncGetAttribute(&value, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, fixed) == CUDA_SUCCESS);
+    CHECK(value == plain - 40960);
+    CHECK(cuLaunchKernel(fixed, 1, 1, 1, 32, 1, 1, (unsigned)plain - 40960, NULL, arguments, NULL) == CUDA_SUCCESS);
+    CHECK(cuLaunchKernel(fixed, 1, 1, 1, 32, 1, 1, (unsigned)plain - 40960 + 16, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cuFuncSetAttribute(fixed, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, limit - 40960 + 1) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cudaFuncSetAttribute(fixed, cudaFuncAttributeMaxDynamicSharedMemorySize, limit - 40960 + 1) == cudaErrorInvalidValue);
+    CHECK(cudaGetLastError() == cudaErrorInvalidValue);
+    CHECK(cuFuncSetAttribute(fixed, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, limit - 40960) == CUDA_SUCCESS);
+    CHECK(cuLaunchKernel(fixed, 1, 1, 1, 32, 1, 1, (unsigned)limit - 40960, NULL, arguments, NULL) == CUDA_SUCCESS);
+
+    /* static shared memory over the default needs no opt-in, and leaves the rest of the maximum */
+    CHECK(cudaFuncGetAttributes(&attributes, large) == cudaSuccess && attributes.sharedSizeBytes == 61440);
+    CHECK(attributes.maxDynamicSharedSizeBytes == limit - 61440);
+    CHECK(cudaLaunchKernel(large, grid, block, arguments, 0, NULL) == cudaSuccess);
+    CHECK(cudaLaunchKernel(large, grid, block, arguments, (size_t)limit - 61440, NULL) == cudaSuccess);
+    CHECK(cudaLaunchKernel(large, grid, block, arguments, (size_t)limit - 61440 + 16, NULL) == cudaErrorInvalidValue);
+    (void)cudaGetLastError();
+
+    /* a function that is no kernel */
+    CHECK(cudaFuncSetAttribute((const void *)&plain, cudaFuncAttributeMaxDynamicSharedMemorySize, 1024) == cudaErrorInvalidDeviceFunction);
+    CHECK(cudaFuncGetAttributes(&attributes, (const void *)&plain) == cudaErrorInvalidDeviceFunction);
+    CHECK(cudaGetLastError() == cudaErrorInvalidDeviceFunction);
+    return 0;
+  }
   if (!strcmp(argv[1], "tokens")) {  /* streams, events and host memory, as TVM's runtime uses them */
     cudaStream_t stream; cudaEvent_t start, end;
     float elapsed = -1.0f;
@@ -445,6 +531,21 @@ def test_refusals_carry_the_codes_a_gpu_gives(client):
     server, done = run_client(client, "errors")
     assert "more than 16 CTAs" in done.stderr and "the limit is 232448" in done.stderr
     assert [stats.ctas for _, stats in server.launches] == [2, 16, 16]  # no refused launch ran
+
+
+def test_launches_need_the_opt_in_a_gpu_needs(client):
+    """More dynamic shared memory than the default leaves is refused by the launch call with
+    cudaErrorInvalidValue / CUDA_ERROR_INVALID_VALUE until `cudaFuncSetAttribute` or
+    `cuFuncSetAttribute` raised the kernel's maximum; `cudaGetLastError` has the error once
+    and the synchronize calls do not. Each line of the client is a line of
+    validation/ampere/launch_errors_3080ti.txt or driver_errors_3080ti.txt at the simulated
+    device's limits."""
+    server, done = run_client(client, "optin")
+    assert "without opt-in it may use 49152" in done.stderr and "cudaFuncSetAttribute(" in done.stderr
+    assert "the program set its maximum to 60000" in done.stderr
+    assert "40960 bytes of static shared memory count against the default" in done.stderr
+    assert [name for name, _ in server.launches] == ["scale"] * 5 + ["with_static"] * 2 + ["mostly_static"] * 2
+    assert server.max_dynamic == {0: 1024, 1: 227 * 1024 - 40960}
 
 
 def test_streams_events_and_host_memory_are_accepted(client):

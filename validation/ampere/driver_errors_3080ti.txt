@@ -21,3 +21,31 @@ cuLaunchKernelEx, grid 4, cluster (2, 1, 1)                      912 CUDA_ERROR_
 cuCtxSynchronize                                                 0 CUDA_SUCCESS
 cuLaunchKernel, ordinary                                         0 CUDA_SUCCESS
 cuCtxSynchronize                                                 0 CUDA_SUCCESS
+attributes, kernel opted in to the maximum above                 SHARED_SIZE_BYTES 0, MAX_DYNAMIC_SHARED_SIZE_BYTES 101376
+attributes, fresh kernel                                         SHARED_SIZE_BYTES 0, MAX_DYNAMIC_SHARED_SIZE_BYTES 49152
+cuLaunchKernel, fresh kernel, default maximum                    0 CUDA_SUCCESS
+cuLaunchKernel, fresh kernel, default maximum + 1                1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(fresh, 60000)                                 0 CUDA_SUCCESS
+attributes, opted in to 60000                                    SHARED_SIZE_BYTES 0, MAX_DYNAMIC_SHARED_SIZE_BYTES 60000
+cuLaunchKernel, opted in to 60000, 60000                         0 CUDA_SUCCESS
+cuLaunchKernel, opted in to 60000, 60001                         1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(the same, 1024)                               0 CUDA_SUCCESS
+cuLaunchKernel, set to 1024, 1024                                0 CUDA_SUCCESS
+cuLaunchKernel, set to 1024, default maximum                     1 CUDA_ERROR_INVALID_VALUE
+attributes, 40960 static                                         SHARED_SIZE_BYTES 40960, MAX_DYNAMIC_SHARED_SIZE_BYTES 8192
+cuLaunchKernel, 40960 static + 8192, no opt-in                   0 CUDA_SUCCESS
+cuLaunchKernel, 40960 static + 8208, no opt-in                   1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(40960 static, 8208)                           0 CUDA_SUCCESS
+cuLaunchKernel, 40960 static + 8208, set to 8208                 0 CUDA_SUCCESS
+cuLaunchKernel, 40960 static + 8224, set to 8208                 1 CUDA_ERROR_INVALID_VALUE
+cuFuncSetAttribute(40960 static, 60416 (opt-in maximum - static)) 0 CUDA_SUCCESS
+cuFuncSetAttribute(40960 static, 60417)                          1 CUDA_ERROR_INVALID_VALUE
+attributes, 40960 static, after the refused 60417                SHARED_SIZE_BYTES 40960, MAX_DYNAMIC_SHARED_SIZE_BYTES 60416
+cuModuleLoadData, kernel with 49152 static bytes                 0 CUDA_SUCCESS
+attributes of it                                                 SHARED_SIZE_BYTES 49152, MAX_DYNAMIC_SHARED_SIZE_BYTES 0
+cuLaunchKernel, 49152 static + 0, no opt-in                      0 CUDA_SUCCESS
+cuLaunchKernel, 49152 static + 16, no opt-in                     1 CUDA_ERROR_INVALID_VALUE
+cuModuleLoadData, kernel with 49153 static bytes                 218 CUDA_ERROR_INVALID_PTX
+cuCtxSynchronize                                                 0 CUDA_SUCCESS
+cuLaunchKernel, ordinary                                         0 CUDA_SUCCESS
+cuCtxSynchronize                                                 0 CUDA_SUCCESS

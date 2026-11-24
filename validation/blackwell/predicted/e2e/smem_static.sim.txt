@@ -1,0 +1,15 @@
+status: ok
+warplens: kernel `static_just_over` needs 232464 bytes of shared memory per CTA (49168 static + 183296 dynamic); the limit is 232448
+warplens: kernel `static_98k` needs 232464 bytes of shared memory per CTA (100352 static + 132112 dynamic); the limit is 232448
+warplens: kernel `static_98k_set`: a maximum of 132112 bytes of dynamic shared memory was refused: with its 100352 bytes of static shared memory the kernel may have 132096, as the device's limit is 232448
+warplens: kernel `static_98k_set` was launched with 16 bytes of dynamic shared memory, but the program set its maximum to 0. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 16), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 16)
+warplens: kernel `static_all` needs 232464 bytes of shared memory per CTA (232448 static + 16 dynamic); the limit is 232448
+warplens: 8 kernel launch(es) simulated on B200, 0 finding(s)
+  static_just_over: 1 CTA(s), 18 warp-instructions
+  static_just_over: 1 CTA(s), 22 warp-instructions
+  static_just_over: 1 CTA(s), 22 warp-instructions
+  static_98k: 1 CTA(s), 18 warp-instructions
+  static_98k: 1 CTA(s), 22 warp-instructions
+  static_98k: 1 CTA(s), 22 warp-instructions
+  static_98k_set: 1 CTA(s), 18 warp-instructions
+  static_all: 1 CTA(s), 18 warp-instructions

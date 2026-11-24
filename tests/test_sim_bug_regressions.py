@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 import warplens
-from warplens.units.smem import MAX_SMEM_BYTES
+from warplens.units.smem import DEFAULT_SMEM_BYTES, MAX_SMEM_BYTES
 
 from conftest import HEADER
 from test_tcgen05 import run as run_mma
@@ -168,10 +168,16 @@ def test_the_shim_reports_the_limit_the_launch_enforces():
     (expr,) = re.findall(r"^#define WL_MAX_SMEM_BYTES \((\d+ \* \d+)\)", header, re.M)
     a, b = map(int, expr.split(" * "))
     assert a * b == MAX_SMEM_BYTES
+    (expr,) = re.findall(r"^#define WL_DEFAULT_SMEM_BYTES \((\d+ \* \d+)\)", header, re.M)
+    a, b = map(int, expr.split(" * "))
+    assert a * b == DEFAULT_SMEM_BYTES == 48 * 1024
+    # One place for each number: the libraries name the limits and do not repeat them.
     for name in ("cudart_shim.c", "cuda_shim.c"):
         source = (SHIM / name).read_text()
-        assert "WL_MAX_SMEM_BYTES" in source
-        assert not re.search(r"22[78] \* 1024", source.replace("return 228 * 1024;", "")), name
+        assert not re.search(r"(22[78]|48) \* 1024", source.replace("return 228 * 1024;", "")), name
+    runtime = (SHIM / "cudart_shim.c").read_text()
+    assert "cudaDevAttrMaxSharedMemoryPerBlockOptin: return WL_MAX_SMEM_BYTES;" in runtime
+    assert "cudaDevAttrMaxSharedMemoryPerBlock: return WL_DEFAULT_SMEM_BYTES;" in runtime
     # Per SM, not per block: stays at 228 KB.
     assert "cudaDevAttrMaxSharedMemoryPerMultiprocessor: return 228 * 1024;" in (SHIM / "cudart_shim.c").read_text()
 

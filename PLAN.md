@@ -444,8 +444,17 @@ Found by this work in the simulator, and fixed since unless marked open:
   and compare successful book kernels without requiring identical host-BLAS
   error magnitudes. The runners' numerical tolerance checks remain in place.
 - Refused launches now retain their CUDA error category, separately from
-  kernel failures. Review also checks per-axis grid/block limits. Shared-memory
-  opt-in above 48 KB remains a documented shim limitation.
+  kernel failures. Review also checks per-axis grid/block limits.
+- The shim did not require the shared-memory opt-in, so a program that forgot
+  `cudaFuncSetAttribute` passed in the simulator and would fail on a GPU.
+  Fixed: programs under the shim are held to the rule measured on the RTX
+  3080 Ti (`validation/README.md`, "The shared-memory opt-in"), with the same
+  error at the same call; the Python API has no such step. Open: that a B200
+  follows the same rule, in particular that static shared memory above 48 KB
+  launches without opt-in (RT-15).
+- `warplens run` used shim libraries built from older sources without saying
+  so. Fixed: `build.sh` records what a build is of, and a build of other
+  sources is rebuilt, or refused when it cannot be.
 - Done: every program of `validation/ampere` that recorded a golden file is
   rerun on the B200 with its lines compared, not on `info:` lines:
   `nan_golden`, `intdiv_golden` and `minmax_cvt_golden` as

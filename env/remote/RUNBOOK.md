@@ -17,6 +17,11 @@ means neither. Nothing here has run on a B200.
 | `run.sh` | Preflight, setup, build and run both probe suites, pack one archive. Resumable. |
 | `gpu_probe.py`, `check_env.py`, `kernels/` | What preflight runs on the GPU. |
 
+The archive also preserves portable PTX/input/output fixtures and the frozen Python
+implementation for future offline ports. Follow [the capture verification and replay
+checklist](../../docs/hardware-capture.md) before releasing the instance; a tarball
+existing alone does not establish that all cases finished.
+
 ## 1. Before renting
 
 Do these at home; none needs the B200.

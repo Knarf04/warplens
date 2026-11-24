@@ -12,6 +12,8 @@ can run. A GPU accepts PTX as well, as long as its driver is at least as new as 
 that wrote the PTX.
 """
 
+import os
+
 import numpy as np
 import tvm_tirx
 from tvm_tirx.script import tirx as T
@@ -37,5 +39,11 @@ a, b = rng.random(N, dtype=np.float32), rng.random(N, dtype=np.float32)
 x, y = tvm_tirx.runtime.tensor(a, device=device), tvm_tirx.runtime.tensor(b, device=device)
 executable.mod(x, y)
 
-np.testing.assert_allclose(y.numpy(), np.float32(2.5) * a + b, rtol=1e-6)
+got = y.numpy()
+if os.environ.get("WARPLENS_CAPTURE_DIR"):
+    from validation.blackwell.frontend_capture import tvm_case
+    tvm_case("tirx_saxpy", executable, inputs={"x": a, "y": b}, outputs={"y": got},
+             comparison={"kind": "allclose", "rtol": 1e-6, "atol": 0},
+             metadata={"backend_config": PTX})
+np.testing.assert_allclose(got, np.float32(2.5) * a + b, rtol=1e-6)
 print(f"saxpy over {N} elements on compute capability {device.compute_version}: matches NumPy")

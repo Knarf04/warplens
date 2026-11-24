@@ -57,8 +57,9 @@ def suite(tmp_path):
     refuses and whose bin-native/ holds one that prints the committed prediction."""
     root = tmp_path / "validation" / "blackwell"
     root.mkdir(parents=True)
-    for name in ("manifest.py", "run_all.py", "compare.py", "probe_process.py"):
+    for name in ("manifest.py", "run_all.py", "compare.py", "probe_process.py", "capture.py", "e2e_checks.py", "provenance.py"):
         shutil.copy(SUITE / name, root / name)
+    (root / "provenance.py").write_text("def archive_probes(*args, **kwargs): return []\ndef validate_probe_archive(*args, **kwargs): return []\n")
     shutil.copytree(SUITE / "predicted", root / "predicted")
     script(root / "bin" / "mbarrier" / "script", f"printf '%s' '{LAUNCH_FAILED}'\nexit 4\n")
     script(root / "bin-native" / "mbarrier" / "script",
@@ -331,6 +332,7 @@ def test_build_scripts_record_their_compiler(tmp_path):
     work = tmp_path / "suite"
     work.mkdir()
     shutil.copy(SUITE / "build.sh", work / "build.sh")
+    shutil.copy(SUITE / "provenance.py", work / "provenance.py")
     (work / "e2e").mkdir()
     (work / "e2e" / "device_attributes.cu").write_text("int main() { return 0; }\n")
     done = subprocess.run(["bash", str(work / "build.sh"), "--native", "e2e/device_attributes"], capture_output=True,

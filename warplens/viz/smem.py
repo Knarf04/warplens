@@ -76,10 +76,10 @@ def bank_heatmap_svg(report, title: str = "Shared-memory banks per instruction")
     for i, e in enumerate(entries):
         y = top + i * row
         text = " ".join(e.text.split())
-        label = f"line {e.line}  {_clip(text, 40)}"
+        label = f"line {e.line}  {_clip(text, 36)}"
         where = f"{e.kernel}, line {e.line}" if several else f"line {e.line}"
         out.append(f'<text x="{left - 8}" y="{y + 14}" text-anchor="end" font-family="monospace">'
-                   f'<title>{escape(e.kernel)}: {escape(text)}</title>{escape(label)}</text>')
+                   f'{escape(label)}<title>{escape(e.kernel)}: {escape(text)}</title></text>')
         for bank in range(BANKS):
             peak, total = int(e.bank_peak[bank]), int(e.bank_words[bank])
             t = (peak - 1) / (BANKS - 1)

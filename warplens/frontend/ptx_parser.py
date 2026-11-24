@@ -215,6 +215,15 @@ class _Parser:
             else:
                 what = "directive" if t.value.startswith(".") else "token"
                 raise self.unsupported(t, f"unsupported module-level {what} `{t.value}`")
+        for var in mod.globals:  # function pointers in initializers, now that every function is known
+            data = bytearray(var.data)
+            for offset, symbol, tok in var.relocs:
+                address = mod.function_address(symbol)
+                if address is None:
+                    raise self.unsupported(tok, f"initializer `{symbol}` is not a number or a function "
+                                                "defined in this module")
+                data[offset:offset + 8] = address.to_bytes(8, "little")
+            var.data, var.relocs = bytes(data), tuple((o, n) for o, n, _ in var.relocs)
         return mod
 
     def param_list(self) -> list[Param]:
@@ -324,16 +333,24 @@ class _Parser:
             count *= int(self.expect_kind("num", "an array size").value)
             self.expect("]")
         values = np.zeros(count, dtype=dt)
+        relocs = []
         if self.accept("="):
             braces = self.accept("{")
             k = 0
             while True:
                 tok = self.next()
-                if tok.kind != "num":
-                    raise self.unsupported(tok, "only numeric initializers are supported")
-                if k >= count:
-                    raise self.syntax(tok, f"too many initializers for `{name.value}`")
-                imm = _number(tok)
+                if tok.kind == "word" and dt.kind in "iu" and dt.itemsize == 8 and not tok.value.startswith("."):
+                    # A function's address, as in a table of function pointers; filled in at the end.
+                    if k >= count:
+                        raise self.syntax(tok, f"too many initializers for `{name.value}`")
+                    relocs.append((8 * k, tok.value, tok))
+                    imm = Imm("int", 0)
+                elif tok.kind != "num":
+                    raise self.unsupported(tok, "only numbers and function names are supported as initializers")
+                else:
+                    if k >= count:
+                        raise self.syntax(tok, f"too many initializers for `{name.value}`")
+                    imm = _number(tok)
                 if imm.kind == "int":
                     if dt.kind == "f":
                         values[k] = imm.value
@@ -353,7 +370,7 @@ class _Parser:
                     break
                 self.expect(",")
         self.expect(";")
-        return GlobalVar(name.value, align or dt.itemsize, values.tobytes(), start.line)
+        return GlobalVar(name.value, align or dt.itemsize, values.tobytes(), start.line, tuple(relocs))
 
     # -- function body -----------------------------------------------------
     def body(self, fn: Function) -> None:
@@ -372,6 +389,9 @@ class _Parser:
             if t.kind == "word" and self.peek().value == ":":
                 self.next()
                 key = self.scoped(t.value, self.scopes[-1])
+                if self.peek().value in (".callprototype", ".calltargets"):
+                    self.call_table(fn, key)
+                    continue
                 if key in fn.labels:
                     raise self.syntax(t, f"label `{t.value}` defined twice")
                 fn.labels[key] = len(fn.instrs)
@@ -388,15 +408,17 @@ class _Parser:
                 self.locals[var.name] = var
                 fn.locals.append(var)
             elif t.value == ".param":  # storage for the arguments of a call
-                ty_tok = self.expect_kind("word", "a parameter type")
-                ty = ty_tok.value.lstrip(".")
-                if ty not in NP_TYPES or ty == "pred":
-                    raise self.unsupported(ty_tok, f"unsupported parameter type `{ty_tok.value}`")
-                name = self.expect_kind("word", "a parameter name")
-                if self.peek().value == "[" or self.peek().value.startswith("."):
-                    raise self.unsupported(name, "only scalar call parameters are supported")
+                self.i -= 1
+                param = self.param()
                 self.expect(";")
-                fn.call_params[self.scoped(name.value, self.scopes[-1])] = ty
+                key = self.scoped(param.name, self.scopes[-1])
+                fn.call_params[key] = param.type
+                if param.by_value:
+                    # A struct passed by value, `.param .align 16 .b8 param0[40]`, is memory on the
+                    # thread's stack: the callee may take its address and read it with `ld.local`.
+                    var = SharedVar(key, param.align or NP_TYPES[param.type].itemsize, param.size, t.line)
+                    self.locals[key] = var
+                    fn.locals.append(var)
             elif t.value in _IGNORED_BODY_DIRECTIVES:
                 self.skip_directive(t)
             elif t.kind == "word" and t.value.startswith("."):
@@ -407,6 +429,29 @@ class _Parser:
                 fn.instrs.append(ins)
                 if ins.opcode == "bra":
                     self.branches.append((ins, list(self.scopes), t))
+
+    def call_table(self, fn: Function, key: str) -> None:
+        """What an indirect call may reach, after `label:`.
+
+            prototype_7 : .callprototype (.param .b32 _) _ (.param .b32 _);
+            targets : .calltargets f, g;
+        """
+        kind = self.next()
+        if kind.value == ".calltargets":
+            names = [self.expect_kind("word", "a function name").value]
+            while self.accept(","):
+                names.append(self.expect_kind("word", "a function name").value)
+            self.expect(";")
+            fn.calltargets[key] = tuple(names)
+            return
+        rets = self.param_list() if self.accept("(") else []
+        self.expect("_")
+        params = self.param_list() if self.accept("(") else []
+        while not self.accept(";"):  # .noreturn, .abi_preserve N, ...
+            t = self.next()
+            if t.kind == "eof" or t.value in ("{", "}"):
+                raise self.syntax(kind, "`.callprototype` is missing its terminating ';'")
+        fn.prototypes[key] = (rets, params)
 
     def shared_var(self, extern: bool) -> SharedVar:
         """`.shared [.align N] .type name[count]...;` (the `.shared` is already consumed)."""
@@ -541,7 +586,10 @@ class _Parser:
                     raise self.unsupported(t, f"`{t.value}` without a .x/.y/.z component is not supported yet")
                 return Special(t.value[1:])
             raise self.syntax(t, f"undeclared register `{t.value}`")
-        return Sym(self.find(t.value, fn.call_params) or t.value)
+        for table in (fn.call_params, fn.prototypes, fn.calltargets):
+            if (key := self.find(t.value, table)) is not None:
+                return Sym(key)
+        return Sym(t.value)
 
 
 def parse_ptx(text: str, name: str = "<ptx>") -> Module:

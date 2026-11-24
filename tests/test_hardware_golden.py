@@ -185,3 +185,14 @@ def test_device_function_calls_match_real_gpu(sim):
     stats = sim.launch(AMPERE / "call_probe.ptx", "call_probe", grid=4, block=64, args=[out])
     assert not stats.findings
     np.testing.assert_array_equal(out.numpy().reshape(256, 5), expect)
+
+
+def test_call_forms_match_real_gpu(sim):
+    """callforms_golden.txt is bin/callforms_golden on an RTX 3080 Ti: structs passed and returned
+    by value, calls through function pointers, and recursion (see callforms_probe.cu)."""
+    expect = np.loadtxt(AMPERE / "callforms_golden.txt", dtype=np.int64).astype(np.int32)
+    assert expect.shape == (256, 12)
+    out = sim.empty(12 * 256, "s32")
+    stats = sim.launch(AMPERE / "callforms_probe.ptx", "callforms_probe", grid=4, block=64, args=[out])
+    assert not stats.findings
+    np.testing.assert_array_equal(out.numpy().reshape(256, 12), expect)

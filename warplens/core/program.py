@@ -19,6 +19,19 @@ def _align_up(x: int, align: int) -> int:
     return -(-x // align) * align
 
 
+class FrameLayout:
+    """A recursive function's copy in a kernel, with its `.local` variables placed: the block
+    they occupy is the stack frame that every active call needs a copy of."""
+
+    def __init__(self, prefix: str, frame, entry_pc: int, offsets: dict[str, int], variables: dict):
+        self.prefix, self.name, self.entry_pc = prefix, frame.name, entry_pc
+        self.regs, self.params, self.args, self.rets = frame.regs, frame.params, frame.args, frame.rets
+        self.locals = frozenset(frame.locals)
+        self.start = min((offsets[v] for v in frame.locals), default=0)
+        self.end = max((offsets[v] + (variables[v].size or 0) for v in frame.locals), default=0)
+        self.align = max((variables[v].align for v in frame.locals), default=1)
+
+
 class Program:
     def __init__(self, module: Module, fn: Function, global_symbols: dict[str, int] | None = None):
         self.module = module
@@ -48,6 +61,13 @@ class Program:
             offset += v.size or 0
         self.local_bytes = offset
         self.global_symbols = global_symbols or {}
+        self.function_symbols = {name: module.function_address(name) for name in module.device_functions}
+        # Copies of recursive functions (frontend/inline.py), by the prefix of their names.
+        variables = {v.name: v for v in fn.locals}
+        self.local_sizes = {name: v.size or 0 for name, v in variables.items()}
+        self.frames = {prefix: FrameLayout(prefix, frame, fn.labels[frame.entry], self.local_symbols, variables)
+                       for prefix, frame in fn.frames.items()}
+        self.frame_locals = frozenset().union(*(f.locals for f in self.frames.values()))
 
         # Parameter space: where each parameter sits when its address is taken.
         self.param_offsets: dict[str, int] = {}

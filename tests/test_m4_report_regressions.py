@@ -21,6 +21,7 @@ POSITIVE_PARAMS = (
 )
 NONNEGATIVE_PARAMS = (
     "tma_latency_ns", "global_access_latency_clk", "tmem_access_clk", "mma_latency_clk",
+    "clc_latency_ns",
 )
 
 

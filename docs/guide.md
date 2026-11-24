@@ -84,6 +84,7 @@ The details are in [validation/README.md](../validation/README.md).
 | --- | --- | --- |
 | `shfl.sync`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive) | recorded outputs of the real GPU, replayed in `tests/test_hardware_golden.py` | match exactly |
 | `cvt.rna.tf32.f32`, `ldmatrix`, `bfe`, `prmt`, `.ftz` arithmetic, `cp.async` zero fill | the same, bit for bit | match exactly |
+| Atomic updates (`atom`): every atomic function on 32- and 64-bit integers, `atomicAdd` on `float` and `double`, in global and shared memory | the same, for results that do not depend on the order of the threads | match exactly |
 | Shared-memory bank conflicts | Nsight Compute counters on the transpose example | conflict counters match exactly; the total wavefront counter matches once two per warp and one per CTA per barrier, which hardware also counts, are added |
 | TMA, tensor maps, mbarriers | PTX specification, CUDA headers, CUTLASS sources; real kernels give right answers | **not compared with hardware** |
 | `tcgen05.mma`, tensor memory, descriptors | the same | **not compared with hardware** |
@@ -782,8 +783,8 @@ Every kind, by area:
 | Kind | Meaning |
 | --- | --- |
 | **Shared memory** | |
-| `smem-race` | two warps touched the same byte, at least one writing, with no barrier completing in between |
-| `smem-uninitialized-read` | a load, a TMA store or an MMA read shared memory this CTA never wrote |
+| `smem-race` | two warps touched the same byte, at least one writing, with no barrier completing in between. Two atomic updates (`atom`) are not a race with each other; an atomic update and another warp's ordinary load or store are, which includes a compare-and-swap loop that starts with a plain load of the word |
+| `smem-uninitialized-read` | a load, an atomic update, a TMA store or an MMA read shared memory this CTA never wrote |
 | **Barriers and shuffles** | |
 | `barrier-in-divergent-code` | a barrier reached by only some of a warp's running lanes |
 | `shfl-inactive-source` | a shuffle read a lane that was not executing it or was outside the member mask |
@@ -1172,6 +1173,11 @@ PTX is [coverage.md](coverage.md); anything not in it raises
   tensor map written by the real driver, or by code that imitates it, cannot
   be read (section 9, CuTe DSL).
 - Misaligned loads and stores are allowed.
+- Lanes of one warp whose `atom` names the same bytes are applied in lane
+  order, lowest first. A GPU's order is not specified; results that depend
+  on it (which old value each thread receives, the word an `atomicExch`
+  leaves) may differ from a GPU's, results that do not (sums, minima and
+  maxima, bit masks, the set of values a counter hands out) cannot.
 
 **`warplens run`**
 
@@ -1199,7 +1205,8 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 - L2 has no capacity or eviction: a byte fetched once counts as cached, and
   so does a byte a TMA store wrote. A store to lines L2 does not hold is
   charged to HBM; the later write-back of cached lines is not modeled.
-- A global load costs a fixed wait and a store nothing. TMEM access and
+- A global load costs a fixed wait and a store nothing. An `atom` is charged
+  as a load followed by a store of its memory (assumed). TMEM access and
   `tcgen05.wait` have a fixed cost. `cp.async` is charged at the TMA engine's
   rates, and its source bytes to L2 or HBM as a TMA load's are.
 - An accumulating MMA's dependence on the one before it is not modeled beyond

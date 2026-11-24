@@ -422,9 +422,17 @@ Found by this work in the simulator, and fixed since unless marked open:
   and 0x7f in both.
 - Open: lanes pass `bar.sync` before lane 0 arrives in two control-flow
   layouts nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`);
-  a stale mbarrier token tests true where the 3080 Ti gives false; `atom` is
-  not implemented (`validation/blackwell/README.md`, "Found while writing the
-  probes").
+  a stale mbarrier token tests true where the 3080 Ti gives false
+  (`validation/blackwell/README.md`, "Found while writing the probes").
+- `atom` was not implemented. Fixed on `work/atom`: the forms nvcc 13.5 emits
+  for `atomicAdd`, `Sub`, `Exch`, `Min`, `Max`, `And`, `Or`, `Xor`, `CAS`,
+  `Inc`, `Dec` and their `_block` / `_system` variants, on global, shared and
+  generic addresses (`docs/coverage.md`), agreeing with the 3080 Ti
+  (`validation/ampere/atom_golden.txt`). Lanes of a warp on one address apply
+  in lane order; atoms of different warps are not an `smem-race` with each
+  other; the timing model charges an atom as a load and a store (assumed).
+  The CLC probes still avoid atomics with single-writer words and no longer
+  need to.
 - Documents that contradict the code are listed in
   `docs/validation-matrix.md`, "Discrepancies found".
 

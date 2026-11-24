@@ -25,6 +25,7 @@ mkdir -p bin
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/callforms_golden callforms_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/prmt_golden prmt_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/minmax_cvt_golden minmax_cvt_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/atom_golden atom_golden.cu
 $PTX_NVCC -arch=sm_100a -ptx shfl_probe.cu -o shfl_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx barrier_exit_hw.cu -o barrier_exit.ptx
 $PTX_NVCC -arch=sm_100a -ptx printf_probe.cu -o printf_probe.ptx
@@ -33,4 +34,5 @@ $PTX_NVCC -arch=sm_100a -ptx ldmatrix_probe.cu -o ldmatrix_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx cpasync_probe.cu -o cpasync_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx call_probe.cu -o call_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx callforms_probe.cu -o callforms_probe.ptx
+$PTX_NVCC -arch=sm_100a -ptx atom_probe.cu -o atom_probe.ptx
 echo "built bin/{shfl_golden,transpose_hw,barrier_exit_hw}, shfl_probe.ptx, barrier_exit.ptx"

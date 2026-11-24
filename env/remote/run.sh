@@ -1,0 +1,389 @@
+#!/usr/bin/env bash
+# The whole rental in one command: check the machine, install the env, build
+# and run both probe suites, pack one results archive.
+#
+#   env/remote/run.sh [--dry-run] [--keep-going] [--redo STAGE|all] [--skip STAGE]
+#                     [--toolkit auto|pinned|X.Y] [--no-ncu] [--price DOLLARS_PER_HOUR]
+#
+# Never asks anything. Safe to run again after an interruption or a failure:
+# stages that finished are skipped, the rest run, and the archive is rebuilt.
+#
+# Stages, in order, and what a failure does:
+#   preflight-quick  GPU identity, driver, disk          stops the run (not a B200: nothing to do)
+#   setup            env/remote/setup.sh                 stops the run (nothing can be built)
+#   preflight        kernels on the GPU, tensor map, ncu stops the run
+#   selftest         the repository's tests, simulator   continues
+#   build-blackwell  validation/blackwell/build.sh       its run stage is skipped; continues
+#   build-timing     validation/blackwell_timing/build.sh  likewise
+#   run-blackwell    validation/blackwell/run_all.sh     continues
+#   run-timing       validation/blackwell_timing/run_all.sh  continues
+#   collect          manifest, checksums, archive        always runs
+#
+#   --dry-run      print the plan and the time and cost estimate; touch nothing
+#   --keep-going   do not stop after a failed preflight (the archive records it)
+#   --redo STAGE   run STAGE again even if it finished (repeatable; `all` for every stage)
+#   --skip STAGE   leave STAGE out (repeatable), e.g. --skip selftest on a second rental
+#   --toolkit, --no-ncu   passed to setup.sh
+#   --price        hourly price for the cost estimate of --dry-run (default 8)
+#
+#   WARPLENS_REMOTE_HOME     where the env and results go (default ~/warplens-remote)
+#   WARPLENS_BUILD_MINUTES   time limit of each build stage (default 30)
+#   WARPLENS_RUN_MINUTES     time limit of each run stage (default 60)
+#
+# Each suite script runs inside the env with these set:
+#   NVCC=nvcc PYTHON=python     the env's compiler and interpreter
+#   WARPLENS_RESULTS_DIR        a directory of its own under the run directory;
+#                               everything written there is archived
+#   WARPLENS_PTX_JIT            ok | refused | unknown: whether the driver takes
+#                               PTX from this toolkit (preflight's ptx-jit check)
+#   WARPLENS_NCU                ok | unavailable: whether ncu can read counters
+# Whatever a suite prints is archived too (logs/<stage>.log), and so are
+# directories named results, out or output inside the suite's directory.
+#
+# Exit status: 0 everything ran and passed, 1 some stage failed (the archive
+# is still written), 3 the run stopped early, 2 usage.
+set -uo pipefail
+# shellcheck source=env/remote/lib.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
+
+stage_body_only=0
+stage_body_args=()
+if [[ "${1:-}" == --stage-body ]]; then   # internal, see stage_body below
+  shift; stage_body_only=1; stage_body_args=("$@"); set --
+fi
+dry_run=0
+keep_going=0
+price=8
+redo=()
+skip=()
+setup_args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) dry_run=1 ;;
+    --keep-going) keep_going=1 ;;
+    --redo) redo+=("${2:?--redo needs a stage}"); shift ;;
+    --skip) skip+=("${2:?--skip needs a stage}"); shift ;;
+    --toolkit) setup_args+=(--toolkit "${2:?--toolkit needs a value}"); shift ;;
+    --no-ncu) setup_args+=(--no-ncu) ;;
+    --price) price="${2:?--price needs a number}"; shift ;;
+    -h|--help) sed -n '2,44p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
+  esac
+  shift
+done
+[[ "$price" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "error: --price takes a number, not '$price'" >&2; exit 2; }
+
+STAGES=(preflight-quick setup preflight selftest build-blackwell build-timing run-blackwell run-timing collect)
+for stage in "${redo[@]}" "${skip[@]}"; do
+  [[ "$stage" == all || " ${STAGES[*]} " == *" $stage "* ]] \
+    || { echo "error: no stage '$stage' (stages: ${STAGES[*]})" >&2; exit 2; }
+done
+is_skipped() { [[ " ${skip[*]} " == *" $1 "* && "$1" != collect ]]; }
+
+build_minutes="${WARPLENS_BUILD_MINUTES:-30}"
+run_minutes="${WARPLENS_RUN_MINUTES:-60}"
+RUN_DIR="$REMOTE_HOME/run"
+SUITE_blackwell="validation/blackwell"
+SUITE_timing="validation/blackwell_timing"
+
+# Minutes, low and high, and where each number comes from. "measured" means on
+# the development machine (20-core laptop, fast network), which is not the
+# rented one; "guess" means nobody has run it. RUNBOOK.md has the same table.
+estimate() {
+  case "$1" in
+    preflight-quick) echo "1|1|measured: 2 s" ;;
+    setup)           echo "2|8|measured: 75 s to download and install 5.8 GB on a fast link; a slow link or disk is the upper end" ;;
+    preflight)       echo "1|2|measured: 5 s without the Blackwell kernels; allows for a first-use driver compile and ncu start-up" ;;
+    selftest)        echo "1|3|measured: 41 s for the whole test suite" ;;
+    build-blackwell) echo "2|10|guess: every probe is compiled two or three times; not yet timed" ;;
+    build-timing)    echo "1|5|guess: ten benchmarks, two builds each; not yet timed" ;;
+    run-blackwell)   echo "3|20|guess: short kernels, but some probes wait out a timeout on purpose; limit $run_minutes min" ;;
+    run-timing)      echo "3|20|guess: repeated microbenchmarks, and ncu reruns each kernel per counter group; limit $run_minutes min" ;;
+    collect)         echo "1|1|measured: under 1 s for a small archive" ;;
+  esac
+}
+
+stage_command() {
+  case "$1" in
+    preflight-quick) echo "env/remote/preflight.sh --quick" ;;
+    setup)           echo "env/remote/setup.sh ${setup_args[*]:-}" ;;
+    preflight)       echo "env/remote/preflight.sh" ;;
+    selftest)        echo "python -m pytest -q   (in the env, CUDA_VISIBLE_DEVICES empty)" ;;
+    build-blackwell) echo "$SUITE_blackwell/build.sh   (adds --native if the driver refuses the toolkit's PTX)" ;;
+    build-timing)    echo "$SUITE_timing/build.sh" ;;
+    run-blackwell)   echo "$SUITE_blackwell/run_all.sh" ;;
+    run-timing)      echo "$SUITE_timing/run_all.sh" ;;
+    collect)         echo "manifest, SHA256SUMS, tar.gz under $REMOTE_HOME/results" ;;
+  esac
+}
+
+commit="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+is_done() {  # finished earlier, for this commit, and not asked to be redone
+  local stage="$1" r
+  for r in "${redo[@]}"; do [[ "$r" == all || "$r" == "$stage" ]] && return 1; done
+  [[ -f "$RUN_DIR/state/$stage.ok" && "$(cat "$RUN_DIR/state/$stage.ok")" == "$commit" ]]
+}
+suite_script() {  # suite_script build-blackwell -> path of the script it runs
+  local kind="${1%%-*}" suite="SUITE_${1#*-}"
+  [[ "$kind" == build ]] && echo "$REPO_DIR/${!suite}/build.sh" || echo "$REPO_DIR/${!suite}/run_all.sh"
+}
+
+# ---------------------------------------------------------------------------
+# --dry-run: the plan
+# ---------------------------------------------------------------------------
+if (( dry_run )); then
+  echo "warplens remote run: plan (dry run, nothing is executed)"
+  echo "  checkout   $REPO_DIR at ${commit:0:12}"
+  echo "  home       $REMOTE_HOME (env, state, results)"
+  echo
+  low_total=0; high_total=0; missing=0
+  printf '  %-16s %-9s %-8s %s\n' STAGE MINUTES STATE COMMAND
+  for stage in "${STAGES[@]}"; do
+    IFS='|' read -r low high basis <<<"$(estimate "$stage")"
+    state=to-run
+    if is_skipped "$stage"; then state=skip; low=0; high=0
+    elif [[ "$stage" != collect ]] && is_done "$stage"; then state="done"; low=0; high=0; fi
+    case "$stage" in build-*|run-*)
+      [[ -f "$(suite_script "$stage")" ]] || { state=MISSING; missing=1; } ;;
+    esac
+    low_total=$((low_total + low)); high_total=$((high_total + high))
+    printf '  %-16s %-9s %-8s %s\n' "$stage" "$low-$high" "$state" "$(stage_command "$stage")"
+    printf '  %-16s   basis: %s\n' "" "$basis"
+  done
+  echo
+  echo "  estimated wall-clock time: $low_total to $high_total minutes for the stages still to run"
+  awk -v lo="$low_total" -v hi="$high_total" -v p="$price" 'BEGIN {
+    printf "  estimated cost at $%.2f per hour: $%.2f to $%.2f, before the time to log in, clone and copy results back\n",
+           p, lo / 60 * p, hi / 60 * p }'
+  echo "  The guesses dominate the total. Budget two hours; see env/remote/RUNBOOK.md."
+  if (( missing )); then
+    echo
+    echo "  MISSING: a probe suite's script is not in this checkout. Those stages will fail with"
+    echo "  that message and the rest will run. Check out a commit that has both suites."
+  fi
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# The run
+# ---------------------------------------------------------------------------
+say() { echo "run: $*"; }
+declare -A result=()
+failures=0
+
+# run_stage NAME MINUTES COMMAND...   -> 0 ok or done earlier, else the exit status
+run_stage() {
+  local stage="$1" minutes="$2" start end t0 rc status
+  shift 2
+  if is_skipped "$stage"; then
+    skip_stage "$stage" "asked to (--skip $stage)"
+    return 0
+  fi
+  if is_done "$stage"; then
+    say "$stage: finished earlier, skipping (--redo $stage to run it again)"
+    result[$stage]="done"
+    return 0
+  fi
+  rm -f "$RUN_DIR/state/$stage.ok"
+  start="$(utc_now)"; t0=$SECONDS
+  say "$stage: started $start (limit $minutes min, log $RUN_DIR/logs/$stage.log)"
+  timeout --kill-after=30 "${minutes}m" "$@" > "$RUN_DIR/logs/$stage.log" 2>&1
+  rc=$?
+  end="$(utc_now)"
+  case "$rc" in
+    0) status=ok; echo "$commit" > "$RUN_DIR/state/$stage.ok" ;;
+    124|137) status=timeout ;;
+    *) status=failed ;;
+  esac
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$stage" "$status" "$rc" "$start" "$end" "$((SECONDS - t0))" >> "$RUN_DIR/stages.tsv"
+  result[$stage]=$status
+  say "$stage: $status after $((SECONDS - t0)) s"
+  if (( rc != 0 )); then
+    failures=$((failures + 1))
+    [[ "$status" == timeout ]] && say "$stage: stopped at its $minutes minute limit"
+    if [[ "$stage" != preflight* ]]; then   # a preflight report is printed whole by the caller
+      say "$stage: last lines of its log:"
+      tail -n 15 "$RUN_DIR/logs/$stage.log" | sed 's/^/    | /'
+    fi
+  fi
+  return "$rc"
+}
+
+skip_stage() {  # skip_stage NAME REASON
+  local now; now="$(utc_now)"
+  printf '%s\tskipped\t-\t%s\t%s\t0\n' "$1" "$now" "$now" >> "$RUN_DIR/stages.tsv"
+  result[$1]=skipped
+  say "$1: skipped: $2"
+}
+
+# Run one suite script inside the env. A missing script is this stage's failure.
+suite_stage() {  # suite_stage build-blackwell [args...]
+  local stage="$1" script; shift
+  script="$(suite_script "$stage")"
+  if [[ ! -f "$script" ]]; then
+    echo "error: $script not found." >&2
+    echo "The probe suite '${script%/*}' is not in this checkout (commit ${commit:0:12})." >&2
+    echo "Check out a commit that contains it and run env/remote/run.sh again; finished stages are kept." >&2
+    return 66
+  fi
+  local out="$RUN_DIR/out/${stage#*-}"
+  mkdir -p "$out"
+  cd "$REPO_DIR" || return 1
+  env_run env NVCC=nvcc PYTHON=python WARPLENS_RESULTS_DIR="$out" \
+      WARPLENS_PTX_JIT="${WARPLENS_PTX_JIT:-unknown}" WARPLENS_NCU="${WARPLENS_NCU:-unavailable}" \
+      bash "$script" "$@"
+}
+
+# Stages that are not one script run through here, in a process of their own
+# so that `timeout` can end them: run.sh --stage-body STAGE [args...]
+stage_body() {
+  local stage="$1"; shift
+  case "$stage" in
+    selftest)
+      cd "$REPO_DIR" || return 1
+      env_run env CUDA_VISIBLE_DEVICES= python -m pytest -q -p no:cacheprovider ;;
+    build-*|run-*) suite_stage "$stage" "$@" ;;
+    *) echo "error: no body for stage '$stage'" >&2; return 2 ;;
+  esac
+}
+if (( stage_body_only )); then
+  stage_body "${stage_body_args[@]}"
+  exit $?
+fi
+self=(bash "$REMOTE_DIR/run.sh" --stage-body)
+
+trap '' HUP   # a dropped ssh session must not end the run
+mkdir -p "$RUN_DIR"/{state,logs,out} "$REMOTE_HOME/results"
+[[ -f "$RUN_DIR/state/first-start" ]] || utc_now > "$RUN_DIR/state/first-start"
+run_start="$(utc_now)"
+echo "$run_start $commit" >> "$RUN_DIR/state/attempts"
+[[ -f "$RUN_DIR/stages.tsv" ]] || printf 'stage\tstatus\texit\tstart\tend\tseconds\n' > "$RUN_DIR/stages.tsv"
+
+collect() {
+  local archive sums name first
+  {
+    echo "# warplens remote run manifest, written $(utc_now)"
+    echo "warplens_commit=$commit"
+    echo "warplens_branch=$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"
+    echo "warplens_uncommitted_files=$(git -C "$REPO_DIR" status --porcelain 2>/dev/null | wc -l)"
+    echo "first_start=$(cat "$RUN_DIR/state/first-start")"
+    echo "this_start=$run_start"
+    echo "end=$(utc_now)"
+    echo "attempts=$(wc -l < "$RUN_DIR/state/attempts")"
+    echo "host=$(hostname)"
+    echo "kernel=$(uname -r)"
+    echo "os=$( (. /etc/os-release 2>/dev/null && echo "${PRETTY_NAME:-unknown}") || echo unknown)"
+    echo "cpu=$(sed -n 's/^model name[[:space:]]*: //p' /proc/cpuinfo 2>/dev/null | head -n 1)"
+    echo "cpus=$(nproc 2>/dev/null)"
+    echo "container=$(container_kind)"
+    echo "uid=$EUID"
+    echo "ptx_jit=$ptx_jit"
+    echo "ncu=$ncu_state"
+    for stage in "${STAGES[@]}"; do
+      [[ "$stage" == collect ]] || echo "stage_${stage//-/_}=${result[$stage]:-not-reached}"
+    done
+    echo
+    echo "# versions: see resolved/versions.txt (what setup.sh installed) and pins.env (what was asked for)"
+    echo "# stage history, every attempt: stages.tsv. Preflight reports: preflight-quick.txt, preflight.txt"
+  } > "$RUN_DIR/manifest.txt"
+  rm -rf "$RUN_DIR/resolved" "$RUN_DIR/suite-dirs"
+  [[ -d "$REMOTE_HOME/resolved" ]] && cp -r "$REMOTE_HOME/resolved" "$RUN_DIR/resolved"
+  cp "$PINS_FILE" "$RUN_DIR/pins.env"
+  nvidia-smi > "$RUN_DIR/nvidia-smi.txt" 2>&1 || true
+  nvidia-smi -q > "$RUN_DIR/nvidia-smi-q.txt" 2>&1 || true
+  # Outputs a suite left in its own directory instead of WARPLENS_RESULTS_DIR.
+  for suite in "$SUITE_blackwell" "$SUITE_timing"; do
+    for sub in results out output; do
+      if [[ -d "$REPO_DIR/$suite/$sub" ]]; then
+        mkdir -p "$RUN_DIR/suite-dirs/$suite"
+        cp -r "$REPO_DIR/$suite/$sub" "$RUN_DIR/suite-dirs/$suite/"
+      fi
+    done
+  done
+  (cd "$RUN_DIR" && find . -type f ! -name SHA256SUMS ! -path './state/*' -print0 | sort -z | xargs -0 sha256sum > state/sums \
+     && mv state/sums SHA256SUMS)
+
+  first="$(tr -d ':-' < "$RUN_DIR/state/first-start")"
+  name="warplens-b200-${first}-${commit:0:10}"
+  archive="$REMOTE_HOME/results/$name.tar.gz"
+  if ! tar -czf "$archive.part" -C "$REMOTE_HOME" --transform "s|^run|$name|" --exclude='run/state' run \
+     || ! mv -f "$archive.part" "$archive"; then
+    say "collect: writing $archive failed"
+    return 1
+  fi
+  sums="$archive.sha256"
+  (cd "$REMOTE_HOME/results" && sha256sum "$name.tar.gz" > "$sums")
+  say "archive:  $archive"
+  say "size:     $(du -h "$archive" | cut -f1) ($(stat -c %s "$archive") bytes)"
+  say "sha256:   $(cut -d' ' -f1 "$sums")"
+  say "fetch it from your own machine with:"
+  say "  scp '<user>@<host>:$archive*' .  &&  sha256sum -c $name.tar.gz.sha256"
+}
+
+finish() {  # finish EXIT_STATUS
+  collect || failures=$((failures + 1))
+  say "stages: $(for s in "${STAGES[@]}"; do [[ $s == collect ]] || printf '%s=%s ' "$s" "${result[$s]:-not-reached}"; done)"
+  exit "$1"
+}
+
+ptx_jit=unknown
+ncu_state=unavailable
+say "checkout $REPO_DIR at ${commit:0:12}; home $REMOTE_HOME; started $run_start"
+
+# 1. Is this the right machine? Needs nothing installed.
+run_stage preflight-quick 5 bash "$REMOTE_DIR/preflight.sh" --quick --out "$RUN_DIR/preflight-quick.txt"
+rc=$?
+[[ -f "$RUN_DIR/preflight-quick.txt" && "${result[preflight-quick]}" != "done" ]] && sed 's/^/    /' "$RUN_DIR/preflight-quick.txt"
+if (( rc != 0 && ! keep_going )); then
+  say "stopping: the quick preflight failed, so this is not a machine to spend time on."
+  say "See 'When preflight fails' in env/remote/RUNBOOK.md. To go on regardless: --keep-going"
+  finish 3
+fi
+
+# 2. The env.
+if ! run_stage setup 45 bash "$REMOTE_DIR/setup.sh" "${setup_args[@]}"; then
+  say "stopping: without the env nothing can be built. Fix the cause (log above) and run again."
+  finish 3
+fi
+
+# 3. Kernels on the GPU.
+run_stage preflight 15 bash "$REMOTE_DIR/preflight.sh" --out "$RUN_DIR/preflight.txt" --status "$RUN_DIR/preflight.status"
+rc=$?
+[[ -f "$RUN_DIR/preflight.txt" && "${result[preflight]}" != "done" ]] && sed 's/^/    /' "$RUN_DIR/preflight.txt"
+if [[ -f "$RUN_DIR/preflight.status" ]]; then
+  case "$(awk '$1 == "ptx-jit" {print $2}' "$RUN_DIR/preflight.status")" in
+    PASS) ptx_jit=ok ;;
+    WARN|FAIL) ptx_jit=refused ;;
+  esac
+  [[ "$(awk '$1 == "ncu" {print $2}' "$RUN_DIR/preflight.status")" == PASS ]] && ncu_state=ok
+fi
+if (( rc != 0 && ! keep_going )); then
+  say "stopping: the full preflight failed. See 'When preflight fails' in env/remote/RUNBOOK.md."
+  say "To run the suites regardless: env/remote/run.sh --keep-going"
+  finish 3
+fi
+
+# 4. The simulator on this machine, as installed.
+run_stage selftest 20 "${self[@]}" selftest || true
+
+# 5-8. Build both suites, then run what built.
+blackwell_build_args=()
+if [[ "$ptx_jit" == refused ]]; then
+  say "the driver refuses this toolkit's PTX: building the Blackwell probes with machine code as well (--native)"
+  blackwell_build_args+=(--native)
+fi
+export WARPLENS_PTX_JIT="$ptx_jit" WARPLENS_NCU="$ncu_state"
+run_stage build-blackwell "$build_minutes" "${self[@]}" build-blackwell "${blackwell_build_args[@]}" || true
+run_stage build-timing "$build_minutes" "${self[@]}" build-timing || true
+for suite in blackwell timing; do
+  case "${result[build-$suite]}" in
+    ok|done|skipped) run_stage "run-$suite" "$run_minutes" "${self[@]}" "run-$suite" || true ;;
+    *) skip_stage "run-$suite" "build-$suite did not succeed (${result[build-$suite]})" ;;
+  esac
+done
+
+if (( failures )); then
+  say "$failures stage(s) failed; the archive has their logs."
+  finish 1
+fi
+finish 0

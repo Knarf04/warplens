@@ -1,0 +1,7 @@
+mbarrier with 1 arrival per phase; one try_wait of each form after the phase completed
+phase 0 completed: try_wait.parity 0 1, try_wait(token of its arrival) 1
+info: phase 0: clock ticks 5 (parity), 4 (token)
+phase 1 completed: try_wait.parity 1 1, try_wait(token of its arrival) 1
+info: phase 1: clock ticks 4 (parity), 4 (token)
+phase 2 completed: try_wait.parity 0 1, try_wait(token of its arrival) 1
+info: phase 2: clock ticks 4 (parity), 4 (token)

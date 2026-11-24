@@ -99,6 +99,12 @@ def _mbarrier() -> list[Probe]:
               "as on an RTX 3080 Ti (validation/ampere/mbarrier_token_golden.txt): test_wait answers from bit 63 "
               "of the token, the parity of the arrival's phase. For tokens two or more phases old and made-up "
               "tokens (invalid PTX use) a difference is Blackwell's, not a simulator error"),
+        Probe("mbarrier/try_wait", "mbarrier/try_wait", (), ("MB-01", "MB-03"),
+              "one try_wait, in the parity and the token form, is true once the phase it names has completed"),
+        Probe("mbarrier/try_wait.incomplete", "mbarrier/try_wait", ("incomplete",), ("MB-11",),
+              "none: the simulator's try_wait blocks (a deadlock report here). Records whether one try_wait "
+              "on a phase that never completes returns false, and after how many clock ticks",
+              risk="hang", predict="none", timeout=30),
         Probe("mbarrier/init_count", "mbarrier/init_count", (), ("MB-10",),
               "mbarrier.init accepts 2^20 - 1 arrivals, and an arrive with that count completes the phase"),
         Probe("mbarrier/init_count.over", "mbarrier/init_count", ("over",), ("MB-10",),
@@ -140,6 +146,9 @@ def _tmem() -> list[Probe]:
         Probe("tmem/fresh_contents", "tmem/fresh_contents", (), ("TM-13",),
               "tensor memory that was never written reads as zero, in a first launch and after a launch "
               "that wrote it"),
+        Probe("tmem/cp_record", "tmem/cp", (), (),
+              "none: tcgen05.cp is outside v1 and refused. Records which shared bytes the four one-CTA "
+              "shapes CUTLASS uses put in which (lane, column)", risk="fault", predict="none"),
         Probe("tmem/alloc_addresses", "tmem/alloc", (), ("TM-07",),
               "alloc returns the lowest free block aligned to its size, as (lane 0, column)"),
         Probe("tmem/alloc_increasing", "tmem/alloc", ("increasing",), ("TM-08",),
@@ -184,6 +193,12 @@ def _mma() -> list[Probe]:
               "eight chained MMAs"),
         Probe("mma/swizzle_mismatch", "mma/swizzle_mismatch", (), ("MMA-11", "TMA-01", "MMA-02"),
               "an operand loaded with a 128B swizzle and described as 64B is read by the descriptor's formula"),
+        Probe("mma/base_offset", "mma/base_offset", (), ("MMA-12",),
+              "with the base-offset field 0 (all CUTLASS emits) an operand that starts off a swizzle period "
+              "is read through the swizzle of its absolute shared address"),
+        Probe("mma/base_offset.field", "mma/base_offset", ("field",), ("MMA-12",),
+              "none: a non-zero base-offset field is outside v1 and refused. Records what it selects, "
+              "against three candidate rules", risk="fault", predict="none"),
     ]
 
 
@@ -299,7 +314,8 @@ def _formats() -> list[Probe]:
 def _device() -> list[Probe]:
     return [
         Probe("e2e/device_attributes", "e2e/device_attributes", (), ("RT-03",),
-              "the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives"),
+              "the device reports compute capability 10.0, 148 SMs, the shared-memory limits the shim gives "
+              "and cluster launch support (cudaDevAttrClusterLaunch = 1)"),
         Probe("e2e/smem_limit", "e2e/smem_limit", (), ("RT-04",),
               "a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory"),
         Probe("e2e/smem_optin", "e2e/smem_optin", (), ("RT-15",),

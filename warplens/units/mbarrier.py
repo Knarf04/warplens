@@ -21,9 +21,15 @@ reports other tokens without granting synchronization credit. For invalid
 inputs it keeps the measured Ampere parity predicate only as a nonportable
 fallback; those observations do not establish Blackwell behavior.
 
-`try_wait` may suspend the thread on real hardware; here it blocks the warp
-until the phase completes, which lets a wait that can never succeed be
-reported as a deadlock instead of spinning forever.
+`try_wait` may suspend the thread on real hardware and, per PTX, return false
+after a system-dependent time limit. Here it blocks the warp until the phase
+completes and never returns false, which lets a wait that can never succeed
+be reported as a deadlock instead of spinning forever. That is exact for the
+loop every target kernel uses (`while (!try_wait)`), and it is the v1 scope:
+a kernel that does other work when `try_wait` fails (a non-blocking fallback)
+is not modeled and shows up as a deadlock; `test_wait` is the non-blocking
+form. validation/blackwell/mbarrier/try_wait.cu records what one `try_wait`
+on an open phase returns on a B200, and after how long (matrix row MB-11).
 """
 
 from __future__ import annotations

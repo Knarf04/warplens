@@ -563,6 +563,10 @@ int warplens_device_attribute(int attribute) {
     case cudaDevAttrMaxBlocksPerMultiprocessor: return 32;
     case cudaDevAttrComputeCapabilityMajor: return 10;
     case cudaDevAttrComputeCapabilityMinor: return is_b300() ? 3 : 0;
+    /* Also CU_DEVICE_ATTRIBUTE_CLUSTER_LAUNCH (same number). The simulator launches clusters
+     * (cudaLaunchKernelEx with cudaLaunchAttributeClusterDimension), so programs that ask
+     * before using them must be told so. */
+    case cudaDevAttrClusterLaunch: return 1;
     default: TRACE("device attribute %d is not described; answering 0", attribute); return 0;
   }
 }
@@ -602,6 +606,7 @@ cudaError_t cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
   prop->minor = warplens_device_attribute(cudaDevAttrComputeCapabilityMinor);
   prop->multiProcessorCount = warplens_device_attribute(cudaDevAttrMultiProcessorCount);
   prop->maxBlocksPerMultiProcessor = warplens_device_attribute(cudaDevAttrMaxBlocksPerMultiprocessor);
+  prop->clusterLaunch = warplens_device_attribute(cudaDevAttrClusterLaunch);
   return cudaSuccess;
 }
 

@@ -76,7 +76,7 @@ validation/blackwell/compare.py validation/blackwell/results/gpu-<host>-<time>.t
 ```
 
 One command, no interaction. `run_all.py` builds (`build.sh --native`), records
-`nvidia-smi`, driver, toolkit and device, runs the 109 probe runs in manifest order, then the
+`nvidia-smi`, driver, toolkit and device, runs the 117 probe runs in manifest order, then the
 end-to-end programs, and writes `results/gpu-<host>-<time>.tar.gz` with every run's standard
 output, standard error and status (`status.tsv`), the build log and the environment. Bring
 the archive back; `compare.py` needs nothing but Python and this directory.
@@ -131,7 +131,7 @@ To keep the predictions' compiler on such a machine: `env/remote/run.sh --toolki
 The driver then refuses the PTX and the machine-code programs run (`bin-native/`).
 
 **Expected run time** (estimated; nothing here has been timed on a B200): the build takes a
-few minutes (55 programs, three compilations each with `--native`). Most runs take well
+few minutes (60 programs, three compilations each with `--native`). Most runs take well
 under a second of GPU time plus process start-up. Runs that hang are killed at their
 timeout, 30 s each; 12 runs are allowed to hang, and two of them (`mbarrier/expect_tx_large`,
 `tmem/alloc_blocks`) are expected to. So the probes take between 3 and 10 minutes. The
@@ -160,10 +160,10 @@ run is isolated for that reason.
 
 | Run | Program and arguments | Matrix | Claim tested | In the simulator | On hardware may |
 | --- | --- | --- | --- | --- | --- |
-| `device_attributes` | `device_attributes` | RT-03 | the device reports compute capability 10.0, 148 SMs and the shared-memory limits the shim gives | runs | - |
+| `device_attributes` | `device_attributes` | RT-03 | the device reports compute capability 10.0, 148 SMs, the shared-memory limits the shim gives and cluster launch support (cudaDevAttrClusterLaunch = 1) | runs | - |
 | `smem_limit` | `smem_limit` | RT-04 | a CTA launches with 227 KiB, 227 KiB + 16 and 228 KiB of dynamic shared memory | runs | - |
-| `smem_optin` | `smem_optin` | RT-13 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
-| `smem_static` | `smem_static` | RT-13 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
+| `smem_optin` | `smem_optin` | RT-15 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
+| `smem_static` | `smem_static` | RT-15 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
 | `elect` | `elect` | RT-05 | elect.sync elects the lowest lane of the member mask; every executing lane gets its id | runs | - |
 | `elect.all` | `elect all` | RT-05 | lanes outside the member mask execute elect.sync too: the lowest lane of the mask is elected | runs | fault |
 | `elect.partial` | `elect partial` | RT-05 | the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected | runs | fault |
@@ -211,6 +211,8 @@ run is isolated for that reason.
 | `arrive_token` | `arrive_token` | MB-03 | test_wait with an arrive token is false while the token's phase is open and true once it completed, also during the next phase | runs | - |
 | `arrive_token.stale` | `arrive_token stale` | MB-03 | a token two phases old is invalid PTX use and is diagnosed; its predicate is informational only | runs (2 finding(s)) | - |
 | `ampere_token` | `ampere_token` | MB-03 | as on an RTX 3080 Ti (validation/ampere/mbarrier_token_golden.txt): test_wait answers from bit 63 of the token, the parity of the arrival's phase. For tokens two or more phases old and made-up tokens (invalid PTX use) a difference is Blackwell's, not a simulator error | runs (333 finding(s)) | - |
+| `try_wait` | `try_wait` | MB-01, MB-03 | one try_wait, in the parity and the token form, is true once the phase it names has completed | runs | - |
+| `try_wait.incomplete` | `try_wait incomplete` | MB-11 | none: the simulator's try_wait blocks (a deadlock report here). Records whether one try_wait on a phase that never completes returns false, and after how many clock ticks | not run (no prediction) | hang |
 | `init_count` | `init_count` | MB-10 | mbarrier.init accepts 2^20 - 1 arrivals, and an arrive with that count completes the phase | runs | - |
 | `init_count.over` | `init_count over` | MB-10 | an arrival count of 2^20 is refused | **refuses**: mbarrier.init with an arrival count of 1048576; it must be 1 to 2^20-1 | fault |
 | `init_count.zero` | `init_count zero` | MB-10 | an arrival count of 0 is refused | **refuses**: mbarrier.init with an arrival count of 0; it must be 1 to 2^20-1 | fault |
@@ -233,6 +235,7 @@ run is isolated for that reason.
 | `transfer_shapes` | `transfer_shapes` | TM-05 | thread and register to (lane, column) for 32x32b, 16x64b, 16x128b, 16x256b, load and store | runs | - |
 | `repeat_counts` | `repeat_counts` | TM-06, TM-05 | every power-of-two repeat count up to 128 registers per thread exists (the build assembles them) and loads the cells the mapping names | runs | - |
 | `fresh_contents` | `fresh_contents` | TM-13 | tensor memory that was never written reads as zero, in a first launch and after a launch that wrote it | runs (64 finding(s)) | - |
+| `cp_record` | `cp` | - | none: tcgen05.cp is outside v1 and refused. Records which shared bytes the four one-CTA shapes CUTLASS uses put in which (lane, column) | not run (no prediction) | fault |
 | `alloc_addresses` | `alloc` | TM-07 | alloc returns the lowest free block aligned to its size, as (lane 0, column) | runs | - |
 | `alloc_increasing` | `alloc increasing` | TM-08 | a later allocation may not be larger than an earlier one | **refuses**: tcgen05.alloc of 64 columns increases the previous allocation size of 32 columns | fault |
 | `alloc_addresses.size_48` | `alloc size-48` | TM-07 | an allocation of 48 columns is refused | **refuses**: tcgen05.alloc of 48 columns; the count must be a power of two from 32 to 512 | fault |
@@ -258,6 +261,8 @@ run is isolated for that reason.
 | `disable_lanes` | `disable_lanes` | MMA-09 | bit l of word i of the disable-output-lane operand leaves TMEM lane 32 i + l unwritten | runs | - |
 | `commit_arrival` | `commit_arrival` | MMA-10 | tcgen05.commit makes exactly one arrival; data loaded after waiting on it is the sum of all eight chained MMAs | runs | - |
 | `swizzle_mismatch` | `swizzle_mismatch` | MMA-11, TMA-01, MMA-02 | an operand loaded with a 128B swizzle and described as 64B is read by the descriptor's formula | runs (2 finding(s)) | - |
+| `base_offset` | `base_offset` | MMA-12 | with the base-offset field 0 (all CUTLASS emits) an operand that starts off a swizzle period is read through the swizzle of its absolute shared address | runs | - |
+| `base_offset.field` | `base_offset field` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what it selects, against three candidate rules | not run (no prediction) | fault |
 
 ### `cluster/`
 
@@ -299,6 +304,7 @@ run is isolated for that reason.
 | `scalar_edges` | `scalar_edges` | NUM-11, NUM-12 | min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, rem, mul.hi and shifts at theirs | runs (8 finding(s)) | - |
 | `ampere_replay.minmax_cvt` | `ampere_replay minmax_cvt` | NUM-11 | as on an RTX 3080 Ti (validation/ampere/minmax_cvt_golden.txt): min/max over zeros, infinities and NaNs, and cvt to s32, u32, s64, u64 in four rounding modes, with the bits of NaN results | runs | - |
 | `ampere_replay.intdiv` | `ampere_replay intdiv` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/intdiv_golden.txt): div and rem on 16, 32 and 64 bits; by zero (unspecified in PTX) both give all ones, the minimum over -1 gives the minimum and 0 | runs (12 finding(s)) | - |
+| `ampere_replay.bitfield` | `ampere_replay bitfield` | NUM-12 | as on an RTX 3080 Ti (validation/ampere/bitfield_golden.txt): bfi.b32, bfi.b64 and shf.{l,r}.{wrap,clamp}.b32 over positions and lengths up to and past the register width | runs | - |
 | `ampere_replay.nan` | `ampere_replay nan` | NUM-13 | as on an RTX 3080 Ti (validation/ampere/nan_golden.txt without its 44 cvt.ftz lines): the bits of every NaN result of add, sub, mul, div, fma, sqrt, neg, abs, mov and cvt, f32 and f64 | runs | - |
 | `ampere_replay.nan_cvt_ftz` | `ampere_replay nan_cvt_ftz` | NUM-13 | none: cvt.ftz.f64.f32 and cvt.rn.ftz.f32.f64 of NaNs, which the simulator does not implement; the 44 lines are to be read against the same lines of validation/ampere/nan_golden.txt | not run (no prediction) | - |
 <!-- end of tables -->
@@ -351,13 +357,14 @@ to see that it runs to the end.
 ## Matrix coverage
 
 Every row of `docs/validation-matrix.md` outside the timing section has at least one run
-here, except four: TMA-01 to -15; MB-01 to -11; TM-01 to -13; MMA-01 to -11; CL-01 to -21;
+here, except four: TMA-01 to -15; MB-01 to -11; TM-01 to -13; MMA-01 to -12; CL-01 to -21;
 NUM-01 to -04 and -06 to -13; RT-01 to -09, -13 and -14.
 
 Partly covered, and how: MMA-01 (only the M, N, format and major-ness fields are varied);
 MMA-05 (repeated accumulation of the same product; no case that isolates "one float32
-addition"); MB-11 (`try_wait` is only used in a loop; whether a single `try_wait` returns
-false on hardware is not printed); CL-01 (ranks along x only); CL-09 and CL-13 (exercised
+addition"); MB-11 (`mbarrier/try_wait.incomplete` prints what a single `try_wait` on an open phase
+returns, without a prediction: the simulator's `try_wait` blocks by design); MMA-12 (the field 0
+is predicted; `mma/base_offset.field` records a non-zero field without a prediction); CL-01 (ranks along x only); CL-09 and CL-13 (exercised
 inside `pair_mma`, not isolated); TMA-10 (the unaligned coordinate; an unaligned shared
 address is `tma/swizzle_misaligned.sixteen`, which is 16-byte aligned, so a shared address
 that is not a multiple of 16 is not tried); TMA-13 (2000 stores per variant in the predicted

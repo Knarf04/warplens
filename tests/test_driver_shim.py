@@ -127,6 +127,10 @@ int main(int argc, char **argv) {
     CHECK(cuDeviceGetAttribute(&value, CU_DEVICE_ATTRIBUTE_WARP_SIZE, 1) == CUDA_ERROR_INVALID_DEVICE);
     CHECK(cudaDeviceGetAttribute(&value, cudaDevAttrComputeCapabilityMinor, 0) == cudaSuccess && value == minor);
     CHECK(cudaDeviceGetAttribute(&value, cudaDevAttrWarpSize, 0) == cudaSuccess && value == 32);
+    value = -1;
+    CHECK(cuDeviceGetAttribute(&value, CU_DEVICE_ATTRIBUTE_CLUSTER_LAUNCH, 0) == CUDA_SUCCESS && value == 1);
+    value = -1;
+    CHECK(cudaDeviceGetAttribute(&value, cudaDevAttrClusterLaunch, 0) == cudaSuccess && value == 1);
     CHECK(cuDeviceGetName(name, sizeof name, 0) == CUDA_SUCCESS && strstr(name, "warplens simulated"));
     CHECK(cuGetErrorName(CUDA_ERROR_NOT_FOUND, &text) == CUDA_SUCCESS && !strcmp(text, "CUDA_ERROR_NOT_FOUND"));
     CHECK(cuGetErrorString(CUDA_SUCCESS, &text) == CUDA_SUCCESS && !strcmp(text, "no error"));

@@ -8,3 +8,4 @@ max grid 2147483647 x 65535 x 65535
 shared memory per block 49152, with opt-in 232448, per multiprocessor 233472
 registers per block 65536, per multiprocessor 65536
 max threads per multiprocessor 2048, max blocks per multiprocessor 32
+cluster launch 1 (attribute), 1 (properties)

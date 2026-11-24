@@ -31,6 +31,7 @@ Contents:
    - [6.5 The bank-conflict report](#65-the-bank-conflict-report)
    - [6.6 Traces and views](#66-traces-and-views)
    - [6.7 The timing report, and how far to trust it](#67-the-timing-report-and-how-far-to-trust-it)
+   - [6.8 Everything on one page: `warplens report`](#68-everything-on-one-page-warplens-report)
 7. [Models: B200 and B300](#7-models-b200-and-b300)
 8. [Limits](#8-limits)
 9. [Troubleshooting](#9-troubleshooting)
@@ -903,6 +904,38 @@ in every layout: it also counts two wavefronts per warp and one per CTA per
 `__syncthreads()`, which are not shared accesses (`validation/README.md`). `stats.smem.wavefronts` and `stats.smem.conflicts`
 are the totals.
 
+**The same as a picture.** `warplens.viz.smem.bank_heatmap_svg(stats.smem)`
+returns an SVG with a row per shared-memory instruction and a column per bank.
+A cell holds the most distinct words that one execution of the instruction put
+in that bank, which is the number of wavefronts the bank alone demanded: 1 in
+every bank is a conflict-free access, and the linear transpose's load shows 32
+in every bank. (The words summed over all executions would not tell the two
+apart: each warp of the linear load hits a different bank, so every bank ends
+up with the same total as in the conflict-free store.) Banks an instruction
+never touched are grey. Each cell has a tooltip with the numbers.
+
+<!-- test: run -->
+```python
+import numpy as np
+import warplens
+from warplens.viz import smem
+
+sim = warplens.Device("B200")
+data = np.random.default_rng(0).standard_normal((2, 32, 32)).astype(np.float32)
+stats = sim.launch("examples/01_smem_transpose/transpose.ptx", "transpose_linear", grid=2, block=(32, 32),
+                   args=[sim.from_numpy(data), sim.empty(data.shape, "f32")])
+with open("banks.svg", "w") as f:
+    f.write(smem.bank_heatmap_svg(stats.smem))
+for e in stats.smem.instructions.values():
+    print(e.line, e.op, "most words in a bank in one execution:", e.bank_peak.max())
+```
+
+<!-- test: output -->
+```text
+48 st most words in a bank in one execution: 1
+54 ld most words in a bank in one execution: 32
+```
+
 ### 6.6 Traces and views
 
 **Instruction trace.** `launch(..., trace=callback)` calls
@@ -944,7 +977,8 @@ python examples/00_divergent/run.py
 **Where an MMA result lands in tensor memory.** `python -m warplens.viz.tmem M N`
 prints the layout for a `tcgen05.mma` of that shape, `--svg FILE` draws it,
 `--lane-offset 16` shows the second position of an M = 64 result, and `--pair`
-shows a two-CTA (`cta_group::2`) MMA:
+shows a two-CTA (`cta_group::2`) MMA, for which `--svg` draws the tensor memory
+of the even-ranked and of the odd-ranked CTA side by side:
 
 <!-- test: run -->
 ```bash
@@ -976,6 +1010,58 @@ TMEM layout of a 128 x 16 tcgen05.mma result (cta_group::2, Layout B)
 `python -m warplens.viz.tmem --transfer 16x128b 1` prints which TMEM cells
 each thread's registers reach in a `tcgen05.ld` or `tcgen05.st` of that shape.
 
+**Where a tile sits in shared memory.** `python -m warplens.viz.smem ROWS
+ROW_BYTES` shows a tile of that many rows of that many bytes per 4-byte word:
+the bank each word falls in, and whether a warp that reads down a column, one
+word per lane, conflicts. `--swizzle 32B|64B|128B` places the tile as a TMA
+copy with that swizzle does, `--pitch BYTES` pads the rows of an unswizzled
+tile, and `--start` is its shared-memory offset.
+
+<!-- test: run -->
+```bash
+python -m warplens.viz.smem 32 128 --swizzle 128B --svg tile.svg
+```
+
+<!-- test: output head=6 -->
+```text
+Tile of 32 rows x 128 bytes at shared offset 0, TMA swizzle 128B
+  32 rows of 32 words (4 bytes each) at shared offsets 0-4095; a warp reading down a column, one word per lane, has a 4-way bank conflict
+  row  offset of its first word  bank of each word
+    0                         0   0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+    1                       144   4  5  6  7  0  1  2  3 12 13 14 15  8  9 10 11 20 21 22 23 16 17 18 19 28 29 30 31 24 25 26 27
+    2                       288   8  9 10 11 12 13 14 15  0  1  2  3  4  5  6  7 24 25 26 27 28 29 30 31 16 17 18 19 20 21 22 23
+...
+```
+
+The linear and the padded tile of `examples/01_smem_transpose`, for comparison:
+
+<!-- test: run -->
+```bash
+python -m warplens.viz.smem 32 128 | sed -n 2p
+python -m warplens.viz.smem 32 128 --pitch 132 | sed -n 2p
+```
+
+<!-- test: output -->
+```text
+  32 rows of 32 words (4 bytes each) at shared offsets 0-4095; a warp reading down a column, one word per lane, has a 32-way bank conflict
+  32 rows of 32 words (4 bytes each) at shared offsets 0-4219; a warp reading down a column, one word per lane, has no bank conflict
+```
+
+`--svg FILE` writes the picture: on the left the
+tile as the program indexes it, on the right shared memory itself in lines of
+128 bytes (one word per bank), every word coloured by its bank, light for bank
+0 to dark for bank 31, and the first word of each row outlined in both. A
+column of the left picture that is one shade is a column whose words share a
+bank. At most 32 rows are drawn. The TMA swizzle moves 16-byte chunks, so it
+spreads a column of 4-byte words over 8 banks, not 32: the 4-way conflict
+above. From Python, `smem.tile_words(...)` gives the offsets and
+`smem.layout_svg(words)` draws any array of word offsets, which is how to look
+at a layout TMA did not make (for the example's `tile[y][x ^ y]`:
+`4 * (32 * y + (x ^ y))`).
+
+The views know the layouts of TMA tiles and of tiles you describe. They do not
+recover the layout a kernel computes with its own index arithmetic.
+
 **One TF32 conversion, bit by bit:**
 
 <!-- test: run -->
@@ -1001,9 +1087,7 @@ run and wait slices (a wait names the instruction it waits at), tracks for the
 TMA engine and the tensor core, instants for mbarrier phase completions and a
 counter of TMA bytes in flight.
 
-There is no `warplens report` command, no picture of a shared-memory layout
-and no per-instruction bank heatmap; the plan sketched them and they are not
-built.
+Section 6.8 puts all of these on one page.
 
 ### 6.7 The timing report, and how far to trust it
 
@@ -1120,6 +1204,94 @@ bandwidth or the tensor core, and what happens to that when a parameter or the
 pipeline depth changes? Treat an answer as a hypothesis to test on hardware.
 `python examples/04_pipelined_gemm/run.py out/` runs that comparison for 1, 2
 and 4 stages in three scenarios. [m4.md](m4.md) describes the model.
+
+### 6.8 Everything on one page: `warplens report`
+
+`warplens report program` runs a program exactly as `warplens run` does
+(section 5.2), with the timing model on, and writes a report of every kernel
+it launched into a directory: `index.html`, and beside it every picture as an
+SVG file, plus the timing report and the Perfetto trace of each launch.
+
+<!-- test: run needs=triton -->
+```bash
+warplens report --quiet -o triton_report examples/05_triton/run.py 2>&1 | grep -c "wrote .*triton_report/index.html"
+ls triton_report | sed "s/^p[0-9]*_//"
+```
+
+<!-- test: output -->
+```text
+1
+01_add_kernel.timeline.svg
+01_add_kernel.timing.html
+01_add_kernel.trace.json
+02_matmul_kernel.banks.svg
+02_matmul_kernel.timeline.svg
+02_matmul_kernel.timing.html
+02_matmul_kernel.tmem_1.svg
+02_matmul_kernel.trace.json
+index.html
+```
+
+For each launch the page has, in this order:
+
+| Part | What it shows | Also written as |
+| --- | --- | --- |
+| Findings | what the checkers reported (6.4), each with its PTX line | |
+| Shared-memory banks | the heatmap and the table of 6.5 | `NAME.banks.svg` |
+| Shared-memory layout | one picture (6.6) per shape of tile that a TMA tensor copy loaded or stored, with the PTX lines and shared offsets of the copies | `NAME.smem_layout_N.svg` |
+| Tensor memory | the TMEM layout (6.6) of each shape of `tcgen05.mma` the launch issued, both CTAs for a `cta_group::2` MMA | `NAME.tmem_N.svg` |
+| Timeline and mbarrier phases | the timeline of the first CTA with a red line at each mbarrier phase completion, and the verdict | `NAME.timeline.svg`, `NAME.timing.html` (6.7), `NAME.trace.json` |
+
+`NAME` is the launch's number and the kernel's name, cut to a safe file name;
+launches made by a Triton driver in another process also carry that process's
+id (`p1234_`). A part with nothing to show says so: a launch without TMA has no
+layout picture, one without an MMA has no TMEM picture.
+
+Options: `-o DIRECTORY` (default `warplens_report`), `--no-timing` to leave the
+timing model off, which drops the timeline, and the options of `warplens run`
+(`--model`, `--timing-config`, `--active-sms`, `--clc-limit`, `--quiet`). The
+exit status is the program's. If the program launches nothing, no page is
+written.
+
+The timeline, verdict and timing report come from the uncalibrated timing
+model; section 6.7 says how far to trust them. The other parts do not depend
+on it.
+
+A script that launches through the Python API is not a program `warplens
+report` can observe; it writes the same page itself:
+
+<!-- test: run -->
+```python
+import numpy as np
+import warplens
+from warplens.viz import write_report
+
+sim = warplens.Device("B200")
+data = np.random.default_rng(0).standard_normal((2, 32, 32)).astype(np.float32)
+launches = []
+for layout in ("linear", "padded"):
+    stats = sim.launch("examples/01_smem_transpose/transpose.ptx", f"transpose_{layout}", grid=2,
+                       block=(32, 32), args=[sim.from_numpy(data), sim.empty(data.shape, "f32")], timing=True)
+    launches.append((f"transpose_{layout}", stats))
+index = write_report("transpose_report", launches, title="Two transposes")
+print(*sorted(p.name for p in index.parent.iterdir()), sep="\n")
+```
+
+<!-- test: output -->
+```text
+01_transpose_linear.banks.svg
+01_transpose_linear.timeline.svg
+01_transpose_linear.timing.html
+01_transpose_linear.trace.json
+02_transpose_padded.banks.svg
+02_transpose_padded.timeline.svg
+02_transpose_padded.timing.html
+02_transpose_padded.trace.json
+index.html
+```
+
+`write_report(directory, [(name, stats), ...], model="B200", title=...)` takes
+the `LaunchStats` of any launches, timed or not.
 
 ## 7. Models: B200 and B300
 

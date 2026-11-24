@@ -139,6 +139,10 @@ def test_a_refused_launch_has_the_runtime_code_for_that_refusal():
     status, text = launch(block=(1025, 1, 1))
     assert status == 9 and b"1025 threads" in text  # cudaErrorInvalidConfiguration
     assert launch(block=(0, 1, 1))[0] == 9 and launch(grid=(0, 1, 1))[0] == 9
+    assert launch(block=(1, 1, 65))[0] == 9
+    for grid in ((2**31, 1, 1), (1, 65536, 1), (1, 1, 65536)):
+        status, text = launch(grid=grid)
+        assert status == 9 and b"dimension" in text  # refused before constructing the grid
     assert launch(grid=(64, 1, 1), n=2048)[0] == shim.LAUNCH_FAILURE == 719  # runs off the allocation
 
 

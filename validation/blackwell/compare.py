@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import struct
 import sys
@@ -58,7 +59,11 @@ SECONDS = re.compile(r", \d+\.\d+ s\)")
 # moves by one unit in the last place on some elements, so the same kernel output is 0.0078
 # from it on one machine and 0.0156 on another. The claim is "matches NumPy" (the script
 # asserts its tolerance before it prints that); the number is not part of it.
-MAX_ERROR = re.compile(r" \(max error \d+\.\d+\)")
+# Normalize only the known successful book output, with a finite nonnegative
+# distance. A failed program, another format, NaN or infinity remains visible.
+MAX_ERROR = re.compile(
+    r"^(hgemm_v\d+ \d+x\d+x\d+: matches NumPy) "
+    r"\(max error (\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)\)$")
 
 
 def key_lines(text: str) -> list[str]:
@@ -68,7 +73,11 @@ def key_lines(text: str) -> list[str]:
 
 def claims(lines: list[str]) -> list[str]:
     """`key_lines` without what depends on the machine: "hgemm_v6 128x128x256: matches NumPy"."""
-    return [MAX_ERROR.sub("", line) for line in lines]
+    result = []
+    for line in lines:
+        match = MAX_ERROR.fullmatch(line)
+        result.append(match[1] if match and math.isfinite(float(match[2])) else line)
+    return result
 
 
 def compared_lines(text: str) -> list[str]:

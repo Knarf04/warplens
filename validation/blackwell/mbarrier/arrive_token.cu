@@ -16,11 +16,10 @@
 //   arrive_token          the above
 //   arrive_token stale    also test_wait(a of the phase before) AFTER the current phase has
 //                         completed, i.e. with a token that is two phases old. The simulator
-//                         says true (a completed phase stays completed). An RTX 3080 Ti says
-//                         FALSE (measured 2026-11-23 with the Ampere build): there a token
-//                         is good for its own phase and the one after, no longer. The
-//                         prediction records the simulator's answer; this case is expected
-//                         to differ on hardware and is kept apart for that reason.
+//                         reports invalid use: PTX only permits a token from the current or
+//                         immediately preceding phase. The RTX 3080 Ti's measured false
+//                         result and the simulator's deterministic true fallback are both
+//                         informational, never a portable hardware prediction.
 //
 // The forms used exist since sm_80, so the Ampere build (build.sh --ampere) runs this on
 // the development machine's GPU.
@@ -82,8 +81,10 @@ int main(int argc, char** argv) {
         printf("phase %d: after the first arrival: test_wait(a) %u", phase, r[0]);
         if (phase) printf(", test_wait(a of phase %d) %u", phase - 1, r[3]);
         printf("; after the second arrival: test_wait(a) %u, test_wait(b) %u", r[1], r[2]);
-        if (phase && stale) printf(", test_wait(a of phase %d, two phases old) %u", phase - 1, r[4]);
         printf("\n");
+        if (phase && stale)
+            printf("info: phase %d: test_wait(a of phase %d, two phases old) %u (outside PTX token lifetime)\n",
+                   phase, phase - 1, r[4]);
         printf("info: phase %d tokens a = %016llx, b = %016llx\n", phase, (unsigned long long)tokens[phase * 2],
                (unsigned long long)tokens[phase * 2 + 1]);
     }

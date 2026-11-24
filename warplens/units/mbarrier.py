@@ -12,14 +12,14 @@ number advances and the arrival count is reloaded.
     complete_tx               what a TMA load does to the barrier when it lands
     test_wait / try_wait      has a given phase completed?
 
-The token `arrive` returns carries one bit of the phase, its parity, in bit 63.
-A wait given a token answers "is the barrier's phase parity different from the
-token's now?", exactly as the `.parity` forms do with bit 0 of their operand.
-So a token is true during the phase after its own, false again one phase
-later, and so on: measured on an RTX 3080 Ti for tokens up to eight phases old
-and for made-up tokens (validation/ampere/mbarrier_token_golden.txt). The low
-half of the simulator's token is the phase number, for whoever prints it; a
-GPU has unrelated bits there and no wait looks at them.
+The model's arrival token carries phase parity in bit 63 and the phase number
+in its low half. A wait compares the parity bit, reproducing the predicates
+recorded on an RTX 3080 Ti (validation/ampere/mbarrier_token_golden.txt).
+Hardware token bits are opaque. State tokens are valid only in their current
+or immediately preceding phase: the model validates its full encoding and
+reports other tokens without granting synchronization credit. For invalid
+inputs it keeps the measured Ampere parity predicate only as a nonportable
+fallback; those observations do not establish Blackwell behavior.
 
 `try_wait` may suspend the thread on real hardware; here it blocks the warp
 until the phase completes, which lets a wait that can never succeed be
@@ -116,6 +116,21 @@ def _mbarrier(w, ins, mask):
         for l, bar in bars(ops[1]):
             done = (bar.phase & 1) != (int(arg[l]) & 1 if parity else int(arg[l]) >> 63)
             result[l] = done
+            valid_tokens = {token_of(bar.phase)}
+            if bar.phase > 0:
+                valid_tokens.add(token_of(bar.phase - 1))
+            if not parity and int(arg[l]) not in valid_tokens:
+                # PTX state tokens are valid only in their own phase and the next.
+                # Keep the model's deterministic predicate for exploratory kernels,
+                # but never acquire a different phase's completion knowledge.
+                cta.findings.add(
+                    "mbarrier-invalid-token",
+                    f"mbarrier token 0x{int(arg[l]):016x} (phase {int(arg[l]) & 0xFFFFFFFF}) "
+                    f"used in phase {bar.phase}; "
+                    "only the current or immediately preceding phase is valid. The "
+                    "predicate is a nonportable model fallback and grants no synchronization",
+                    w, ins, [l])
+                continue
             if done:
                 if "relaxed" not in ins.mods:
                     w.seen |= bar.completed_knowledge
@@ -167,8 +182,10 @@ def _fence(w, ins, mask):
 
 
 def token_of(phase: int) -> int:
-    """The token of an arrival made in `phase`: its parity in bit 63, the only bit a wait
-    reads, and the phase number in the low half (the simulator's own addition)."""
+    """Model token: parity in bit 63 for the predicate, phase below for validation.
+
+    Hardware token bits are opaque; the low half is the simulator's own encoding.
+    """
     return (phase & 1) << 63 | phase & 0xFFFFFFFF
 
 

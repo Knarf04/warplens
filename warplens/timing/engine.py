@@ -55,9 +55,8 @@ class TimedEngine(Engine):
             else:
                 warp.time = when
                 line = warp.cta.timeline
-                ins = warp.program.instrs[warp.stack.top.pc]
                 set_now(when)
-                warp.step()
+                ins = warp.step()
                 line.charge(warp, ins)
                 now = warp.time
                 set_now(now)

@@ -13,8 +13,8 @@ products inside one MMA are accumulated.
 
 | Operation | Rule | Checked |
 | --- | --- | --- |
-| Integer arithmetic | wraps; division truncates toward zero; shifts clamp at the register width | by test, from the PTX rules |
-| Integer `div` and `rem` by zero, and the minimum over -1 | by zero: all ones, for `div` and for `rem`, signed and unsigned, 16, 32 and 64 bits. Minimum over -1: the minimum, remainder 0. The PTX manual leaves division by zero undefined | on a GPU (Ampere): `validation/ampere/intdiv_golden.txt`, 5808 cases. Blackwell may differ |
+| Integer arithmetic | wraps; division by a nonzero divisor truncates toward zero; shifts clamp at the register width | by test, from the PTX rules |
+| Integer `div` and `rem` by zero, and the minimum over -1 | by zero: all ones, for `div` and for `rem`, signed and unsigned, 16, 32 and 64 bits. Minimum over -1: the minimum, remainder 0. PTX leaves zero-divisor results unspecified and machine-specific; active lanes report `integer-divide-by-zero` | on a GPU (Ampere): `validation/ampere/intdiv_golden.txt`, 5808 cases. Blackwell may differ |
 | `add`, `sub`, `mul`, `div`, `sqrt` on floats | IEEE round-to-nearest-even, as NumPy does them | NumPy |
 | NaN results | see "NaN bit patterns" below | on a GPU (Ampere), bit for bit: `validation/ampere/nan_golden.txt`, 14270 cases. Blackwell may differ |
 | `fma`, floating `mad` | exact product and sum with integer significands, rounded once | against exact rational arithmetic, and against libc `fma` by the reviewer |
@@ -25,8 +25,13 @@ products inside one MMA are accumulated.
 
 ## NaN bit patterns
 
-The PTX manual does not say which NaN an instruction returns. The simulator
-returns what an RTX 3080 Ti returned (`validation/ampere/nan_golden.txt`,
+[PTX leaves f32 NaN encodings unspecified, while f64 NaN payloads are supported](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#floating-point-instructions)
+(except the documented approximate reciprocal operations). This does not establish
+the complete operand-selection and quieting policy measured below. In particular,
+[the `abs.f64` section](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#floating-point-instructions-abs)
+says a NaN passes through unchanged; the recorded Ampere results quiet signalling
+NaNs. The table records this model's empirical policy, not a blanket PTX guarantee.
+The simulator returns what an RTX 3080 Ti returned (`validation/ampere/nan_golden.txt`,
 `validation/ampere/ftz_golden.txt`, `validation/ampere/minmax_cvt_golden.txt`;
 `tests/test_hardware_golden.py`), implemented in
 `warplens/units/alu.py:_gpu_nans` and `warplens/units/alu.py:_converted_nans`:
@@ -49,7 +54,19 @@ simulator they share the code of `div.rn` and `sqrt.rn` and so give
 f16 arithmetic. `cvt` with `.ftz` is recorded in the golden file and not
 implemented. A NaN that the tensor core or
 TMA's NaN fill produces is a separate claim (TMA-05). All of this is Ampere
-behaviour; NUM-13 keeps it as a claim for Blackwell.
+observations; NUM-13 records Blackwell NaN bits as informational. The hardware
+probes compare NaN classification and non-NaN values bit for bit. The Ampere
+golden tests also pin the empirical payload policy, without requiring it of Blackwell.
+
+### Integer zero divisors
+
+[Integer `div`](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#integer-arithmetic-instructions-div)
+and [`rem`](https://docs.nvidia.com/cuda/parallel-thread-execution/index.html#integer-arithmetic-instructions-rem)
+with a zero divisor produce an unspecified, machine-specific value. Active lanes
+report `integer-divide-by-zero`; execution continues with the measured Ampere
+all-ones fallback, signed or unsigned, at 16, 32 and 64 bits. The scalar-edge
+probe records those values as informational only. Floating-point division by
+zero is a separate IEEE operation and does not trigger this integer diagnostic.
 
 ## TF32
 

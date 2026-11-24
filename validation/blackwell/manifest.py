@@ -94,8 +94,7 @@ def _mbarrier() -> list[Probe]:
               "test_wait with an arrive token is false while the token's phase is open and true once it "
               "completed, also during the next phase"),
         Probe("mbarrier/arrive_token.stale", "mbarrier/arrive_token", ("stale",), ("MB-03",),
-              "a token two phases old tests false again: a token carries only the parity of its phase (as on an "
-              "RTX 3080 Ti)"),
+              "a token two phases old is invalid PTX use and is diagnosed; its predicate is informational only"),
         Probe("mbarrier/init_count", "mbarrier/init_count", (), ("MB-10",),
               "mbarrier.init accepts 2^20 - 1 arrivals, and an arrive with that count completes the phase"),
         Probe("mbarrier/init_count.over", "mbarrier/init_count", ("over",), ("MB-10",),

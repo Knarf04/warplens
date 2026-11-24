@@ -238,10 +238,12 @@ def test_unsupported_proxy_fences_are_not_silently_ignored(sim, instruction):
         sim.launch(kernel(instruction + "\nret;"), "k", grid=1, block=1)
 
 
-def test_a_token_carries_only_the_parity_of_its_phase(sim):
-    """An RTX 3080 Ti answers `test_wait` from bit 63 of the token (the parity of the phase the
-    arrival was made in), so a token two completions old is false again, and so is a made-up
-    token with the same bit (validation/ampere/mbarrier_token_golden.txt)."""
+def test_invalid_tokens_keep_the_measured_ampere_predicate_with_findings(sim):
+    """Pin the empirical Ampere fallback for invalid stale/made-up tokens, with diagnostics.
+
+    The parity predicate is not a portable guarantee for those invalid inputs
+    (validation/ampere/mbarrier_token_golden.txt).
+    """
     steps = "".join(f"""
         mbarrier.arrive.shared::cta.b64 %new, [%bar];
         mbarrier.test_wait.shared::cta.b64 %p, [%bar], %token;
@@ -260,4 +262,5 @@ def test_a_token_carries_only_the_parity_of_its_phase(sim):
     stats = sim.launch(mod, "k", grid=1, block=1, args=[out])
     # The token is of phase 0; the tests are made in phases 2, 3, 4, 5, 6 and twice more in 6.
     assert out.numpy().tolist() == [0, 1, 0, 1, 0, 1, 0]
-    assert not stats.findings
+    assert len(stats.findings) == 7
+    assert {f.kind for f in stats.findings} == {"mbarrier-invalid-token"}

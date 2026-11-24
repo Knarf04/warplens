@@ -421,37 +421,32 @@ Found by this work in the simulator, and fixed since unless marked open:
   an E5M2 NaN as 0x7d where the `cvt` instructions give 0x7f. Fixed: 160 SMs,
   and 0x7f in both.
 - Lanes passed `bar.sync` before lane 0 arrived in two control-flow layouts
-  nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`): the
-  sides of a branch were only joined at its post-dominator, which there is
-  past the join. Fixed: diverged groups that meet earlier are joined where
-  they meet, as the 3080 Ti does
-  (`validation/ampere/reconvergence_golden.py`, `core/warp.py:_regroup`). The
-  `__syncthreads()` workaround in the probes is no longer needed and is kept
-  because the predictions were made with it.
-- `atom` was not implemented. Fixed: the forms nvcc 13.5 emits
-  for `atomicAdd`, `Sub`, `Exch`, `Min`, `Max`, `And`, `Or`, `Xor`, `CAS`,
-  `Inc`, `Dec` and their `_block` / `_system` variants, on global, shared and
-  generic addresses (`docs/coverage.md`), agreeing with the 3080 Ti
-  (`validation/ampere/atom_golden.txt`). Lanes of a warp on one address apply
-  in lane order; atoms of different warps are not an `smem-race` with each
-  other; the timing model charges an atom as a load and a store (assumed).
-  The CLC probes still avoid atomics with single-writer words and no longer
-  need to.
-- Four disagreements with the 3080 Ti, found by the probes. Fixed, each with
-  a golden file from that GPU (`validation/README.md`): an mbarrier token
-  carries only the parity of its phase, so a token two completions old tests
-  false again; a NaN result has the GPU's bits (`0x7fffffff` for f32, a
-  quieted operand or `0xfff8000000000000` for f64); integer division by zero
-  gives all ones; and a launch refused before the kernel runs has the
-  runtime's code for it (`cudaErrorInvalidValue`,
-  `cudaErrorInvalidConfiguration`, `cudaErrorInvalidClusterSize`) instead of
-  `cudaErrorLaunchFailure`, with `cudaFuncSetAttribute` refusing more than
-  227 KB. All measured on Ampere; MB-03, NUM-12, NUM-13, RT-04 and RT-12 keep
-  them as claims for the B200.
-- Open: the three new golden programs (`nan_golden`, `intdiv_golden`,
-  `mbarrier_token_golden`) are not yet among those `e2e/ampere_replay` reruns
-  on the B200; the shim does not require the shared-memory opt-in a GPU
-  requires above 48 KB.
+  nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`). Fixed:
+  the merged implementation groups paths that meet early, matching the recorded
+  Ampere cases; warp-synchronizing instructions also rendezvous pending paths
+  before counting the warp as arrived, including joins inside cycles.
+  Unsynchronized code has no portable implicit ordering guarantee.
+- State tokens older than the immediately preceding mbarrier phase are invalid
+  PTX use. They now report `mbarrier-invalid-token` and grant no synchronization
+  credit. Their parity-based fallback reproduces recorded Ampere behavior;
+  it is informational for invalid use. Integer zero divisors likewise produce
+  a diagnostic while returning the recorded all-ones fallback. The new NaN
+  and division golden files document observed Ampere behavior, not bit-exact
+  Blackwell guarantees.
+- Atomic instructions were missing. The CUDA-emitted add, exchange, CAS,
+  bitwise, min/max and increment/decrement operations now run, with
+  `red.add`, generic pointers and relaxed cta/gpu/sys scope. Review fixes
+  add natural-alignment validation, f32 global FTZ and shared access diagnostics;
+  see `docs/atomics.md`. Stronger memory ordering remains unsupported.
+- CI uses the exact compiler patch named by the predictions and remote pins.
+  The rental tests isolate fake-root environments, respect optional Triton,
+  and compare successful book kernels without requiring identical host-BLAS
+  error magnitudes. The runners' numerical tolerance checks remain in place.
+- Refused launches now retain their CUDA error category, separately from
+  kernel failures. Review also checks per-axis grid/block limits. Shared-memory
+  opt-in above 48 KB remains a documented shim limitation.
+- Open: the new `nan_golden`, `intdiv_golden` and `mbarrier_token_golden`
+  programs are not yet included in the B200 `e2e/ampere_replay` runner.
 - Documents that contradict the code are listed in
   `docs/validation-matrix.md`, "Discrepancies found".
 
@@ -466,5 +461,5 @@ Found by this work in the simulator, and fixed since unless marked open:
 
 - Done: a tutorial notebook that follows the book's GEMM chapters
   (`notebooks/book_tour.ipynb`) and a single user guide (`docs/guide.md`).
-  Jupyter is not in the env or in the package's extras.
+  The `jupyter` extra installs the notebook tools and TIRx dependencies.
 - Reserve the PyPI name.

@@ -124,10 +124,10 @@ class Timeline:
         t = warp.time
         waves, waits = warp.smem_waves, warp.global_accesses
         warp.smem_waves = warp.global_accesses = 0
-        # An `atom` is charged as the load and then the store it stands for: an issue slot
+        # An `atom` or `red` is charged as the load and then the store it stands for: an issue slot
         # each, the wait of a global load, and for shared memory its wavefronts twice
-        # (units/alu.py:_atom records them doubled). Assumed, not measured.
-        parts = ((waves // 2, waits), (waves // 2, 0)) if ins.opcode == "atom" else ((waves, waits),)
+        # (units/atomics.py:_atomic records them doubled). Assumed, not measured.
+        parts = ((waves // 2, waits), (waves // 2, 0)) if ins.opcode in ("atom", "red") else ((waves, waits),)
         for waves, waits in parts:
             _, t = slot.reserve(t, self.clk, 1)
             if waves:

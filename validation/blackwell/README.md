@@ -204,7 +204,7 @@ run is isolated for that reason.
 | `arrivals_and_bytes` | `script tx` | MB-02 | a phase completes when pending arrivals and the byte count are both zero, in either order | runs | - |
 | `lane_arrivals` | `lane_arrivals` | MB-09 | every lane that executes an arrive arrives once, also when only part of a warp does | runs | - |
 | `arrive_token` | `arrive_token` | MB-03 | test_wait with an arrive token is false while the token's phase is open and true once it completed, also during the next phase | runs | - |
-| `arrive_token.stale` | `arrive_token stale` | MB-03 | a token two phases old tests false again: a token carries only the parity of its phase (as on an RTX 3080 Ti) | runs | - |
+| `arrive_token.stale` | `arrive_token stale` | MB-03 | a token two phases old is invalid PTX use and is diagnosed; its predicate is informational only | runs (2 finding(s)) | - |
 | `init_count` | `init_count` | MB-10 | mbarrier.init accepts 2^20 - 1 arrivals, and an arrive with that count completes the phase | runs | - |
 | `init_count.over` | `init_count over` | MB-10 | an arrival count of 2^20 is refused | **refuses**: mbarrier.init with an arrival count of 1048576; it must be 1 to 2^20-1 | fault |
 | `init_count.zero` | `init_count zero` | MB-10 | an arrival count of 0 is refused | **refuses**: mbarrier.init with an arrival count of 0; it must be 1 to 2^20-1 | fault |
@@ -290,7 +290,7 @@ run is isolated for that reason.
 | `ftz` | `ftz` | NUM-09 | .ftz add, sub, mul, div, fma and sqrt around the subnormal range, as recorded on an RTX 3080 Ti (validation/ampere/ftz_golden.txt; NaN results compared as NaNs) | runs | - |
 | `fma` | `fma` | NUM-10 | fma and mad round the exact product-sum once, f32 and f64: 1000 cases in full and checksums of 10^4 each | runs | - |
 | `fma.all` | `fma all` | NUM-10 | none: all 2 x 10^4 fma cases in full, to locate a checksum of formats/fma that differs | not run (no prediction) | - |
-| `scalar_edges` | `scalar_edges` | NUM-11, NUM-12 | min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, rem, mul.hi and shifts at theirs | runs | - |
+| `scalar_edges` | `scalar_edges` | NUM-11, NUM-12 | min/max with NaNs and signed zeros; float-to-integer conversion at the limits; integer div, rem, mul.hi and shifts at theirs | runs (8 finding(s)) | - |
 <!-- end of tables -->
 
 ### End to end (`e2e/run_e2e.py`)
@@ -384,7 +384,7 @@ What was done on the development machine (RTX 3080 Ti Laptop GPU, `sm_86`, drive
 | the timeout path: `--mode sim --timeout-scale 0.004` | the run is killed and recorded as `timeout`; the next run proceeds; `compare.py` reports `timed out` |
 | **on the GPU**: `build.sh --ampere`, `run_all.py --binaries ampere --no-build --only ...` | `mbarrier/phase_parity`, `mbarrier/phase_parity.counts` and `mbarrier/lane_arrivals` ran on the 3080 Ti and are **identical** to the predictions. `e2e/device_attributes` ran and differs, as it should (8.6, 58 SMs): that is the check that catches a wrong machine. The environment capture (`nvidia-smi`, `compute_cap`, driver, ...) was exercised by the same run |
 | **the driver refusing PTX, on the GPU**: `mbarrier/script` built by nvcc 13.5 for `compute_86` as a PTX-carrying program and as machine code; the driver supports CUDA 13.0 | the PTX program prints `LAUNCH FAILED` (`cudaErrorUnsupportedPtxVersion`, exit 4); `run_all.py` records `launch-failed`, exits 1, and `compare.py` says `FAILED TO LAUNCH`. With `--binaries auto` the canary fails from `bin/`, passes from `bin-native/`, and the three mbarrier runs are identical to the predictions. With `toolkit.txt` naming another nvcc the banner appears in `run_all.py` and `compare.py` |
-| **on the GPU**, the probes added later that need nothing newer than Ampere: `formats/fma`, `fma.all`, `scalar_edges`, `ftz`, `mbarrier/arrive_token`, the seven `e2e/ampere_replay` cases | identical to the predictions. `mbarrier/arrive_token.stale` **differed**: a token two phases old tests false on the 3080 Ti and tested true in the simulator (finding 10 below). Rerun after findings 10 and 12 were fixed: both `arrive_token` cases are identical to the predictions (the token values on their `info:` lines aside, which differ below bit 63 as expected), and `formats/ftz`, `scalar_edges` and `fma` are identical including their `info:` lines (the NaN bits and the results of division by zero) |
+| **on the GPU**, the probes added later that need nothing newer than Ampere: `formats/fma`, `fma.all`, `scalar_edges`, `ftz`, `mbarrier/arrive_token`, the seven `e2e/ampere_replay` cases | identical to the predictions. `mbarrier/arrive_token.stale` records an **invalid-use observation**: the model now reproduces the 3080 Ti's parity fallback, but stale results and opaque token bits remain informational, not portable PTX expectations (finding 10 below) |
 | **another compiler**: every probe built by nvcc 13.0.88 (the toolkit `env/remote/setup.sh` falls back to on this machine's driver), then `run_all.py --mode predict` on those programs | all 98 predictions byte-identical to the committed ones, which come from nvcc 13.5.37 code. Before the barriers of finding 16 were added, 16 differed |
 | **the whole rental, rehearsed**: `env/remote/run.sh --keep-going` on the 3080 Ti with `PREFLIGHT_EXPECT_CAP=8.6`, env from `setup.sh` (fallback toolkit 13.0, PyTorch env) | 13 min 52 s. Preflight: the new `predictions` check warns, `torch` passes, the three Blackwell checks fail as they must. Both suites build. `run-blackwell`: the canary fails from `bin/` and `bin-native/` (`cudaErrorNoKernelImageForDevice`: `sm_100a` code on `sm_86`), `NEITHER BUILD RUNS`; 71 runs `launch-failed`, 28 `host-error` (no tensor maps on Ampere), 2 `ok`; the stage fails with the count in capitals. `compare.py`: 71 `FAILED TO LAUNCH`, 28 `HOST ERROR`, none "by design". `run-timing`: every benchmark `LAUNCH FAILED`. The archive has `PREDICTIONS-NOT-COMPARABLE.txt` at its top and the banner is the last thing printed. An interrupt (Ctrl-C) during the self-test stopped the stage and still wrote the archive |
 | end to end in the simulator | tutorials 1-4 pass their own check; Triton, the TIRx script and the CuTe DSL script match NumPy; the book's `hgemm_v1` to `v9` match NumPy |
@@ -457,52 +457,41 @@ Those marked "fixed since" were fixed on other branches.
    UE8M0, where CUDA's conversions return something. Those inputs are printed on `info:`
    lines; what the GPU returns for them will be in the archive.
 
-10. **A stale mbarrier token tested true** (fixed since, on branch `work/gpu-mismatches`).
-    `mbarrier.test_wait` with the token of a phase two completions back returned true in the
-    simulator and **false on the RTX 3080 Ti**; a token tested during the phase after its own
-    agreed (true). Reproduction: `mbarrier/arrive_token stale`, also built by
-    `build.sh --ampere`. Measured further on that GPU
-    (`validation/ampere/mbarrier_token_golden.txt`: tokens up to eight phases old, made-up
-    tokens, 1 to 5 arrivals per phase), the rule is that a token carries the parity of its
-    phase in bit 63 and a wait reads nothing else: true when the barrier's parity differs.
-    The simulator now does that, `docs/m2.md` and matrix row MB-03 say so, and
-    `predicted/mbarrier/arrive_token.stale.txt` is what the 3080 Ti prints, the token values
-    on the `info:` lines aside. The
-    comment at the top of `mbarrier/arrive_token.cu` still describes the old disagreement.
-11. **`atom` was not implemented** (fixed since, on branch `work/atom`). A kernel with
-    `atomicAdd(uint32_t*, 1u)` (`atom.relaxed.gpu.global.add.u32`) stopped with "uses
-    instructions warplens does not implement yet: atom". The forms nvcc 13.5 emits for the
-    atomic functions run now (`docs/coverage.md`, "Atomic updates") and agree with the
-    RTX 3080 Ti (`validation/ampere/atom_golden.txt`). The CLC probes still use
-    single-writer words, which they no longer need to.
-12. **NaN payloads, and division by zero** (fixed since, on branch `work/gpu-mismatches`;
-    `min`/`max` earlier). For `.ftz` results the simulator's NaN was `ffc00000` where the
-    3080 Ti gave `7fffffff`; `min`/`max` of two NaNs returned an input NaN in the simulator
-    and `7fffffff` on the GPU; `div.s32 x, 0` gave `x` in the simulator and `ffffffff` on the
-    GPU, `rem.u64 7, 0` gave 0 against all ones. The simulator now returns what the 3080 Ti
-    returns, bit for bit: every f32 NaN is `7fffffff`, with or without `.ftz`; an f64 NaN is
-    a NaN operand made quiet, or `fff8000000000000` for an invalid operation; `div` and `rem`
-    by zero give all ones in every integer type (`validation/ampere/nan_golden.txt`,
-    `validation/ampere/intdiv_golden.txt`; matrix rows NUM-12 and NUM-13). PTX leaves all of
-    these open and Blackwell may differ, so the probes still print NaNs as `nan` and division
-    by zero on `info:` lines; those lines of the predictions changed.
-13. **A refused cluster shape reached the program as `cudaErrorLaunchFailure`**, the code of
-    a fault inside a kernel; and the shim's `cudaFuncSetAttribute` accepted any dynamic
-    shared-memory size (fixed since, on branch `work/gpu-mismatches`). A launch refused
-    before the kernel runs now has the code the CUDA runtime gives it:
-    `cudaErrorInvalidClusterSize` for a cluster the device does not accept,
-    `cudaErrorInvalidValue` for too much shared memory, `cudaErrorInvalidConfiguration` for
-    block or grid dimensions; `cudaGetLastError` returns it once and `cudaDeviceSynchronize`
-    does not repeat it. `cudaFuncSetAttribute` returns `cudaErrorInvalidValue` above the
-    227 KiB the device reports. The shared-memory, block and grid codes and where they show
-    up were measured on the RTX 3080 Ti at its own limits (`validation/README.md`, "Launch
-    errors"); the cluster code is the one the CUDA headers define for a cluster
-    misconfiguration and the one that GPU, which has no clusters, returns for every cluster
-    launch, but a B200 refusing 32 CTAs was not measured (matrix row RT-12). In
-    `predicted/e2e/smem_limit.txt` the two larger sizes now read "opt-in refused; launch
-    refused", and the `info:` lines of it and of `predicted/cluster/max_size.txt` name the
-    new codes. The simulator still does not require the opt-in before a launch may use more
-    than 48 KiB.
+10. **Stale mbarrier tokens are invalid use.** PTX permits state waits only for the
+    current or immediately preceding phase. Older or malformed tokens report
+    `mbarrier-invalid-token` and grant no synchronization credit. The model's
+    parity fallback now matches recorded RTX 3080 Ti results, including invalid
+    inputs, without turning those observations into a Blackwell requirement.
+    Token bits and stale predicates remain on `info:` lines. See `docs/m2.md`
+    and matrix row MB-03.
+11. **Atomic updates are implemented.** The forms nvcc 13.5 emits for the
+    atomic functions run and match the recorded RTX 3080 Ti results
+    (`validation/ampere/atom_golden.txt`). The integrated implementation also
+    accepts `red.add`, older default-scope spellings and `add.s32`. Review checks
+    enforce natural alignment, global f32 FTZ and shared race/async diagnostics.
+    Acquire/release, cluster scope and packed/half/vector forms remain
+    unsupported; see `docs/atomics.md`. The CLC probes still use single-writer
+    words.
+12. **NaN bit patterns and integer zero divisors now match recorded Ampere results.**
+    The model uses the RTX 3080 Ti's f32 NaN pattern and measured f64 payload/
+    quieting rules (`validation/ampere/nan_golden.txt`). PTX leaves f32 NaN
+    encodings unspecified but supports f64 payloads; the complete measured policy
+    is not guaranteed on Blackwell. Integer `div`/`rem` by zero continue to report
+    `integer-divide-by-zero` and now use Ampere's all-ones fallback. The probes
+    compare NaN classification and record zero-divisor results on `info:` lines.
+    See `docs/numerics.md` and matrix rows NUM-12 and NUM-13.
+13. **Refused launches now carry their specific CUDA error codes.** Too much shared
+    memory returns `cudaErrorInvalidValue`; invalid block/grid dimensions return
+    `cudaErrorInvalidConfiguration`; invalid cluster shapes return
+    `cudaErrorInvalidClusterSize`. Block dimensions are limited to 1024 x 1024 x 64
+    (1024 threads total), and grid dimensions to 2147483647 x 65535 x 65535.
+    `cudaGetLastError` reports the refusal once; synchronization does not repeat
+    it. Dynamic shared-memory attributes above the reported 227 KiB are refused.
+    The shared-memory, block and grid error codes were measured on Ampere at its
+    own limits; the B200 cluster code follows CUDA headers and is not measured.
+    Real kernel faults still become `cudaErrorLaunchFailure`. Clearing that fault
+    with `cudaGetLastError` is a simulator recovery policy, not CUDA context recovery
+    (`docs/m6.md`). Explicit opt-in above 48 KiB is still not required by the model.
 14. Not the simulator: **TVM's CUDA runtime does not find `libcudart.so.13` under plain
     `python`** (its library has no run path to the env's `lib`), and TIRx then reports "no
     CUDA device is available" on a machine with a working GPU. `e2e/run_e2e.py` sets
@@ -513,38 +502,28 @@ Those marked "fixed since" were fixed on other branches.
     13.5), and with it the PTX of every TIRx kernel. PyTorch therefore lives in a venv of
     its own (`env/remote/pins.env`).
 
-16. **Lanes of a warp that reach the same instruction by different paths were not always
-    brought together, and `bar.sync` then let some through** (fixed since, on branch
-    `work/reconvergence`). In two layouts of
-    `if (tid == 0) shared = 7; __syncthreads(); out[tid] = shared;` lanes 1 to 31 read the
-    word before lane 0 had written it: when the other lanes' block ends in a conditional
-    branch that none of them takes before falling into the join, and when that block sits
-    at the end of the function and branches back. The only sign was a
-    `barrier-in-divergent-code` finding (and `smem-uninitialized-read`) on a program that
-    has no barrier in divergent code. Reproduction, four kernels of twenty lines:
-    `findings/reconvergence.py` (32 of 32 lanes right in the two layouts nvcc 13.5 emits,
-    1 of 32 in the two that nvcc 13.0 emits; now 32 in all four). It was found by building
-    the probes with nvcc 13.0.88: 15 runs that share
-    `if (tid == 0) {...} if (warp == 0) tmem_alloc(...)` were refused ("tcgen05.alloc ...
-    requires all 32 lanes of the warp to execute together; only 31 participate") and
-    `cluster/clc_per_thread` issued requests before its mbarrier was initialized. The
-    programs were correct; the predictions depended on the compiler.
+16. **Fixed: warp rendezvous beyond the static reconvergence point.** Two layouts of
+    `if (tid == 0) shared = 7; __syncthreads(); out[tid] = shared;` let lanes 1–31
+    read before lane 0 wrote, because `bar.sync` counted a partial SIMT path as a
+    whole warp. Named CTA barriers now run pending paths until every non-exited
+    lane reaches the instruction. `tcgen05` `.sync.aligned` operations also collect
+    paths before their full-warp check, fixing the compiler-merged allocation
+    refusal. All four synchronized layouts in `findings/reconvergence.py` now
+    return 32 correct lanes; tests also cover multiple warps, `bar.arrive`, exits,
+    repeated phases and timing. Unsynchronized reads have no implicit warp-wide
+    communication guarantee and remain dependent on scheduling. Rendezvous at
+    different instruction addresses or across divergent recursive calls remains
+    unsupported. The probes retain their explicit synchronization between setup
+    and allocation, keeping the generated predictions easy to compare.
 
-    The cause: the sides of a branch were only joined at its immediate post-dominator, and
-    in both layouts that is past the join (the second branch can go around it). The
-    RTX 3080 Ti joins them at the join in every layout, with and without the barrier, 100
-    launches of 100 (`validation/ampere/reconvergence_golden.py`, 20 kernels; ptxas puts
-    the warp's `BSYNC` there). The warp now does the same: of the diverged groups that
-    rejoin at one place, a group that can still reach where another is runs first, and
-    groups at the same instruction become one (`warplens/core/warp.py`, `_regroup`). Where
-    half of the lanes do take the second branch, the GPU still gives the other half the
-    written word, and the simulator agrees and reports `barrier-in-divergent-code` for the
-    lanes that met there. No committed prediction changed.
-
-    The probes still have the `__syncthreads()` between the two tests that was put in as a
-    workaround (`tests/test_rental_harness.py` checks that); the simulator no longer needs
-    it, and it stays because the predictions were generated with it. With it nvcc 13.0.88
-    and nvcc 13.5.37 give byte-identical predictions for all 98 predicted runs.
+    The implementation's early grouping policy (`core/warp.py:_regroup`) also
+    joins paths that meet before their static postdominator. This matches the
+    recorded RTX 3080 Ti runs in `validation/ampere/reconvergence_golden.py`:
+    all four layouts read the expected word even without the barrier. That
+    observation is specific to those compiled programs; it does not make
+    unsynchronized communication portable. The explicit rendezvous above is
+    still needed when paths meet inside a control-flow cycle, which the early
+    grouping policy deliberately leaves alone.
 
 ## Adding a probe
 

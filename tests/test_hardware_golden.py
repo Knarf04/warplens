@@ -296,10 +296,10 @@ def test_lanes_rejoin_where_they_do_on_a_real_gpu(sim):
                            grid=1, block=32, args=[out])
         if out.numpy().tolist() != expect[name]:
             problems.append(f"{name}: {out.numpy().tolist()}")
-        # A barrier that half of the warp goes around is reported; nothing else is.
-        divergent = "_half_" in name and name.endswith("_bar")
+        # Bypassing lanes finish their work and exit before the explicit
+        # rendezvous counts the remaining lanes; that needs no warning.
         kinds = sorted({f.kind for f in stats.findings})
-        if kinds != (["barrier-in-divergent-code"] if divergent else []):
+        if kinds:
             problems.append(f"{name}: findings {kinds}")
     assert not problems, problems
 
@@ -363,7 +363,9 @@ def test_mbarrier_tokens_match_real_gpu(sim):
     """mbarrier_token_golden.txt is bin/mbarrier_token_golden on an RTX 3080 Ti: after every
     arrival, `test_wait` with the token of each arrival so far (up to eight phases old), with
     the made-up tokens 1 << b, and `test_wait.parity` with 0 to 3. The GPU answers from bit 63
-    of the token alone, which holds the parity of the phase the arrival was made in."""
+    of the token alone, which holds the parity of the phase the arrival was made in.
+    Older and made-up tokens are invalid PTX use: this pins an empirical fallback,
+    not a portable synchronization guarantee, and findings are required."""
     rows = [l.split() for l in (AMPERE / "mbarrier_token_golden.txt").read_text().splitlines()]
     assert len(rows) == 8 * (1 + 2 + 3 + 5)
     problems = []
@@ -374,14 +376,16 @@ def test_mbarrier_tokens_match_real_gpu(sim):
         out = sim.from_numpy(np.zeros(4 * steps, np.uint64))
         stats = sim.launch(AMPERE / "mbarrier_token_probe.ptx", "mbarrier_token_probe", grid=1, block=1,
                            args=[np.uint32(count), np.int32(steps), out])
-        assert not stats.findings
+        # Stale and forged tokens are deliberate invalid-use observations. They
+        # reproduce Ampere's predicate but must not acquire synchronization credit.
+        assert {f.kind for f in stats.findings} == {"mbarrier-invalid-token"}
         got = out.numpy().reshape(steps, 4)
         problems += [f"count {count}, arrival {s}: gpu {[hex(v) for v in expect[s]]}, sim {[hex(v) for v in got[s]]}"
                      for s in range(steps) if (got[s] != expect[s]).any()]
     assert not problems, f"{len(problems)} arrivals differ:\n" + "\n".join(problems[:8])
 
 
-def _golden_instruction_mismatches(sim, path, operands, skip=()):
+def _golden_instruction_mismatches(sim, path, operands, skip=(), expected_findings=()):
     """Run every line "instruction a b [c] result" of a golden file (64-bit hex patterns, a
     narrower value in the low bits) through the simulator, one instruction per thread, and
     describe the lines whose result differs. Returns (problems, lines per instruction)."""
@@ -404,11 +408,13 @@ def _golden_instruction_mismatches(sim, path, operands, skip=()):
         arity = {"fma": 3, "sqrt": 1, "neg": 1, "abs": 1, "mov": 1, "cvt": 1}.get(name.split(".")[0], 2)
         ins = [f"%a{k}" for k in range(arity)]
         mod = kernel(f"""
-            .reg .b64 %p0, %p1, %p2, %po, %off; .reg .b32 %i, %x, %y;
+            .reg .b64 %p0, %p1, %p2, %po, %off; .reg .b32 %i, %x, %y; .reg .pred %outside;
             .reg .{reg(src)} %a0, %a1, %a2; .reg .{reg(dst)} %d;
             ld.param.u64 %p0, [a]; ld.param.u64 %p1, [b]; ld.param.u64 %p2, [c]; ld.param.u64 %po, [o];
             mov.u32 %x, %ctaid.x; mov.u32 %y, %tid.x;
             mad.lo.u32 %i, %x, 256, %y;
+            setp.ge.u32 %outside, %i, {n};
+            @%outside ret;
             mul.wide.u32 %off, %i, 8;
             add.u64 %p0, %p0, %off; add.u64 %p1, %p1, %off; add.u64 %p2, %p2, %off; add.u64 %po, %po, %off;
             ld.global.{reg(src)} %a0, [%p0]; ld.global.{reg(src)} %a1, [%p1]; ld.global.{reg(src)} %a2, [%p2];
@@ -422,7 +428,7 @@ def _golden_instruction_mismatches(sim, path, operands, skip=()):
         out = sim.from_numpy(np.zeros(n + pad, np.uint64))  # a narrow result leaves the rest zero
         stats = sim.launch(mod, "k", grid=(n + pad) // 256, block=256,
                            args=[*(sim.from_numpy(c) for c in columns), out])
-        assert not stats.findings
+        assert {f.kind for f in stats.findings} == set(expected_findings)
         got, expect = out.numpy()[:n], rows[:, operands]
         wrong = np.flatnonzero(got != expect)
         if len(wrong):
@@ -448,7 +454,9 @@ def test_nan_results_match_real_gpu(sim):
 def test_integer_division_matches_real_gpu(sim):
     """intdiv_golden.txt is bin/intdiv_golden on an RTX 3080 Ti: `div` and `rem` for s16, u16,
     s32, u32, s64 and u64 over all pairs of 22 values. Division by zero gives all ones, for
-    `rem` too; the minimum over -1 gives the minimum, and remainder 0."""
-    problems, counts = _golden_instruction_mismatches(sim, AMPERE / "intdiv_golden.txt", 2)
+    `rem` too; the minimum over -1 gives the minimum, and remainder 0. Zero-divisor
+    results are machine-specific in PTX, so the empirical match retains findings."""
+    problems, counts = _golden_instruction_mismatches(sim, AMPERE / "intdiv_golden.txt", 2,
+        expected_findings=("integer-divide-by-zero",))
     assert len(counts) == 12 and sum(counts.values()) == 5808
     assert not problems, "\n".join(problems)

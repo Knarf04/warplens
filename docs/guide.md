@@ -785,11 +785,13 @@ Every kind, by area:
 
 | Kind | Meaning |
 | --- | --- |
+| **Integer arithmetic** | |
+| `integer-divide-by-zero` | an active integer `div` or `rem` lane has a zero divisor; its deterministic fallback is not a hardware prediction |
 | **Shared memory** | |
 | `smem-race` | two warps touched the same byte, at least one writing, with no barrier completing in between. Two atomic updates (`atom`) are not a race with each other; an atomic update and another warp's ordinary load or store are, which includes a compare-and-swap loop that starts with a plain load of the word |
 | `smem-uninitialized-read` | a load, an atomic update, a TMA store or an MMA read shared memory this CTA never wrote |
 | **Barriers and shuffles** | |
-| `barrier-in-divergent-code` | a barrier reached by only some of a warp's running lanes |
+| `barrier-in-divergent-code` | an aligned CTA barrier has a divergent guard predicate, or a cluster barrier has partial warp participation |
 | `shfl-inactive-source` | a shuffle read a lane that was not executing it or was outside the member mask |
 | `shfl-membermask-mismatch` | a caller is absent from its own mask, or a named member is not executing with the same mask |
 | `warp-sync-membermask-mismatch` | the same, for `bar.warp.sync` (`__syncwarp()`): lanes on separate divergent paths do not wait for each other |
@@ -797,6 +799,7 @@ Every kind, by area:
 | `mbarrier-tx-mismatch` | completion bytes not balanced by `expect_tx` when the kernel returned or deadlocked |
 | `mbarrier-over-arrival` | more arrivals than the phase needed |
 | `mbarrier-init-race` | an mbarrier used by another warp with no barrier since its `init` |
+| `mbarrier-invalid-token` | a state token is outside the current or immediately preceding phase; it grants no synchronization credit |
 | **TMA and `cp.async`** | |
 | `tma-load-unsynchronized` | shared memory that a TMA load writes was read, written, stored or fed to an MMA without waiting on the load's mbarrier |
 | `tma-store-missing-fence` | a TMA store of bytes written by ordinary stores with no `fence.proxy.async` in between |
@@ -1179,8 +1182,9 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 - Lanes of one warp whose `atom` names the same bytes are applied in lane
   order, lowest first. A GPU's order is not specified; results that depend
   on it (which old value each thread receives, the word an `atomicExch`
-  leaves) may differ from a GPU's, results that do not (sums, minima and
-  maxima, bit masks, the set of values a counter hands out) cannot.
+  leaves, and floating sums) may differ from a GPU's. Integer sums,
+  minima/maxima, bit masks and the set of values an integer counter hands out
+  do not depend on this lane order.
 
 **`warplens run`**
 

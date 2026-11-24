@@ -1,3 +1,9 @@
 status: ok
-warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+warplens: 1 kernel launch(es) simulated on B200, 2 finding(s)
   arrive_token: 1 CTA(s), 72 warp-instructions
+    [mbarrier-invalid-token] mbarrier token 0x0000000000000000 (phase 0) used in phase 2; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 119: mbarrier.test_wait.shared::cta.b64 p, [%r11], %rd9;
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-invalid-token] mbarrier token 0x8000000000000001 (phase 1) used in phase 3; only the current or immediately preceding phase is valid. The predicate is a nonportable model fallback and grants no synchronization
+      line 173: mbarrier.test_wait.shared::cta.b64 p, [%r17], %rd10;
+      first in CTA (0, 0, 0), warp 0, lanes 0

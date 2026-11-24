@@ -104,7 +104,9 @@ def test_root_installs_a_download_tool_and_the_checksum_is_verified(bare):
     assert not (bare / "remote" / "bin" / "micromamba").exists()      # the bad download was not installed
 
 
-def test_root_whose_apt_fails_gets_the_same_plain_message(bare):
+@pytest.mark.parametrize("frontend", ["noninteractive", "dialog"])
+def test_root_whose_apt_fails_gets_the_same_plain_message(bare, monkeypatch, frontend):
+    monkeypatch.setenv("DEBIAN_FRONTEND", frontend)
     fake_apt(bare, "exit 100\n")
     done = setup(bare, root=True)
     assert done.returncode == 1

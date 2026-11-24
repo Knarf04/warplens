@@ -304,6 +304,16 @@ int main(int argc, char **argv) {
     CHECK(cudaPeekAtLastError() == cudaErrorInvalidValue && cudaDeviceSynchronize() == cudaSuccess);
     CHECK(cudaGetLastError() == cudaErrorInvalidValue && cudaGetLastError() == cudaSuccess);
     CHECK(cudaLaunchKernel(kernel, grid, big, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+    dim3 deep = {1, 1, 65};
+    dim3 oversized_grids[] = {{2147483648u, 1, 1}, {1, 65536, 1}, {1, 1, 65536}};
+    CHECK(cudaLaunchKernel(kernel, grid, deep, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+    CHECK(cuLaunchKernel(kernel, 1, 1, 1, 1, 1, 65, 0, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
+    for (unsigned i = 0; i < sizeof oversized_grids / sizeof oversized_grids[0]; ++i) {
+      dim3 shape = oversized_grids[i];
+      CHECK(cudaLaunchKernel(kernel, shape, block, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+      CHECK(cuLaunchKernel(kernel, shape.x, shape.y, shape.z, 32, 1, 1, 0, NULL, arguments, NULL) ==
+            CUDA_ERROR_INVALID_VALUE);
+    }
     CHECK(cudaLaunchKernel(kernel, grid, none, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
     CHECK(cudaLaunchKernel(kernel, none, block, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
     CHECK(cudaDeviceSynchronize() == cudaSuccess && cudaGetLastError() == cudaErrorInvalidConfiguration);

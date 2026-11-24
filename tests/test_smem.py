@@ -299,8 +299,9 @@ def test_barrier_completes_when_threads_already_returned(sim, which):
     stats = sim.launch(AMPERE / "barrier_exit.ptx", "barrier_exit", grid=1, block=128, args=[out, which])
     exited = [t >= 64 if which == 0 else bool(t & 1) for t in range(128)]
     assert out.numpy().tolist() == [0 if exited[t] else (t ^ 2) + 1000 for t in range(128)]
-    # Half-warp case: the barrier is reached in divergent code, which is reported.
-    assert [f.kind for f in stats.findings] == (["barrier-in-divergent-code"] if which else [])
+    # The pending path exits before the barrier counts the warp. Exited lanes
+    # are exempt, so this is not a divergent-barrier violation.
+    assert not stats.findings
 
 
 def test_barrier_number_out_of_range(sim):

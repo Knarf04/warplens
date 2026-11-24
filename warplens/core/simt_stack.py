@@ -12,13 +12,14 @@ import numpy as np
 
 
 class Entry:
-    __slots__ = ("pc", "mask", "rpc", "frame")
+    __slots__ = ("pc", "mask", "rpc", "frame", "rendezvous")
 
     def __init__(self, pc: int, mask: np.ndarray, rpc: int, frame=None):
         self.pc, self.mask, self.rpc = pc, mask, rpc
         # Set on the entry a recursive call pushes (units/call.py): what to restore when its
         # lanes return. Such an entry has no reconvergence pc; the return pops it.
         self.frame = frame
+        self.rendezvous = False
 
 
 class SimtStack:
@@ -56,6 +57,54 @@ class SimtStack:
             self.entries.append(Entry(fallthrough, not_taken, reconv))
         if target != reconv:
             self.entries.append(Entry(target, taken, reconv))
+        self.max_depth = max(self.max_depth, len(self.entries))
+
+    def rendezvous_at(self, pc: int, active: np.ndarray) -> None:
+        """Run the other paths before issuing a warp-wide synchronizing instruction.
+
+        Static postdominators need not be the first instruction every *actual* path
+        reaches. Park this path at the synchronization point and give the other lanes
+        a chance to reach it or exit. Parent entries include their children's lanes;
+        only their exclusive masks describe lanes currently waiting at their pc.
+        """
+        from ..errors import UnsupportedError
+
+        # Recursive activation boundaries carry saved register/local state. Never
+        # move lanes across one of those boundaries to manufacture convergence.
+        start = next((i for i in range(len(self.entries) - 1, -1, -1)
+                      if self.entries[i].frame is not None), 0)
+        region = self.entries[start:]
+        live = np.zeros_like(active)
+        for entry in self.entries:
+            live |= entry.mask
+        members = np.zeros_like(active)
+        for entry in region:
+            members |= entry.mask
+        if not np.array_equal(members, live):
+            raise UnsupportedError("warp rendezvous across divergent recursive calls is not modeled")
+        if any(entry.rendezvous and entry.pc != pc for entry in region):
+            raise UnsupportedError("warp lanes waiting at different synchronizing instructions "
+                                   "cannot rendezvous here")
+
+        covered = np.zeros_like(active)
+        pending = []
+        for entry in reversed(region):
+            lanes = entry.mask & ~covered
+            covered |= entry.mask
+            if entry is self.top:
+                # Predicate-false lanes have not executed this instruction. They
+                # continue independently; they may exit or reach it on a later path.
+                inactive = lanes & ~active
+                if inactive.any():
+                    pending.append(Entry(pc + 1, inactive, pc))
+            elif entry.pc != pc and lanes.any():
+                pending.append(Entry(entry.pc, lanes, pc))
+        root = region[0]
+        join = Entry(pc, members, root.rpc, root.frame)
+        join.rendezvous = True
+        # Retain the usual top-first path order after replacing duplicate parent
+        # masks with disjoint runnable paths.
+        self.entries[start:] = [join, *reversed(pending)]
         self.max_depth = max(self.max_depth, len(self.entries))
 
     def retire(self, lanes: np.ndarray) -> None:

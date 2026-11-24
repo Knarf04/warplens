@@ -49,6 +49,31 @@ def have(module: str) -> bool:
 key_lines = compare.key_lines  # the lines compare.py shows for an end-to-end program, without the times
 
 
+@pytest.mark.parametrize("error", ["0", "0.0156", "1.56e-2", "1.56E-02"])
+def test_book_comparison_normalizes_only_finite_success_distances(error):
+    first = "hgemm_v6 128x128x256: matches NumPy (max error 0.0078, 1.23 s)"
+    another_cpu = f"hgemm_v6 128x128x256: matches NumPy (max error {error}, 2.34 s)"
+    assert compare.claims(key_lines(first)) == compare.claims(key_lines(another_cpu))
+    assert compare.claims(key_lines(first)) != compare.claims(key_lines(
+        another_cpu.replace("128x128x256", "128x128x64")))
+    assert compare.claims(key_lines(first)) != compare.claims(key_lines(
+        another_cpu.replace("matches NumPy", "FAILED")))
+
+
+@pytest.mark.parametrize("error", ["nan", "NaN", "inf", "-inf", "1e999", "-0.0156", "1.2.3"])
+def test_book_comparison_retains_invalid_or_nonfinite_distances(error):
+    line = f"hgemm_v6 128x128x256: matches NumPy (max error {error})"
+    assert compare.claims([line]) == [line]
+    assert compare.claims([line]) != ["hgemm_v6 128x128x256: matches NumPy"]
+
+
+def test_book_comparison_does_not_rewrite_other_program_results():
+    lines = ["tutorial_01: matches NumPy (max error 0.0156)",
+             "hgemm_v6 128x128x256: FAILED (max error 0.0156)",
+             "hgemm_v6 128x128x256: matches NumPy (max error 0.0156) extra diagnostic"]
+    assert compare.claims(lines) == lines
+
+
 @pytest.fixture(scope="module")
 def run(tmp_path_factory):
     """One run of the whole path. Returns (process, predicted directory, results directory,

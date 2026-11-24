@@ -395,10 +395,10 @@ def test_timing_runner_tells_a_failed_launch_from_a_failed_benchmark(tmp_path):
 def test_no_thread_test_runs_into_a_warp_wide_allocation():
     """`if (tid == 0) {...}` directly followed by `if (warp == 0) tmem_alloc(...)` lets a
     compiler merge the two tests, so that lane 0 reaches the allocation by a path of its own
-    (nvcc 13.0 does; nvcc 13.5 does not). The simulator mishandled that shape
-    (validation/blackwell/findings/reconvergence.py), which made 15 predictions depend on
-    the compiler. A __syncthreads() between the two keeps them apart; the simulator no longer
-    needs it, and the probes keep it because their predictions were made with it."""
+    (nvcc 13.0 does; nvcc 13.5 does not). This once made 15 predictions depend on
+    the compiler; the rendezvous regression now covers that shape directly.
+    Keep the probe's explicit synchronization between initialization and allocation
+    so its memory-ordering intent remains clear."""
     alloc = re.compile(r"tmem_alloc\(|tcgen05\.alloc")
     thread_test = re.compile(r"if \((tid|threadIdx\.x) == 0\)")
     barrier = re.compile(r"__syncthreads\(\)|cluster_sync\(\)")

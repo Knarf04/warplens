@@ -106,30 +106,20 @@ def test_every_emitted_form(sim, prefix, operation):
 
 
 @pytest.mark.parametrize("instruction, why", [
-    ("atom.global.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),  # what CUDA 12.4 emitted
-    ("atom.shared.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.global.add.s32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.global.sub.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.global.inc.u64 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.global.min.f32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.global.add.f16 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.global.exch.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.cta.global.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.sys.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.acquire.gpu.global.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.shared::cta.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.shared::cluster.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.relaxed.gpu.local.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.global.cluster.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.global.gpu.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.global.shared.cta.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
-    ("atom.cta.global.add.u32 %d, [%a], %b;", "expected atom.relaxed.gpu"),
+    ("atom.relaxed.gpu.global.sub.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.relaxed.gpu.global.inc.u64 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.relaxed.gpu.global.min.f32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.relaxed.gpu.global.add.f16 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.relaxed.gpu.global.exch.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.acquire.gpu.global.add.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.relaxed.gpu.shared::cluster.add.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.relaxed.gpu.local.add.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.global.cluster.add.u32 %d, [%a], %b;", "unsupported instruction"),
+    ("atom.global.shared.cta.add.u32 %d, [%a], %b;", "unsupported instruction"),
     ("atom.relaxed.gpu.global.add.u32 %d, [%a];", "expected 3 operands"),
     ("atom.relaxed.gpu.global.cas.b32 %d, [%a], %b;", "expected 4 operands"),
     ("atom.relaxed.gpu.global.add.u32 %d, [%a], %b, %c;", "expected 3 operands"),
     ("atom.relaxed.gpu.global.add.u32 %d, %a, %b;", r"expected a \[address\] operand"),
-    ("red.relaxed.gpu.global.add.u32 [%a], %b;", "does not implement yet: red"),
 ])
 def test_other_forms_are_refused(sim, instruction, why):
     old = np.zeros(32, np.uint32)
@@ -223,9 +213,9 @@ def test_some_lanes_share_a_word_and_some_do_not(sim):
     assert out.numpy().tolist() == [t // 4 + 10 * (t % 4) for t in range(16)] + list(range(4, 20))
 
 
-def test_overlapping_words_apply_in_lane_order(sim):
-    # Lane 0 updates bytes 0..3 and lane 1 bytes 2..5 of the same buffer: lane 1 reads the two
-    # bytes lane 0 has just written.
+def test_misaligned_overlapping_atomic_words_are_rejected(sim):
+    # A u32 access at byte 2 violates PTX natural alignment; do not fabricate a
+    # deterministic result for undefined hardware behavior.
     mod = kernel("""
         .reg .b64 %p, %o, %off; .reg .b32 %t, %d;
         mov.u32 %t, %tid.x; mul.wide.u32 %off, %t, 2;
@@ -236,9 +226,9 @@ def test_overlapping_words_apply_in_lane_order(sim):
         ret;
     """, ".param .u64 mem, .param .u64 out")
     mem, out = sim.from_numpy(np.array([0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80], np.uint8)), sim.empty(2, "u32")
-    sim.launch(mod, "k", grid=1, block=2, args=[mem, out])
-    assert mem.numpy().tolist() == [0x11, 0x21, 0x32, 0x42, 0x51, 0x61, 0x70, 0x80]
-    assert out.numpy().tolist() == [0x40302010, 0x60504131]
+    with pytest.raises(warplens.ExecutionError, match="aligned to 4 bytes"):
+        sim.launch(mod, "k", grid=1, block=2, args=[mem, out])
+    assert mem.numpy().tolist() == [0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80]
 
 
 # -- warps and CTAs ---------------------------------------------------------------------------
@@ -415,8 +405,8 @@ def test_atom_outside_global_and_shared_memory_is_an_error(sim, address, what):
 @pytest.mark.parametrize("instruction, message, lanes", [
     # A word per lane: lanes 2 and 3 are past the end of the 8 bytes.
     ("atom.relaxed.gpu.global.add.u32 %d, [%p], 1;", "outside every allocation", [2, 3]),
-    # One address for all: lanes run one after another, and the first of them faults.
-    ("atom.relaxed.gpu.shared.add.u32 %d, [cell+2], 1;", "atomic update of 4 byte", [1]),
+    # All active addresses are checked before the first update.
+    ("atom.relaxed.gpu.shared.add.u32 %d, [cell+4], 1;", "atomic access of 4 byte", [1, 2, 3]),
 ])
 def test_atom_out_of_bounds_faults_with_its_lanes(sim, instruction, message, lanes):
     mod = kernel(f"""

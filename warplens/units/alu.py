@@ -87,8 +87,10 @@ _QUIET_F64 = np.uint64(1 << 51)
 
 
 def _gpu_nans(out: np.ndarray, *by_priority: np.ndarray) -> np.ndarray:
-    """Give the NaNs in `out` the bit patterns a GPU gives them. The PTX manual says nothing
-    about NaN payloads; this is what an RTX 3080 Ti returned (validation/ampere/nan_golden.txt):
+    """Use the measured Ampere NaN policy (validation/ampere/nan_golden.txt).
+
+    PTX leaves f32 NaN encodings unspecified and supports f64 payloads; it does
+    not establish the entire empirical selection/quieting policy for Blackwell:
 
     * f32: 0x7fffffff, whatever the operands were and with or without `.ftz`;
     * f64: the first NaN among `by_priority` (the instruction's operands, in the order that
@@ -456,10 +458,16 @@ def _div_rem(w, ins, mask):
     ty, _ = _type(ins, kinds="iu")
     d, a, b = _operands(ins, 3)
     x, y = w.read(a, ty), w.read(b, ty)
-    # The PTX manual leaves division by zero undefined. An RTX 3080 Ti returns all ones for
-    # `div` and for `rem`, signed or unsigned, at 16, 32 and 64 bits; the minimum over -1 wraps
-    # to the minimum, with remainder 0 (validation/ampere/intdiv_golden.txt).
+    # Zero-divisor results are unspecified and machine-specific in PTX. Keep the
+    # measured Ampere all-ones fallback without treating it as portable arithmetic.
     by_zero = y == 0
+    zero_lanes = np.flatnonzero(mask & by_zero)
+    if len(zero_lanes):
+        w.cta.findings.add(
+            "integer-divide-by-zero",
+            f"{ins.opcode}.{ty} has a zero divisor; PTX leaves the result unspecified and "
+            "machine-specific. The model uses the measured Ampere all-ones fallback",
+            w, ins, zero_lanes)
     y = np.where(by_zero, 1, y).astype(x.dtype)
     with np.errstate(over="ignore"):
         q = x // y
@@ -489,7 +497,7 @@ def _min_max(w, ins, mask):
         both_nan = np.isnan(x) & np.isnan(y)
         if both_nan.any():
             # Recorded on an RTX 3080 Ti (validation/ampere/minmax_cvt_golden.txt): f32 gives
-            # PTX's canonical NaN 0x7fffffff; f64 gives the second operand, made quiet.
+            # 0x7fffffff; f64 gives the second operand, made quiet.
             if ty == "f32":
                 result.view(np.uint32)[both_nan] = 0x7FFF_FFFF
             elif ty == "f64":
@@ -981,7 +989,7 @@ def _record_memory_banks(w, ins, space, addrs, mask, size: int) -> None:
     if shared is not None and shared.any():
         w.smem_waves += w.cta.smem_report.record(ins, w.program.fn.name, offsets[shared], size,
                                                  pc=w.stack.top.pc)
-    if in_global is not None and in_global.any() and ins.opcode in ("ld", "atom"):
+    if in_global is not None and in_global.any() and ins.opcode in ("ld", "atom", "red"):
         # For the timing model: a load makes the warp wait, a store does not; an atom loads.
         w.global_accesses += 1
 
@@ -1074,173 +1082,6 @@ def _st(w, ins, mask):
     for k, value in enumerate(values):
         _store(w, ins, space, addrs + np.uint64(k * dt.itemsize), w.read(value, ty), mask)
     _record_memory_banks(w, ins, space, addrs, mask, width * dt.itemsize)
-
-
-# -- atomic updates ------------------------------------------------------------------
-
-# The operation.type pairs nvcc 13.5 emits for sm_100a / sm_103a (compiled, not guessed):
-# atomicAdd on int, unsigned, unsigned long long, float and double; atomicSub is an `add`
-# of the negated value; signed and floating atomicExch / atomicCAS use the .b forms.
-_ATOM_TYPES = {
-    "add": ("u32", "u64", "f32", "f64"),
-    "and": ("b32", "b64"), "or": ("b32", "b64"), "xor": ("b32", "b64"),
-    "exch": ("b32", "b64"), "cas": ("b32", "b64"),
-    "inc": ("u32",), "dec": ("u32",),
-    "min": ("s32", "u32", "s64", "u64"), "max": ("s32", "u32", "s64", "u64"),
-}
-_ATOM_FORMS = ("atom.relaxed.gpu[.global|.shared].<op>.<type> or atom[.global|.shared].{cta,sys}"
-               ".<op>.<type>, with add.{u32,u64,f32,f64}, {and,or,xor,exch,cas}.{b32,b64}, "
-               "{inc,dec}.u32, {min,max}.{s32,u32,s64,u64}")
-
-
-def _atom_form(ins: Instr) -> tuple[str, str, str]:
-    """(operation, type, address space) of an `atom`, for the two spellings nvcc 13.5 emits:
-
-        atom.relaxed.gpu[.global|.shared].op.type     atomicAdd(...) and the other plain calls
-        atom[.global|.shared].{cta,sys}.op.type       the _block and _system variants
-
-    No space means a generic address. The ordering and the scope change nothing here: an
-    instruction of one warp runs to completion before any other warp's next instruction, in
-    this CTA or another, so every atom is atomic at every scope and sequentially consistent.
-    """
-    if len(ins.mods) < 3 or ins.mods[-2] not in _ATOM_TYPES \
-            or ins.mods[-1] not in _ATOM_TYPES[ins.mods[-2]]:
-        raise unsupported(ins, f"expected {_ATOM_FORMS}")
-    *prefix, operation, ty = ins.mods
-    if prefix[:2] == ["relaxed", "gpu"]:
-        space = prefix[2:]
-    elif prefix[-1] in ("cta", "sys"):
-        space = prefix[:-1]
-    else:
-        space = None
-    if space is None or len(space) > 1 or (space and space[0] not in ("global", "shared")):
-        raise unsupported(ins, f"expected {_ATOM_FORMS}")
-    return operation, ty, (space[0] if space else "generic")
-
-
-def _atom_result(operation: str, old: np.ndarray, b: np.ndarray, c) -> np.ndarray:
-    """What an atom leaves in memory, given the value it found there."""
-    if operation == "add":
-        with np.errstate(all="ignore"):
-            return old + b
-    if operation == "exch":
-        return b
-    if operation == "cas":  # b is the value to compare with, c the replacement
-        return np.where(old == b, c, old)
-    if operation == "inc":  # atomicInc: count up to b, then wrap to 0
-        return np.where(old >= b, 0, old + old.dtype.type(1)).astype(old.dtype)
-    if operation == "dec":  # atomicDec: count down, starting again from b at 0 or above b
-        return np.where((old == 0) | (old > b), b, old - old.dtype.type(1)).astype(old.dtype)
-    return {"and": np.bitwise_and, "or": np.bitwise_or, "xor": np.bitwise_xor,
-            "min": np.minimum, "max": np.maximum}[operation](old, b)
-
-
-def _atom_apply(w, ins, space, addrs, dt, mask, update, found: dict) -> np.ndarray:
-    """Read-modify-write for the lanes in `mask`, whose addresses do not overlap one another.
-    `update(old, lanes)` gives the new values for the lanes selected. Returns the old values.
-    Lanes to report go to `found`, by (kind of finding, message)."""
-    old = np.zeros(len(mask), dtype=dt)
-    if space == "generic":
-        shared = mask & (addrs >= GENERIC_WINDOW) & (addrs < GENERIC_WINDOW + CLUSTER_WINDOW)
-        if shared.any():  # maybe another CTA's shared memory, through a `mapa` pointer
-            offsets = addrs - np.uint64(GENERIC_WINDOW)
-            for target, lanes, local in _cluster_groups(w, offsets, shared):
-                if target is w.cta:
-                    old[lanes] = _atom_apply(w, ins, "shared", local, dt, lanes, update, found)[lanes]
-                    continue
-                try:  # as for a store there, a race with that CTA's own accesses is not reported here
-                    old[lanes], unwritten, _ = target.smem.atomic(
-                        local[lanes], dt, _remote_id(w), lambda value, lanes=lanes: update(value, lanes))
-                except MemoryFault as e:
-                    _fault_lanes(e, lanes)
-                    raise
-                if len(unwritten):
-                    found.setdefault(("smem-uninitialized-read", "atomic update of shared memory that "
-                                      f"CTA {target.id} never wrote"), []).extend(np.flatnonzero(lanes)[unwritten])
-            mask = mask & ~shared
-        for window, what in ((LOCAL_WINDOW, "local memory"), (PARAM_WINDOW, "kernel parameters")):
-            inside = mask & (addrs >= np.uint64(window)) & (addrs < np.uint64(window + _LOCAL_WINDOW_BYTES))
-            if inside.any():
-                raise ExecutionError(f"`{ins.name}` on {what}: PTX defines atomic operations on global "
-                                     "and shared memory only")
-        space = "global"
-    if not mask.any():
-        return old
-    if space == "global":
-        try:
-            old[mask] = w.mem.read(addrs[mask], dt)
-            w.mem.write(addrs[mask], np.asarray(update(old[mask], mask), dtype=dt))
-        except MemoryFault as e:
-            _fault_lanes(e, mask)
-            raise
-        return old
-    cta = w.cta
-    offsets = local_shared_offset(addrs)
-    try:
-        if cta.smem.async_active:
-            idx = cta.smem.index(offsets[mask], dt.itemsize, "atomic update")
-            _async_check(w, ins, mask, offsets, dt.itemsize, "atomic update of", writing=True)
-            cta.smem.async_writer[idx] = 0  # overwritten, as by an ordinary store
-        old[mask], unwritten, racy = cta.smem.atomic(offsets[mask], dt, w.warp_id,
-                                                     lambda value: update(value, mask))
-    except MemoryFault as e:
-        _fault_lanes(e, mask)
-        raise
-    if len(unwritten):
-        found.setdefault(("smem-uninitialized-read", "atomic update of shared memory that this CTA "
-                          "never wrote"), []).extend(np.flatnonzero(mask)[unwritten])
-    if len(racy):
-        found.setdefault(("smem-race", "atomic update of shared memory that another warp read or wrote "
-                          "with an ordinary load or store, with no barrier in between"),
-                         []).extend(np.flatnonzero(mask)[racy])
-    return old
-
-
-@op("atom")
-def _atom(w, ins, mask):
-    """atom.<form> d, [a], b[, c]: d = the value at a; then that value is replaced by
-    `op(value, b)`, or for `cas` by c if it equals b. The forms are those of `_atom_form`.
-
-    Lanes of the warp whose addresses share bytes are applied one after another in order of
-    lane number, lowest first, each seeing what the one before it left: 32 lanes that add 1 to
-    one word receive 32 different old values and leave the word 32 higher. PTX does not say
-    which order a GPU uses; anything that does not depend on it (the final value of an add,
-    and/or/xor/min/max, the set of values returned) is the same for every order. Other warps
-    cannot come in between: the scheduler runs one whole warp instruction at a time.
-    """
-    operation, ty, space = _atom_form(ins)
-    d, mem, *sources = _operands(ins, 4 if operation == "cas" else 3)
-    dt = NP_TYPES[ty]
-    b = w.read(sources[0], ty)
-    c = w.read(sources[1], ty) if operation == "cas" else None
-    addrs = _address(w, ins, mem)
-    if not mask.any():
-        return
-
-    def update(value, lanes):
-        return _atom_result(operation, value, b[lanes], None if c is None else c[lanes])
-
-    lanes = np.flatnonzero(mask)
-    # The same shared byte has several spellings as a `.shared` address (with and without
-    # the bits that name this CTA in its cluster), so compare what they resolve to.
-    where = np.sort((local_shared_offset(addrs) if space == "shared" else addrs)[lanes])
-    found: dict = {}
-    if len(lanes) == 1 or (np.diff(where) >= np.uint64(dt.itemsize)).all():
-        old = _atom_apply(w, ins, space, addrs, dt, mask, update, found)
-    else:
-        old = np.zeros(len(mask), dtype=dt)
-        for lane in lanes:
-            one = np.zeros(len(mask), dtype=bool)
-            one[lane] = True
-            old[lane] = _atom_apply(w, ins, space, addrs, dt, one, update, found)[lane]
-    for (kind, message), reported in found.items():  # once per instruction, not per lane
-        w.cta.findings.add(kind, message, w, ins, sorted(int(x) for x in reported))
-    w.write(d, old, mask)
-    # Bank statistics count the access once. For timing an atom is a load and a store.
-    # (An atom on another CTA's shared memory records nothing, as `ld`/`st.shared::cluster`.)
-    waves = w.smem_waves
-    _record_memory_banks(w, ins, space, addrs, mask, dt.itemsize)
-    w.smem_waves += w.smem_waves - waves
 
 
 @op("elect")

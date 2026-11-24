@@ -70,6 +70,9 @@ class SharedMemory:
         self.epoch = 0  # advanced by the CTA whenever a barrier completes
         self._writer = np.full(size, -1, dtype=np.int32)  # warp id, -1 = never written
         self._write_epoch = np.zeros(size, dtype=np.int32)
+        # Proxy-fence ownership must not reuse the race history: an atomic may
+        # preserve an earlier ordinary writer or have several atomic contenders.
+        self._last_writer = np.full(size, -1, dtype=np.int32)
         self._reader = np.full(size, -1, dtype=np.int32)
         self._read_epoch = np.zeros(size, dtype=np.int32)
         self._atom_warp = np.full(size, -1, dtype=np.int32)  # -1 = no atom yet, or ATOM_MANY
@@ -112,6 +115,7 @@ class SharedMemory:
         racy |= self._other_atom(idx, warp)
         self.data[idx] = np.ascontiguousarray(values).view(np.uint8).reshape(len(offsets), size)
         self._writer[idx] = warp
+        self._last_writer[idx] = warp
         self._write_epoch[idx] = self.epoch
         self.unfenced[idx] = True
         return np.flatnonzero(racy.any(axis=1))
@@ -142,6 +146,7 @@ class SharedMemory:
         # An ordinary write of this epoch stays on record: it races with a later atom of
         # another warp, which this atom does not.
         self._writer[idx] = np.where(plain, writer, ATOMIC)
+        self._last_writer[idx] = warp
         self._write_epoch[idx] = self.epoch
         by = self._atom_warp[idx]
         several = (by != -1) & (by != warp) & (self._atom_epoch[idx] == self.epoch)
@@ -170,6 +175,7 @@ class SharedMemory:
         # Non-bulk cp.async is a generic-proxy write, unlike a TMA load. A later
         # bulk copy/MMA still needs fence.proxy.async before consuming these bytes.
         self._writer[idx] = ASYNC_PROXY if writer_warp is None else writer_warp
+        self._last_writer[idx] = self._writer[idx]
         if writer_warp is not None:
             self._write_epoch[idx] = self.epoch
         self.unfenced[idx] = writer_warp is not None
@@ -178,6 +184,5 @@ class SharedMemory:
         """fence.proxy.async by `warp`: its own earlier writes, and writes that a
         completed barrier already ordered before it, become visible to TMA."""
         if self.unfenced.any():
-            ordered = (self._writer == warp) | (self._write_epoch < self.epoch)
-            ordered |= (self._writer == ATOMIC) & (self._atom_warp == warp)  # its own atoms
+            ordered = (self._last_writer == warp) | (self._write_epoch < self.epoch)
             self.unfenced &= ~ordered

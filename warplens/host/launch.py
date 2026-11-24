@@ -20,6 +20,8 @@ from ..units.smem import MAX_SMEM_BYTES
 from ..units.smem_banks import SmemReport
 
 MAX_THREADS_PER_BLOCK = 1024
+MAX_BLOCK_DIM = (1024, 1024, 64)
+MAX_GRID_DIM = (2**31 - 1, 65535, 65535)
 MAX_CLUSTER_CTAS = 16  # a multicast mask has 16 bits
 
 
@@ -53,6 +55,14 @@ def dim3(value, what: str) -> tuple[int, int, int]:
         raise LaunchError(f"{what} must be 1 to 3 positive integers, got {value!r}",
                           CUDA_INVALID_CLUSTER_SIZE if what == "cluster" else CUDA_INVALID_CONFIGURATION)
     return tuple(int(d) for d in dims) + (1,) * (3 - len(dims))
+
+
+def _check_dimensions(dims: tuple[int, int, int], maximum: tuple[int, int, int], what: str) -> None:
+    """Per-axis limits are independent of the block's total thread count."""
+    for axis, value, limit in zip("xyz", dims, maximum):
+        if value > limit:
+            raise LaunchError(f"{what} {axis}-dimension {value} exceeds the limit of {limit}",
+                              CUDA_INVALID_CONFIGURATION)
 
 
 def _struct_bytes(arg) -> bytes | None:
@@ -132,6 +142,8 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
     if threads > MAX_THREADS_PER_BLOCK:
         raise LaunchError(f"block {(bx, by, bz)} has {threads} threads; the limit is {MAX_THREADS_PER_BLOCK}",
                           CUDA_INVALID_CONFIGURATION)
+    _check_dimensions((bx, by, bz), MAX_BLOCK_DIM, "block")
+    _check_dimensions((gx, gy, gz), MAX_GRID_DIM, "grid")
     params = encode_args(program.fn, args, mem=mem)
     if int(smem) != smem or smem < 0:
         raise LaunchError(f"smem must be a non-negative byte count, got {smem!r}")

@@ -227,7 +227,7 @@ def test_barrier_at_an_early_join_is_reached_by_the_whole_warp(sim, layout):
 
 @pytest.mark.parametrize("layout", LAYOUTS)
 def test_lanes_meet_at_an_early_join_without_a_barrier(sim, layout):
-    """The join's instructions execute once, on 32 lanes, as on a GPU."""
+    """Match the measured Ampere schedule; this is not an implicit sync guarantee."""
     seen, out, stats = _executions(sim, LAYOUTS[layout](""), "ld")
     assert seen == [32, 32]  # the kernel's parameter, then the shared word
     assert out.tolist() == [7] * 32
@@ -252,17 +252,16 @@ def test_warp_wide_allocation_at_an_early_join(sim, layout):
 
 
 @pytest.mark.parametrize("layout", LAYOUTS)
-def test_barrier_some_lanes_go_around_is_still_reported(sim, layout):
-    """Lanes 16 to 31 take the second branch past the join and go on to other work. Lanes 0
-    to 15 meet at the barrier, and the finding names them."""
+def test_barrier_waits_for_bypassing_lanes_to_exit(sim, layout):
+    """Lanes 16 to 31 bypass the join and exit. The barrier first lets their
+    pending path exit, then counts the remaining lanes without a false warning."""
     body = LAYOUTS[layout]("bar.sync 0;")
     body = body.replace("setp.gt.u32 %q, %t, 31;", "setp.gt.u32 %q, %t, 15;")
     body = body.replace("setp.lt.u32 %q, %t, 32;", "setp.lt.u32 %q, %t, 16;")
     seen, out, stats = _executions(sim, body, "bar")
     assert seen == [16]
     assert out.tolist() == [7] * 16 + [0xDEAD] * 16
-    assert [f.kind for f in stats.findings] == ["barrier-in-divergent-code"]
-    assert "16 of the warp's 32 running lanes" in stats.findings[0].message
+    assert not stats.findings
 
 
 def test_diverged_lanes_in_a_loop_keep_their_order(sim):

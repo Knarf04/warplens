@@ -101,6 +101,7 @@ class Cta:
                     warp.blocked = None
                 released = released or bool(bar.waiters)
                 self.smem.epoch += 1
+                self.smem_report.barrier_completions += 1
                 bar.arrived, bar.waiters, bar.count = [], [], None
                 bar.knowledge = set()
         return released

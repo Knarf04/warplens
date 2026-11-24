@@ -57,6 +57,7 @@ def test_bank_conflict_counters_match_ncu(sim):
         # Hardware also counts two wavefronts per warp and one per CTA per barrier
         # (see test_wavefront_offset_rule): 2 * 64 * 32 + 64 = 4160 here.
         assert counters["l1tex__data_pipe_lsu_wavefronts_mem_shared"] - stats.smem.wavefronts == 4160
+        assert counters["l1tex__data_pipe_lsu_wavefronts_mem_shared"] == stats.smem.ncu_wavefronts
 
 
 def test_wavefront_offset_rule():

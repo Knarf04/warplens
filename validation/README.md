@@ -102,4 +102,5 @@ What this does not show:
   skip.
 
 The simulator's `wavefronts` is left as it is: the count of what shared
-accesses cost. To compare it with the `ncu` counter, add the two terms above.
+accesses cost. `stats.smem.ncu_wavefronts` adds the two terms above, and is
+what `compare_ncu.py` compares with the `ncu` counter.

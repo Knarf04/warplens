@@ -33,6 +33,8 @@ Do these at home; none needs the B200.
       `conda run -n warplens python validation/blackwell/run_rows.py --out /tmp/rows` must
       print `ok` for `formats/ue4m3_ptxas` and `e2e/driver_call_trace.cute_dsl`, and
       `skipped (needs sm_100 ...)` for `e2e/cute_dsl_tma` (section 3, "The rows without a probe").
+      `e2e/driver_call_trace.tirx` is `failed` there for as long as that machine's driver
+      is older than the toolkit: it refuses NVRTC's PTX, traced or not.
 - [ ] The toolkit policy of section 2 is read, and the owner has confirmed or changed the
       budget for a second rental (section 5).
 - [ ] Write down the commit: `git rev-parse HEAD`. The archive's manifest must show the same.
@@ -389,7 +391,7 @@ What was and was not tried of this is in section 9.
 | `selftest` (the repository's tests, in the simulator) | 4 to 20 | measured: 10.5 min on 20 cores (1513 tests). It includes the whole predict path, which is what says whether the committed predictions hold for the installed compiler; worth its time on a first rental with a fallback toolkit, `--skip selftest` otherwise. Limit: 30 min |
 | `build-blackwell` | 1 to 6 | measured: 8 s on 20 cores for the 51 programs (13 s with `--native`); the upper end is a guess for a smaller machine |
 | `build-timing` | 1 to 4 | measured: 62 s for the 14 benchmarks |
-| `predict-toolkit` | 0, or 5 to 15 | 0 when the driver takes the pinned toolkit's PTX (the stage is skipped). With a fallback toolkit, measured with nvcc 13.5.37 on 20 cores: 78 s for the 98 probe predictions, 8 at once, and about 6 min for the 14 timing benchmarks, one at a time; the upper end is a guess for a slower CPU. Limit: 30 min |
+| `predict-toolkit` | 0, or 5 to 15 | 0 when the driver takes the pinned toolkit's PTX (the stage is skipped). With a fallback toolkit, measured with nvcc 13.5.37 on 20 cores: 65 s for the 108 probe predictions, 8 at once, and about 7 min for the 14 timing benchmarks, one at a time; the upper end is a guess for a slower CPU. Limit: 30 min |
 | `run-blackwell` | 3 to 20 | guess. Kernels are tiny; the time is process start-up and the probes that wait out a timeout on purpose. The rows without a probe at its end add about 15 s here (measured without the RT-11 tutorial, which needs a B200; that is two runs of a GEMM and a guess of 1 to 2 min) |
 | `run-timing` | 3 to 20 | guess. Under `ncu` every kernel is replayed per counter group |
 | `collect` | under 1 | measured |
@@ -611,6 +613,28 @@ Measured on the development machine, into throwaway directories that were remove
   13.5 code). In the rehearsal there were 26 failures: those 8, the 16 probe
   predictions that finding 16 has since fixed, and 2 caused by the rehearsal's
   own `PREFLIGHT_EXPECT_CAP`. Any other failure on the day is news.
+- On 2026-11-24, the additions of that day (toolkit policy, rows without a probe):
+  - `env/remote/predict_toolkit.sh --build` with nvcc 13.5.37, the only `sm_100a`
+    compiler installed: 9 min 40 s in all on 20 cores, of which 65 s for the 108 probe
+    predictions. As it must with the predictions' own compiler, it reproduced every
+    committed probe prediction and every timing prediction (`DIFFERENCES.txt` empty).
+    That exercises the script, not the fallback: with another nvcc it has not run.
+  - The stage `predict-toolkit` of `run.sh`, with stand-in suites only
+    (`tests/test_remote_env.py`): it runs before the GPU stages when
+    `resolved/versions.txt` says `not-comparable`, its directory and the names that
+    differ are in the archive, a failure does not stop the GPU stages, and it is skipped
+    with the pinned toolkit. Not run inside a whole `run.sh` with a real fallback env.
+  - `validation/blackwell/run_rows.py` on the RTX 3080 Ti (driver 580.173.02): NUM-05
+    `ok` (ptxas 13.5 accepts the eight control conversions and none for UE4M3); the
+    CuTe DSL trace `ok` in 5 s (26 distinct driver calls, one `cuLaunchKernelEx`, its three
+    parameters read); the TIRx trace logged 33 distinct calls and ended as `failed`,
+    because this driver refuses NVRTC 13.5's PTX at `cuModuleLoadData`, as the untraced
+    script does here; RT-11 `skipped (needs sm_100 ...)`.
+  - The capture of launch parameters, with a CUDA C++ program for `sm_86` whose kernel
+    takes a 128-byte, 64-byte-aligned struct by value (`cuLaunchKernel`, the other entry
+    point): the driver reported sizes 4, 128, 8 and the 128 bytes saved were the bytes
+    passed. With the system gdb 15.1 and with conda-forge's gdb 18.1.
+  - `shellcheck` 0.11 on the five scripts, `predict_toolkit.sh` included: clean.
 
 Not tried, because there was no way to here:
 
@@ -626,5 +650,20 @@ Not tried, because there was no way to here:
 - `--toolkit pinned` on a driver older than the toolkit, as a whole run.
 - Ubuntu 22.04 (the development machine is 24.04), any provider's image, a slow
   network, Arm.
+- RT-11 itself: `fp16_gemm_0.py` has not run under the tracer anywhere, because it
+  needs a B200 and PyTorch (the development machine's env has no PyTorch). That the
+  DSL's tensor maps arrive as kernel parameters is what `docs/m6.md` saw in the
+  simulator; on hardware it is expected, not observed. If they do not, `calls.txt` of
+  the same trace shows what the DSL called instead.
+- gdb inside a provider's container. Starting a child under gdb needs `ptrace`, which
+  Docker's default seccomp profile allows on current kernels; a stricter profile makes
+  the two tracing rows `skipped (... ptrace is not permitted)`.
+- `setup.sh`'s new gdb step in a real run: the three branches (a gdb on `PATH`,
+  `apt-get install gdb` as root, conda-forge's gdb into `gdb-env`) were not exercised
+  through `setup.sh`; conda-forge's gdb was installed by hand with the same package
+  spec and ran the tracer.
+- The book's fetch commands of section 3 on this machine (they are CI's).
+- `predict_toolkit.sh` with a toolkit between 13.0 and 13.4: none is installed here
+  (section 2).
 - A driver newer than the pinned toolkit, and a 12.x driver (only a 12.8
   *toolkit* on a 13.0 driver).

@@ -123,7 +123,7 @@ estimate() {
     selftest)        echo "4|20|measured: 10.5 min on 20 cores for the whole test suite (1513 tests; it runs the whole predict path, which is what says whether the predictions hold for the installed compiler). --skip selftest saves it" ;;
     build-blackwell) echo "1|6|measured: 8 s on 20 cores for the 51 probe programs (13 s with --native); a smaller machine is the upper end" ;;
     build-timing)    echo "1|4|measured: 62 s, one compile at a time, for the 14 benchmarks" ;;
-    predict-toolkit) echo "0|15|measured: 7 min on 20 cores (78 s for the 98 probe predictions, 6 min for the 14 timing benchmarks, one at a time). Runs only when setup.sh fell back to another toolkit than the predictions' (0 otherwise)" ;;
+    predict-toolkit) echo "0|15|measured: 8 min on 20 cores (65 s for the 108 probe predictions, 7 min for the 14 timing benchmarks, one at a time). Runs only when setup.sh fell back to another toolkit than the predictions' (0 otherwise)" ;;
     run-blackwell)   echo "3|20|guess: short kernels, but some probes wait out a timeout on purpose; limit $run_minutes min" ;;
     run-timing)      echo "3|20|guess: repeated microbenchmarks, and ncu reruns each kernel per counter group; limit $run_minutes min" ;;
     collect)         echo "1|1|measured: under 1 s for a small archive" ;;

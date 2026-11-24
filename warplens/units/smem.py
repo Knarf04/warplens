@@ -101,6 +101,7 @@ class _Accesses:
 
     def __init__(self, size: int, clocks: Clocks):
         self.clocks = clocks
+        self.used = False  # nothing recorded yet: callers skip `unordered` and `clear`
         self.who = np.full(size, -1, dtype=np.int32)  # -1: none on record, or see `table`
         self.clock = np.zeros(size, dtype=np.int32)
         self.several = np.zeros(size, dtype=np.bool_)  # the byte's accessors are in `table`
@@ -130,6 +131,7 @@ class _Accesses:
         return out
 
     def record(self, idx: np.ndarray, warp: int, row: np.ndarray) -> None:
+        self.used = True
         flat = idx.ravel()
         who = self.who[flat]
         apart = (who >= 0) & (who != warp) & (self.clock[flat] > row.take(who, mode="clip"))
@@ -203,7 +205,8 @@ class SharedMemory:
         writer = self._writer[idx]
         unwritten = np.flatnonzero((writer == -1).any(axis=1))
         racy = self._other_write(idx, writer, warp, row)
-        racy |= self._atoms.unordered(idx, warp, row)
+        if self._atoms.used:
+            racy |= self._atoms.unordered(idx, warp, row)
         self._reads.record(idx, warp, row)
         return values, unwritten, np.flatnonzero(racy.any(axis=1))
 
@@ -213,16 +216,20 @@ class SharedMemory:
         idx = self._index(offsets, size, "write")
         row = self.clocks.row(warp)
         racy = self._other_write(idx, self._writer[idx], warp, row)
-        racy |= self._reads.unordered(idx, warp, row)
-        racy |= self._atoms.unordered(idx, warp, row)
+        if self._reads.used:
+            racy |= self._reads.unordered(idx, warp, row)
+        if self._atoms.used:
+            racy |= self._atoms.unordered(idx, warp, row)
         self.data[idx] = np.ascontiguousarray(values).view(np.uint8).reshape(len(offsets), size)
         self._writer[idx] = self._last_writer[idx] = warp
         self._write_clock[idx] = self._last_clock[idx] = row[warp]
         # This store was checked against every access on record. A later access that is not
         # ordered after one of them is not ordered after this store either, unless this
         # store itself raced with that access and was reported.
-        self._reads.clear(idx)
-        self._atoms.clear(idx)
+        if self._reads.used:
+            self._reads.clear(idx)
+        if self._atoms.used:
+            self._atoms.clear(idx)
         self.unfenced[idx] = True
         return np.flatnonzero(racy.any(axis=1))
 

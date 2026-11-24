@@ -150,7 +150,8 @@ extern "C" __global__ void mma_dump(const uint32_t* image, uint64_t desc_a, uint
         __syncthreads();
     }
     if (tid == 0) {
-        uint64_t where = (uint64_t)(smem_addr(operands) >> 4);  // descriptors are buffer-relative
+        // Descriptors are buffer-relative; the start field holds 14 bits of address / 16.
+        uint64_t where = (uint64_t)((smem_addr(operands) >> 4) & 0x3fff);
         uint32_t d = base + (d_lane << 16);
         for (uint32_t i = 0; i < repeat; ++i) {
             if (kind == 0) mma_f16(d, desc_a + where, desc_b + where, idesc, i);

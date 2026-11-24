@@ -33,6 +33,13 @@ __device__ __forceinline__ uint32_t smem_addr(const void* p) {
     return (uint32_t)__cvta_generic_to_shared(p);
 }
 
+// Read a shared word the compiler cannot assume unchanged (TMA writes behind its back).
+__device__ __forceinline__ uint32_t smem_peek(const uint32_t* p) {
+    uint32_t v;
+    asm volatile("ld.shared.u32 %0, [%1];" : "=r"(v) : "r"(smem_addr(p)) : "memory");
+    return v;
+}
+
 // ---- mbarrier ----
 __device__ __forceinline__ void mbar_init(uint64_t* bar, uint32_t arrivals) {
     asm volatile("mbarrier.init.shared::cta.b64 [%0], %1;" :: "r"(smem_addr(bar)), "r"(arrivals) : "memory");

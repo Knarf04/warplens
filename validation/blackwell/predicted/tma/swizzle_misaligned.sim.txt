@@ -1,0 +1,32 @@
+status: ok
+warplens: 12 kernel launch(es) simulated on B200, 6 finding(s)
+  tma_dump: 1 CTA(s), 579 warp-instructions
+  tma_dump: 1 CTA(s), 579 warp-instructions
+  tma_dump: 1 CTA(s), 579 warp-instructions
+  tma_dump: 1 CTA(s), 579 warp-instructions
+    [tma-swizzle-misaligned] shared buffer at offset 1152 is not aligned to 256 bytes, the period of swizzle 32B. The swizzle is a function of the address, so code that indexes this buffer by offset will not find the data where it expects
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  tma_dump: 1 CTA(s), 579 warp-instructions
+  tma_dump: 1 CTA(s), 579 warp-instructions
+  tma_dump: 1 CTA(s), 579 warp-instructions
+    [tma-swizzle-misaligned] shared buffer at offset 1152 is not aligned to 512 bytes, the period of swizzle 64B. The swizzle is a function of the address, so code that indexes this buffer by offset will not find the data where it expects
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  tma_dump: 1 CTA(s), 579 warp-instructions
+    [tma-swizzle-misaligned] shared buffer at offset 1280 is not aligned to 512 bytes, the period of swizzle 64B. The swizzle is a function of the address, so code that indexes this buffer by offset will not find the data where it expects
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  tma_dump: 1 CTA(s), 579 warp-instructions
+  tma_dump: 1 CTA(s), 579 warp-instructions
+    [tma-swizzle-misaligned] shared buffer at offset 1152 is not aligned to 1024 bytes, the period of swizzle 128B. The swizzle is a function of the address, so code that indexes this buffer by offset will not find the data where it expects
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  tma_dump: 1 CTA(s), 579 warp-instructions
+    [tma-swizzle-misaligned] shared buffer at offset 1280 is not aligned to 1024 bytes, the period of swizzle 128B. The swizzle is a function of the address, so code that indexes this buffer by offset will not find the data where it expects
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  tma_dump: 1 CTA(s), 579 warp-instructions
+    [tma-swizzle-misaligned] shared buffer at offset 1536 is not aligned to 1024 bytes, the period of swizzle 128B. The swizzle is a function of the address, so code that indexes this buffer by offset will not find the data where it expects
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0

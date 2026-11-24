@@ -1,0 +1,20 @@
+A: cta_group::1, multicast to ranks 0-3, mbarrier address in rank 0
+  CTA rank 0: armed with expect_tx 256, phase completed 1; buffer holds the box
+  CTA rank 1: armed with expect_tx 256, phase completed 1; buffer holds the box
+  CTA rank 2: armed with expect_tx 256, phase completed 1; buffer holds the box
+  CTA rank 3: armed with expect_tx 256, phase completed 1; buffer holds the box
+B: cta_group::2, multicast to ranks 0-3, mbarrier address in rank 0 (even)
+  CTA rank 0: armed with expect_tx 512, phase completed 1; buffer holds the box
+  CTA rank 1: not armed;                                 buffer holds the box
+  CTA rank 2: armed with expect_tx 512, phase completed 1; buffer holds the box
+  CTA rank 3: not armed;                                 buffer holds the box
+C: cta_group::2, multicast to ranks 0-3, mbarrier address mapped to rank 1 (odd)
+  CTA rank 0: not armed;                                 buffer holds the box
+  CTA rank 1: armed with expect_tx 512, phase completed 1; buffer holds the box
+  CTA rank 2: not armed;                                 buffer holds the box
+  CTA rank 3: armed with expect_tx 512, phase completed 1; buffer holds the box
+D: cta_group::2, no multicast, destination in rank 0, mbarrier address mapped to rank 1
+  CTA rank 0: not armed;                                 buffer holds the box
+  CTA rank 1: armed with expect_tx 256, phase completed 1; buffer untouched
+  CTA rank 2: not armed;                                 buffer untouched
+  CTA rank 3: not armed;                                 buffer untouched

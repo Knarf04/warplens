@@ -1,0 +1,4 @@
+status: ok
+warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
+  add_kernel: 8 CTA(s), 672 warp-instructions
+  matmul_kernel: 4 CTA(s), 8480 warp-instructions

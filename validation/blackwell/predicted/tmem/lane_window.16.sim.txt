@@ -1,0 +1,4 @@
+status: exit 3
+warplens: unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer spanning the local 32-row tensor-memory window)
+  line 383: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r68}, [%r131];
+warplens: the program launched no kernels

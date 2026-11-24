@@ -1,0 +1,26 @@
+MMA: M = 128, N = 8, D[m][n] = 256 m + n; row m is expected on lane m
+lane field 32 * warp (each warp names its own window):
+  warp 0: thread lanes 0-31 read rows 0-31
+  warp 1: thread lanes 0-31 read rows 32-63
+  warp 2: thread lanes 0-31 read rows 64-95
+  warp 3: thread lanes 0-31 read rows 96-127
+lane field 0 in all four warps:
+  warp 0: thread lanes 0-31 read rows 0-31
+  warp 1: thread lanes 0-31 read rows 32-63
+  warp 2: thread lanes 0-31 read rows 64-95
+  warp 3: thread lanes 0-31 read rows 96-127
+lane field 32 in all four warps:
+  warp 0: thread lanes 0-31 read rows 0-31
+  warp 1: thread lanes 0-31 read rows 32-63
+  warp 2: thread lanes 0-31 read rows 64-95
+  warp 3: thread lanes 0-31 read rows 96-127
+lane field 64 in all four warps:
+  warp 0: thread lanes 0-31 read rows 0-31
+  warp 1: thread lanes 0-31 read rows 32-63
+  warp 2: thread lanes 0-31 read rows 64-95
+  warp 3: thread lanes 0-31 read rows 96-127
+lane field 96 in all four warps:
+  warp 0: thread lanes 0-31 read rows 0-31
+  warp 1: thread lanes 0-31 read rows 32-63
+  warp 2: thread lanes 0-31 read rows 64-95
+  warp 3: thread lanes 0-31 read rows 96-127

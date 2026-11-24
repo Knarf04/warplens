@@ -1,0 +1,2 @@
+vector add: max abs error vs NumPy 0; 8 CTA(s), 672 warp-instructions, 0 finding(s)
+matmul: max abs error vs NumPy 4.77e-06; 4 CTA(s), 8480 warp-instructions, 0 finding(s)

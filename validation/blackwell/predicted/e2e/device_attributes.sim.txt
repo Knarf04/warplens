@@ -1,0 +1,2 @@
+status: ok
+warplens: the program launched no kernels

@@ -1,0 +1,5 @@
+status: ok
+warplens: 3 kernel launch(es) simulated on B200, 0 finding(s)
+  mbar_script: 1 CTA(s), 194 warp-instructions
+  mbar_script: 1 CTA(s), 142 warp-instructions
+  mbar_script: 1 CTA(s), 140 warp-instructions

@@ -1,0 +1,8 @@
+neither            issued 1 time(s): D[0][0] = 3f800000, D[1][2] = 43818000, D[127][7] = 46fe1000; 1024 of 1024 elements equal +1 (256 m + n + 1)
+negate A (bit 13)  issued 1 time(s): D[0][0] = bf800000, D[1][2] = c3818000, D[127][7] = c6fe1000; 1024 of 1024 elements equal -1 (256 m + n + 1)
+negate B (bit 14)  issued 1 time(s): D[0][0] = bf800000, D[1][2] = c3818000, D[127][7] = c6fe1000; 1024 of 1024 elements equal -1 (256 m + n + 1)
+negate A and B     issued 1 time(s): D[0][0] = 3f800000, D[1][2] = 43818000, D[127][7] = 46fe1000; 1024 of 1024 elements equal +1 (256 m + n + 1)
+neither            issued 2 time(s): D[0][0] = 40000000, D[1][2] = 44018000, D[127][7] = 477e1000; 1024 of 1024 elements equal +2 (256 m + n + 1)
+negate A (bit 13)  issued 2 time(s): D[0][0] = c0000000, D[1][2] = c4018000, D[127][7] = c77e1000; 1024 of 1024 elements equal -2 (256 m + n + 1)
+negate B (bit 14)  issued 2 time(s): D[0][0] = c0000000, D[1][2] = c4018000, D[127][7] = c77e1000; 1024 of 1024 elements equal -2 (256 m + n + 1)
+negate A and B     issued 2 time(s): D[0][0] = 40000000, D[1][2] = 44018000, D[127][7] = 477e1000; 1024 of 1024 elements equal +2 (256 m + n + 1)

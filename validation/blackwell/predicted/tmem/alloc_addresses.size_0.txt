@@ -1,0 +1,3 @@
+script: an allocation of 0 columns
+KERNEL FAILED: an allocation of 0 columns
+info: error cudaErrorLaunchFailure

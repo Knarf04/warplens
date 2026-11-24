@@ -1,0 +1,23 @@
+status: ok
+warplens: 3 kernel launch(es) simulated on B200, 6 finding(s)
+  tma_dump: 1 CTA(s), 123697 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 135 writes; that load has completed, but this warp never waited on its mbarrier
+      line 590: ld.shared.b32 %r163, [%r181];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [mbarrier-tx-mismatch] the kernel returned with 64 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 4096; expect_tx is missing or too small
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  tma_dump: 1 CTA(s), 123697 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 135 writes; that load has completed, but this warp never waited on its mbarrier
+      line 590: ld.shared.b32 %r163, [%r181];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [mbarrier-tx-mismatch] the kernel returned with 64 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 4096; expect_tx is missing or too small
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  tma_dump: 1 CTA(s), 123697 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 135 writes; that load has completed, but this warp never waited on its mbarrier
+      line 590: ld.shared.b32 %r163, [%r181];
+      first in CTA (0, 0, 0), warp 0, lanes 0-31
+    [mbarrier-tx-mismatch] the kernel returned with 64 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 4096; expect_tx is missing or too small
+      line 135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+      first in CTA (0, 0, 0), warp 0, lanes 0

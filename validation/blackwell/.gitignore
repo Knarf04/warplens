@@ -1,0 +1,6 @@
+bin/
+bin-native/
+results/
+*.tar.gz
+__pycache__/
+bin-ampere/

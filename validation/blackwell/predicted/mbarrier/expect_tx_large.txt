@@ -1,0 +1,3 @@
+script: expect_tx 512 for a 256-byte load, then wait without a bound
+KERNEL FAILED: expect_tx 512 for a 256-byte load, then wait without a bound
+info: error cudaErrorLaunchFailure

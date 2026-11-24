@@ -1,0 +1,3 @@
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
+  tf32_modes: 3 CTA(s), 562 warp-instructions

@@ -1,0 +1,3 @@
+script: 512 columns, then 32 more with nothing free (expected to wait forever)
+KERNEL FAILED: 512 columns, then 32 more with nothing free (expected to wait forever)
+info: error cudaErrorLaunchFailure

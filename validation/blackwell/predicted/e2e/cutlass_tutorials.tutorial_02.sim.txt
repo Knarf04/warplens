@@ -1,0 +1,4 @@
+status: ok
+warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
+  _ZN3cub17_V_300500_SM_10006detail8for_each13static_kernelINS2...: 1024 CTA(s), 147456 warp-instructions
+  _Z11gemm_deviceI13SharedStorageIN7cutlass6half_tES2_N4cute14C...: 16 CTA(s), 78165 warp-instructions

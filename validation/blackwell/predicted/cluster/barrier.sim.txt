@@ -1,0 +1,4 @@
+status: ok
+warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
+  cluster_barrier: 4 CTA(s), 188 warp-instructions
+  cluster_barrier: 4 CTA(s), 13982 warp-instructions

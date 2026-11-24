@@ -1,0 +1,12 @@
+status: ok
+warplens: 10 kernel launch(es) simulated on B200, 0 finding(s)
+  lane_arrivals: 1 CTA(s), 39 warp-instructions
+  lane_arrivals: 1 CTA(s), 39 warp-instructions
+  lane_arrivals: 1 CTA(s), 39 warp-instructions
+  lane_arrivals: 1 CTA(s), 41 warp-instructions
+  lane_arrivals: 1 CTA(s), 41 warp-instructions
+  lane_arrivals: 1 CTA(s), 41 warp-instructions
+  lane_arrivals: 1 CTA(s), 41 warp-instructions
+  lane_arrivals: 1 CTA(s), 39 warp-instructions
+  lane_arrivals: 1 CTA(s), 41 warp-instructions
+  lane_arrivals: 1 CTA(s), 39 warp-instructions

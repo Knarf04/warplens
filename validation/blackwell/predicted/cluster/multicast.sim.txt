@@ -1,0 +1,6 @@
+status: ok
+warplens: 4 kernel launch(es) simulated on B200, 0 finding(s)
+  multicast: 4 CTA(s), 288 warp-instructions
+  multicast: 4 CTA(s), 246512 warp-instructions
+  multicast: 4 CTA(s), 246518 warp-instructions
+  multicast: 4 CTA(s), 246518 warp-instructions

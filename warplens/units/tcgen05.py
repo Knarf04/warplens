@@ -134,7 +134,11 @@ def _operand_bytes(w, ins, desc: int, rows: int, dtype: np.dtype, which: str,
     if layout not in _LAYOUTS:
         raise unsupported(ins, f"shared-memory descriptor layout type {layout} for operand {which}")
     if (desc >> 49) & 7:
-        raise unsupported(ins, "shared-memory descriptor with a non-zero base offset")
+        # CUTLASS never sets the field (make_umma_desc), and what hardware does with it is
+        # unmeasured: validation/blackwell/mma/base_offset records it. With the field 0 the
+        # swizzle below is on absolute shared addresses, whatever the start (MMA-12).
+        raise unsupported(ins, "shared-memory descriptor with a non-zero base offset "
+                               f"({(desc >> 49) & 7} for operand {which}); outside the v1 scope")
     bits, row_bytes = _LAYOUTS[layout]
     start = (desc & 0x7FFF) << 4
     lbo = ((desc >> 16) & 0x7FFF) << 4

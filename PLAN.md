@@ -428,9 +428,11 @@ Found by this work in the simulator, and fixed since unless marked open:
   Unsynchronized code has no portable implicit ordering guarantee.
 - State tokens older than the immediately preceding mbarrier phase are invalid
   PTX use. They now report `mbarrier-invalid-token` and grant no synchronization
-  credit. The simulator's true and the 3080 Ti's false result are informational.
-  Likewise, integer zero divisors now produce a diagnostic; f32 NaN payloads
-  and integer divide-by-zero values remain explicitly nonportable.
+  credit. Their parity-based fallback reproduces recorded Ampere behavior;
+  it is informational for invalid use. Integer zero divisors likewise produce
+  a diagnostic while returning the recorded all-ones fallback. The new NaN
+  and division golden files document observed Ampere behavior, not bit-exact
+  Blackwell guarantees.
 - Atomic instructions were missing. The CUDA-emitted add, exchange, CAS,
   bitwise, min/max and increment/decrement operations now run, with
   `red.add`, generic pointers and relaxed cta/gpu/sys scope. Review fixes
@@ -440,6 +442,11 @@ Found by this work in the simulator, and fixed since unless marked open:
   The rental tests isolate fake-root environments, respect optional Triton,
   and compare successful book kernels without requiring identical host-BLAS
   error magnitudes. The runners' numerical tolerance checks remain in place.
+- Refused launches now retain their CUDA error category, separately from
+  kernel failures. Review also checks per-axis grid/block limits. Shared-memory
+  opt-in above 48 KB remains a documented shim limitation.
+- Open: the new `nan_golden`, `intdiv_golden` and `mbarrier_token_golden`
+  programs are not yet included in the B200 `e2e/ampere_replay` runner.
 - Documents that contradict the code are listed in
   `docs/validation-matrix.md`, "Discrepancies found".
 

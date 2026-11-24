@@ -12,6 +12,15 @@ number advances and the arrival count is reloaded.
     complete_tx               what a TMA load does to the barrier when it lands
     test_wait / try_wait      has a given phase completed?
 
+The model's arrival token carries phase parity in bit 63 and the phase number
+in its low half. A wait compares the parity bit, reproducing the predicates
+recorded on an RTX 3080 Ti (validation/ampere/mbarrier_token_golden.txt).
+Hardware token bits are opaque. State tokens are valid only in their current
+or immediately preceding phase: the model validates its full encoding and
+reports other tokens without granting synchronization credit. For invalid
+inputs it keeps the measured Ampere parity predicate only as a nonportable
+fallback; those observations do not establish Blackwell behavior.
+
 `try_wait` may suspend the thread on real hardware; here it blocks the warp
 until the phase completes, which lets a wait that can never succeed be
 reported as a deadlock instead of spinning forever.
@@ -83,7 +92,7 @@ def _mbarrier(w, ins, mask):
         n = count(ops[2]) if len(ops) == 3 else None
         token = np.zeros(len(mask), dtype=np.uint64)
         for l, bar in bars(ops[1]):
-            token[l] = bar.phase
+            token[l] = token_of(bar.phase)
             if expect:
                 bar.expect_tx(int(n[l]))
                 bar.arrive(1, w, ins, [l])
@@ -105,15 +114,19 @@ def _mbarrier(w, ins, mask):
         result = np.zeros(len(mask), dtype=np.bool_)
         waiting = []
         for l, bar in bars(ops[1]):
-            done = (bar.phase & 1) != (int(arg[l]) & 1) if parity else bar.phase != int(arg[l])
+            done = (bar.phase & 1) != (int(arg[l]) & 1 if parity else int(arg[l]) >> 63)
             result[l] = done
-            if not parity and int(arg[l]) not in (bar.phase, bar.phase - 1):
+            valid_tokens = {token_of(bar.phase)}
+            if bar.phase > 0:
+                valid_tokens.add(token_of(bar.phase - 1))
+            if not parity and int(arg[l]) not in valid_tokens:
                 # PTX state tokens are valid only in their own phase and the next.
                 # Keep the model's deterministic predicate for exploratory kernels,
                 # but never acquire a different phase's completion knowledge.
                 cta.findings.add(
                     "mbarrier-invalid-token",
-                    f"mbarrier token for phase {int(arg[l])} used in phase {bar.phase}; "
+                    f"mbarrier token 0x{int(arg[l]):016x} (phase {int(arg[l]) & 0xFFFFFFFF}) "
+                    f"used in phase {bar.phase}; "
                     "only the current or immediately preceding phase is valid. The "
                     "predicate is a nonportable model fallback and grants no synchronization",
                     w, ins, [l])
@@ -166,6 +179,14 @@ def _fence(w, ins, mask):
         pass
     else:
         raise unsupported(ins)
+
+
+def token_of(phase: int) -> int:
+    """Model token: parity in bit 63 for the predicate, phase below for validation.
+
+    Hardware token bits are opaque; the low half is the simulator's own encoding.
+    """
+    return (phase & 1) << 63 | phase & 0xFFFFFFFF
 
 
 class Mbarrier:

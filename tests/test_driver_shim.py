@@ -262,6 +262,98 @@ int main(int argc, char **argv) {
     CHECK(cuStreamDestroy(stream) == CUDA_SUCCESS && cuCtxDestroy(context) == CUDA_SUCCESS);
     return 0;
   }
+  if (!strcmp(argv[1], "errors")) {  /* refusals, with the codes an RTX 3080 Ti gave for them */
+    CUmodule module; CUfunction kernel;
+    const char *text = NULL;
+    unsigned *source, *target, factor = 2;
+    int limit = 0;
+    CHECK(cuInit(0) == CUDA_SUCCESS && cuModuleLoadData(&module, ptx) == CUDA_SUCCESS);
+    CHECK(cuModuleGetFunction(&kernel, module, "scale") == CUDA_SUCCESS);
+    CHECK(cudaMalloc((void **)&source, 4096) == cudaSuccess && cudaMalloc((void **)&target, 4096) == cudaSuccess);
+    void *arguments[3] = {&source, &target, &factor};
+    dim3 grid = {2, 1, 1}, block = {32, 1, 1}, big = {1025, 1, 1}, none = {0, 1, 1};
+    CHECK(cudaDeviceGetAttribute(&limit, cudaDevAttrMaxSharedMemoryPerBlockOptin, 0) == cudaSuccess);
+    CHECK(limit == 227 * 1024);
+
+    /* cudaFuncSetAttribute: up to the opt-in maximum the device reports, and no further */
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 0) == cudaSuccess);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, limit) == cudaSuccess);
+    CHECK(cudaGetLastError() == cudaSuccess);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, limit + 1) == cudaErrorInvalidValue);
+    CHECK(cudaPeekAtLastError() == cudaErrorInvalidValue && cudaDeviceSynchronize() == cudaSuccess);
+    CHECK(cudaGetLastError() == cudaErrorInvalidValue && cudaGetLastError() == cudaSuccess);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, limit + 16) == cudaErrorInvalidValue);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 228 * 1024) == cudaErrorInvalidValue);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, -1) == cudaErrorInvalidValue);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributePreferredSharedMemoryCarveout, 100) == cudaSuccess);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributePreferredSharedMemoryCarveout, -1) == cudaSuccess);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributePreferredSharedMemoryCarveout, 101) == cudaErrorInvalidValue);
+    CHECK(cudaFuncSetAttribute(kernel, cudaFuncAttributePreferredSharedMemoryCarveout, -2) == cudaErrorInvalidValue);
+    CHECK(cudaFuncSetAttribute(kernel, (enum cudaFuncAttribute)99, 0) == cudaErrorInvalidValue);
+    CHECK(cudaFuncSetAttribute(kernel, (enum cudaFuncAttribute)14, 1) == cudaSuccess);  /* non-portable cluster size */
+    CHECK(cuFuncSetAttribute(kernel, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, limit) == CUDA_SUCCESS);
+    CHECK(cuFuncSetAttribute(kernel, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, limit + 1) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cuFuncSetAttribute(kernel, CU_FUNC_ATTRIBUTE_PREFERRED_SHARED_MEMORY_CARVEOUT, 101) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cuFuncSetAttribute(kernel, CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK, 5) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cuFuncSetAttribute(NULL, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 0) == CUDA_ERROR_INVALID_HANDLE);
+    (void)cudaGetLastError();
+
+    /* a refused launch: returned by the call, kept for cudaGetLastError, not a kernel error */
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, (size_t)limit, NULL) == cudaSuccess);
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, (size_t)limit + 16, NULL) == cudaErrorInvalidValue);
+    CHECK(cudaPeekAtLastError() == cudaErrorInvalidValue && cudaDeviceSynchronize() == cudaSuccess);
+    CHECK(cudaGetLastError() == cudaErrorInvalidValue && cudaGetLastError() == cudaSuccess);
+    CHECK(cudaLaunchKernel(kernel, grid, big, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+    dim3 deep = {1, 1, 65};
+    dim3 oversized_grids[] = {{2147483648u, 1, 1}, {1, 65536, 1}, {1, 1, 65536}};
+    CHECK(cudaLaunchKernel(kernel, grid, deep, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+    CHECK(cuLaunchKernel(kernel, 1, 1, 1, 1, 1, 65, 0, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
+    for (unsigned i = 0; i < sizeof oversized_grids / sizeof oversized_grids[0]; ++i) {
+      dim3 shape = oversized_grids[i];
+      CHECK(cudaLaunchKernel(kernel, shape, block, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+      CHECK(cuLaunchKernel(kernel, shape.x, shape.y, shape.z, 32, 1, 1, 0, NULL, arguments, NULL) ==
+            CUDA_ERROR_INVALID_VALUE);
+    }
+    CHECK(cudaLaunchKernel(kernel, grid, none, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+    CHECK(cudaLaunchKernel(kernel, none, block, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+    CHECK(cudaDeviceSynchronize() == cudaSuccess && cudaGetLastError() == cudaErrorInvalidConfiguration);
+    CHECK(cuLaunchKernel(kernel, 2, 1, 1, 1025, 1, 1, 0, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
+    CHECK(cuLaunchKernel(kernel, 2, 1, 1, 32, 1, 1, (unsigned)limit + 16, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
+    (void)cudaGetLastError();  /* the two libraries share one last error here */
+    for (unsigned clusters = 16; clusters <= 32; clusters += 16) {  /* 16 CTAs is the largest cluster */
+      cudaLaunchConfig_t config; cudaLaunchAttribute attribute; CUlaunchConfig driver; CUlaunchAttribute shape;
+      memset(&config, 0, sizeof config); memset(&attribute, 0, sizeof attribute);
+      memset(&driver, 0, sizeof driver); memset(&shape, 0, sizeof shape);
+      config.gridDim.x = clusters; config.gridDim.y = config.gridDim.z = 1; config.blockDim.x = 1;
+      config.blockDim.y = config.blockDim.z = 1;
+      attribute.id = cudaLaunchAttributeClusterDimension;
+      attribute.val.clusterDim.x = clusters; attribute.val.clusterDim.y = attribute.val.clusterDim.z = 1;
+      config.attrs = &attribute; config.numAttrs = 1;
+      driver.gridDimX = clusters; driver.gridDimY = driver.gridDimZ = 1;
+      driver.blockDimX = driver.blockDimY = driver.blockDimZ = 1;
+      shape.id = CU_LAUNCH_ATTRIBUTE_CLUSTER_DIMENSION;
+      shape.value.clusterDim.x = clusters; shape.value.clusterDim.y = shape.value.clusterDim.z = 1;
+      driver.attrs = &shape; driver.numAttrs = 1;
+      cudaError_t expected = clusters == 16 ? cudaSuccess : cudaErrorInvalidClusterSize;
+      CHECK(cudaLaunchKernelExC(&config, kernel, arguments) == expected);
+      CHECK(cudaDeviceSynchronize() == cudaSuccess && cudaGetLastError() == expected);
+      CHECK(cuLaunchKernelEx(&driver, kernel, arguments, NULL) ==
+            (clusters == 16 ? CUDA_SUCCESS : CUDA_ERROR_INVALID_CLUSTER_SIZE));
+      (void)cudaGetLastError();
+    }
+    CHECK(!strcmp(cudaGetErrorName(cudaErrorInvalidClusterSize), "cudaErrorInvalidClusterSize"));
+    CHECK(!strcmp(cudaGetErrorName(cudaErrorInvalidConfiguration), "cudaErrorInvalidConfiguration"));
+    CHECK(!strcmp(cudaGetErrorName(cudaErrorMemoryAllocation), "cudaErrorMemoryAllocation"));
+    CHECK(cuGetErrorName(CUDA_ERROR_INVALID_CLUSTER_SIZE, &text) == CUDA_SUCCESS);
+    CHECK(!strcmp(text, "CUDA_ERROR_INVALID_CLUSTER_SIZE"));
+
+    /* a kernel that faults is still a launch failure, and the synchronize reports that one */
+    grid.x = 1024;
+    CHECK(cudaLaunchKernel(kernel, grid, block, arguments, 0, NULL) == cudaErrorLaunchFailure);
+    CHECK(cudaDeviceSynchronize() == cudaErrorLaunchFailure && cudaGetLastError() == cudaErrorLaunchFailure);
+    CHECK(cudaDeviceSynchronize() == cudaSuccess && cudaGetLastError() == cudaSuccess);
+    return 0;
+  }
   if (!strcmp(argv[1], "tokens")) {  /* streams, events and host memory, as TVM's runtime uses them */
     cudaStream_t stream; cudaEvent_t start, end;
     float elapsed = -1.0f;
@@ -343,6 +435,16 @@ def test_driver_rejects_machine_code_and_text_that_is_not_ptx(client):
 @pytest.mark.parametrize("model", ["B200", "B300"])
 def test_driver_and_runtime_describe_the_same_device(client, model):
     run_client(client, "device", model)
+
+
+def test_refusals_carry_the_codes_a_gpu_gives(client):
+    """`cudaFuncSetAttribute` above the opt-in maximum, and launches refused for their shared
+    memory, block, grid or cluster: the code the call returns, that `cudaGetLastError` has it
+    once, and that `cudaDeviceSynchronize` does not repeat it (measured on an RTX 3080 Ti with
+    its own limits; the cluster cases are documented behaviour, Ampere having no clusters)."""
+    server, done = run_client(client, "errors")
+    assert "more than 16 CTAs" in done.stderr and "the limit is 232448" in done.stderr
+    assert [stats.ctas for _, stats in server.launches] == [2, 16, 16]  # no refused launch ran
 
 
 def test_streams_events_and_host_memory_are_accepted(client):

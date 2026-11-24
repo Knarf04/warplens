@@ -20,7 +20,12 @@
 
 static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static int channel = -2;
+/* The last error a call returned, for cudaGetLastError and cudaPeekAtLastError; and the
+ * error of a kernel that failed while running, which is what the synchronize calls report.
+ * On a GPU an error a call returns (a bad argument, a refused launch) is not repeated by
+ * cudaDeviceSynchronize; a kernel fault is. */
 static __thread cudaError_t last_error = cudaSuccess;
+static __thread cudaError_t kernel_error = cudaSuccess;
 
 struct function { const void *host; uint32_t id, count, size[MAX_PARAMS]; };
 static struct function functions[MAX_FUNCTIONS];
@@ -234,8 +239,10 @@ cudaError_t cudaLibraryUnload(cudaLibrary_t library) { (void)library; return cud
 
 cudaError_t cudaKernelSetAttributeForDevice(cudaKernel_t kernel, enum cudaFuncAttribute attr,
                                             int value, int device) {
-  (void)kernel; (void)attr; (void)value;  /* as cudaFuncSetAttribute: always allowed */
-  return result(device == 0 ? cudaSuccess : cudaErrorInvalidDevice);
+  (void)kernel;
+  TRACE("cudaKernelSetAttributeForDevice(%d, %d, device %d)", (int)attr, value, device);
+  if (device != 0) return result(cudaErrorInvalidDevice);
+  return result(wl_function_attribute_is_valid((int)attr, value) ? cudaSuccess : cudaErrorInvalidValue);
 }
 
 static struct function *find_function(const void *host) {
@@ -298,6 +305,9 @@ static cudaError_t launch(const void *host, dim3 grid, dim3 block, dim3 cluster,
     fflush(stdout);
   }
   free(text);
+  if (status && status != WL_INVALID_VALUE && status != WL_INVALID_CONFIGURATION &&
+      status != WL_INVALID_CLUSTER_SIZE)
+    kernel_error = (cudaError_t)status;
   return result(status);
 }
 
@@ -435,9 +445,15 @@ cudaError_t cudaMemset(void *devPtr, int value, size_t count) {
 
 /* -- everything is synchronous ----------------------------------------------------------- */
 
-cudaError_t cudaDeviceSynchronize(void) { TRACE("cudaDeviceSynchronize -> %d", (int)last_error); return last_error; }
-cudaError_t cudaStreamSynchronize(cudaStream_t stream) { (void)stream; TRACE("cudaStreamSynchronize -> %d", (int)last_error); return last_error; }
-cudaError_t cudaGetLastError(void) { cudaError_t e = last_error; TRACE("cudaGetLastError -> %d", (int)e); last_error = cudaSuccess; return e; }
+cudaError_t cudaDeviceSynchronize(void) { TRACE("cudaDeviceSynchronize -> %d", (int)kernel_error); return kernel_error; }
+cudaError_t cudaStreamSynchronize(cudaStream_t stream) { (void)stream; TRACE("cudaStreamSynchronize -> %d", (int)kernel_error); return kernel_error; }
+cudaError_t cudaGetLastError(void) {
+  cudaError_t e = last_error;
+  TRACE("cudaGetLastError -> %d", (int)e);
+  /* The simulated context survives a failed kernel, so reading the error clears that too. */
+  last_error = kernel_error = cudaSuccess;
+  return e;
+}
 cudaError_t cudaPeekAtLastError(void) { TRACE("cudaPeekAtLastError -> %d", (int)last_error); return last_error; }
 
 /* Streams and events are tokens: work finishes before the call that started it returns, and
@@ -458,7 +474,7 @@ cudaError_t cudaEventCreate(cudaEvent_t *event) {
 }
 cudaError_t cudaEventDestroy(cudaEvent_t event) { free(event); return cudaSuccess; }
 cudaError_t cudaEventRecord(cudaEvent_t event, cudaStream_t stream) { (void)event; (void)stream; return cudaSuccess; }
-cudaError_t cudaEventSynchronize(cudaEvent_t event) { (void)event; return last_error; }
+cudaError_t cudaEventSynchronize(cudaEvent_t event) { (void)event; return kernel_error; }
 cudaError_t cudaEventElapsedTime(float *ms, cudaEvent_t start, cudaEvent_t end) {
   (void)start; (void)end;
   *ms = 0.0f;
@@ -470,10 +486,16 @@ const char *cudaGetErrorName(cudaError_t error) {
   switch (error) {
     case cudaSuccess: return "cudaSuccess";
     case cudaErrorInvalidValue: return "cudaErrorInvalidValue";
+    case cudaErrorMemoryAllocation: return "cudaErrorMemoryAllocation";
     case cudaErrorInvalidDeviceFunction: return "cudaErrorInvalidDeviceFunction";
     case cudaErrorInvalidConfiguration: return "cudaErrorInvalidConfiguration";
     case cudaErrorInvalidDevice: return "cudaErrorInvalidDevice";
+    case cudaErrorInvalidMemcpyDirection: return "cudaErrorInvalidMemcpyDirection";
+    case cudaErrorInvalidKernelImage: return "cudaErrorInvalidKernelImage";
+    case cudaErrorSymbolNotFound: return "cudaErrorSymbolNotFound";
     case cudaErrorLaunchFailure: return "cudaErrorLaunchFailure";
+    case cudaErrorNotSupported: return "cudaErrorNotSupported";
+    case cudaErrorInvalidClusterSize: return "cudaErrorInvalidClusterSize";
     default: return "cudaErrorUnknown";
   }
 }
@@ -567,9 +589,13 @@ cudaError_t cudaFuncGetAttributes(struct cudaFuncAttributes *attr, const void *f
   return cudaSuccess;
 }
 
+/* Opting in to more dynamic shared memory than the default 48 KB. A launch is not held to
+ * what was asked for here (the simulator allows WL_MAX_SMEM_BYTES without the opt-in a GPU
+ * requires), but a value the device could never give is refused as a GPU refuses it. */
 cudaError_t cudaFuncSetAttribute(const void *func, enum cudaFuncAttribute attr, int value) {
-  (void)func; (void)attr; (void)value;  /* e.g. opting in to more shared memory: always allowed */
-  return cudaSuccess;
+  (void)func;
+  TRACE("cudaFuncSetAttribute(%p, %d, %d)", func, (int)attr, value);
+  return result(wl_function_attribute_is_valid((int)attr, value) ? cudaSuccess : cudaErrorInvalidValue);
 }
 
 /* -- driver API entry points ----------------------------------------------------------- */

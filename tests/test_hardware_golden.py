@@ -170,7 +170,7 @@ def test_prmt_matches_real_gpu(sim):
 
 def test_flush_to_zero_arithmetic_matches_real_gpu(sim):
     """ftz_golden.txt is bin/ftz_golden on an RTX 3080 Ti: add, sub, mul, div, fma and sqrt with
-    `.ftz` on operands around the subnormal range. NaN results are compared as NaNs only."""
+    `.ftz` on operands around the subnormal range. Compared bit for bit, NaN results included."""
     from conftest import kernel
     rows = np.array([[int(x, 16) for x in l.split()] for l in (AMPERE / "ftz_golden.txt").read_text().splitlines()],
                     dtype=np.uint32)
@@ -198,8 +198,8 @@ def test_flush_to_zero_arithmetic_matches_real_gpu(sim):
         sim.launch(mod, "k", grid=(n + pad) // 256, block=256, args=[*(sim.from_numpy(c) for c in columns), out])
         got, expect = out.numpy()[:n], cases[:, 4]
         nan = np.isnan(expect.view(np.float32))
-        assert (np.isnan(got.view(np.float32)) == nan).all(), body
-        wrong = np.flatnonzero((got != expect) & ~nan)
+        assert (expect[nan] == 0x7FFFFFFF).all()  # the only NaN the GPU returned, 642 times
+        wrong = np.flatnonzero(got != expect)
         assert not len(wrong), (f"{body} {len(wrong)} of {n} differ, e.g. " +
                                 "; ".join(f"{cases[i, 1]:08x} {cases[i, 2]:08x} {cases[i, 3]:08x} -> gpu "
                                           f"{expect[i]:08x}, sim {got[i]:08x}" for i in wrong[:6]))
@@ -357,3 +357,106 @@ def test_atomic_updates_match_real_gpu(sim):
     assert recorded["ticket_g"] == list(range(total))  # 512 increments, each a different old value
     assert recorded["g32"][0] == total and recorded["g32"][13] == 11 + 3 * total  # counter, CAS loop
     assert recorded["g32"][11] == total % 100 and recorded["g32"][12] == 100 - total % 100  # inc, dec
+
+
+def test_mbarrier_tokens_match_real_gpu(sim):
+    """mbarrier_token_golden.txt is bin/mbarrier_token_golden on an RTX 3080 Ti: after every
+    arrival, `test_wait` with the token of each arrival so far (up to eight phases old), with
+    the made-up tokens 1 << b, and `test_wait.parity` with 0 to 3. The GPU answers from bit 63
+    of the token alone, which holds the parity of the phase the arrival was made in.
+    Older and made-up tokens are invalid PTX use: this pins an empirical fallback,
+    not a portable synchronization guarantee, and findings are required."""
+    rows = [l.split() for l in (AMPERE / "mbarrier_token_golden.txt").read_text().splitlines()]
+    assert len(rows) == 8 * (1 + 2 + 3 + 5)
+    problems = []
+    for count in (1, 2, 3, 5):
+        expect = np.array([[int(r[2])] + [int(x, 16) for x in r[3:]] for r in rows if int(r[0]) == count],
+                          dtype=np.uint64)
+        steps = len(expect)
+        out = sim.from_numpy(np.zeros(4 * steps, np.uint64))
+        stats = sim.launch(AMPERE / "mbarrier_token_probe.ptx", "mbarrier_token_probe", grid=1, block=1,
+                           args=[np.uint32(count), np.int32(steps), out])
+        # Stale and forged tokens are deliberate invalid-use observations. They
+        # reproduce Ampere's predicate but must not acquire synchronization credit.
+        assert {f.kind for f in stats.findings} == {"mbarrier-invalid-token"}
+        got = out.numpy().reshape(steps, 4)
+        problems += [f"count {count}, arrival {s}: gpu {[hex(v) for v in expect[s]]}, sim {[hex(v) for v in got[s]]}"
+                     for s in range(steps) if (got[s] != expect[s]).any()]
+    assert not problems, f"{len(problems)} arrivals differ:\n" + "\n".join(problems[:8])
+
+
+def _golden_instruction_mismatches(sim, path, operands, skip=(), expected_findings=()):
+    """Run every line "instruction a b [c] result" of a golden file (64-bit hex patterns, a
+    narrower value in the low bits) through the simulator, one instruction per thread, and
+    describe the lines whose result differs. Returns (problems, lines per instruction)."""
+    from collections import defaultdict
+    from conftest import kernel
+    cases = defaultdict(list)
+    for line in path.read_text().splitlines():
+        name, *values = line.split()
+        assert len(values) == operands + 1
+        cases[name].append([int(x, 16) for x in values])
+    reg = lambda ty: "b16" if ty == "f16" else ty  # half floats live in 16-bit registers
+    problems = []
+    for name, rows in cases.items():
+        if name in skip:
+            continue
+        rows = np.array(rows, dtype=np.uint64)
+        n = len(rows)
+        *_, src = name.split(".")
+        dst = name.split(".")[-2] if name.startswith("cvt") else src
+        arity = {"fma": 3, "sqrt": 1, "neg": 1, "abs": 1, "mov": 1, "cvt": 1}.get(name.split(".")[0], 2)
+        ins = [f"%a{k}" for k in range(arity)]
+        mod = kernel(f"""
+            .reg .b64 %p0, %p1, %p2, %po, %off; .reg .b32 %i, %x, %y; .reg .pred %outside;
+            .reg .{reg(src)} %a0, %a1, %a2; .reg .{reg(dst)} %d;
+            ld.param.u64 %p0, [a]; ld.param.u64 %p1, [b]; ld.param.u64 %p2, [c]; ld.param.u64 %po, [o];
+            mov.u32 %x, %ctaid.x; mov.u32 %y, %tid.x;
+            mad.lo.u32 %i, %x, 256, %y;
+            setp.ge.u32 %outside, %i, {n};
+            @%outside ret;
+            mul.wide.u32 %off, %i, 8;
+            add.u64 %p0, %p0, %off; add.u64 %p1, %p1, %off; add.u64 %p2, %p2, %off; add.u64 %po, %po, %off;
+            ld.global.{reg(src)} %a0, [%p0]; ld.global.{reg(src)} %a1, [%p1]; ld.global.{reg(src)} %a2, [%p2];
+            {name} %d, {", ".join(ins)};
+            st.global.{reg(dst)} [%po], %d;
+            ret;
+        """, ".param .u64 a, .param .u64 b, .param .u64 c, .param .u64 o")
+        pad = -n % 256
+        columns = [np.concatenate([rows[:, k] if k < operands else np.zeros(n, np.uint64), np.zeros(pad, np.uint64)])
+                   for k in range(3)]
+        out = sim.from_numpy(np.zeros(n + pad, np.uint64))  # a narrow result leaves the rest zero
+        stats = sim.launch(mod, "k", grid=(n + pad) // 256, block=256,
+                           args=[*(sim.from_numpy(c) for c in columns), out])
+        assert {f.kind for f in stats.findings} == set(expected_findings)
+        got, expect = out.numpy()[:n], rows[:, operands]
+        wrong = np.flatnonzero(got != expect)
+        if len(wrong):
+            problems.append(f"{name}: {len(wrong)} of {n} differ, e.g. " + "; ".join(
+                " ".join(f"{v:x}" for v in rows[i, :arity]) + f" -> gpu {expect[i]:x}, sim {got[i]:x}"
+                for i in wrong[:4]))
+    return problems, {name: len(rows) for name, rows in cases.items()}
+
+
+def test_nan_results_match_real_gpu(sim):
+    """nan_golden.txt is bin/nan_golden on an RTX 3080 Ti: add, sub, mul, div, fma, sqrt, neg,
+    abs, mov and the conversions between f16, f32 and f64 over NaNs of every kind in every
+    operand position and over every invalid operation. Compared bit for bit: an f32 NaN
+    result is 0x7fffffff whatever went in; an f64 one is a NaN operand made quiet (which one
+    depends on the instruction) or 0xfff8000000000000 for an invalid operation.
+    `cvt` with `.ftz` is recorded but not implemented by the simulator."""
+    problems, counts = _golden_instruction_mismatches(
+        sim, AMPERE / "nan_golden.txt", 3, skip=("cvt.ftz.f64.f32", "cvt.rn.ftz.f32.f64"))
+    assert len(counts) == 38 and sum(counts.values()) == 14270
+    assert not problems, "\n".join(problems)
+
+
+def test_integer_division_matches_real_gpu(sim):
+    """intdiv_golden.txt is bin/intdiv_golden on an RTX 3080 Ti: `div` and `rem` for s16, u16,
+    s32, u32, s64 and u64 over all pairs of 22 values. Division by zero gives all ones, for
+    `rem` too; the minimum over -1 gives the minimum, and remainder 0. Zero-divisor
+    results are machine-specific in PTX, so the empirical match retains findings."""
+    problems, counts = _golden_instruction_mismatches(sim, AMPERE / "intdiv_golden.txt", 2,
+        expected_findings=("integer-divide-by-zero",))
+    assert len(counts) == 12 and sum(counts.values()) == 5808
+    assert not problems, "\n".join(problems)

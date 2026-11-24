@@ -26,6 +26,11 @@ mkdir -p bin
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/prmt_golden prmt_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/minmax_cvt_golden minmax_cvt_golden.cu
 "$HW_NVCC" -arch="$HW_ARCH" -o bin/atom_golden atom_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/mbarrier_token_golden mbarrier_token_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/nan_golden nan_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/intdiv_golden intdiv_golden.cu
+"$HW_NVCC" -arch="$HW_ARCH" -std=c++17 -o bin/launch_errors_hw launch_errors_hw.cu
+"${CC:-cc}" -I"$(dirname "$(dirname "$(command -v "$HW_NVCC")")")/include" -o bin/driver_errors_hw driver_errors_hw.c -lcuda
 $PTX_NVCC -arch=sm_100a -ptx shfl_probe.cu -o shfl_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx barrier_exit_hw.cu -o barrier_exit.ptx
 $PTX_NVCC -arch=sm_100a -ptx printf_probe.cu -o printf_probe.ptx
@@ -35,4 +40,5 @@ $PTX_NVCC -arch=sm_100a -ptx cpasync_probe.cu -o cpasync_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx call_probe.cu -o call_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx callforms_probe.cu -o callforms_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx atom_probe.cu -o atom_probe.ptx
+$PTX_NVCC -arch=sm_100a -ptx mbarrier_token_probe.cu -o mbarrier_token_probe.ptx
 echo "built bin/{shfl_golden,transpose_hw,barrier_exit_hw}, shfl_probe.ptx, barrier_exit.ptx"

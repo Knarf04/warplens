@@ -384,7 +384,7 @@ What was done on the development machine (RTX 3080 Ti Laptop GPU, `sm_86`, drive
 | the timeout path: `--mode sim --timeout-scale 0.004` | the run is killed and recorded as `timeout`; the next run proceeds; `compare.py` reports `timed out` |
 | **on the GPU**: `build.sh --ampere`, `run_all.py --binaries ampere --no-build --only ...` | `mbarrier/phase_parity`, `mbarrier/phase_parity.counts` and `mbarrier/lane_arrivals` ran on the 3080 Ti and are **identical** to the predictions. `e2e/device_attributes` ran and differs, as it should (8.6, 58 SMs): that is the check that catches a wrong machine. The environment capture (`nvidia-smi`, `compute_cap`, driver, ...) was exercised by the same run |
 | **the driver refusing PTX, on the GPU**: `mbarrier/script` built by nvcc 13.5 for `compute_86` as a PTX-carrying program and as machine code; the driver supports CUDA 13.0 | the PTX program prints `LAUNCH FAILED` (`cudaErrorUnsupportedPtxVersion`, exit 4); `run_all.py` records `launch-failed`, exits 1, and `compare.py` says `FAILED TO LAUNCH`. With `--binaries auto` the canary fails from `bin/`, passes from `bin-native/`, and the three mbarrier runs are identical to the predictions. With `toolkit.txt` naming another nvcc the banner appears in `run_all.py` and `compare.py` |
-| **on the GPU**, the probes added later that need nothing newer than Ampere: `formats/fma`, `fma.all`, `scalar_edges`, `ftz`, `mbarrier/arrive_token`, the seven `e2e/ampere_replay` cases | identical to the predictions. `mbarrier/arrive_token.stale` records an **invalid-use observation**: a token two phases old tests false on the 3080 Ti and true in the simulator; that result is informational, not a portable PTX expectation (finding 10 below) |
+| **on the GPU**, the probes added later that need nothing newer than Ampere: `formats/fma`, `fma.all`, `scalar_edges`, `ftz`, `mbarrier/arrive_token`, the seven `e2e/ampere_replay` cases | identical to the predictions. `mbarrier/arrive_token.stale` records an **invalid-use observation**: the model now reproduces the 3080 Ti's parity fallback, but stale results and opaque token bits remain informational, not portable PTX expectations (finding 10 below) |
 | **another compiler**: every probe built by nvcc 13.0.88 (the toolkit `env/remote/setup.sh` falls back to on this machine's driver), then `run_all.py --mode predict` on those programs | all 98 predictions byte-identical to the committed ones, which come from nvcc 13.5.37 code. Before the barriers of finding 16 were added, 16 differed |
 | **the whole rental, rehearsed**: `env/remote/run.sh --keep-going` on the 3080 Ti with `PREFLIGHT_EXPECT_CAP=8.6`, env from `setup.sh` (fallback toolkit 13.0, PyTorch env) | 13 min 52 s. Preflight: the new `predictions` check warns, `torch` passes, the three Blackwell checks fail as they must. Both suites build. `run-blackwell`: the canary fails from `bin/` and `bin-native/` (`cudaErrorNoKernelImageForDevice`: `sm_100a` code on `sm_86`), `NEITHER BUILD RUNS`; 71 runs `launch-failed`, 28 `host-error` (no tensor maps on Ampere), 2 `ok`; the stage fails with the count in capitals. `compare.py`: 71 `FAILED TO LAUNCH`, 28 `HOST ERROR`, none "by design". `run-timing`: every benchmark `LAUNCH FAILED`. The archive has `PREDICTIONS-NOT-COMPARABLE.txt` at its top and the banner is the last thing printed. An interrupt (Ctrl-C) during the self-test stopped the stage and still wrote the archive |
 | end to end in the simulator | tutorials 1-4 pass their own check; Triton, the TIRx script and the CuTe DSL script match NumPy; the book's `hgemm_v1` to `v9` match NumPy |
@@ -444,9 +444,11 @@ Those marked "fixed since" were fixed on other branches.
    are then charged to the next phase. That is the signed-count model working as designed,
    but it means a box wholly outside the tensor cannot be used to ask whether `complete_tx`
    counts filled bytes; `tma/oob_complete_tx` uses partly-outside boxes only.
-7. **Every kernel failure reaches the program as `cudaErrorLaunchFailure`** (the shim's
-   `cudaGetErrorName` knows six names). A GPU distinguishes illegal instructions, illegal
-   addresses and so on, so the probes print the name on an `info:` line.
+7. **Every kernel failure reaches the program as `cudaErrorLaunchFailure`.** A GPU
+   distinguishes illegal instructions, illegal addresses and so on, so the probes print the
+   name on an `info:` line. (The shim's `cudaGetErrorName` knew six names; it now knows the
+   eleven codes the shim can return. A launch refused before the kernel runs is no longer
+   among the failures: finding 13.)
 8. Not the simulator: **`nvcc -arch=sm_100a -c` assembles for `.target sm_100`** with this
    toolkit and rejects `tcgen05` and `.cta_group` ("not supported on .target 'sm_100'").
    `-gencode arch=compute_100a,code=sm_100a` is what `build.sh` uses. The first version of
@@ -456,10 +458,12 @@ Those marked "fixed since" were fixed on other branches.
    lines; what the GPU returns for them will be in the archive.
 
 10. **Stale mbarrier tokens are invalid use.** PTX permits state waits only for the
-    current or immediately preceding phase. A two-phases-old token is now reported as
-    `mbarrier-invalid-token` and grants no synchronization credit. The model's true
-    fallback and the RTX 3080 Ti's false result are not portable predictions; the probe
-    records them on `info:` lines. See `docs/m2.md` and matrix row MB-03.
+    current or immediately preceding phase. Older or malformed tokens report
+    `mbarrier-invalid-token` and grant no synchronization credit. The model's
+    parity fallback now matches recorded RTX 3080 Ti results, including invalid
+    inputs, without turning those observations into a Blackwell requirement.
+    Token bits and stale predicates remain on `info:` lines. See `docs/m2.md`
+    and matrix row MB-03.
 11. **Atomic updates are implemented.** The forms nvcc 13.5 emits for the
     atomic functions run and match the recorded RTX 3080 Ti results
     (`validation/ampere/atom_golden.txt`). The integrated implementation also
@@ -468,17 +472,26 @@ Those marked "fixed since" were fixed on other branches.
     Acquire/release, cluster scope and packed/half/vector forms remain
     unsupported; see `docs/atomics.md`. The CLC probes still use single-writer
     words.
-12. **NaN payloads and integer division by zero are nonportable.** PTX leaves f32
-    arithmetic NaN encodings unspecified: `.ftz` results such as the simulator's
-    `ffc00000` and the RTX 3080 Ti's `7fffffff` are equivalent for this validation.
-    `min`/`max` already match the recorded Ampere NaN policy. Integer `div`/`rem` by
-    zero now report `integer-divide-by-zero`; their divisor-1 fallback is not a hardware
-    prediction. The probes compare NaN classification and record zero-divisor results
-    on `info:` lines. See `docs/numerics.md` for the PTX references.
-13. **A refused cluster shape reaches the program as `cudaErrorLaunchFailure`**, the code of
-    a fault inside a kernel; and the shim's `cudaFuncSetAttribute` accepts any dynamic
-    shared-memory size (`e2e/smem_limit`: 227 KiB, 227 KiB + 16 and 228 KiB all launch,
-    although the reported opt-in maximum is 227 KiB).
+12. **NaN bit patterns and integer zero divisors now match recorded Ampere results.**
+    The model uses the RTX 3080 Ti's f32 NaN pattern and measured f64 payload/
+    quieting rules (`validation/ampere/nan_golden.txt`). PTX leaves f32 NaN
+    encodings unspecified but supports f64 payloads; the complete measured policy
+    is not guaranteed on Blackwell. Integer `div`/`rem` by zero continue to report
+    `integer-divide-by-zero` and now use Ampere's all-ones fallback. The probes
+    compare NaN classification and record zero-divisor results on `info:` lines.
+    See `docs/numerics.md` and matrix rows NUM-12 and NUM-13.
+13. **Refused launches now carry their specific CUDA error codes.** Too much shared
+    memory returns `cudaErrorInvalidValue`; invalid block/grid dimensions return
+    `cudaErrorInvalidConfiguration`; invalid cluster shapes return
+    `cudaErrorInvalidClusterSize`. Block dimensions are limited to 1024 x 1024 x 64
+    (1024 threads total), and grid dimensions to 2147483647 x 65535 x 65535.
+    `cudaGetLastError` reports the refusal once; synchronization does not repeat
+    it. Dynamic shared-memory attributes above the reported 227 KiB are refused.
+    The shared-memory, block and grid error codes were measured on Ampere at its
+    own limits; the B200 cluster code follows CUDA headers and is not measured.
+    Real kernel faults still become `cudaErrorLaunchFailure`. Clearing that fault
+    with `cudaGetLastError` is a simulator recovery policy, not CUDA context recovery
+    (`docs/m6.md`). Explicit opt-in above 48 KiB is still not required by the model.
 14. Not the simulator: **TVM's CUDA runtime does not find `libcudart.so.13` under plain
     `python`** (its library has no run path to the env's `lib`), and TIRx then reports "no
     CUDA device is available" on a machine with a working GPU. `e2e/run_e2e.py` sets

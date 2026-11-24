@@ -37,35 +37,35 @@ warplens: 54 kernel launch(es) simulated on B200, 8 finding(s)
   scalar_edges: 1 CTA(s), 177 warp-instructions
   scalar_edges: 1 CTA(s), 183 warp-instructions
   scalar_edges: 1 CTA(s), 208 warp-instructions
-    [integer-divide-by-zero] div.s32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses divisor 1 as a nonportable fallback (4 times)
+    [integer-divide-by-zero] div.s32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (4 times)
       line 484: div.s32 %r17, %r2, %r3;
       first in CTA (0, 0, 0), warp 0, lanes 0, 11, 22
   scalar_edges: 1 CTA(s), 216 warp-instructions
-    [integer-divide-by-zero] div.u32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses divisor 1 as a nonportable fallback (4 times)
+    [integer-divide-by-zero] div.u32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (4 times)
       line 264: div.u32 %r16, %r2, %r3;
       first in CTA (0, 0, 0), warp 0, lanes 0, 11, 22
   scalar_edges: 1 CTA(s), 204 warp-instructions
-    [integer-divide-by-zero] div.s64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses divisor 1 as a nonportable fallback (4 times)
+    [integer-divide-by-zero] div.s64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (4 times)
       line 490: div.s64 %rd13, %rd1, %rd2;
       first in CTA (0, 0, 0), warp 0, lanes 0, 11, 22
   scalar_edges: 1 CTA(s), 212 warp-instructions
-    [integer-divide-by-zero] div.u64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses divisor 1 as a nonportable fallback (4 times)
+    [integer-divide-by-zero] div.u64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (4 times)
       line 276: div.u64 %rd13, %rd1, %rd2;
       first in CTA (0, 0, 0), warp 0, lanes 0, 11, 22
   scalar_edges: 1 CTA(s), 200 warp-instructions
-    [integer-divide-by-zero] rem.s32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses divisor 1 as a nonportable fallback (4 times)
+    [integer-divide-by-zero] rem.s32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (4 times)
       line 495: rem.s32 %r15, %r2, %r3;
       first in CTA (0, 0, 0), warp 0, lanes 0, 11, 22
   scalar_edges: 1 CTA(s), 208 warp-instructions
-    [integer-divide-by-zero] rem.u32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses divisor 1 as a nonportable fallback (4 times)
+    [integer-divide-by-zero] rem.u32 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (4 times)
       line 501: rem.u32 %r14, %r2, %r3;
       first in CTA (0, 0, 0), warp 0, lanes 0, 11, 22
   scalar_edges: 1 CTA(s), 212 warp-instructions
-    [integer-divide-by-zero] rem.s64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses divisor 1 as a nonportable fallback (4 times)
+    [integer-divide-by-zero] rem.s64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (4 times)
       line 293: rem.s64 %rd13, %rd1, %rd2;
       first in CTA (0, 0, 0), warp 0, lanes 0, 11, 22
   scalar_edges: 1 CTA(s), 204 warp-instructions
-    [integer-divide-by-zero] rem.u64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses divisor 1 as a nonportable fallback (4 times)
+    [integer-divide-by-zero] rem.u64 has a zero divisor; PTX leaves the result unspecified and machine-specific. The model uses the measured Ampere all-ones fallback (4 times)
       line 507: rem.u64 %rd13, %rd1, %rd2;
       first in CTA (0, 0, 0), warp 0, lanes 0, 11, 22
   scalar_edges: 1 CTA(s), 216 warp-instructions

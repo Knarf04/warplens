@@ -6,9 +6,13 @@ import pytest
 from conftest import kernel, run_lanes
 
 
+@pytest.mark.parametrize("phase", [2, 3])
 @pytest.mark.parametrize("wait", ["test_wait", "try_wait"])
 @pytest.mark.parametrize("semantics", ["acquire", "relaxed"])
-def test_stale_state_wait_is_reported_without_acquiring_newer_data(sim, wait, semantics):
+def test_stale_state_wait_is_reported_without_acquiring_newer_data(sim, wait, semantics, phase):
+    # At phase 3 the stale token's fallback is true; even then it must not acquire
+    # the newer TMA completion. Phase 2 exercises the false fallback too.
+    extra_phase = "mbarrier.arrive.shared::cta.b64 _, [bar];" if phase == 3 else ""
     mod = kernel(f"""
         .reg .b64 %src, %old; .reg .b32 %value; .reg .pred %p;
         .shared .align 16 .b8 data[16]; .shared .align 8 .b64 bar;
@@ -16,6 +20,7 @@ def test_stale_state_wait_is_reported_without_acquiring_newer_data(sim, wait, se
         mbarrier.init.shared::cta.b64 [bar], 1;
         mbarrier.arrive.shared::cta.b64 %old, [bar];
         mbarrier.test_wait.shared::cta.b64 %p, [bar], %old;
+        {extra_phase}
         mbarrier.arrive.expect_tx.shared::cta.b64 _, [bar], 16;
         cp.async.bulk.shared::cluster.global.mbarrier::complete_tx::bytes [data], [%src], 16, [bar];
         mbarrier.{wait}.{semantics}.cta.shared::cta.b64 %p, [bar], %old;
@@ -28,16 +33,19 @@ def test_stale_state_wait_is_reported_without_acquiring_newer_data(sim, wait, se
     assert "mbarrier-invalid-token" in kinds
     assert "tma-load-unsynchronized" in kinds
     invalid = next(f for f in stats.findings if f.kind == "mbarrier-invalid-token")
-    assert "phase 0" in invalid.message and "phase 2" in invalid.message
+    assert "phase 0" in invalid.message and f"phase {phase}" in invalid.message
     assert "no synchronization" in invalid.message
 
 
-def test_current_and_previous_phase_tokens_remain_valid(sim):
-    mod = kernel("""
+@pytest.mark.parametrize("phase", [0, 1, 2])
+def test_current_and_previous_phase_tokens_remain_valid(sim, phase):
+    advance = "mbarrier.arrive.shared::cta.b64 _, [bar];" * (2 * phase)
+    mod = kernel(f"""
         .reg .b64 %out, %token; .reg .b32 %v; .reg .pred %p;
         .shared .align 8 .b64 bar;
         ld.param.u64 %out, [out];
         mbarrier.init.shared::cta.b64 [bar], 2;
+        {advance}
         mbarrier.arrive.shared::cta.b64 %token, [bar];
         mbarrier.test_wait.shared::cta.b64 %p, [bar], %token;
         selp.u32 %v, 1, 0, %p; st.global.u32 [%out], %v;

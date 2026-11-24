@@ -113,6 +113,39 @@ def test_errors_reach_the_program_as_a_status_and_a_message():
     assert status != 0 and b"unknown shim request" in text
 
 
+def test_a_refused_launch_has_the_runtime_code_for_that_refusal():
+    """A launch refused before the kernel runs is not a kernel fault. The codes are what
+    CUDA 12.4 returned on an RTX 3080 Ti for too much shared memory (invalid value), a block
+    or grid it cannot run (invalid configuration) and a cluster it does not accept (invalid
+    cluster size; there for any cluster, since Ampere has none)."""
+    c = Client()
+    (module,) = struct.unpack("<I", c.ok(shim.REGISTER_FATBIN, fatbin(VECADD)))
+    function = struct.unpack_from("<I", c.ok(shim.REGISTER_FUNCTION, struct.pack("<I", module) + b"vecadd"))[0]
+    (p,) = struct.unpack("<Q", c.ok(shim.MALLOC, struct.pack("<Q", 4096)))
+
+    def launch(grid=(1, 1, 1), block=(32, 1, 1), cluster=(0, 0, 0), smem=0, n=32):
+        return c.call(shim.LAUNCH, struct.pack("<10IQ", function, *grid, *block, *cluster, smem)
+                      + struct.pack("<QQQi", p, p, p, n))
+
+    assert launch()[0] == 0
+    assert launch(cluster=(2, 1, 1), grid=(2, 1, 1))[0] == 0
+    status, text = launch(cluster=(32, 1, 1), grid=(32, 1, 1))
+    assert status == 912 and b"more than 16 CTAs" in text  # cudaErrorInvalidClusterSize
+    status, text = launch(cluster=(2, 1, 1), grid=(3, 1, 1))
+    assert status == 912 and b"not a whole number of clusters" in text
+    status, text = launch(smem=227 * 1024 + 16)
+    assert status == 1 and b"the limit is 232448" in text  # cudaErrorInvalidValue
+    assert launch(smem=227 * 1024)[0] == 0
+    status, text = launch(block=(1025, 1, 1))
+    assert status == 9 and b"1025 threads" in text  # cudaErrorInvalidConfiguration
+    assert launch(block=(0, 1, 1))[0] == 9 and launch(grid=(0, 1, 1))[0] == 9
+    assert launch(block=(1, 1, 65))[0] == 9
+    for grid in ((2**31, 1, 1), (1, 65536, 1), (1, 1, 65536)):
+        status, text = launch(grid=grid)
+        assert status == 9 and b"dimension" in text  # refused before constructing the grid
+    assert launch(grid=(64, 1, 1), n=2048)[0] == shim.LAUNCH_FAILURE == 719  # runs off the allocation
+
+
 def test_tensor_map_request_builds_a_usable_tensor_map():
     c = Client()
     (p,) = struct.unpack("<Q", c.ok(shim.MALLOC, struct.pack("<Q", 64 * 128 * 2)))

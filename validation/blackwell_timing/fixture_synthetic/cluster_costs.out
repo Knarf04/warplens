@@ -1,0 +1,9 @@
+DEVICE bench=cluster_costs name=SYNTHETIC_not_measured cc=10.0 sm_count=148 total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 trials=2 scale=1 synthetic=1
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=4000 trial=0 event_ns=501933.363 wall_ns=506933.363 clk=915673 check=0
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=8000 trial=0 event_ns=983139.779 wall_ns=988139.779 clk=1829966 check=0
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=4000 trial=1 event_ns=502112.642 wall_ns=507112.642 clk=915673 check=0
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=8000 trial=1 event_ns=984457.354 wall_ns=989457.354 clk=1829966 check=0
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=4000 trial=0 event_ns=1745552.610 wall_ns=1750552.610 clk=3278550 check=0
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=8000 trial=0 event_ns=3470378.273 wall_ns=3475378.273 clk=6555719 check=0
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=4000 trial=1 event_ns=1747160.825 wall_ns=1752160.825 clk=3278550 check=0
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=8000 trial=1 event_ns=3477472.251 wall_ns=3482472.251 clk=6555719 check=0

@@ -36,6 +36,7 @@ TRUTH = {
     "hbm_bandwidth_tb_s": 3.0,
     "l2_bandwidth_per_sm_gb_s": 300.0,
     "tma_latency_ns": 240.0,
+    "clc_latency_ns": 170.0,
     "tma_bytes_per_clk": 60.0,
     "smem_wavefront_clk": 1.6,
     "global_access_latency_clk": 45.0,
@@ -47,7 +48,7 @@ TRUTH = {
 LAUNCH_NS = 20000.0
 REPS_FACTOR = 1000
 SMALL = ("launch/", "alu_chain/", "smem_wavefronts/load_chain", "global_load/", "gstream/", "cp_async/",
-         "mbar/", "tma/", "m=128/n=256", "tmem_access/")
+         "mbar/", "tma/", "m=128/n=256", "tmem_access/", "clc_latency/")
 
 
 def truth_config(path: Path) -> None:
@@ -99,9 +100,16 @@ def synthesize(out: Path, small: bool = False, trials: int = 3) -> None:
             for reps in points:
                 kernel = intercept + slope * reps
                 event = LAUNCH_NS + kernel * (1 + noise(ident, trial, reps))
+                # clc_latency's kernels report their requests in `check`: `reps` that fail, or the
+                # `reps` clusters the first cluster took over (it then made one more, which failed).
+                # Its `clk` is the ticks of the request loop alone, so without the kernel's setup.
+                clc = ident.startswith("clc_latency/")
+                ticks = (slope * reps if clc else kernel) * TRUTH["clock_ghz"]
+                if ident.startswith("clc_latency/succeed/"):
+                    ticks *= (reps + 1) / reps
                 bench.append(f"BENCH id={ident} {extra + ' ' if extra else ''}reps={reps:.0f} trial={trial} "
                              f"event_ns={event:.3f} wall_ns={event + 5000:.3f} "
-                             f"clk={kernel * TRUTH['clock_ghz']:.0f} check=0")
+                             f"clk={ticks:.0f} check={reps if clc else 0:.0f}")
     for bench, body in lines.items():
         device = (f"DEVICE bench={bench} name=SYNTHETIC_not_measured cc=10.0 sm_count=148 "
                   f"total_mem_bytes=196000000000 free_mem_bytes=196000000000 bench_clock=1 sim=0 "

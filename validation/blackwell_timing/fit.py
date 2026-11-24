@@ -113,6 +113,12 @@ def summarize(rows: list[dict], key: str = "event_ns") -> dict[str, dict]:
                 "row": group[0]}
         times = [r[key] for r in group]
         info["launch_min_ns"], info["launch_median_ns"] = min(times), statistics.median(times)
+        # The kernel's own count, for the configurations whose launch time is not a number of
+        # round trips (clc_latency/succeed/*): `clk` is the %clock64 ticks the cluster at (0, 0)
+        # spent requesting and `check` how many of its requests succeeded, so it made check + 1.
+        own = [r["clk"] / (r["check"] + 1) for r in group if r.get("clk", 0) > 0 and r.get("check", -1) >= 0]
+        if own:
+            info["clk_per_request"], info["clk_per_request_median"] = min(own), statistics.median(own)
         if len(reps) >= 2:
             at = {x: [r[key] for r in group if r["reps"] == x] for x in reps}
             slope, intercept = linfit(reps, [min(at[x]) for x in reps])
@@ -158,8 +164,17 @@ TILE_BYTES = (64, 256, 1024, 4096, 16384, 32768)
 CONFLICTS = (1, 2, 4, 8, 16, 32)
 BATCHES = (1, 2, 4, 8)
 MMA_K = {"f16": 16, "tf32": 8, "i8": 32}
+# Cluster launch control. Requests that fail, in a launch of one cluster: the slope of launch
+# time against requests is one round trip. In order of preference for clc_latency_ns: the
+# first has nothing in its loop but the request; the other two add a cluster barrier.
+CLC_FAIL = ("clc_latency/fail/plain/ctas=1", "clc_latency/fail/plain/ctas=2", "clc_latency/fail/multicast/ctas=2")
+# Requests that succeed: on a GPU many clusters start at once, so only the kernel's own
+# count (clk_per_request) is a round trip, and it is in %clock64 ticks.
+CLC_SUCCEED = ("clc_latency/succeed/plain/ctas=1", "clc_latency/succeed/multicast/ctas=2")
+CLC_DISAGREE = 0.2  # another form's latency further than this from the fitted one is named in its note
 UNITS = {"sm_count": "SMs", "clock_ghz": "GHz", "hbm_capacity_gb": "GB", "hbm_bandwidth_tb_s": "TB/s",
-         "l2_bandwidth_per_sm_gb_s": "GB/s", "tma_latency_ns": "ns", "tma_bytes_per_clk": "bytes/clk",
+         "l2_bandwidth_per_sm_gb_s": "GB/s", "tma_latency_ns": "ns", "clc_latency_ns": "ns",
+         "tma_bytes_per_clk": "bytes/clk",
          "smem_wavefront_clk": "clk", "global_access_latency_clk": "clk", "tmem_access_clk": "clk",
          "tensor_core_tflops_f16": "TFLOPS", "tensor_core_tflops_tf32": "TFLOPS", "mma_latency_clk": "clk"}
 
@@ -212,9 +227,12 @@ def derive(meas: dict, pred: dict, cfg: dict, device: dict, stat: str = "min"):
     clock_note = (f"Clocks converted with the fitted clock_ghz = {f:.4g}." if f != f_cfg else
                   f"Clocks converted with the config's clock_ghz = {f_cfg:g} (no usable alu_chain clock fit).")
     ticks = meas.get("alu_chain/warps=1", {})
+    ticks_per_ns = None  # of %clock64, to turn a kernel's own tick count into time
     if ticks.get("clk_per_rep") and a:
         diag.append(("%clock64 ticks per ns", ticks["clk_per_rep"] / a, "ticks/ns",
                      "alu_chain/warps=1: clock64 slope / event-time slope. 0 means the build did not read the clock"))
+        if a > 0 and math.isfinite(ticks["clk_per_rep"] / a) and ticks["clk_per_rep"] > 0:
+            ticks_per_ns = ticks["clk_per_rep"] / a
 
     # smem_wavefront_clk: slope of ns per access against wavefronts per access.
     pts = series(meas, "smem_wavefronts/load_chain/conflict={}/warps=1", CONFLICTS, stat)
@@ -236,6 +254,67 @@ def derive(meas: dict, pred: dict, cfg: dict, device: dict, stat: str = "min"):
 
     fixed("global_access_latency_clk", "global_load/load_chain/footprint=l2", "one load per repetition")
     fixed("tmem_access_clk", "tmem_access/ld/x1", "one tcgen05.ld per repetition")
+
+    # clc_latency_ns. The model lands the response of a clusterlaunchcontrol.try_cancel a fixed
+    # time after the request is issued, the same for every form (docs/clc.md, timing/model.py
+    # kind "clc"). A request's round trip (arm the mbarrier, try_cancel, wait for the phase) is
+    # that latency plus the loop's instructions, which the simulator counted for the same loop:
+    #     latency = measured round trip - (predicted round trip - config latency)
+    # with the instruction time rescaled to the fitted clock, as for tma_latency_ns.
+    clc_measured = [i for i in (*CLC_FAIL, *CLC_SUCCEED) if i in meas]
+    clc_values = {}  # id -> (latency this form implies, measured round trip, instruction time)
+    if clc_measured and "clc_latency_ns" not in cfg:
+        diag.append(("clc_latency_ns", "not derived", "", "the config the predictions were made with has no "
+                     "clc_latency_ns entry, so the instruction time of a request cannot be separated"))
+        clc_measured = []
+    for ident in clc_measured:
+        label = f"CLC request, {ident[len('clc_latency/'):]}"
+        b = p(ident)
+        if ident in CLC_SUCCEED:
+            own = meas[ident].get("clk_per_request_median" if stat == "median" else "clk_per_request")
+            if own is None:
+                diag.append((label, "not derived", "", "no %clock64 ticks in its lines (clk = 0): the launch time of a "
+                             "grid of clusters is not a number of round trips, only the kernel's own count is"))
+                continue
+            if ticks_per_ns is None:
+                diag.append((label, "not derived", "", f"{own:.4g} %clock64 ticks per request, but no ticks per ns "
+                             "to convert them (alu_chain/warps=1 is missing or its clock did not run)"))
+                continue
+            a, how = own / ticks_per_ns, (f"{own:.4g} ticks per request of the first cluster (clk / (check + 1)) / "
+                                          f"{ticks_per_ns:.4g} ticks per ns")
+        else:
+            a, how = m(ident), "slope of launch time against requests"
+        if a is None or not math.isfinite(a) or a <= 0:
+            diag.append((label, "not derived", "", "no positive finite round trip was measured"))
+            continue
+        if b is None or not math.isfinite(b):
+            diag.append((label, a, "ns", how + "; round trip only: there is no prediction of this configuration "
+                         "to take the instruction time from"))
+            continue
+        overhead = (b - cfg["clc_latency_ns"]) * f_cfg / f
+        clc_values[ident] = (a - overhead, a, overhead)
+        diag.append((label, a, "ns", f"{how}; minus {overhead:.4g} ns of instructions the simulator counts for the "
+                     f"same loop = {a - overhead:.4g} ns of latency"))
+    chosen = next((i for i in CLC_FAIL if i in clc_values), None)
+    if chosen:
+        latency, a, overhead = clc_values[chosen]
+        note = ("One latency for every form of the request, as the model has. Includes whatever the mbarrier "
+                "wake-up costs on hardware beyond its instructions. " + clock_note)
+        if chosen != CLC_FAIL[0]:
+            note += (f" {CLC_FAIL[0]} was not usable; this loop also has a cluster barrier per request, which "
+                     "the model charges as instructions only.")
+        others = {i: v[0] for i, v in clc_values.items()
+                  if i != chosen and abs(v[0] - latency) > CLC_DISAGREE * max(abs(latency), 1.0)}
+        if others:
+            note += (" NOT ONE NUMBER on this device: " + ", ".join(f"{i} implies {v:.4g} ns" for i, v in others.items())
+                     + "; the model would need a latency per form.")
+        add("clc_latency_ns", latency,
+            f"measured {a:.4g} ns per request - {overhead:.4g} ns of instruction time the simulator counts for "
+            f"the same loop ({chosen}, requests that fail in a launch of one cluster)", note)
+    elif clc_measured:
+        diag.append(("clc_latency_ns", "not derived", "", "none of " + ", ".join(CLC_FAIL) + " has a usable "
+                     "measurement and prediction; the requests that succeed are reported, not fitted, because "
+                     "their round trip rests on the %clock64 tick rate"))
 
     # TMA: round trip against bytes.
     fits = {}
@@ -425,6 +504,10 @@ def build_report(device, meas, pred, params, diag, cfg, problems, warnings, pred
         else:
             ratio = fmt(a / b)
         out.append(f"| {ident}{unit} | {fmt(a)} | {fmt(b)} | {ratio} |")
+    if any(i in meas for i in CLC_SUCCEED):
+        out += ["", "`clc_latency/succeed/*`: on a GPU many clusters start at once, so these two slopes are not "
+                "round trips and their ratios mean nothing; the kernel's own count is under \"Other measured "
+                "quantities\" (CLC request, succeed/...)."]
     absent = [i for i in pred if i not in meas]
     if absent:
         out += ["", f"{len(absent)} predicted configuration(s) have no measurement, e.g. " +

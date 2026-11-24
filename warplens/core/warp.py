@@ -117,7 +117,7 @@ class Warp:
         kind = type(operand)
         if kind is Reg:
             raw = self.regs[operand.name]
-            if raw.dtype.kind == "b" or dt.kind == "b":
+            if raw.dtype.kind in "bV" or dt.kind in "bV":  # predicates and 128-bit values
                 if raw.dtype != dt:
                     raise ExecutionError(f"register {operand.name} cannot be read as .{ty}")
                 return raw
@@ -144,6 +144,9 @@ class Warp:
         if imm.kind == "int":
             if dt.kind == "b":
                 return np.full(WARP_SIZE, bool(imm.value))
+            if dt.kind == "V":  # .b128
+                bits = imm.value % (1 << 128)
+                return np.full(WARP_SIZE, np.array((bits % (1 << 64), bits >> 64), dtype=dt))
             if dt.kind == "f":
                 raise ExecutionError(f"integer literal {imm.value} used as a .{ty} value")
             u = UINT_BY_SIZE[dt.itemsize]
@@ -163,7 +166,7 @@ class Warp:
         if type(dest) is not Reg:
             raise ExecutionError(f"destination {dest!r} is not a register")
         raw = self.regs[dest.name]
-        if raw.dtype.kind == "b" or value.dtype.kind == "b":
+        if raw.dtype.kind in "bV" or value.dtype.kind in "bV":
             if raw.dtype != value.dtype:
                 raise ExecutionError(f"type mismatch writing register {dest.name}")
             bits = value

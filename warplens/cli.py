@@ -137,6 +137,8 @@ def summary(launches, model: str) -> None:
           f"{findings} finding(s)", file=out)
     for name, stats in launches:
         line = f"  {short(name)}: {stats.ctas} CTA(s), {stats.instructions} warp-instructions"
+        if stats.canceled_ctas:  # cluster launch control: their work was done by CTAs that did start
+            line = line.replace(" CTA(s)", f" CTA(s) of which {stats.canceled_ctas} canceled before starting")
         if stats.timing is not None:
             line += f", {stats.timing.time_ns:,.0f} ns simulated ({stats.timing.bottleneck}-bound)"
         print(line, file=out)

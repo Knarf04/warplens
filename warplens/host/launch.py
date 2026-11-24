@@ -11,6 +11,7 @@ from ..check.report import Finding, Findings
 from ..core.cluster import Cluster
 from ..core.cta import Cta
 from ..core.engine import Engine
+from ..core.launch_queue import LaunchQueue
 from ..core.program import Program
 from ..core.warp import WARP_SIZE, Warp
 from ..errors import LaunchError
@@ -24,7 +25,8 @@ MAX_CLUSTER_CTAS = 16  # a multicast mask has 16 bits
 
 @dataclass(slots=True)
 class LaunchStats:
-    ctas: int = 0
+    ctas: int = 0  # of the grid; `canceled_ctas` of them never started
+    canceled_ctas: int = 0  # in clusters canceled by clusterlaunchcontrol.try_cancel
     warps: int = 0
     threads: int = 0
     instructions: int = 0  # instructions issued, counted once per warp
@@ -115,7 +117,10 @@ def encode_args(fn: Function, args, *, mem) -> dict[str, bytes]:
 
 def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace=None,
                max_steps: int | None = None, async_delay: int = 4, timing=None,
-               cluster=None) -> LaunchStats:
+               cluster=None, clc_limit: int | None = None) -> LaunchStats:
+    if clc_limit is not None and (not isinstance(clc_limit, (int, np.integer))
+                                  or isinstance(clc_limit, (bool, np.bool_)) or clc_limit < 0):
+        raise LaunchError(f"clc_limit must be None or a non-negative integer, got {clc_limit!r}")
     if (not isinstance(async_delay, (int, np.integer))
             or isinstance(async_delay, (bool, np.bool_)) or async_delay < 0):
         raise LaunchError(f"async_delay must be a non-negative integer, got {async_delay!r}")
@@ -168,9 +173,15 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                         "nclusterid.x": const(gx // kx), "nclusterid.y": const(gy // ky),
                         "nclusterid.z": const(gz // kz),
                         "is_explicit_cluster": const(int(explicit_cluster))}
+    # Clusters start one at a time, in this order. A running cluster can cancel those still
+    # in the queue with clusterlaunchcontrol.try_cancel; they then never start.
+    queue = LaunchQueue([(qx, qy, qz) for qz, qy, qx in np.ndindex(gz // kz, gy // ky, gx // kx)],
+                        cluster, None if clc_limit is None else int(clc_limit))
     with np.errstate(all="ignore"):
-        for qz, qy, qx in np.ndindex(gz // kz, gy // ky, gx // kx):  # one cluster at a time
-            group = Cluster((qx, qy, qz), cluster)
+        while (started := queue.start_next()) is not None:
+            qx, qy, qz = started
+            group = Cluster(started, cluster)
+            group.launch = queue
             # CTAs within a cluster overlap in time, so they must agree when
             # fetched lines become readable in L2. Earlier clusters have
             # finished and remain warm through Timing.l2_lines.
@@ -197,11 +208,13 @@ def run_kernel(program: Program, mem, *, grid, block, args, smem: int = 0, trace
                                           mem=mem, trace=trace))
                 group.warps.extend(cta.warps)
             engine.run(group)
+            queue.close(group)
             for w in group.warps:
                 stats.instructions += w.instructions
                 stats.lane_instructions += w.lane_instructions
                 stats.divergent_branches += w.divergences
                 stats.max_simt_depth = max(stats.max_simt_depth, w.stack.max_depth)
+    stats.canceled_ctas = queue.canceled * kx * ky * kz
     stats.findings = findings.items
     if timing is not None:
         stats.timing = timing.report()

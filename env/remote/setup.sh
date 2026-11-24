@@ -7,7 +7,7 @@
 # only re-verified. Needs no root, no conda and no system CUDA toolkit: it
 # downloads one static micromamba binary and builds a private env from
 # conda-forge and PyPI, at the versions in env/remote/pins.env. Root is used
-# only if a download tool or git is missing and apt-get is available.
+# only if a download tool, git or gdb is missing and apt-get is available.
 #
 #   --toolkit auto     (default) the pinned CUDA toolkit, or the release that
 #                      matches the driver when the driver is older (the driver
@@ -270,6 +270,28 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# 5c. gdb, for the two rows that trace a launch
+# ---------------------------------------------------------------------------
+# validation/blackwell/run_rows.py runs TIRx and the CuTe DSL under gdb to log their driver
+# calls (matrix row RT-10) and to save the tensor maps a CuTe DSL kernel is handed (RT-11).
+# Any gdb with Python support does; it is a tool, not part of what is measured, so it is
+# not pinned and not installed into the env. Without it those rows are skipped, and the
+# descriptors are what a later decoder needs: hence three attempts.
+if [[ -z "$(gdb_program)" ]]; then
+  apt_install gdb || {
+    say "no gdb and no way to install the system package: conda-forge's gdb into $GDB_ENV (not pinned)"
+    mamba create -y -q -p "$GDB_ENV" --override-channels -c conda-forge gdb \
+      || { rm -rf "$GDB_ENV"; warn "gdb did not install; matrix rows RT-10 and RT-11 (driver call trace, tensor maps of the CuTe DSL) will be skipped"; }
+  }
+fi
+gdb_bin="$(gdb_program)"
+if [[ -n "$gdb_bin" ]] && "$gdb_bin" -q -batch -ex "python print('gdb-python-ok')" 2>/dev/null | grep -q gdb-python-ok; then
+  say "gdb: $("$gdb_bin" --version | head -n 1) ($gdb_bin)"
+elif [[ -n "$gdb_bin" ]]; then
+  warn "$gdb_bin has no Python support; matrix rows RT-10 and RT-11 will be skipped (set WARPLENS_GDB to another gdb)"
+fi
+
+# ---------------------------------------------------------------------------
 # 6. Record what was installed, and compare with the pins
 # ---------------------------------------------------------------------------
 resolved="$REMOTE_HOME/resolved"
@@ -304,6 +326,7 @@ package_status=0
   echo "cuda_cudart_dev=$(conda_version cuda-cudart-dev)"
   echo "cuda_nvrtc=$(conda_version cuda-nvrtc)"
   echo "nsight_compute=$(conda_version nsight-compute)"
+  echo "gdb=$( { [[ -n "$gdb_bin" ]] && "$gdb_bin" --version 2>/dev/null | head -n 1; } || echo none)"
   env_run python "$REMOTE_DIR/check_env.py" versions || package_status=1
   if [[ -x "$TORCH_ENV/bin/python" ]]; then
     env_run "$TORCH_ENV/bin/python" "$REMOTE_DIR/check_env.py" torch || echo "torch=MISSING"

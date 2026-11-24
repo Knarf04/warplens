@@ -263,7 +263,7 @@ else
       pass native-e2e "CUDA PyTorch, Triton and the book clone are available"
     else
       fail native-e2e "native end-to-end prerequisites are missing: $(tr '\n' ' ' <<<"$out")"
-      note "Install compatible CUDA PyTorch and set WARPLENS_BOOK before a full run."
+      note "PyTorch: env/remote/setup.sh installs it (run it again). The book: clone it and set WARPLENS_BOOK (RUNBOOK.md, section 3)."
       note "For a probe-only run: WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e env/remote/run.sh"
     fi
   fi

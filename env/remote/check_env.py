@@ -110,7 +110,7 @@ def e2e(book=None):
         print(f"torch={torch.__version__} (CUDA {torch.version.cuda})")
     except Exception as error:
         print(f"error=native Triton: {type(error).__name__}: {error}; "
-              "the pinned setup does not install PyTorch")
+              "env/remote/setup.sh installs it into torch-env (run it again; not with --no-torch)")
         status = 1
     book = os.environ.get("WARPLENS_BOOK", "") if book is None else book
     if not book or not (Path(book) / "chapter_gemm_basics" / "index.md").is_file():

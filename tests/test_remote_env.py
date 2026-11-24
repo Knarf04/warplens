@@ -24,7 +24,7 @@ import pytest
 
 REPO = Path(__file__).resolve().parent.parent
 REMOTE = REPO / "env" / "remote"
-SCRIPTS = ["lib.sh", "setup.sh", "preflight.sh", "run.sh"]
+SCRIPTS = ["lib.sh", "setup.sh", "preflight.sh", "run.sh", "predict_toolkit.sh"]
 
 # Recorded: the line of `nvidia-smi` that names the driver, and what ncu printed as a normal user.
 SMI_HEADER_3080TI = ("| NVIDIA-SMI 580.173.02             Driver Version: 580.173.02     "
@@ -326,7 +326,7 @@ def test_capability_bits():
 # ---------------------------------------------------------------------------------------------
 
 STAGES = ["preflight-quick", "setup", "preflight", "selftest", "build-blackwell", "build-timing",
-          "run-blackwell", "run-timing", "collect"]
+          "predict-toolkit", "run-blackwell", "run-timing", "collect"]
 
 
 def test_dry_run_prints_the_plan_without_a_gpu(tmp_path):
@@ -449,6 +449,105 @@ def test_run_says_which_suite_is_missing_and_goes_on(checkout, tmp_path):
     plan = bash(root / "env/remote/run.sh", "--dry-run", env=env)
     assert re.search(r"build-timing\s+\S+\s+MISSING", plan.stdout)
     assert re.search(r"run-blackwell\s+\S+\s+done", plan.stdout)
+
+
+def fallback_checkout(root: Path, tmp_path: Path, predict_body: str) -> None:
+    """Stand-ins for what predict_toolkit.sh calls: programs built by nvcc 13.0.88, committed
+    predictions made with 13.5.37, a predict mode that writes two probe predictions (one as
+    committed, one not) and a timing predictor."""
+    suite(root, "blackwell", 'mkdir -p "$(dirname "$0")/bin"\necho nvcc_version=13.0.88 > "$(dirname "$0")/bin/toolkit.txt"\n',
+          # The GPU stage records whether the predictions were there before it ran.
+          '[[ -f "$WARPLENS_RESULTS_DIR/../predicted-toolkit/toolkit.txt" ]] && echo yes > "$WARPLENS_RESULTS_DIR/predicted-first.txt"\n'
+          'echo ran > "$WARPLENS_RESULTS_DIR/probes.txt"\n')
+    suite(root, "blackwell_timing", "echo built\n", "echo ran\n")
+    probes, timing = root / "validation/blackwell", root / "validation/blackwell_timing"
+    (probes / "predicted/tma").mkdir(parents=True)
+    (probes / "predicted/provenance.json").write_text('{\n "nvcc_version": "13.5.37"\n}\n')
+    (probes / "predicted/tma/same.txt").write_text("value 1\n")
+    (probes / "predicted/tma/other.txt").write_text("value 2\n")
+    (probes / "predicted/tma/not_made.txt").write_text("value 3\n")
+    (probes / "run_all.py").write_text(
+        "import sys, pathlib\n"
+        "assert sys.argv[1:5] == ['--mode', 'predict', '--no-build', '--no-e2e'], sys.argv\n"
+        "out = pathlib.Path(sys.argv[sys.argv.index('--predicted') + 1]) / 'tma'\n"
+        "out.mkdir(parents=True)\n"
+        "(out / 'same.txt').write_text('value 1\\n')\n"
+        "(out / 'other.txt').write_text('value 2, as nvcc 13.0 compiles it\\n')\n"
+        "(out.parent / 'provenance.json').write_text('{\\n \"nvcc_version\": \"13.0.88\"\\n}\\n')\n"
+        + predict_body)
+    (timing / "predicted").mkdir()
+    (timing / "predicted/meta.json").write_text('{"nvcc_version": "13.5.37"}\n')
+    (timing / "predicted/tma.out").write_text("BENCH tma instructions=10\n")
+    (timing / "predict.py").write_text(
+        "import sys, pathlib\n"
+        "out = pathlib.Path(sys.argv[sys.argv.index('--out') + 1])\n"
+        "out.mkdir(parents=True)\n"
+        "(out / 'tma.out').write_text('BENCH tma instructions=11\\n')\n")
+    resolved = tmp_path / "home" / "resolved"
+    resolved.mkdir(parents=True)
+    (resolved / "versions.txt").write_text(
+        "cuda_nvcc=13.0.88\npredictions_comparable=not-comparable\n"
+        "predictions_comparable_why=BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE: stand-in\n")
+
+
+def test_a_fallback_toolkit_gets_its_own_predictions_before_the_gpu_stages(checkout, tmp_path):
+    """The toolkit policy (RUNBOOK.md, "Driver older than the toolkit"): when setup.sh fell
+    back to another nvcc, the predictions are made again with it, before the GPU stages,
+    into the archive, with the names that differ from the committed ones."""
+    root, env, args = checkout
+    fallback_checkout(root, tmp_path, "")
+    done = bash(root / "env/remote/run.sh", *args, env=env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "predict-toolkit: ok" in done.stdout
+    assert done.stdout.index("predict-toolkit: ok") < done.stdout.index("run-blackwell: started")
+    files = members(archive_of(tmp_path / "home"))
+    assert files["out/blackwell/predicted-first.txt"] == b"yes\n"
+    assert files["out/predicted-toolkit/blackwell/tma/other.txt"] == b"value 2, as nvcc 13.0 compiles it\n"
+    assert b'"13.0.88"' in files["out/predicted-toolkit/blackwell/provenance.json"]
+    differences = files["out/predicted-toolkit/DIFFERENCES.txt"].decode().splitlines()
+    assert "differs tma/other.txt" in differences and "missing tma/not_made.txt" in differences
+    assert "differs tma/same.txt" not in differences
+    assert "differs tma.out" in differences[differences.index("[timing]"):]
+    facts = dict(line.split("=", 1) for line in files["out/predicted-toolkit/toolkit.txt"].decode().splitlines())
+    assert facts["nvcc_version"] == "13.0.88" and facts["committed_predictions_nvcc_version"] == "13.5.37"
+    assert facts["probe_predictions"] == "2" and facts["probe_predictions_that_differ_from_committed"] == "1"
+    assert facts["probe_prediction_files_missing_here"] == "1"
+    assert facts["timing_prediction_files_that_differ_or_are_missing"] == "1"
+    note = files["PREDICTIONS-NOT-COMPARABLE.txt"].decode()
+    assert "stage predict-toolkit: ok" in note and "--predicted out/predicted-toolkit/blackwell" in note
+    assert "stage_predict_toolkit=ok" in files["manifest.txt"].decode()
+    # The committed predictions are untouched.
+    assert (root / "validation/blackwell/predicted/tma/other.txt").read_text() == "value 2\n"
+
+    # Building again invalidates the predictions made from the old programs.
+    again = bash(root / "env/remote/run.sh", *args, "--redo", "build-blackwell", env=env)
+    assert again.returncode == 0 and "predict-toolkit: ok" in again.stdout
+    assert "predict-toolkit: finished earlier" not in again.stdout
+
+
+def test_failed_fallback_predictions_do_not_stop_the_gpu_stages(checkout, tmp_path):
+    root, env, args = checkout
+    fallback_checkout(root, tmp_path, "sys.exit(1)\n")
+    done = bash(root / "env/remote/run.sh", *args, env=env)
+    assert done.returncode == 1
+    assert "predict-toolkit: failed" in done.stdout and "A STEP FAILED" in done.stdout
+    assert "run-blackwell: ok" in done.stdout and "run-timing: ok" in done.stdout
+    files = members(archive_of(tmp_path / "home"))
+    assert "stage_predict_toolkit=failed" in files["manifest.txt"].decode()
+    assert "stage predict-toolkit: failed" in files["PREDICTIONS-NOT-COMPARABLE.txt"].decode()
+
+
+def test_the_pinned_toolkit_needs_no_predictions_of_its_own(checkout, tmp_path):
+    root, env, args = checkout
+    fallback_checkout(root, tmp_path, "")
+    (tmp_path / "home/resolved/versions.txt").write_text(
+        "predictions_comparable=comparable\npredictions_comparable_why=nvcc 13.5.37 as for the predictions\n")
+    done = bash(root / "env/remote/run.sh", *args, env=env)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "predict-toolkit: skipped: not needed: comparable" in done.stdout
+    files = members(archive_of(tmp_path / "home"))
+    assert not any(name.startswith("out/predicted-toolkit/") for name in files)
+    assert "PREDICTIONS-NOT-COMPARABLE.txt" not in files
 
 
 def test_run_ends_a_stage_at_its_time_limit(checkout, tmp_path):
@@ -598,7 +697,9 @@ def test_run_carries_a_fallback_toolkit_into_the_archive(checkout, tmp_path):
     suite(root, "blackwell_timing", "echo built\n", "echo ran\n")
     why = "BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE: the probes will be built by nvcc 12.8.93"
     versions_file(tmp_path / "home", "not-comparable", why)
-    done = bash(root / "env/remote/run.sh", *args, env=env)
+    # The flagging is under test here; the predictions of the fallback toolkit have tests of
+    # their own (this stand-in checkout has nothing to predict from).
+    done = bash(root / "env/remote/run.sh", *args, "--skip", "predict-toolkit", env=env)
     assert done.returncode == 0, done.stdout + done.stderr          # flagged, not failed
     assert done.stdout.count(why) == 2                               # after setup, and as the last thing printed
     assert done.stdout.rstrip().splitlines()[-1] == "!" * 100

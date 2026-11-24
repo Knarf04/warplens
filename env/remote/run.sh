@@ -17,6 +17,10 @@
 #   selftest         the repository's tests, simulator   continues
 #   build-blackwell  validation/blackwell/build.sh       its run stage is skipped; continues
 #   build-timing     validation/blackwell_timing/build.sh  likewise
+#   predict-toolkit  env/remote/predict_toolkit.sh       continues. Only with a fallback toolkit
+#                    (setup.sh installed another nvcc than the committed predictions were
+#                    made with): the predictions are made again with the installed nvcc,
+#                    before anything runs on the GPU, into out/predicted-toolkit/ of the archive
 #   run-blackwell    validation/blackwell/run_all.sh     continues
 #   run-timing       validation/blackwell_timing/run_all.sh  continues
 #   collect          manifest, checksums, archive        always runs
@@ -46,6 +50,7 @@
 #                               PTX from this toolkit (preflight's ptx-jit check)
 #   WARPLENS_NCU                ok | unavailable: whether ncu can read counters
 #   WARPLENS_TORCH_PYTHON       the interpreter of the PyTorch env, when there is one
+#   WARPLENS_GDB                a gdb for the rows that trace a launch, when there is one
 #   WARPLENS_PREDICTIONS        comparable | comparable-native | not-comparable | unknown
 # Whatever a suite prints is archived too (logs/<stage>.log), and so are
 # directories named results*, out or output that the run creates inside the
@@ -87,14 +92,14 @@ while [[ $# -gt 0 ]]; do
     --no-torch) setup_args+=(--no-torch) ;;
     --strict-toolkit) strict_toolkit=1 ;;
     --price) price="${2:?--price needs a number}"; shift ;;
-    -h|--help) sed -n '2,60p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,65p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
 done
 [[ "$price" =~ ^[0-9]+(\.[0-9]+)?$ ]] || { echo "error: --price takes a number, not '$price'" >&2; exit 2; }
 
-STAGES=(preflight-quick setup preflight selftest build-blackwell build-timing run-blackwell run-timing collect)
+STAGES=(preflight-quick setup preflight selftest build-blackwell build-timing predict-toolkit run-blackwell run-timing collect)
 for stage in "${redo[@]}" "${skip[@]}"; do
   [[ "$stage" == all || " ${STAGES[*]} " == *" $stage "* ]] \
     || { echo "error: no stage '$stage' (stages: ${STAGES[*]})" >&2; exit 2; }
@@ -118,6 +123,7 @@ estimate() {
     selftest)        echo "4|20|measured: 10.5 min on 20 cores for the whole test suite (1513 tests; it runs the whole predict path, which is what says whether the predictions hold for the installed compiler). --skip selftest saves it" ;;
     build-blackwell) echo "1|6|measured: 8 s on 20 cores for the 51 probe programs (13 s with --native); a smaller machine is the upper end" ;;
     build-timing)    echo "1|4|measured: 62 s, one compile at a time, for the 14 benchmarks" ;;
+    predict-toolkit) echo "0|15|measured: 7 min on 20 cores (78 s for the 98 probe predictions, 6 min for the 14 timing benchmarks, one at a time). Runs only when setup.sh fell back to another toolkit than the predictions' (0 otherwise)" ;;
     run-blackwell)   echo "3|20|guess: short kernels, but some probes wait out a timeout on purpose; limit $run_minutes min" ;;
     run-timing)      echo "3|20|guess: repeated microbenchmarks, and ncu reruns each kernel per counter group; limit $run_minutes min" ;;
     collect)         echo "1|1|measured: under 1 s for a small archive" ;;
@@ -132,6 +138,7 @@ stage_command() {
     selftest)        echo "python -m pytest -q   (in the env, CUDA_VISIBLE_DEVICES empty)" ;;
     build-blackwell) echo "$SUITE_blackwell/build.sh   (adds --native if the driver refuses the toolkit's PTX)" ;;
     build-timing)    echo "$SUITE_timing/build.sh" ;;
+    predict-toolkit) echo "env/remote/predict_toolkit.sh --out <run directory>/out/predicted-toolkit   (fallback toolkit only)" ;;
     run-blackwell)   echo "$SUITE_blackwell/run_all.sh" ;;
     run-timing)      echo "$SUITE_timing/run_all.sh --out <results directory>" ;;
     collect)         echo "manifest, SHA256SUMS, tar.gz under $REMOTE_HOME/results" ;;
@@ -217,10 +224,10 @@ run_stage() {
   rm -f "$RUN_DIR/state/$stage.ok"
   # Rebuilt programs or a changed environment invalidate dependent results.
   case "$stage" in
-    setup) rm -f "$RUN_DIR/state/"{preflight,selftest,build-blackwell,build-timing,run-blackwell,run-timing}.ok ;;
+    setup) rm -f "$RUN_DIR/state/"{preflight,selftest,build-blackwell,build-timing,predict-toolkit,run-blackwell,run-timing}.ok ;;
     preflight) rm -f "$RUN_DIR/state/"{build-blackwell,build-timing,run-blackwell,run-timing}.ok ;;
-    build-blackwell) rm -f "$RUN_DIR/state/run-blackwell.ok" ;;
-    build-timing) rm -f "$RUN_DIR/state/run-timing.ok" ;;
+    build-blackwell) rm -f "$RUN_DIR/state/"{predict-toolkit,run-blackwell}.ok ;;
+    build-timing) rm -f "$RUN_DIR/state/"{predict-toolkit,run-timing}.ok ;;
   esac
   if [[ -f "$RUN_DIR/logs/$stage.log" ]]; then
     mkdir -p "$RUN_DIR/logs/history"
@@ -287,6 +294,7 @@ suite_stage() {  # suite_stage build-blackwell [args...]
       WARPLENS_PTX_JIT="${WARPLENS_PTX_JIT:-unknown}" WARPLENS_NCU="${WARPLENS_NCU:-unavailable}" \
       WARPLENS_PREDICTIONS="${WARPLENS_PREDICTIONS:-unknown}" \
       ${WARPLENS_TORCH_PYTHON:+WARPLENS_TORCH_PYTHON="$WARPLENS_TORCH_PYTHON"} \
+      ${WARPLENS_GDB:+WARPLENS_GDB="$WARPLENS_GDB"} \
       bash "$script" "$@"
 }
 
@@ -299,6 +307,9 @@ stage_body() {
       cd "$REPO_DIR" || return 1
       env_run env CUDA_VISIBLE_DEVICES= python -m pytest -q -p no:cacheprovider ;;
     build-*|run-*) suite_stage "$stage" "$@" ;;
+    predict-toolkit)
+      # Not --build: build-blackwell and build-timing have made the programs it simulates.
+      bash "$REMOTE_DIR/predict_toolkit.sh" --out "$RUN_DIR/out/predicted-toolkit" ;;
     *) echo "error: no body for stage '$stage'" >&2; return 2 ;;
   esac
 }
@@ -368,8 +379,8 @@ collect() {
   rm -f "$RUN_DIR/PREDICTIONS-NOT-COMPARABLE.txt"
   case "$predictions_state" in
     comparable|comparable-native) ;;
-    *) printf '%s\n\nEvery verdict of validation/blackwell/compare.py and every predicted time in\nvalidation/blackwell_timing is to be read with this in mind. See env/remote/RUNBOOK.md,\n"Driver older than the toolkit".\n' \
-         "$predictions_why" > "$RUN_DIR/PREDICTIONS-NOT-COMPARABLE.txt" ;;
+    *) printf '%s\n\nEvery verdict of validation/blackwell/compare.py and every predicted time in\nvalidation/blackwell_timing is to be read with this in mind. See env/remote/RUNBOOK.md,\n"Driver older than the toolkit".\n\nPredictions made on this machine with the installed nvcc, before the GPU stages ran\n(stage predict-toolkit: %s), are in out/predicted-toolkit/. Hold the results against those:\n  validation/blackwell/compare.py out/blackwell --predicted out/predicted-toolkit/blackwell\n  validation/blackwell_timing/fit.py out/timing --predicted out/predicted-toolkit/timing\nout/predicted-toolkit/DIFFERENCES.txt names the predictions that differ from the committed ones.\n' \
+         "$predictions_why" "${result[predict-toolkit]:-not-reached}" > "$RUN_DIR/PREDICTIONS-NOT-COMPARABLE.txt" ;;
   esac
   # Outputs a suite left in its own directory instead of WARPLENS_RESULTS_DIR.
   # Only what this run made: directories that came with the checkout are older
@@ -526,6 +537,10 @@ export WARPLENS_PTX_JIT="$ptx_jit" WARPLENS_NCU="$ncu_state" WARPLENS_PREDICTION
 if [[ -z "${WARPLENS_TORCH_PYTHON:-}" && -x "$TORCH_ENV/bin/python" ]]; then
   export WARPLENS_TORCH_PYTHON="$TORCH_ENV/bin/python"
 fi
+# gdb for the rows that trace a launch (run_rows.py); inside the env PATH may not have it.
+if [[ -z "${WARPLENS_GDB:-}" && -n "$(gdb_program)" ]]; then
+  WARPLENS_GDB="$(gdb_program)"; export WARPLENS_GDB
+fi
 suite_run_stage() {  # suite_run_stage STAGE MINUTES
   local words=()
   read -r -a words <<<"${stage_args[$1]}"
@@ -533,6 +548,16 @@ suite_run_stage() {  # suite_run_stage STAGE MINUTES
 }
 suite_run_stage build-blackwell "$build_minutes" || true
 suite_run_stage build-timing "$build_minutes" || true
+# A fallback toolkit: the committed predictions are another compiler's. Make them again
+# with this one now, before the GPU has said anything (RUNBOOK.md, "Driver older than the toolkit").
+if [[ "$predictions_state" != not-comparable ]]; then
+  skip_stage predict-toolkit "not needed: $predictions_state (only a fallback toolkit needs its own predictions)"
+else
+  case "${result[build-blackwell]}" in
+    ok|done) run_stage predict-toolkit 30 "${self[@]}" predict-toolkit || true ;;
+    *) skip_stage predict-toolkit "build-blackwell did not succeed (${result[build-blackwell]})" ;;
+  esac
+fi
 for suite in blackwell timing; do
   case "${result[build-$suite]}" in
     ok|done|skipped) suite_run_stage "run-$suite" "$run_minutes" || true ;;

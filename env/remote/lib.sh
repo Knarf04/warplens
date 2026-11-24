@@ -19,6 +19,16 @@ ENV_PREFIX="$REMOTE_HOME/env"
 # shellcheck disable=SC2034  # used by the scripts that source this file
 TORCH_ENV="$REMOTE_HOME/torch-env"
 torch_python() { echo "${WARPLENS_TORCH_PYTHON:-$TORCH_ENV/bin/python}"; }
+# gdb, for the rows that trace a launch (validation/blackwell/run_rows.py: RT-10, RT-11).
+# The machine's own if it has one; else the one setup.sh put in an env of its own, apart
+# from the pinned env. Prints nothing when there is none.
+GDB_ENV="$REMOTE_HOME/gdb-env"
+gdb_program() {
+  if [[ -n "${WARPLENS_GDB:-}" ]]; then echo "$WARPLENS_GDB"
+  elif command -v gdb >/dev/null 2>&1; then command -v gdb
+  elif [[ -x "$GDB_ENV/bin/gdb" ]]; then echo "$GDB_ENV/bin/gdb"
+  fi
+}
 MAMBA_BIN="$REMOTE_HOME/bin/micromamba"
 
 # Load pins.env into PIN_<KEY> variables. The file is parsed, not sourced: a

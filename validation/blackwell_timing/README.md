@@ -226,9 +226,19 @@ through this script**. What was done instead:
   counter list and its retry, and `compare_ncu.py` on the table recorded from
   the 3080 Ti.
 
-Still untested: a real ncu returning counters through `run_ncu.sh`, on any GPU;
-what ncu prints for a rejected counter name; `ncu_banks_compare.py` on real
-counters; and whether the B200's ncu knows each counter at run time.
+Run for real on 2026-11-24, as root on the RTX 3080 Ti (driver 580.173.02, the machine's
+ncu 2024.1.1, not the pinned one): `sudo env NCU_BIN=/usr/local/cuda/bin/ncu ./run_ncu.sh
+bin/ampere OUT` read counters and profiled all six programs built for Ampere and the
+transpose, none with a reduced counter list; the five Blackwell programs were reported as
+not built. `ncu_banks_compare.py` on those counters: instruction and conflict counters
+equal the model's for all nine kernels, and the wavefront surplus is 4160 for the 32 x 32
+kernels and 1088 for 32 x 8 and 16 x 16, that is 65 and 17 per CTA: one per warp and one
+per CTA more. `../ampere/compare_ncu.py`: all counters match. Under `sudo` the script's
+`python3` is the system's, without NumPy, so both comparisons failed inside the run and
+were made again as the user; `run.sh` runs the suite inside the env, where they have it.
+
+Still untested: what ncu prints for a rejected counter name; the pinned ncu reading a
+counter; and whether the B200's ncu knows each counter at run time.
 
 `ncu_banks` is the program for TIM-17: nine kernels, the three layouts in three block
 shapes, launched once each with `--trials 1`. `ncu_banks_compare.py NCU.csv` simulates the

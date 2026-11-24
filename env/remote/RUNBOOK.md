@@ -927,7 +927,11 @@ Not tried, because there was no way to here:
   `apt-get install gdb` as root, conda-forge's gdb into `gdb-env`) were not exercised
   through `setup.sh`; conda-forge's gdb was installed by hand with the same package
   spec and ran the tracer.
-- `PASS ncu` for real: it needs root, here as on the rented machine.
+- `PASS ncu` of `preflight.sh` for real: it needs root, here as on the rented machine.
+  What has run as root is the timing suite's own `run_ncu.sh`, on the RTX 3080 Ti with the
+  machine's ncu 2024.1.1 (2026-11-24): counters read, six programs and the transpose
+  profiled, counters equal to the model's (`validation/blackwell_timing/README.md`). The
+  pinned ncu has not read a counter anywhere.
 - The book fetched by a git that `setup.sh` put into the env (a machine without git):
   `git_run` in `lib.sh` falls back to it, and no machine without git was at hand.
 - The by-hand fetch of the book of section 3 on this machine (the commands are CI's;

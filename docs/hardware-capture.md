@@ -70,9 +70,51 @@ their arbitrary outputs do not become a universal hardware contract.
    was collected. A partial/custom `--only` run cannot establish full-suite coverage.
 5. Keep an immutable copy of the original archive. Preserve mismatches and failed
    attempts as well as successful results. Keep at least two independent copies.
+6. Check the capture of the CuTe DSL kernel with TMA (matrix row RT-11, next section):
+
+   ```bash
+   python validation/blackwell/e2e/launch_capture.py verify /path/to/run/out/blackwell/rows/e2e/cute_dsl_tma
+   ```
+
+   It must print `RT-11 capture: COMPLETE`. `run.sh` exits 1 and ends with a banner when
+   it is not there; `out/blackwell/RT-11-NOT-CAPTURED.txt` exists exactly then.
 
 Replay can run locally after downloading. It is also useful to replay a small case
 before ending the rental, so missing artifacts are discovered while access remains.
+
+## The CuTe DSL kernel with TMA (RT-11): captured, not yet a fixture
+
+CUTLASS's `fp16_gemm_0.py` cannot be one of the cases above. A case's tensor maps are
+recipes, the arguments of `cuTensorMapEncodeTiled`, and the CuTe DSL never calls the
+encoder: its compiled host code writes the 128-byte descriptors itself, in the driver's
+layout, which the simulator cannot read yet (`docs/m6.md`, "Not working: kernels that use
+TMA"). So its launch is captured from outside, by a debugger, and kept raw. It is in
+`out/blackwell/rows/e2e/cute_dsl_tma/` of the archive, not in `captures/`; the capture
+verifier above does not look at it and `compare.py` does not replay it.
+`validation/blackwell/e2e/cute_dsl_tma.py` writes it, `validation/blackwell/e2e/launch_capture.py verify`
+checks it, with no GPU.
+
+| Path under `rows/e2e/cute_dsl_tma/` | What |
+| --- | --- |
+| `summary.txt`, `capture.sha256` | the verdict (`RT-11 capture: COMPLETE`), every pointer with its allocation and dumps; a checksum per file |
+| `tutorial.stdout` | the unmodified tutorial at its own size; ends with `PASS` |
+| `trace/launches.json`, `trace/launchNN.paramMM.bin` | the launch parameters at the tutorial's own size (8192 x 8192 x 8192): two more tensor maps for the decoder |
+| `capture/dsl_dump/*.ptx` | the kernel's PTX, from the DSL's own dump (`CUTE_DSL_KEEP=ptx,cubin`). This is what a replay runs |
+| `capture/moduleNN.bin`, `capture/dsl_dump/*.cubin` | what the driver was handed at `cuLibraryLoadData`: a fat binary around machine code, not PTX. The dumped cubin is checked to be inside it, which ties the PTX to the code that ran |
+| `capture/launches.json` | the launch at `--mnk 256,512,512`: kernel name, grid, block, every parameter's offset, size and bytes; and under `memory`, every address found in a parameter (at any byte offset, so also inside a tensor map), the allocation it points into, the offset in it, and that allocation's dump before the kernel and after `cuCtxSynchronize` |
+| `capture/mem/<sha256>.bin` | the dumps. A dump is a whole driver allocation: PyTorch keeps the three tensors in one allocation of its caching allocator, and where each starts is the pointer's `offset_in_allocation`. Their extents are the tutorial's (`a` is M x K, `b` N x K, `c` M x N, float16, row-major) |
+| `capture/capture.json` | modules, kernel lookups, every allocation and free the tracer followed, and anything it could not do |
+
+What is still to be done, after the rental and without a GPU: the decoder of driver-format
+tensor maps (from the descriptors here and the encoder sweep of TMA-12), and then a
+converter of this directory into a `warplens.capture.v1` case, whose expected output is the
+`after` dump of `c`. Until then nothing compares the simulator with this capture.
+
+The address field of a driver-format tensor map is not established. The tracer therefore
+looks for addresses at every byte offset of every parameter, and when a launch has a
+parameter of 64 bytes or more it also saves every live allocation, so that an address in a
+form the scan does not see still has its memory in the capture (`summary.txt` then carries
+a warning naming the parameter).
 
 ## Replay without a GPU or original compiler
 

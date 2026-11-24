@@ -9,6 +9,7 @@ Needs no GPU. Exit status 1 when a package is missing or NVRTC refuses ARCH.
 
 import importlib
 import importlib.metadata
+import re
 import sys
 
 # distribution name -> module that must import
@@ -22,11 +23,6 @@ PACKAGES = {
     "cuda-bindings": "cuda.bindings",
     "warplens": "warplens",
 }
-# reported, not imported
-EXTRA = ["apache-tvm-ffi", "apache-tvm-ffi-orcjit", "cuda-pathfinder",
-         "nvidia-cutlass-dsl-libs-base", "nvidia-cutlass-dsl-libs-core",
-         "nvidia-cutlass-dsl-libs-cu12", "ml-dtypes", "typing-extensions", "setuptools"]
-
 SOURCE = b"""
 extern "C" __global__ void k(float* a, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -50,11 +46,15 @@ def versions():
         except Exception as e:  # a missing package or one that fails to import
             print(f"{key(dist)}=MISSING ({type(e).__name__}: {e})")
             status = 1
-    for dist in EXTRA:
-        try:
-            print(f"{key(dist)}={importlib.metadata.version(dist)}")
-        except importlib.metadata.PackageNotFoundError:
-            print(f"{key(dist)}=MISSING")
+    # Everything else pip sees, as pip_<name>, to compare with the PIP_ pins.
+    main = {re.sub(r"[-_.]+", "-", name).lower() for name in PACKAGES} | {"pip"}
+    others = {}
+    for dist in importlib.metadata.distributions():
+        name = re.sub(r"[-_.]+", "-", dist.metadata["Name"] or "").lower()
+        if name and name not in main:
+            others.setdefault(name, dist.version)   # the first on sys.path is the one imported
+    for name in sorted(others):
+        print(f"pip_{key(name)}={others[name]}")
     return status
 
 

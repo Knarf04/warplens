@@ -285,6 +285,32 @@ def test_ncu_output_is_read_strictly():
     assert lib("parse_ncu_output", metric, row.replace('"1,234"', '"n/a"')) == "none|"
 
 
+def test_the_commit_is_found_without_a_git_program(tmp_path):
+    root = tmp_path / "repo"
+    shutil.copytree(REMOTE, root / "env" / "remote")
+    commit = "0123456789abcdef0123456789abcdef01234567"
+    (root / ".git/refs/heads").mkdir(parents=True)
+    (root / ".git/HEAD").write_text("ref: refs/heads/main\n")
+    (root / ".git/refs/heads/main").write_text(commit + "\n")
+    tools = tmp_path / "tools"          # a PATH with no git on it
+    tools.mkdir()
+    for tool in ("bash", "cat", "awk", "dirname"):
+        (tools / tool).symlink_to(shutil.which(tool))
+
+    def found():
+        done = subprocess.run([shutil.which("bash"), "-c", 'source "$1"; repo_commit', "_",
+                               str(root / "env/remote/lib.sh")], capture_output=True, text=True,
+                              env={"PATH": str(tools), "HOME": str(tmp_path)})
+        return done.stdout.strip()
+
+    assert found() == commit
+    (root / ".git/refs/heads/main").unlink()
+    (root / ".git/packed-refs").write_text(f"# pack-refs with: peeled\n{commit} refs/heads/main\n")
+    assert found() == commit
+    shutil.rmtree(root / ".git")
+    assert found() == "unknown"
+
+
 def test_capability_bits():
     assert lib("eval", "has_capability 000001ffffffffff 21 && echo yes") == "yes"     # root
     assert lib("eval", "has_capability 0000000000000000 21 || echo no") == "no"

@@ -49,6 +49,9 @@ warnings=()
 load_pins
 mkdir -p "$REMOTE_HOME"/{bin,state,resolved,mamba}
 export MAMBA_ROOT_PREFIX="$REMOTE_HOME/mamba"
+# Packages in ~/.local must neither satisfy pip nor be imported: a fresh rented
+# machine has none, and the development machine's would hide what is missing.
+export PYTHONNOUSERSITE=1
 
 # ---------------------------------------------------------------------------
 # 1. The machine
@@ -112,7 +115,7 @@ case "$toolkit_status" in
     fi ;;
 esac
 if [[ "${toolkit%%.*}" != "${PIN_CUDA_VERSION%%.*}" ]]; then
-  warn "toolkit $toolkit is a different major release from the pinned $PIN_CUDA_VERSION: the pinned cuda-bindings $PIN_CUDA_BINDINGS and apache-tvm-tirx $PIN_APACHE_TVM_TIRX expect CUDA ${PIN_CUDA_VERSION%%.*} libraries and will probably not run on the GPU (the simulator paths still work)"
+  warn "toolkit $toolkit is a different major release from the pinned $PIN_CUDA_VERSION: the pinned cuda-bindings $PIN_CUDA_BINDINGS and apache-tvm-tirx $PIN_APACHE_TVM_TIRX are built for CUDA ${PIN_CUDA_VERSION%%.*}. Measured with toolkit 12.8: nvcc and CUDA C++ programs are unaffected, but the TIRx, CuTe DSL and driver-shim launch paths fail, in the simulator too (3 failures and 9 errors in the test suite)"
 fi
 
 # One line that identifies this configuration; a finished setup with the same
@@ -178,7 +181,7 @@ export CONDA_OVERRIDE_CUDA="$toolkit"
 # ---------------------------------------------------------------------------
 if (( ! already )); then
   specs=("python==$PIN_PYTHON" "numpy==$PIN_NUMPY" "pyyaml==$PIN_PYYAML" "pytest==$PIN_PYTEST" pip
-         "setuptools==$PIN_SETUPTOOLS" "cuda-version==$toolkit")
+         "setuptools==$PIN_SETUPTOOLS" "typing_extensions==$PIN_TYPING_EXTENSIONS" "cuda-version==$toolkit")
   if [[ "$toolkit" == "$PIN_CUDA_VERSION" ]]; then
     specs+=("cuda-nvcc==$PIN_CUDA_NVCC" "cuda-cudart-dev==$PIN_CUDA_CUDART_DEV" "cuda-nvrtc==$PIN_CUDA_NVRTC")
   else
@@ -207,20 +210,17 @@ if (( ! already )); then
   # 5. PyPI packages, then warplens from this checkout
   # -------------------------------------------------------------------------
   constraints="$REMOTE_HOME/state/pip-constraints.txt"
-  cat > "$constraints" <<EOF
-numpy==$PIN_NUMPY
-PyYAML==$PIN_PYYAML
-pytest==$PIN_PYTEST
-setuptools==$PIN_SETUPTOOLS
-apache-tvm-ffi==$PIN_APACHE_TVM_FFI
-apache-tvm-ffi-orcjit==$PIN_APACHE_TVM_FFI_ORCJIT
-cuda-pathfinder==$PIN_CUDA_PATHFINDER
-nvidia-cutlass-dsl-libs-base==$PIN_NVIDIA_CUTLASS_DSL_LIBS_BASE
-nvidia-cutlass-dsl-libs-core==$PIN_NVIDIA_CUTLASS_DSL_LIBS_CORE
-nvidia-cutlass-dsl-libs-cu12==$PIN_NVIDIA_CUTLASS_DSL_LIBS_CU12
-ml-dtypes==$PIN_ML_DTYPES
-typing-extensions==$PIN_TYPING_EXTENSIONS
-EOF
+  {
+    echo "numpy==$PIN_NUMPY"
+    echo "PyYAML==$PIN_PYYAML"
+    echo "pytest==$PIN_PYTEST"
+    echo "setuptools==$PIN_SETUPTOOLS"
+    echo "typing-extensions==$PIN_TYPING_EXTENSIONS"
+    for pin in "${!PIN_PIP_@}"; do          # PIN_PIP_ML_DTYPES becomes a constraint on ml-dtypes
+      name="${pin#PIN_PIP_}"; name="${name,,}"
+      echo "${name//_/-}==${!pin}"
+    done
+  } > "$constraints"
   say "PyPI: triton $PIN_TRITON, nvidia-cutlass-dsl $PIN_NVIDIA_CUTLASS_DSL, apache-tvm-tirx $PIN_APACHE_TVM_TIRX, cuda-bindings $PIN_CUDA_BINDINGS"
   env_run python -m pip install -q --no-input --disable-pip-version-check -c "$constraints" \
       "triton==$PIN_TRITON" "nvidia-cutlass-dsl==$PIN_NVIDIA_CUTLASS_DSL" \
@@ -274,6 +274,9 @@ drift=()
 while IFS='=' read -r key value; do
   [[ "$key" =~ ^[a-z_0-9]+$ ]] || continue
   pin_var="PIN_${key^^}"
+  # check_env.py reports packages it does not import as pip_<name>; their pin
+  # is PIP_<NAME>, or plain <NAME> when conda installs it.
+  [[ -n "${!pin_var:-}" || "$key" != pip_* ]] || { plain="${key#pip_}"; pin_var="PIN_${plain^^}"; }
   [[ -n "${!pin_var:-}" ]] || continue
   [[ "${!pin_var}" == "$value" ]] || drift+=("$key: pinned ${!pin_var}, installed $value")
 done < "$resolved/versions.txt"
@@ -289,14 +292,33 @@ done
 (( ${#drift[@]} == 0 )) || printf '%s\n' "${drift[@]}" > "$resolved/drift.txt"
 
 # ---------------------------------------------------------------------------
-# 7. Does it work: compile for both Blackwell targets, NVRTC, import warplens
+# 7. Does it work: compile for the Blackwell targets, NVRTC, import warplens
 # ---------------------------------------------------------------------------
-say "toolchain check (env/check.sh)"
-env_run bash "$REPO_DIR/env/check.sh" || die "nvcc cannot compile for the Blackwell targets"
-nvrtc_out="$(env_run python "$REMOTE_DIR/check_env.py" nvrtc sm_100a)" \
-  || die "NVRTC cannot compile for sm_100a: $nvrtc_out"
-say "NVRTC: $(tr '\n' ' ' <<<"$nvrtc_out")"
-echo "$nvrtc_out" | grep -E '^nvrtc' >> "$resolved/versions.txt"
+# sm_100a is what the rental needs. sm_103a (B300) is what env/check.sh also asks
+# for; toolkit 12.8 does not have it, so on a fallback toolkit it is a warning.
+check_dir="$(mktemp -d)"
+for arch in sm_100a sm_103a; do
+  if err="$(env_run nvcc -arch="$arch" -ptx "$REPO_DIR/env/check_vecadd.cu" -o "$check_dir/$arch.ptx" 2>&1)"; then
+    say "nvcc $(conda_version cuda-nvcc): $arch ok, PTX .version $(sed -n 's/^\.version //p' "$check_dir/$arch.ptx")"
+    [[ "$arch" == sm_100a ]] && echo "nvcc_ptx_version=$(sed -n 's/^\.version //p' "$check_dir/$arch.ptx")" >> "$resolved/versions.txt"
+  elif [[ "$arch" == sm_100a || "$toolkit" == "$PIN_CUDA_VERSION" ]]; then
+    rm -rf "$check_dir"
+    die "nvcc cannot compile for $arch: $err"
+  else
+    warn "nvcc of toolkit $toolkit cannot compile for $arch (B300); the B200 probes do not need it: $(tail -n 1 <<<"$err")"
+  fi
+done
+rm -rf "$check_dir"
+# NVRTC is what TIRx compiles with. The pinned cuda-bindings loads the NVRTC of
+# its own major release, so with a toolkit of another major this cannot work.
+if nvrtc_out="$(env_run python "$REMOTE_DIR/check_env.py" nvrtc sm_100a 2>&1)"; then
+  say "NVRTC: $(tr '\n' ' ' <<<"$nvrtc_out")"
+  grep -E '^nvrtc' <<<"$nvrtc_out" >> "$resolved/versions.txt"
+elif [[ "${toolkit%%.*}" == "${PIN_CUDA_VERSION%%.*}" ]]; then
+  die "NVRTC cannot compile for sm_100a: $nvrtc_out"
+else
+  warn "NVRTC is not usable from cuda-bindings $PIN_CUDA_BINDINGS with toolkit $toolkit, so TIRx kernels will not compile here: $(tail -n 1 <<<"$nvrtc_out")"
+fi
 env_run python -c 'import warplens; warplens.Device("B200")' || die "warplens does not import from $REPO_DIR"
 
 # A way in for people and for other scripts.
@@ -304,6 +326,7 @@ cat > "$REMOTE_HOME/envrun" <<EOF
 #!/usr/bin/env bash
 # Run a command inside the warplens remote env: $REMOTE_HOME/envrun <command...>
 export MAMBA_ROOT_PREFIX="$REMOTE_HOME/mamba"
+export PYTHONNOUSERSITE=1
 exec "$MAMBA_BIN" run -p "$ENV_PREFIX" "\$@"
 EOF
 chmod +x "$REMOTE_HOME/envrun"

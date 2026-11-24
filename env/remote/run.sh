@@ -38,7 +38,13 @@
 #                               PTX from this toolkit (preflight's ptx-jit check)
 #   WARPLENS_NCU                ok | unavailable: whether ncu can read counters
 # Whatever a suite prints is archived too (logs/<stage>.log), and so are
-# directories named results, out or output inside the suite's directory.
+# directories named results*, out or output that the run creates inside the
+# suite's directory.
+# Arguments: validation/blackwell/build.sh gets --native when the driver
+# refuses the toolkit's PTX; validation/blackwell_timing/run_all.sh gets
+# --out <its results directory>. WARPLENS_BLACKWELL_BUILD_ARGS,
+# WARPLENS_BLACKWELL_RUN_ARGS, WARPLENS_TIMING_BUILD_ARGS and
+# WARPLENS_TIMING_RUN_ARGS replace those when set.
 #
 # Exit status: 0 everything ran and passed, 1 some stage failed (the archive
 # is still written), 3 the run stopped early, 2 usage.
@@ -66,7 +72,7 @@ while [[ $# -gt 0 ]]; do
     --toolkit) setup_args+=(--toolkit "${2:?--toolkit needs a value}"); shift ;;
     --no-ncu) setup_args+=(--no-ncu) ;;
     --price) price="${2:?--price needs a number}"; shift ;;
-    -h|--help) sed -n '2,44p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,50p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -95,8 +101,8 @@ estimate() {
     setup)           echo "2|8|measured: 75 s to download and install 5.8 GB on a fast link; a slow link or disk is the upper end" ;;
     preflight)       echo "1|2|measured: 5 s without the Blackwell kernels; allows for a first-use driver compile and ncu start-up" ;;
     selftest)        echo "1|3|measured: 41 s for the whole test suite" ;;
-    build-blackwell) echo "2|10|guess: every probe is compiled two or three times; not yet timed" ;;
-    build-timing)    echo "1|5|guess: ten benchmarks, two builds each; not yet timed" ;;
+    build-blackwell) echo "1|6|measured: 8 s on 20 cores (67 CPU-seconds) for an unfinished copy of the suite with 21 probes; the finished suite and a smaller machine are the upper end" ;;
+    build-timing)    echo "1|4|measured: 41 s, one compile at a time, for an unfinished copy of the suite" ;;
     run-blackwell)   echo "3|20|guess: short kernels, but some probes wait out a timeout on purpose; limit $run_minutes min" ;;
     run-timing)      echo "3|20|guess: repeated microbenchmarks, and ncu reruns each kernel per counter group; limit $run_minutes min" ;;
     collect)         echo "1|1|measured: under 1 s for a small archive" ;;
@@ -112,12 +118,12 @@ stage_command() {
     build-blackwell) echo "$SUITE_blackwell/build.sh   (adds --native if the driver refuses the toolkit's PTX)" ;;
     build-timing)    echo "$SUITE_timing/build.sh" ;;
     run-blackwell)   echo "$SUITE_blackwell/run_all.sh" ;;
-    run-timing)      echo "$SUITE_timing/run_all.sh" ;;
+    run-timing)      echo "$SUITE_timing/run_all.sh --out <results directory>" ;;
     collect)         echo "manifest, SHA256SUMS, tar.gz under $REMOTE_HOME/results" ;;
   esac
 }
 
-commit="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || echo unknown)"
+commit="$(repo_commit)"
 is_done() {  # finished earlier, for this commit, and not asked to be redone
   local stage="$1" r
   for r in "${redo[@]}"; do [[ "$r" == all || "$r" == "$stage" ]] && return 1; done
@@ -292,13 +298,16 @@ collect() {
   nvidia-smi > "$RUN_DIR/nvidia-smi.txt" 2>&1 || true
   nvidia-smi -q > "$RUN_DIR/nvidia-smi-q.txt" 2>&1 || true
   # Outputs a suite left in its own directory instead of WARPLENS_RESULTS_DIR.
+  # Only what this run made: directories that came with the checkout are older
+  # than the run's first start.
   for suite in "$SUITE_blackwell" "$SUITE_timing"; do
-    for sub in results out output; do
-      if [[ -d "$REPO_DIR/$suite/$sub" ]]; then
-        mkdir -p "$RUN_DIR/suite-dirs/$suite"
-        cp -r "$REPO_DIR/$suite/$sub" "$RUN_DIR/suite-dirs/$suite/"
-      fi
-    done
+    [[ -d "$REPO_DIR/$suite" ]] || continue
+    while IFS= read -r -d '' made; do
+      mkdir -p "$RUN_DIR/suite-dirs/$suite"
+      cp -r "$made" "$RUN_DIR/suite-dirs/$suite/"
+    done < <(find "$REPO_DIR/$suite" -mindepth 1 -maxdepth 1 -type d \
+               \( -name 'results*' -o -name out -o -name output \) \
+               -newer "$RUN_DIR/state/first-start" -print0)
   done
   (cd "$RUN_DIR" && find . -type f ! -name SHA256SUMS ! -path './state/*' -print0 | sort -z | xargs -0 sha256sum > state/sums \
      && mv state/sums SHA256SUMS)
@@ -367,17 +376,28 @@ fi
 run_stage selftest 20 "${self[@]}" selftest || true
 
 # 5-8. Build both suites, then run what built.
-blackwell_build_args=()
+# Arguments for the suite scripts. The defaults are the two things run.sh knows
+# about them; WARPLENS_<SUITE>_<BUILD|RUN>_ARGS, when set, replaces a default.
+declare -A stage_args=([build-blackwell]="" [build-timing]="" [run-blackwell]="" [run-timing]="--out $RUN_DIR/out/timing")
 if [[ "$ptx_jit" == refused ]]; then
   say "the driver refuses this toolkit's PTX: building the Blackwell probes with machine code as well (--native)"
-  blackwell_build_args+=(--native)
+  stage_args[build-blackwell]="--native"
 fi
+[[ -n "${WARPLENS_BLACKWELL_BUILD_ARGS+set}" ]] && stage_args[build-blackwell]="$WARPLENS_BLACKWELL_BUILD_ARGS"
+[[ -n "${WARPLENS_BLACKWELL_RUN_ARGS+set}" ]] && stage_args[run-blackwell]="$WARPLENS_BLACKWELL_RUN_ARGS"
+[[ -n "${WARPLENS_TIMING_BUILD_ARGS+set}" ]] && stage_args[build-timing]="$WARPLENS_TIMING_BUILD_ARGS"
+[[ -n "${WARPLENS_TIMING_RUN_ARGS+set}" ]] && stage_args[run-timing]="$WARPLENS_TIMING_RUN_ARGS"
 export WARPLENS_PTX_JIT="$ptx_jit" WARPLENS_NCU="$ncu_state"
-run_stage build-blackwell "$build_minutes" "${self[@]}" build-blackwell "${blackwell_build_args[@]}" || true
-run_stage build-timing "$build_minutes" "${self[@]}" build-timing || true
+suite_run_stage() {  # suite_run_stage STAGE MINUTES
+  local words=()
+  read -r -a words <<<"${stage_args[$1]}"
+  run_stage "$1" "$2" "${self[@]}" "$1" "${words[@]}"
+}
+suite_run_stage build-blackwell "$build_minutes" || true
+suite_run_stage build-timing "$build_minutes" || true
 for suite in blackwell timing; do
   case "${result[build-$suite]}" in
-    ok|done|skipped) run_stage "run-$suite" "$run_minutes" "${self[@]}" "run-$suite" || true ;;
+    ok|done|skipped) suite_run_stage "run-$suite" "$run_minutes" || true ;;
     *) skip_stage "run-$suite" "build-$suite did not succeed (${result[build-$suite]})" ;;
   esac
 done

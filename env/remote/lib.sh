@@ -191,7 +191,8 @@ env_run() {
     $WARPLENS_ENV_RUN "$@"
     return
   fi
-  MAMBA_ROOT_PREFIX="$REMOTE_HOME/mamba" "$MAMBA_BIN" run -p "$ENV_PREFIX" "$@"
+  # PYTHONNOUSERSITE: packages in ~/.local are not part of the env.
+  PYTHONNOUSERSITE=1 MAMBA_ROOT_PREFIX="$REMOTE_HOME/mamba" "$MAMBA_BIN" run -p "$ENV_PREFIX" "$@"
 }
 
 env_installed() {
@@ -200,3 +201,29 @@ env_installed() {
 }
 
 utc_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+
+# The commit of the checkout. Without a git program (a bare container) it is
+# read from .git directly; "unknown" for a copy that has no .git at all.
+repo_commit() {
+  local head ref
+  if command -v git >/dev/null 2>&1 && head="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null)"; then
+    echo "$head"
+    return 0
+  fi
+  if [[ -f "$REPO_DIR/.git/HEAD" ]]; then
+    head="$(cat "$REPO_DIR/.git/HEAD")"
+    if [[ "$head" == "ref: "* ]]; then
+      ref="${head#ref: }"
+      if [[ -f "$REPO_DIR/.git/$ref" ]]; then
+        head="$(cat "$REPO_DIR/.git/$ref")"
+      else
+        head="$(awk -v ref="$ref" '$2 == ref {print $1}' "$REPO_DIR/.git/packed-refs" 2>/dev/null)"
+      fi
+    fi
+    if [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then
+      echo "$head"
+      return 0
+    fi
+  fi
+  echo unknown
+}

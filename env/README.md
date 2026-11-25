@@ -34,4 +34,4 @@ must not be compared silently. Moving to another toolkit is one commit that does
    `provenance.json` and `meta.json` with the new nvcc; read the diff, since a change of
    compiler may change a prediction;
 4. `conda run -n warplens env/check.sh`, then the tests `regenerate_predictions.sh --help`
-   names. `tests/test_rental_harness.py` fails while the four files disagree.
+   names. `tests/validation/probes/test_rental_harness.py` fails while the four files disagree.

@@ -8,7 +8,7 @@
 // An mbarrier that is not armed has had no arrival, so its phase cannot complete whatever
 // bytes it is sent; those lines only show where the data went.
 //
-// Claims tested (docs/m5.md, "TMA multicast"; warplens/units/tma.py `_load_targets`):
+// Claims tested (docs/history/m5.md, "TMA multicast"; warplens/units/tma.py `_load_targets`):
 //   A. .cta_group::1 with multicast: every receiving CTA's own mbarrier gets the box size.
 //   B. .cta_group::2 with multicast, mbarrier address in the issuer (even rank): the
 //      completions of both members of a pair go to the pair's EVEN member, which therefore

@@ -6,7 +6,7 @@
 // model that: its try_wait blocks the warp until the phase completes and never returns
 // false (warplens/units/mbarrier.py), so that a wait that can never succeed is reported as
 // a deadlock. A kernel with a non-blocking fallback, one that does other work when
-// try_wait returns false, is outside the v1 scope (PLAN.md, "v1 instruction scope").
+// try_wait returns false, is outside the v1 scope (docs/history/plan.md, "v1 instruction scope").
 //
 // One thread, one mbarrier, nothing asynchronous.
 //

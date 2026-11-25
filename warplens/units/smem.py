@@ -35,12 +35,12 @@ from ..errors import MemoryFault
 # and 228 KB per SM for compute capability 10.x, and CUTLASS sizes its sm_100 kernels by
 # `sm100_smem_capacity_bytes = 232448` (cutlass/arch/arch.h). The shim libraries report the
 # same number to programs as WL_MAX_SMEM_BYTES (warplens/shim/protocol.h), which
-# tests/test_sim_bug_regressions.py keeps equal to this one.
+# tests/execution/test_sim_bug_regressions.py keeps equal to this one.
 MAX_SMEM_BYTES = 227 * 1024
 
 # The shared memory of one CTA that a program gets without asking: what the device reports as
 # its shared memory per block (WL_DEFAULT_SMEM_BYTES in warplens/shim/protocol.h, kept equal
-# by tests/test_sim_bug_regressions.py). 48 KB is what every compute capability in the CUDA
+# by tests/execution/test_sim_bug_regressions.py). 48 KB is what every compute capability in the CUDA
 # C++ Programming Guide's table has; a B200 has not been asked (RT-03).
 DEFAULT_SMEM_BYTES = 48 * 1024
 

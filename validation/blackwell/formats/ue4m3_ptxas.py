@@ -36,7 +36,7 @@ import tempfile
 from pathlib import Path
 
 # name -> (rounding and modifiers of the narrowing form, is it a control)
-# Controls are spelled as nvcc emits them (tests/test_small_format_cvt.py has the list).
+# Controls are spelled as nvcc emits them (tests/numerics/test_small_format_cvt.py has the list).
 NARROW = {
     "e4m3x2": ("rn.satfinite", True),
     "e5m2x2": ("rn.satfinite", True),

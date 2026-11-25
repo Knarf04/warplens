@@ -3,7 +3,7 @@
 Each example asks one question of a kernel in `examples/` and answers it with
 the pictures warplens draws. Every picture here is the unedited output of a
 function of `warplens.viz`; `python tools/make_gallery.py` writes them all, and
-`tests/test_gallery.py` fails if they are stale. `warplens report program`
+`tests/documentation/test_gallery.py` fails if they are stale. `warplens report program`
 (guide, section 6.8) puts the same views of your own kernel on one page.
 
 The files are SVG with a tooltip on every mark. A Markdown viewer shows them

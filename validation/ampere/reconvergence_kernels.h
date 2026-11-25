@@ -1,5 +1,5 @@
 // Written by `python validation/ampere/reconvergence_golden.py --header`. Do not edit:
-// tests/test_ampere_replay.py compares this file with what that command prints.
+// tests/validation/golden_replay/test_ampere_replay.py compares this file with what that command prints.
 // The PTX modules that recorded validation/ampere/reconvergence_golden.txt, one per kernel;
 // each has one entry point `k(out)`, launched as one block of 32 threads.
 #pragma once

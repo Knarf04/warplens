@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import numpy as np
 
+__all__ = ["TF32_DISCARDED_BITS", "TF32_MODES", "TF32_NAN", "explain_tf32", "flush_subnormals",
+           "fused_multiply_add", "to_tf32"]
+
 
 _FORMATS = {
     np.dtype(np.float16): (np.uint16, 10, 5),
     np.dtype(np.float32): (np.uint32, 23, 8),
     np.dtype(np.float64): (np.uint64, 52, 11),
 }
+
+
+def flush_subnormals(x: np.ndarray, small=None) -> np.ndarray:
+    """Subnormal values (or those marked `small`) become zeros of the same sign."""
+    if small is None:
+        small = np.abs(x) < np.finfo(x.dtype).tiny
+    return np.where(small, np.copysign(x.dtype.type(0), x), x)
 
 
 def _fma_bits(a: int, b: int, c: int, fraction_bits: int, exponent_bits: int) -> int:

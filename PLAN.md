@@ -1,637 +1,121 @@
-# warplens
+# warplens: what is left
 
 **Understand a Blackwell GPU by watching it run, on your CPU.**
 
-> Status: M0 to M6 done (2026-11-23), with gaps recorded in docs/m1.md to docs/m6.md. The probe suites ran on a rented B200 on 2026-11-25 (docs/b200-rental-1.md): most claims held, about ten did not and are fixed on the branch `work/b200-rental-1`; those fixes still need a second run to confirm them. What remains before v1.0 is in section 11.
-> GitHub description: *Understand a Blackwell GPU by watching it run, on your CPU.*
-> Topics: `cuda` `gpu` `blackwell` `simulator` `ptx` `cutlass` `triton` `tensor-cores` `gpu-programming`
+This file is the release checklist for v1.0 and the roadmap after it. What
+warplens is and does is in the manual, [docs/guide.md](docs/guide.md); how it
+works is in [docs/architecture.md](docs/architecture.md).
 
-## 1. Goal
+The plan this project was built from (goals, the survey of related work, the
+architecture as first sketched, milestones M0 to M6, and the path to the
+first run on a rented B200, step by step) is kept as it stood on 2026-11-25
+in [docs/history/plan.md](docs/history/plan.md). Section and step numbers
+that other files cite ("section 3.5", "step A3", "section 11") are that
+file's.
 
-Take real kernel code written for datacenter Blackwell (sm_100a / sm_103a): CUDA C++, CUTLASS/CuTe, Triton, CuTe DSL.
-Compile it to PTX on an ordinary machine and **execute it on the CPU** under a configurable GPU model (B200, B300).
-Then show:
+## Where the project stands (2026-11-25)
 
-1. **Correctness:** output tensors, compared against a NumPy reference.
-2. **Mechanisms:** how every byte moves (GMEM → TMA → swizzled SMEM → Tensor Core → TMEM → registers → SMEM → TMA store → GMEM), which mbarrier phase each step waits on, which banks each access hits.
-3. **Misuse:** races, hangs, wrong `expect_tx` byte counts, TMEM lane-rule violations, missing proxy fences, bank conflicts. Each one is reported with the PTX line that caused it.
-4. **Approximate performance:** a timeline and a utilization report for each resource (HBM, L2, TMA, SMEM, Tensor Core, issue slots). This answers questions like "is this pipeline TMA-bound or MMA-bound with 2 stages vs 4?"
+- Milestones M0 to M6 are built: the PTX executor, shared memory, TMA and
+  mbarriers, `tcgen05` and tensor memory, the timing model, clusters, and the
+  front ends (`warplens run` for compiled programs, Triton, TIRx, the CuTe
+  DSL). The write-ups of each are under [docs/history/](docs/history/README.md).
+- The probe suites ran once on a rented B200, on 2026-11-25
+  ([docs/b200-rental-1.md](docs/b200-rental-1.md)). Of 126 probe runs 88 were
+  identical to the simulator's prediction; the differences were taken into
+  the simulator, which now reproduces the recorded outputs. Those changes
+  have not been run on hardware again.
+- The timing model's shipped configs still hold the values assumed before
+  that run. A fit of the run is recorded and not applied.
 
-### Non-goals for v1
+The guide's section 2 has the evidence area by area.
 
-- Cycle accuracy. The microarchitecture is not public, and even trace-driven research simulators miss by 5–13%. warplens aims for *explanatory* timing, clearly labeled as approximate.
-- Multi-GPU, NVLink, NVSHMEM, NCCL. These are planned for v2 (see §10).
-- SASS input. PTX is documented and SASS is not.
-- Graphics, texture units, consumer Blackwell (sm_120).
+## The v1 scope
 
-## 2. Why this doesn't exist yet (survey, Nov 2026)
+Frozen on 2026-11-24, amended once by the owner on 2026-11-25
+([docs/history/plan.md](docs/history/plan.md), section 3.5, has the decision
+and its reasons). The surface is what [docs/coverage.md](docs/coverage.md)
+lists form by form. Nothing is added before v1.0: a result from hardware can
+change how an instruction in scope behaves, not which instructions are in
+it. Anything outside is a hard error that names the instruction. Three
+points of the freeze that other documents rely on:
 
-| Work | Data values | Timing | Blackwell tcgen05/TMEM | Runs without a Blackwell GPU end to end |
-| --- | --- | --- | --- | --- |
-| [ptxv](https://github.com/meta-pytorch/ptxv) (Meta, BSD, WIP) | yes (numerics) | no | yes | **no**: kernels are captured from a launch on a real Blackwell GPU |
-| Accel-Sim 2.0 ([arXiv 2608.22602](https://arxiv.org/abs/2608.22602)) | no | cycle-level | yes (UTCMMA) | no: NVBit traces from real HW; code not found |
-| Sim-FA ([arXiv 2605.00555](https://arxiv.org/html/2605.00555)) | no | cycle-level | no (Hopper TMA/WGMMA only) | traces from real HW; code not found |
-| GPU-Tile-Sim ([arXiv 2607.11262](https://arxiv.org/abs/2607.11262)) | not stated | yes | preliminary | tile graphs, not real code; code not found |
-| GPGPU-Sim / Accel-Sim 1.x | partial | yes | no (pre-Hopper) | yes |
+- the matrix base offset of a shared-memory descriptor must be 0;
+- `mbarrier.try_wait` blocks and never returns false;
+- `tcgen05.cp` is refused by name.
 
-**warplens's niche:** *real code in, no Blackwell hardware anywhere in the loop, functional + mechanism-checked + visual + approximate timing.*
-The key enabler: warplens emulates the **host side** too (tensor-map encoding, launch with cluster dims, SMEM opt-in), so nothing has to be captured from hardware.
+The amendment added `tcgen05.mma` with `.collector::a::discard` and
+`cvt.rn.f16x2.f32`, for the kernel of CUTLASS's `fp16_gemm_0.py`.
 
-Target users:
-- learners of Blackwell kernel programming, like this course's readers;
-- kernel developers without B200 access;
-- **LLM kernel-generation agents**, which need a cheap, no-GPU correctness and protocol checker in the loop.
+Non-goals for v1: cycle accuracy; multi-GPU, NVLink, NVSHMEM, NCCL; SASS
+input; graphics, texture units, consumer Blackwell (`sm_120`).
 
-## 3. Architecture
+The project has two version numbers and no others: `0.0.1`, a placeholder to
+reserve the PyPI name, and `1.0`, the public release
+([RELEASING.md](RELEASING.md)).
 
-```
- CUDA C++ / CUTLASS ──nvcc -arch=sm_100a -ptx──┐
- Triton ──compile(target=cuda:100)────────────┤
- CuTe DSL ──export PTX (to investigate)───────┤
- hand-written PTX ────────────────────────────┤
-                                              ▼
-                                  ┌────────────────────┐
- host program / Python harness ──►│ host runtime emu   │  malloc, memcpy, cuTensorMapEncode*,
-                                  │                    │  launch (grid, cluster, smem bytes)
-                                  └─────────┬──────────┘
-                                            ▼
-                       ┌──────────────────────────────────────┐
-                       │ PTX frontend: parse → IR, CFG, IPDOM │
-                       └─────────────────┬────────────────────┘
-                                         ▼
- ┌────────────────────────── discrete-event engine ─────────────────────────┐
- │  warps (SIMT, 32-lane vectors + active mask)   async units:              │
- │                                                  TMA engine, Tensor Core │
- │  state: GMEM | L2 (timing) | SMEM/CTA (+banks) | TMEM/CTA 128×512×32b    │
- │         registers/lane | mbarriers | bulk-async groups | tensor maps     │
- │  ── functional semantics ──┬── checkers ──┬── timing model (config) ──   │
- └────────────────────────────┼──────────────┼──────────────────────────────┘
-                              ▼              ▼
-              outputs + diff vs NumPy   reports: hazards, bank conflicts,
-                                        Perfetto trace, utilization, layout views
-```
+## Still owed for v1.0
 
-### 3.1 Frontends (everything lowers to PTX)
+1. **A second rental.** 4 GPU-hours are in reserve (the budget and the
+   triggers are in `env/remote/RUNBOOK.md`, section 5). The fixes made after
+   the first run changed predictions of bit-exact and tolerance rows, which
+   hardware has to confirm, and three constants in those fixes are
+   assumptions that new probe runs measure: the piece size in which a TMA
+   copy reports its bytes, the alignment a tensor copy needs, and three rules
+   of the MMA sum. What to look for is in
+   [docs/b200-rental-1.md](docs/b200-rental-1.md), "What the second rental
+   has to confirm".
+2. **A decision on the timing config.** Take the fit of the first run
+   (`validation/blackwell_timing/measured/b200/calibrated.yaml`) as it is and
+   rewrite what depends on the assumed values (about twenty tests, the
+   guide's worked examples, one ordering property, TIM-18, that then fails by
+   a hair), or first give the model what the fit says it lacks (a
+   cluster-launch-control latency per form of the request, the cost of an
+   mbarrier wake-up) and fit again
+   ([docs/b200-rental-1.md](docs/b200-rental-1.md), "The timing config is a
+   decision, not a fix").
+3. **A decision on the RT-11 capture.** The kernel of `fp16_gemm_0.py`
+   replays byte for byte against the B200, given the capture
+   (`tests/validation/golden_replay/test_rt11_replay.py` with `WARPLENS_RT11_CAPTURE`). The capture is
+   not a committed fixture: it is 42 MB, and its PTX is CUTLASS's code
+   compiled. The tutorial as a script under `warplens run` is not done: it
+   holds its arrays in PyTorch, which needs a GPU.
+4. **Reserve the PyPI name** with the `0.0.1` placeholder.
+5. What [RELEASING.md](RELEASING.md) lists under "Before the release".
 
-- **CUDA C++ / CUTLASS:** the user runs `nvcc -arch=sm_100a -ptx` (CUDA ≥ 12.8, no GPU needed). warplens never redistributes NVIDIA headers or tools.
-- **Triton:** compile for `GPUTarget("cuda", 100, 32)` without a GPU and take the PTX. Later, register a warplens "driver" so that `kernel[grid](...)` runs in the simulator.
-- **CuTe DSL:** *open question.* Check whether `cute.compile` can emit PTX without a GPU or driver present, and how to extract the PTX and the launch parameters. This is a spike in M6.
-- **Raw PTX:** first-class input, used for unit tests.
+Open and recorded, not blocking:
 
-### 3.2 Host runtime emulation
+- What separates the repeated `tcgen05.dealloc` that a B200 ended a kernel
+  for from the ones in the book's kernels, which ran (TM-11).
+- NUM-05: ptxas 13.3 and 13.5 have no UE4M3 conversion, so that format has
+  nothing on a GPU to be compared with.
+- The self-test on the rented machine under the fallback toolkit: 20 failed,
+  4 errors, of which not all were read.
+- `shfl.sync`, `bar.warp.sync` and `elect.sync` do not wait in the simulator
+  for lanes their masks name that are elsewhere; what a GPU does then was not
+  measured (`vote.sync` was, and waits).
+- The launch-error recordings of the RTX 3080 Ti are at Ampere's own limits
+  and were not rerun verbatim on the B200; RT-04 and RT-12 cover them.
+- `kind::i8` arithmetic and half-precision subnormals in an MMA.
 
-- **v1:** a Python API.
-  ```python
-  sim = warplens.Device("B200")
-  A = sim.from_numpy(a); C = sim.empty((M, N), "f32")
-  tmap = sim.tensor_map_tiled(A, box=(64, 128), swizzle="128B")   # our own encoding of the 128-byte CUtensorMap
-  sim.launch("gemm.ptx", "kernel", grid=(...), block=(...), cluster=(2, 1, 1), smem=..., args=[tmap, C, ...])
-  ```
-- **v1.x:** a drop-in `libcuda`/`libcudart` shim, so unmodified host programs (CUTLASS examples) run under `warplens run ./a.out`. This needs coverage of `cuTensorMapEncodeTiled`, `cudaLaunchKernelEx` (cluster dims), `cudaFuncSetAttribute`, memory APIs, and streams (serialized).
-- **Tensor maps are opaque on real hardware.** Because warplens emulates the encode call, it defines its own 128-byte encoding and decodes it in the TMA unit.
+## After v1
 
-### 3.3 PTX frontend
-
-- A parser for the PTX grammar: directives, `.reg` / `.shared` / `.param`, predicates, vector operands, and inline-asm blocks that nvcc emits verbatim.
-- IR → per-function CFG → immediate post-dominators, which give divergence reconvergence points.
-- Coverage is driven by the target kernels (§6). Any unsupported instruction is a hard error that names the instruction, never silently skipped.
-
-### 3.4 Execution model
-
-- **Warp = unit of execution.** Each instruction runs on all 32 lanes at once as NumPy vectors, under an active mask; a SIMT stack handles divergence. This keeps Python fast enough for tile-sized problems.
-- **Discrete-event engine.** Warps, the TMA engine, and the Tensor Core are actors. Async instructions (`cp.async.bulk.tensor`, `tcgen05.mma`, `tcgen05.commit`) enqueue work, and completion is an event (`complete_tx` on an mbarrier, `commit` arrival).
-- **Scheduling:**
-  - Functional mode uses a deterministic, configurable policy (round-robin or seeded random), with optional "adversarial" scheduling: delay async completions to expose races.
-  - Timing mode orders events by the timing model.
-- **Scale:** simulate a configurable subset of CTAs (default: one wave on k SMs). Shared resources (HBM, L2) are given each SM's share of bandwidth. Full 148-SM runs are allowed but slow.
-
-### 3.5 State and semantics (v1 instruction surface)
-
-| Area | PTX |
-| --- | --- |
-| Core | int/fp ALU, `cvt`, `setp`, `selp`, `bra`, `ret`, `ld/st.{global,shared,param,local}`, `atom`/`red` (global, shared, generic), `shfl.sync`, `vote`, `elect.sync`, `bar.sync`/`bar.arrive` (named barriers), special registers (`%tid`, `%ctaid`, `%clusterid`, `%cluster_ctarank`, …) |
-| mbarrier | `init`, `arrive`(`.expect_tx`, count), `expect_tx`, `complete_tx`, `test_wait`/`try_wait`(`.parity`; `try_wait` blocks, see below), `inval` |
-| TMA | `cp.async.bulk.tensor.{1..5}d` load (tile mode, OOB fill) and store, `cp.async.bulk` (non-tensor), `.multicast::cluster` (M5), `cp.async.bulk.commit_group`/`wait_group(.read)`, `prefetch.tensormap` |
-| Fences / proxies | `fence.proxy.async`, `fence.mbarrier_init`, `fence.acq_rel` (modeled as checker events) |
-| tcgen05 | `alloc`/`dealloc`/`relinquish_alloc_permit`, `mma` (`kind::f16`, `kind::tf32` first; `f8f6f4` and block-scaled later; `cta_group::1` first), `commit` (incl. `.multicast`), `ld`/`st` (32x32b, 16x64b, 16x128b, 16x256b shapes), `wait::ld/st`, `fence::before/after_thread_sync` |
-| Descriptors | SMEM matrix descriptor (start, LBO, SBO, swizzle mode; base offset 0 only, see below), instruction descriptor (dtypes, M, N, major-ness, negate/transposes), decoded exactly as the PTX ISA specifies |
-| Clusters (M5) | `barrier.cluster.arrive/wait`, `mapa`, DSMEM `ld/st.shared::cluster`, remote mbarrier arrive, `cta_group::2` (Layouts A/B for the M=256/128 pair), CLC `clusterlaunchcontrol.try_cancel` |
-
-**v1 instruction scope (frozen 2026-11-24).** The table above, as implemented and listed
-form by form in `docs/coverage.md`, is the v1 surface. Nothing is added to it before v1.0;
-a result from the B200 run can change how an instruction in it behaves, not which
-instructions are in it. Anything outside it is a hard error that names the instruction,
-never something else run in its place. Three points that were open are settled as follows
-(and one amendment was made by the owner on 2026-11-25, after the list):
-
-- **Descriptor base offset: 0 only.** The 3-bit matrix base offset of the shared-memory
-  descriptor (bits 49-51) must be 0; a non-zero field is refused. CUTLASS and CuTe never set
-  it (`make_umma_desc`), so no target kernel is affected. What v1 does claim is what an
-  operand reads when the field is 0 and its start is not on a swizzle period: the swizzle
-  of the absolute shared address. That claim is matrix row MMA-12, tested on the B200 by
-  `validation/blackwell/mma/base_offset`; its `field` case records what a non-zero field
-  selects, as the specification for supporting it after v1.
-- **`mbarrier.try_wait` blocks; no non-blocking fallback.** PTX lets `try_wait` return false
-  after a system-dependent time limit. v1 treats the limit as unbounded: `try_wait` blocks
-  the warp until the phase completes and never returns false. That is exact for the wait
-  loop all target kernels use and makes a hopeless wait a deadlock report. A kernel that
-  does other work when `try_wait` fails is out of scope and is reported as a deadlock;
-  `test_wait` is the non-blocking form and is modeled. `validation/blackwell/mbarrier/try_wait`
-  records what a single `try_wait` returns on the B200 and after how long (MB-11).
-- **`tcgen05.cp` is v2**, with the block-scaled formats it serves (section 10). It was
-  listed here for M5 and never implemented; it is refused by name.
-  `validation/blackwell/tmem/cp.cu` records what the one-CTA forms copy, for that later work.
-
-**Amendment (owner, 2026-11-25): two forms added, for CUTLASS's `fp16_gemm_0.py`.** The
-kernel of that CuTe DSL tutorial, the one with TMA that row RT-11 captured on the B200,
-uses `tcgen05.mma` with `.collector::a::discard` and `cvt.rn.f16x2.f32`. A tutorial of
-CUTLASS's own Blackwell set that stops at an unsupported instruction is not a scope worth
-keeping frozen, and both forms are small and now rest on hardware: `discard` is what an MMA
-without the modifier does, and the packed conversion's operand order is the one with which
-the captured launch replays byte for byte against the GPU (the other order leaves 129,920
-of 131,072 elements wrong). The collector forms that keep operand A (`fill`, `use`,
-`lastuse`) stay out, as does every other `x2` conversion that is not already listed. The
-freeze stands for everything else.
-
-Also out of v1, as before (`docs/coverage.md`, `docs/guide.md` "Instructions not
-implemented"): MMA kinds other than `f16` and `tf32`, operand A from tensor memory,
-`tcgen05.shift`, `.pack`/`.unpack`, mbarrier `arrive_drop` / `.noComplete` /
-`pending_count`, TMA im2col mode, memory orderings stronger than relaxed for atomics.
-
-**Numerics:** the MMA computes in fp32 with documented input rounding; a bit-exact accumulation order is not promised. Report max abs/rel error vs NumPy.
-
-### 3.6 Checkers (the main value for learning)
-
-Each finding is reported with the PTX line, the warp/lane, and a short explanation of the rule.
-
-- **Async-write hazards:** SMEM bytes written by TMA are tagged "pending (barrier B, phase p)". A generic-proxy read before that phase completes is a race.
-- **TMA store source reuse:** overwriting SMEM before the matching `wait_group.read`. A TMA store of data written by `st.shared` without `fence.proxy.async` in between.
-- **mbarrier:**
-  - phase completes with bytes ≠ total box bytes (`expect_tx` mismatch);
-  - an arrival that lands in the next phase;
-  - waiting on a parity two phases behind (ABA);
-  - use before `init` / fence.
-- **Deadlock:** every warp is blocked, no async work is pending, and the kernel is unfinished. Report who waits on what.
-- **TMEM:**
-  - warp *w* accessing lanes outside `32·(w%4)…+31`;
-  - reading accumulators before `commit` completes / `wait::ld`;
-  - alloc not a power of 2 ≥ 32 columns;
-  - leaking an allocation at exit.
-- **SMEM banks:** wavefronts per access vs the minimum for its width; a heatmap per instruction.
-- **Descriptors/layout:**
-  - swizzle-mode alignment (1024 B for 128B mode);
-  - box inner bytes > swizzle span;
-  - an MMA descriptor whose layout disagrees with the TMA swizzle that wrote that buffer.
-
-### 3.7 Timing model (approximate, config-driven)
-
-- Every resource is modeled as a server with a latency and a throughput:
-  - HBM (device-wide, shared);
-  - L2 (hit/miss with a simple set-associative model, optional);
-  - the TMA engine per SM (issue cost, bytes/clk);
-  - SMEM per SM (128 B/clk of wavefronts);
-  - the Tensor Core per SM (FLOP/clk per dtype, per MMA shape);
-  - the TMEM ↔ RF path;
-  - warp issue slots (4 sub-partitions per SM).
-- **GPU configs** in YAML (`configs/b200.yaml`, `configs/b300.yaml`): SM count, clock, HBM bandwidth and capacity, L2 size, SMEM/TMEM sizes, Tensor Core rates. Values come from public specs and microbenchmark papers (e.g. [arXiv 2512.02189](https://arxiv.org/pdf/2512.02189)), with a `source:` field on every number.
-- **Outputs:**
-  - a Perfetto/Chrome trace with tracks per warp, TMA, Tensor Core, and HBM (the busy time of one SM's share; L2 likewise), plus mbarrier phase flips as instant events on a track per barrier and counters for bytes in flight;
-  - a summary table of utilization per resource and the bottleneck verdict;
-  - roofline placement.
-
-### 3.8 Visualization
-
-- **v1 (static):**
-  - SMEM layout view: logical tile → physical bytes, colored by bank;
-  - TMEM map: which logical rows/columns are in which lane/column, for the four tcgen05 layouts;
-  - mbarrier timeline;
-  - all exported as SVG/HTML from `warplens report`.
-- **Later:** an interactive web viewer that steps through a pipeline stage by stage.
-
-## 4. Implementation choices
-
-- **Language:** Python 3.11+ with NumPy for v1. This favors iteration speed, readability for learners, and contributions.
-  - Hot loops are warp-vectorized.
-  - If profiling shows the interpreter is the bottleneck, move the core (PTX IR execution) to Rust via PyO3, keeping the Python API.
-- **Packaging:** `pip install warplens`; CLI `warplens run|report|check`. CUDA ≥ 12.8 is needed only to *compile* CUDA C++, never to run.
-- **License:** Apache-2.0 (patent grant, friendly to companies). Do not vendor NVIDIA headers or PTX docs; link to them.
-
-## 5. Repository layout
-
-```
-warplens/
-  warplens/
-    frontend/      ptx_parser.py, ir.py, cfg.py
-    host/          device.py, tensor_map.py, launch.py, (shim/ later)
-    core/          engine.py, warp.py, simt_stack.py
-    units/         alu.py, memory.py, smem_banks.py, mbarrier.py, tma.py, tcgen05.py, tmem.py, cluster.py
-    check/         hazards.py, deadlock.py, tmem_rules.py, report.py
-    timing/        model.py, resources.py
-    viz/           trace_perfetto.py, layout_svg.py, html_report.py
-  configs/         b200.yaml, b300.yaml
-  examples/        00_vecadd, 01_smem_transpose, 02_tma_copy, 03_mma_sm100, 04_pipelined_gemm, ...
-  tests/           unit (per instruction), layout goldens, end-to-end kernels
-  docs/            design.md, coverage.md (instruction support table), validation.md
-```
-
-## 6. Milestones and acceptance criteria
-
-Each milestone ends with a runnable example, tests, and a short write-up in `docs/`.
-
-| # | Scope | Done when |
-| --- | --- | --- |
-| **M0** skeleton | PTX parser (basic subset), warp SIMT executor, GMEM, Python launch API, CI | `vecadd` and a divergent-branch kernel, compiled by nvcc for sm_100a, run on CPU and match NumPy |
-| **M1** SMEM | shared memory, named barriers, `shfl`, bank/wavefront model, conflict report | the transpose kernel in linear/padded/swizzled layouts reports 32-way / 0 / 0 conflicts. **Validated against `ncu` on a real Ampere GPU** (same counters) |
-| **M2** TMA + mbarrier | tensor-map emulation, TMA load/store 1–5D tile mode, OOB fill, swizzle 32/64/128B, mbarrier full semantics, bulk groups, proxy fences, hazard + deadlock checkers | a TMA copy kernel round-trips GMEM→SMEM→GMEM for every swizzle mode. Deliberately broken variants (wrong expect_tx, missing fence, early reuse) are each caught |
-| **M3** tcgen05 + TMEM | alloc/dealloc, SMEM + instruction descriptors, `mma` kind::f16/tf32 `cta_group::1` (M=64 Layout F, M=128), `commit`, `ld/st` shapes, lane-rule checker | the CUTLASS Blackwell CuTe tutorials (`examples/cute/tutorial/blackwell/01_mma_sm100.cu`, `02_mma_tma_sm100.cu`) produce correct GEMM output. The TMEM layout view matches the course's Layout F/B figures |
-| **M4** timing + reports | timing model, B200/B300 configs, Perfetto trace, utilization summary, HTML report | a warp-specialized pipelined GEMM shows the expected trend over 1/2/4 stages (bottleneck moves from latency to TMA/HBM to Tensor Core). Every number in the report links to its config source |
-| **M5** clusters | clusters, DSMEM, remote mbarrier, TMA multicast, `cta_group::2` (Layouts A/B), CLC | the CUTLASS tutorials with multicast and 2-SM MMA (`03_mma_tma_multicast_sm100.cu`, `04_mma_tma_2sm_sm100.cu`) are correct; Layout B worked example (C[10,11] → lane 74) is reproduced |
-| **M6** frontends | Triton driver, CuTe DSL spike, libcudart/libcuda shim | a Triton matmul and an unmodified CUTLASS example binary run under `warplens run` |
-| **v1.0** | docs, coverage table, tutorial notebook that follows the MLC course chapters | public release |
-
-Suggested order of public visibility: announce after **M3**. "Run the CUTLASS Blackwell tutorial on your laptop and see every mbarrier phase" is the demo.
-
-## 7. Validation strategy
-
-1. **Spec-driven unit tests:** one test per instruction form, derived from the PTX ISA text and its examples.
-2. **Golden layouts:** check swizzle and TMEM layouts against independent sources: the CuTe layout algebra evaluated on host (C++ `print_layout` / CuTe DSL), the course figures, and the PTX layout tables.
-3. **Real-code end to end:** CUTLASS Blackwell tutorials, the course's examples, Triton tutorials. Compare outputs with NumPy.
-4. **Hardware cross-checks where possible:**
-   - the Ampere-level subset (SMEM, banks, `cp.async`, mbarrier without tx) against a real RTX 3080 Ti, using `ncu` counters;
-   - later, community B200 runs to calibrate timing.
-5. **Cross-check with ptxv** on shared kernels when someone with a Blackwell GPU can capture them.
-
-## 8. Risks and mitigations
-
-| Risk | Mitigation |
-| --- | --- |
-| PTX surface used by CUTLASS is large | coverage driven by target kernels; hard errors on unsupported ops; a `coverage.md` table so contributors can pick items |
-| Undocumented behaviors (exact TMA/MMA timing, L2 policy, scheduling) | timing labeled approximate; every parameter is configurable and sourced; functional semantics stick to what the PTX ISA guarantees, and the checkers flag reliance on anything stronger |
-| Python too slow | warp-level vectorization, simulate a subset of CTAs, Rust core later |
-| CuTe DSL / Triton need a GPU or driver to compile | spike in M6; fall back to "export PTX + launch params" files |
-| Tensor-map and descriptor encodings change across CUDA versions | own the host-side encoding; decode device-side descriptors exactly as the PTX ISA version declared in the PTX file |
-| Overlap with ptxv / Accel-Sim 2.0 | position on *no hardware anywhere + education + visualization + timing*; credit and link them; consider interop (e.g. export our traces) |
-
-## 9. Open questions
-
-- ~~Project name~~ decided: **warplens** (GitHub and PyPI were free on 2026-11-23). Not related to NVIDIA Warp (`nvidia/warp`); say so in the README FAQ. Reserve the PyPI name early with a placeholder 0.0.1 release.
-- How much of the PTX memory model to model in v1 (a checker for proxy and async ordering only, versus a full axiomatic model).
-- Whether to support sm_103a (B300) specific instructions from day one, or only via config differences.
-
-## 10. TODO for v2 and later
-
-- Multi-GPU: NVLink / NVL72 domain, NVSHMEM and NCCL-style collectives, copy engines, multimem / NVLS.
-- Structured sparsity, block-scaled formats (MXFP8/FP4, NVFP4) and `tcgen05.cp` scale-factor paths.
-- A non-zero descriptor base offset, and `mbarrier.try_wait` returning false (a non-blocking fallback): both wait for the B200 recordings named in section 3.5.
-- Interactive web visualizer; Jupyter widgets.
-- Hopper (sm_90a) mode: wgmma, the same TMA/mbarrier engine. This is cheap once M2 exists and broadens the audience.
+- Multi-GPU: NVLink / NVL72 domain, NVSHMEM and NCCL-style collectives, copy
+  engines, multimem / NVLS.
+- Structured sparsity, block-scaled formats (MXFP8/FP4, NVFP4) and the
+  `tcgen05.cp` scale-factor paths; MMA kinds other than `f16` and `tf32`;
+  operand A from tensor memory.
+- A non-zero descriptor base offset, and `mbarrier.try_wait` returning false
+  (a non-blocking fallback). The B200 recordings both waited for exist now
+  (`validation/blackwell/measured/b200/mma/base_offset.field.*.txt`,
+  `mbarrier/try_wait.incomplete.txt`).
+- An interactive viewer that steps through a pipeline stage by stage; Jupyter
+  widgets. The views are static SVG today.
+- A `warplens check` command (the first plan's CLI named one; it is not
+  built).
+- Hopper (`sm_90a`) mode: `wgmma` on the same TMA and mbarrier engine.
 - Optional SASS-level input via `nvdisasm` for timing studies.
-- Calibration suite to run on real B200/B300 when available.
-
-## 11. Path to hardware validation on a rented B200
-
-The aim: finish everything locally, then rent a B200 for one scripted run that
-produces files, with no debugging on the clock.
-
-### Where the project stands (2026-11-23)
-
-Solid:
-
-- All six milestones are built. The simulator runs real code from three
-  independent code generators without modification: the four CUTLASS Blackwell
-  tutorials (including 16-CTA clusters and the two-SM MMA), a Triton matmul,
-  and all nine TIRx GEMM kernels from the book *Modern GPU Programming for
-  MLSys*. Their agreement is the strongest evidence there is.
-- Everything Ampere shares with Blackwell has been checked bit for bit on an
-  RTX 3080 Ti: shuffles, barriers, `printf`, TF32 conversion, `ldmatrix`,
-  `bfe`, `prmt`, `cp.async`, `.ftz` arithmetic, calls to device functions,
-  and the bank-conflict counters.
-
-Weak:
-
-- TMA, mbarrier, tcgen05, TMEM and clusters rest on reading CUTLASS sources and
-  on kernels producing correct output. That misses whatever the kernels do not
-  exercise. The TMEM lane rule was wrong until the book's kernels contradicted
-  it; expect more of that kind.
-- The timing model is uncalibrated and several parameters are assumptions.
-- TIRx and CuTe DSL scripts launch through `warplens run` unchanged, with
-  arrays that work without a GPU (TVM's, or driver memory), not PyTorch's.
-  A DSL kernel that uses TMA does not run: the DSL writes real tensor-map
-  descriptors, whose layout the simulator cannot read.
-
-### Steps before renting
-
-**A. Stabilize the code**
-
-1. Done: the branch stack is on `main`.
-2. Done: CI's `full` job builds the CUTLASS tutorials and the shim libraries,
-   installs Triton and the CuTe DSL, and runs the whole suite with
-   `WARPLENS_NO_SKIPS=1`, under which a skipped test fails the run.
-3. Done, except for one thing that needs hardware. One script runs unchanged
-   in the simulator and on the GPU, for TIRx (`examples/07_tirx`) and the CuTe
-   DSL (`examples/06_cute_dsl`), with arrays in both; all nine `hgemm` kernels
-   of the book run from a clone of it (`examples/08_book`). What was measured
-   and how each runtime is reached is in `docs/m6.md`. Left:
-   - CuTe DSL kernels that use TMA. The DSL writes the 128-byte tensor-map
-     descriptor itself, in the driver's layout. Reading it needs samples from
-     the driver's encoder, which only encodes on a GPU that has TMA. Step 7
-     now includes that sweep; the decoder can be written from its output
-     without a GPU.
-4. Done: `clusterlaunchcontrol` is implemented (`docs/clc.md`,
-   `examples/09_clc`). Which cluster a request cancels and when requests fail
-   are assumptions; they are rows of the validation matrix.
-
-**B. Write down every claim to test**
-
-5. Collect the assumptions in `docs/m2.md` to `docs/m6.md` and
-   `docs/numerics.md` into one validation matrix: the claim, the probe that
-   tests it, the predicted output, the pass criterion.
-6. Include claims taken from review without verification: behaviour of an
-   undersized `expect_tx`, TMEM allocation sizes not increasing, UE8M0 tie
-   rounding, which CTA may issue a two-CTA MMA.
-
-**C. Build the Blackwell probe suite** (modeled on `validation/ampere/`: small
-kernels, a host program that prints results, a comparison script)
-
-7. TMA: swizzle by address versus by offset, with a deliberately misaligned
-   buffer; out-of-bounds fill and the NaN fill constant; whether `complete_tx`
-   counts filled bytes; element strides; ranks 1 to 5. Also save the bytes
-   `cuTensorMapEncodeTiled` writes over a sweep of its parameters (step 3).
-8. mbarrier: phase parity; over-arrival; an undersized `expect_tx`, under a
-   timeout.
-9. TMEM: the lane-window rule, including addresses that name another window;
-   Layout F at both offsets; all four load/store shapes; allocation rules. Whether a second
-   `tcgen05.dealloc` of the same columns is harmless, as the book's
-   `hgemm_v7` to `v9` assume.
-10. MMA: K-major and MN-major operands in every swizzle mode; whether results
-    match the simulator bit for bit or only to rounding; what `kind::tf32` does
-    with low mantissa bits; `cvt.rn` and `cvt.rz` to TF32.
-11. Clusters: multicast targets; the cluster barrier; the two-CTA MMA with
-    M = 256 and with M = 128 (Layout B); the leader/peer TMA accounting.
-12. Small formats: the GPU's own FP8 and FP4 conversions against
-    `warplens.numerics`.
-13. End to end: the four CUTLASS tutorials, the Triton matmul, and the book's
-    `hgemm_v1` to `v9`, with outputs saved for comparison.
-14. Timing calibration: microbenchmarks for TMA latency and throughput, MMA
-    rate and shared-memory access, plus `ncu` counters.
-
-**D. Make the run unattended**
-
-15. Give every probe a timeout; some test behaviour that may hang.
-16. One script builds, runs everything, and packs the raw outputs into an
-    archive.
-17. Run every probe in the simulator first and commit the predicted outputs
-    before the rental, so that a mismatch is unambiguous.
-18. Dry-run the whole harness locally: the Ampere-compatible probes on the
-    3080 Ti, and the rest at least through the assembler for `sm_100a`.
-
-**E. Prepare the remote environment**
-
-19. A setup script with pinned versions: CUDA toolkit and driver, Triton, TIRx,
-    the CuTe DSL.
-20. Confirm the instance is a real B200 (`sm_100a`), not a consumer Blackwell
-    card (`sm_120`), which lacks parts of this.
-21. Confirm `ncu` can read performance counters there. It needed root on the
-    development machine, and containers on rented machines often block it.
-22. Estimate the run time and plan how results get back.
-
-**F. Decide in advance what happens with mismatches**
-
-23. What counts as a pass for each row of the matrix: bit-exact, within a
-    tolerance, or informational.
-24. Budget for a second, shorter rental. The first run will surface
-    discrepancies, and fixing them needs re-checking.
-
-### Status of steps B to F (2026-11-23)
-
-Everything below was prepared without Blackwell hardware. The PASS path of
-nothing Blackwell-specific has run on a GPU.
-
-| Steps | Where | State |
-| --- | --- | --- |
-| B5, B6, F23 | `docs/validation-matrix.md` | one row per claim with its probe, prediction and pass criterion; a test keeps its citations valid |
-| C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 126 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 27 runs also match the 3080 Ti. Every matrix row outside timing has a run. NUM-05, RT-10 and RT-11 are not probes: `run_rows.py` runs them in a GPU run after the probes without a risk and the end-to-end programs, RT-11 first, before the probes that may fault or hang (ptxas asked for a UE4M3 conversion; the driver calls of TIRx and the CuTe DSL logged under gdb; the kernel parameters of a CuTe DSL TMA kernel saved, its tensor maps among them). On the 3080 Ti the first two run and the third is skipped for want of `sm_100`. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
-| C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema (`clc_latency_ns` included), predictions committed, each launch timed with the active SMs its shape implies; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output. Reading counters was tried as root on the 3080 Ti (2026-11-24), with the machine's ncu 2024.1.1 and with the pinned 2026.4.0: `run_ncu.sh` read them for six programs and the transpose, equal to the model's (`validation/blackwell_timing/README.md`; `env/remote/RUNBOOK.md`, section 9). Not tried: on a B200, and `PASS ncu` of `preflight.sh` |
-| E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. The toolkit policy for an older driver is decided and built into `run.sh` (below). Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
-| F24 | `env/remote/RUNBOOK.md`, section 5 | **decided by the owner (2026-11-24)**: 6 GPU-hours on a single B200 in all, 2 for the first rental and 4 in reserve. The reserve is for a second rental (same run, `--skip selftest`), only when a fix changes a prediction hardware must confirm, when probes tested nothing, when the tensor maps of RT-11 were not captured, or when `ncu` could not read counters. An 8-GPU node needs an explicit yes |
-
-To settle before renting:
-
-- The driver on the rented machine will probably be older than toolkit 13.5,
-  and such a driver refuses the toolkit's PTX (measured here: `.version 9.5`
-  on a 9.0 driver). That can no longer pass unnoticed: every probe and
-  benchmark reports a module that did not load as `LAUNCH FAILED`, apart from
-  a kernel that failed; the runner, the comparison and `run.sh` count it as a
-  failure whatever a probe is allowed to do; and the nvcc that built the
-  programs is compared with the one the predictions were made with, a mismatch
-  being flagged from `setup.sh` to `compare.py`. **Decided (2026-11-24)**, so
-  that the day has one command whatever the driver is: toolkit 13.5 as pinned
-  when the driver takes its PTX; for a driver of CUDA 13.0 to 13.4 the
-  toolkit of the driver's release, and the predictions made again with that
-  nvcc by `run.sh` itself (stage `predict-toolkit`), before the GPU stages,
-  into the archive. `--toolkit pinned` was the alternative: it keeps the
-  predictions' compiler and runs machine code, but the CUTLASS tutorials and
-  the book's kernels then do not load on the GPU, which cannot be made up
-  afterwards, while predictions can
-  (`env/remote/RUNBOOK.md`, "Driver older than the toolkit").
-- PyTorch is pinned (2.15.0, the release that requires Triton 3.9.0; CUDA
-  13.2 build) and installed into a venv of its own, because in the project
-  env its CUDA wheels change which NVRTC `cuda-bindings` loads.
-  `validation/blackwell/e2e/triton_gpu.py` ran whole on the 3080 Ti. With a
-  12.x driver there is no PyTorch for it and the step is skipped.
-  `setup.sh` installs it, and fetches the book and CUTLASS at their pinned
-  commits as well: nothing is fetched by hand (`env/remote/RUNBOOK.md`,
-  section 3; the by-hand fetch there is only for a machine that cannot reach
-  github.com).
-- The budget (F24) is decided: 6 GPU-hours on one B200, 2 for the first rental
-  and 4 in reserve (`env/remote/RUNBOOK.md`, section 5).
-
-Pre-rental hardening (2026-11-24), after a review of the paths no rehearsal had
-taken. Nothing here has run on a B200; what was and was not tried is in
-`env/remote/RUNBOOK.md`, section 9, and in the two suites' READMEs.
-
-- `env/remote/`: Ctrl-C under `run.sh | tee` still writes the archive; each
-  stage runs in a session of its own and nothing it started outlives it; CUTLASS
-  is fetched by `setup.sh` at a pinned commit and its tutorials are built in a
-  stage before the preflight, which checks both, so nothing is cloned or
-  compiled for them inside a GPU stage; a preflight that failed for what
-  `setup.sh` provides makes the next run repeat setup by itself; `ncu_counters`
-  in the archive is the timing suite's own word once it has run; with the
-  pinned toolkit the self-test runs after the GPU stages; the kernel's log
-  (Xid, NVRM) is archived with a baseline from before the GPU was used; the
-  source snapshot and the archive survive a checkout of another owner, a
-  machine without `python3`, and a file that changes while it is packed.
-  When the probe suite finds the GPU unhealthy (`GPU-UNHEALTHY.txt`) the
-  timing suite is not started, and the next `run.sh` resumes the probes.
-- `validation/blackwell/` (intent; see its README for what was done): the
-  order in which probes run, health checks between them, matrix row RT-11
-  first, and the verdicts `compare.py` gives.
-- `validation/blackwell_timing/` (intent; see its README): time limits that
-  reach every process a benchmark starts, and the order of the `ncu` profiles,
-  with a status file (`ncu/STATUS.txt`) that says what they read.
-
-Found by this work in the simulator, and fixed since unless marked open:
-
-- `bar.warp.sync` (`__syncwarp()`), `.volatile` loads and stores, and
-  `%clock64` were not supported. Fixed: all three run; `bar.warp.sync` across
-  divergent paths is reported as a finding, not modeled.
-- The FP8 and FP4 `cvt` forms of `cuda_fp8.h` and `cuda_fp4.h` were not
-  implemented. Fixed for the forms an `sm_100a` build emits; the small-format
-  probes are now predicted by running them.
-- After more arrivals than an mbarrier's count, the pending count stayed
-  negative and every later arrival completed a phase. Fixed: the surplus
-  completes as many phases as it covers.
-- An M = 64 MMA accepted any destination lane offset; `docs/m3.md` allows 0
-  and 16. Fixed: any other lane is an error.
-- A launch accepted 228 KB of shared memory, and the shim reported an opt-in
-  maximum of 227 KB. Fixed: both are 227 KB.
-- Timing model: TMA stores and `cp.async` were always charged to HBM; B300
-  timing equalled B200; utilization was averaged over CTAs that do no work.
-  Fixed: all three use the L2 record, B300 has its own config (160 SMs), and
-  utilization is over CTAs that did work.
-- `warplens run script.py` without `python` took the Triton path and failed
-  confusingly for a TIRx or CuTe DSL script, and `clc_limit`, the active SM
-  count and the timing config were not reachable from `warplens run`. Fixed:
-  a `.py` runs under the shim; `--clc-limit`, `--active-sms`, `--timing-config`.
-- The device query answered 148 SMs for a B300 and `warplens.numerics` encoded
-  an E5M2 NaN as 0x7d where the `cvt` instructions give 0x7f. Fixed: 160 SMs,
-  and 0x7f in both.
-- Lanes passed `bar.sync` before lane 0 arrived in two control-flow layouts
-  nvcc 13.0 produces (`validation/blackwell/findings/reconvergence.py`). Fixed:
-  the merged implementation groups paths that meet early, matching the recorded
-  Ampere cases; warp-synchronizing instructions also rendezvous pending paths
-  before counting the warp as arrived, including joins inside cycles.
-  Unsynchronized code has no portable implicit ordering guarantee.
-- State tokens older than the immediately preceding mbarrier phase are invalid
-  PTX use. They now report `mbarrier-invalid-token` and grant no synchronization
-  credit. Their parity-based fallback reproduces recorded Ampere behavior;
-  it is informational for invalid use. Integer zero divisors likewise produce
-  a diagnostic while returning the recorded all-ones fallback. The new NaN
-  and division golden files document observed Ampere behavior, not bit-exact
-  Blackwell guarantees.
-- Atomic instructions were missing. The CUDA-emitted add, exchange, CAS,
-  bitwise, min/max and increment/decrement operations now run, with
-  `red`, generic pointers and relaxed cta/gpu/sys scope, in the spellings of
-  both nvcc 13.5 and nvcc 12.4 (no ordering or scope; `red` for discarded results). Review fixes
-  add natural-alignment validation, f32 global FTZ and shared access diagnostics;
-  see `docs/atomics.md`. Stronger memory ordering remains unsupported.
-- CI uses the exact compiler patch named by the predictions and remote pins.
-  The rental tests isolate fake-root environments, respect optional Triton,
-  and compare successful book kernels without requiring identical host-BLAS
-  error magnitudes. The runners' numerical tolerance checks remain in place.
-- Refused launches now retain their CUDA error category, separately from
-  kernel failures. Review also checks per-axis grid/block limits.
-- The shim did not require the shared-memory opt-in, so a program that forgot
-  `cudaFuncSetAttribute` passed in the simulator and would fail on a GPU.
-  Fixed: programs under the shim are held to the rule measured on the RTX
-  3080 Ti (`validation/README.md`, "The shared-memory opt-in"), with the same
-  error at the same call; the Python API has no such step. Open: that a B200
-  follows the same rule, in particular that static shared memory above 48 KB
-  launches without opt-in (RT-15).
-- `warplens run` used shim libraries built from older sources without saying
-  so. Fixed: `build.sh` records what a build is of, and a build of other
-  sources is rebuilt, or refused when it cannot be.
-- Done: every program of `validation/ampere` that recorded a golden file is
-  rerun on the B200 with its lines compared, not on `info:` lines:
-  `nan_golden`, `intdiv_golden` and `minmax_cvt_golden` as
-  `formats/ampere_replay`, `mbarrier_token_golden` as `mbarrier/ampere_token`,
-  `atom_golden` as `e2e/ampere_atom`, the PTX kernels of
-  `reconvergence_golden.py` as `e2e/ampere_reconvergence`, and
-  `callforms_golden` as a case of `e2e/ampere_replay`. Each prediction is the
-  Ampere golden file (`tests/test_ampere_replay.py`), so a mismatch on the
-  B200 is a difference between the two architectures.
-- The offset of `[reg+offset]` was added in 64 bits whatever the register's
-  width. nvcc 13.5 compiles a reversed index into shared memory
-  (`fixed[N - 1 - threadIdx.x]`) to a 32-bit register that has wrapped below
-  zero plus a positive offset, which the simulator reported as a memory fault.
-  Fixed: with a 32-bit register the sum wraps at 32 bits, as measured on the
-  RTX 3080 Ti with hand-written PTX
-  (`tests/test_sim_bug_regressions.py`). Done: a golden file from the 3080 Ti
-  (`validation/ampere/addrwrap_golden.txt`: the reversed index as C++, and the
-  wrapping load and store as inline PTX, because nvcc 12.4, which builds the
-  program for that GPU, compiles the C++ without a wrapped register), which
-  the simulator reproduces for the PTX of both toolkits, and a rerun on the
-  B200 (`e2e/ampere_replay.addrwrap`, RT-01), where the C++ is compiled by
-  nvcc 13.5 into the wrapping form.
-- Done: `cvt` with `.ftz` as the 3080 Ti does it (`cvt_ftz_golden.txt`), with
-  the conversions to an integer in f32 and f64 (`floorf`); the 44 such lines
-  of `nan_golden.txt` are predicted and compared with the rest, and the new
-  golden is rerun as `formats/ampere_replay.cvt_ftz`.
-- Done: `vote` (`__all_sync`, `__any_sync`, `__uni_sync`, `__ballot_sync`, and
-  the forms without `.sync`), with a golden from the 3080 Ti and a rerun on
-  the B200 (`e2e/ampere_replay.vote`, RT-16). `vote.sync` waits for the lanes
-  of its mask, as the GPU does. Open: `shfl.sync`, `bar.warp.sync` and
-  `elect.sync` do not wait in the simulator, and what the GPU does when their
-  masks name lanes that are elsewhere was not measured.
-- Open: the launch-error recordings
-  (`launch_errors_3080ti.txt`, `driver_errors_3080ti.txt`) are at Ampere's own
-  limits and are not rerun verbatim; RT-04 and RT-12 cover them.
-- Documents that contradict the code are listed in
-  `docs/validation-matrix.md`, "Discrepancies found".
-
-### Can be done now, without a B200
-
-- Done: the 4160-wavefront offset in the `ncu` comparison (M1) is explained
-  on the 3080 Ti. `ncu` also counts two wavefronts per warp and one per CTA
-  per `__syncthreads()` (`validation/README.md`, "The wavefront offset"). The
-  Blackwell `ncu` run now only has to check that the same rule holds there.
-
-### After the first rental (2026-11-25)
-
-The run of steps E19 to E22 happened: one B200, driver 610.57.04 (CUDA 13.3, so
-the fallback toolkit, and a second pass with the pinned one), about the two
-hours budgeted. `docs/b200-rental-1.md` is the record; the outputs that
-differed from a prediction are in `validation/blackwell/measured/b200/` and
-`validation/blackwell_timing/measured/b200/`.
-
-- Held on hardware: 88 of 126 probe runs identical to the prediction, every
-  Ampere golden file reproduced on the B200, the four CUTLASS tutorials, Triton
-  and the TIRx and CuTe DSL scripts bit-identical or inside their tolerance,
-  the bank-conflict counters equal to `ncu`'s, and the capture of row RT-11.
-- Did not hold, and changed since: the arithmetic of `tcgen05.mma` (one sum,
-  lined up and cut toward zero; `kind::tf32` drops operand bits), when a phase
-  with a byte count completes under a TMA copy, the NaN of the TMA fill and of
-  `cvt.rn/.rz.tf32`, the non-portable cluster attribute above 8 CTAs, the
-  reported maximum of dynamic shared memory, and five cases a GPU ends the
-  kernel for where the simulator went on. With the new arithmetic the book's
-  nine kernels replay bit for bit against the day's captures.
-- The timing model has a fit of that run
-  (`validation/blackwell_timing/measured/b200/calibrated.yaml`), **not yet
-  applied** to `warplens/configs/b200.yaml`. Applied, it moves 45 of 152
-  benchmark configurations to within 10 % of the measurement (from 5) and 104
-  to within a factor of two (from 53), breaks the ordering TIM-18 asks for by
-  a hair, and changes the guide's worked examples; and it shows where one
-  parameter per mechanism cannot follow the GPU (`docs/b200-rental-1.md`,
-  "The timing config is a decision").
-
-Owed before v1.0 because of it:
-
-- **A second rental** (4 GPU-hours are in reserve): the changed predictions of
-  bit-exact and tolerance rows have to be confirmed, and three constants in
-  the fixes are assumptions that new probe runs measure
-  (`docs/b200-rental-1.md`, "What the second rental has to confirm").
-- Done since: the decoder of driver-format tensor maps, from the encoder
-  sweep (`warplens/host/tensor_map.py:decode_driver`), and the two instruction
-  forms the RT-11 kernel needed (section 3.5, the amendment). The capture
-  replays byte for byte against the B200
-  (`validation/blackwell/e2e/replay_launch.py`; `tests/test_rt11_replay.py`
-  with `WARPLENS_RT11_CAPTURE`).
-- Not done: `fp16_gemm_0.py` as a script under `warplens run`. Its kernel
-  runs; the script holds its arrays in PyTorch, which does not work without a
-  GPU, so what was replayed is the launch, not the program. And the capture is
-  not a committed fixture: it is 42 MB, and its PTX is CUTLASS's code compiled,
-  which wants a decision on carrying it.
-- **A decision on the timing config**: take the fit as it is and rewrite what
-  depends on the assumed values, or first give the model what the fit says it
-  lacks (a CLC latency per form of the request, the cost of an mbarrier
-  wake-up) and fit again.
-- Open and recorded, not blocking: the repeated `tcgen05.dealloc` (TM-11),
-  NUM-05 (no UE4M3 conversion in ptxas 13.3 or 13.5), the self-test's 24
-  failures under the fallback toolkit, of which not all were read.
-
-### Still owed for v1.0 besides the above
-
-- Done: a tutorial notebook that follows the book's GEMM chapters
-  (`notebooks/book_tour.ipynb`) and a single user guide (`docs/guide.md`).
-  The `jupyter` extra installs the notebook tools and TIRx dependencies.
-- Reserve the PyPI name.
+- A calibration run on a B300: nothing in `b300.yaml` was measured on one.
+- If profiling shows the interpreter is the bottleneck, the core (PTX IR
+  execution) in Rust behind the same Python API.
+  [docs/hardware-capture.md](docs/hardware-capture.md) describes the capture
+  format a second implementation would be checked against.

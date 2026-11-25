@@ -23,14 +23,14 @@ placeholder to reserve the PyPI name, and `1.0`, the public release. The tree is
 ## Before the release
 
 1. What `PLAN.md` still lists under "Still owed for v1.0" is done, or the owner has decided to
-   release without it. What has not been checked against hardware is said in the README
-   ("Not checked against any hardware"); the release does not change that.
+   release without it. What has and has not been checked against hardware is said in the
+   README ("Status") and in section 2 of `docs/guide.md`; the release does not change that.
 2. CI is green on the commit to be tagged, in all four jobs: `test` (the core suite on each
    supported Python), `dist` (the wheel and the sdist, installed in place of the checkout),
    `triton`, and `full` (everything, with no test allowed to skip).
 3. `README.md` reads correctly as the PyPI project page. It is the long description, and PyPI
    does not resolve links that are relative to the repository: the README has such links
-   (`docs/guide.md`, `env/README.md`, `notebooks/book_tour.ipynb`), which lead nowhere there
+   (`docs/guide.md`, `env/README.md`, `examples/08_book/book_tour.ipynb`), which lead nowhere there
    until they are written as full URLs.
 4. The first upload of a name to PyPI is permanent, and a version cannot be uploaded twice:
    a mistake in an uploaded file is fixed by a new version, not by a new file.
@@ -43,7 +43,7 @@ put the files it lists into the sdist again, whatever `MANIFEST.in` says.
 
 1. Bump `__version__` in `warplens/__init__.py` (the one line above).
 2. In `CHANGELOG.md`, give the version its section: `## <version> (<date>)`, with what changed
-   since the last release. `tests/test_packaging.py` fails while the section is missing.
+   since the last release. `tests/packaging/test_packaging.py` fails while the section is missing.
 3. For `1.0.0`: in `pyproject.toml`, change the classifier `Development Status :: 3 - Alpha`
    to the status the owner chooses (`5 - Production/Stable` or `4 - Beta`), and strike
    "Reserve the PyPI name" in `PLAN.md` once the upload is done.
@@ -113,6 +113,6 @@ put the files it lists into the sdist again, whatever `MANIFEST.in` says.
   included (`MANIFEST.in`), so the suite runs from an unpacked sdist. A new top-level
   directory is added to `MANIFEST.in`.
 
-`tests/test_packaging.py` builds both and fails when a file of the package is missing from
+`tests/packaging/test_packaging.py` builds both and fails when a file of the package is missing from
 the wheel, when the sdist is not the tree that git has, or when a build script has lost its
 executable bit. It needs `build`, which the `dev` extra installs, and is skipped without it.

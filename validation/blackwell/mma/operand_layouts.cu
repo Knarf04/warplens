@@ -8,7 +8,7 @@
 // scrambles the result, and the probe prints how many elements are right and the first
 // wrong ones.
 //
-// Claims tested (docs/m3.md "Design"; warplens/units/tcgen05.py `_operand_bytes`):
+// Claims tested (docs/history/m3.md "Design"; warplens/units/tcgen05.py `_operand_bytes`):
 //   * K-major addressing for no swizzle, 32B, 64B and 128B, for kind::f16 and kind::tf32
 //     (only 128B has run in a real kernel, in the CUTLASS tutorials);
 //   * MN-major addressing for kind::f16 in the same four modes, for A, for B and for both

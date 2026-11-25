@@ -1,8 +1,18 @@
 # Numerical contract
 
 What warplens computes exactly, what it approximates, and how each rule was
-checked. "Checked on a GPU" means an RTX 3080 Ti (Ampere); nothing here has
-been checked on Blackwell.
+checked. "On a GPU" without a name means an RTX 3080 Ti (Ampere). Three
+things here were measured on a B200, on 2026-11-25
+([b200-rental-1.md](b200-rental-1.md)), and say so where they are stated:
+`cvt.rn.tf32.f32` and `cvt.rz.tf32.f32`, the arithmetic of `tcgen05.mma`, and
+the GPU's FP8 and FP4 conversions. On the same day the Ampere programs behind
+`nan_golden.txt`, `intdiv_golden.txt`, `minmax_cvt_golden.txt` and
+`cvt_ftz_golden.txt` were rerun on the B200 and reproduced those files line
+for line (the runs `formats/ampere_replay.*` of
+`validation/blackwell/measured/b200/compare-pinned-nvcc-13.5.37.txt`), the
+probe of `.ftz` arithmetic was identical to its prediction (`formats/ftz`),
+and `cvt.rna.tf32.f32` gave the Ampere result for all 715 inputs. So where a
+row below says "Blackwell may differ", that one B200 did not.
 
 **Bit-exact execution of this model does not by itself establish bit-exact
 agreement with Blackwell.** PTX leaves TF32's internal representation
@@ -19,14 +29,14 @@ promises.
 | Integer `div` and `rem` by zero, and the minimum over -1 | by zero: all ones, for `div` and for `rem`, signed and unsigned, 16, 32 and 64 bits. Minimum over -1: the minimum, remainder 0. PTX leaves zero-divisor results unspecified and machine-specific; active lanes report `integer-divide-by-zero` | on a GPU (Ampere): `validation/ampere/intdiv_golden.txt`, 5808 cases. Blackwell may differ |
 | `add`, `sub`, `mul`, `div`, `sqrt` on floats | IEEE round-to-nearest-even, as NumPy does them | NumPy |
 | NaN results | see "NaN bit patterns" below | on a GPU (Ampere), bit for bit: `validation/ampere/nan_golden.txt`, 14270 cases. Blackwell may differ |
-| `fma`, floating `mad` | exact product and sum with integer significands, rounded once | against exact rational arithmetic, and against libc `fma` by the reviewer |
+| `fma`, floating `mad` | exact product and sum with integer significands, rounded once | against exact rational arithmetic, and against libc `fma` by the reviewer; on a B200, bit for bit, for the 10^4 cases per type of the probe `formats/fma` |
 | `min`, `max` | a NaN operand yields the other; `min(+0, -0)` is `-0`, `max` is `+0`. Two NaNs give `0x7fffffff` for f32, and the second operand made quiet for f64 | on a GPU, bit for bit: `validation/ampere/minmax_cvt_golden.txt` (f32 and f64) |
 | float to integer | saturates; NaN gives 0, or the sign-bit pattern when the source is f64 or the result is 64-bit | on a GPU, bit for bit: the same file (f32 and f64 to s32, u32, s64, u64, all four rounding modes) |
 | `cvt` between f16, f32 and f64 | IEEE round-to-nearest-even, as NumPy does it; NaNs as below | on a GPU, bit for bit, around the subnormal range of each type: `validation/ampere/cvt_ftz_golden.txt` |
 | `cvt.{rni,rzi,rmi,rpi}.f32.f32`, `.f64.f64` (`rintf`, `truncf`, `floorf`, `ceilf`) | NumPy's `rint`, `trunc`, `floor`, `ceil`; NaNs as arithmetic gives them | on a GPU, bit for bit: the same file |
 | `cvt` with `.ftz` | see "Flush to zero" below | on a GPU, bit for bit: the same file, 8120 cases with the two rows above |
 | `cvt.rna.tf32.f32` | see below | on a GPU, bit for bit |
-| `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | see below | against exact rational arithmetic only |
+| `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | see below | on a B200, bit for bit, 715 inputs; finite values also against exact rational arithmetic |
 
 ## NaN bit patterns
 
@@ -38,7 +48,7 @@ says a NaN passes through unchanged; the recorded Ampere results quiet signallin
 NaNs. The table records this model's empirical policy, not a blanket PTX guarantee.
 The simulator returns what an RTX 3080 Ti returned (`validation/ampere/nan_golden.txt`,
 `validation/ampere/ftz_golden.txt`, `validation/ampere/minmax_cvt_golden.txt`,
-`validation/ampere/cvt_ftz_golden.txt`; `tests/test_hardware_golden.py`), implemented in
+`validation/ampere/cvt_ftz_golden.txt`; `tests/validation/golden_replay/test_hardware_golden.py`), implemented in
 `warplens/units/alu.py:_gpu_nans`, `warplens/units/alu.py:_converted_nans` and
 `warplens/units/alu.py:_float_to_float`:
 
@@ -65,8 +75,10 @@ TMA's NaN fill produces is a separate claim (TMA-05). All of this is Ampere
 observations. The scalar probes compare NaN classification and non-NaN values
 bit for bit; `validation/blackwell/formats/ampere_replay` reruns the Ampere
 programs on the B200 and compares the NaN bits too (NUM-11, NUM-13), so a
-Blackwell payload policy that differs from Ampere's shows as a difference. The
-Ampere golden tests pin the empirical policy without requiring it of Blackwell.
+Blackwell payload policy that differs from Ampere's shows as a difference. On
+the B200 of 2026-11-25 none showed: the reruns were identical to the Ampere
+files. The Ampere golden tests pin the empirical policy without requiring it
+of every Blackwell.
 
 ### Flush to zero
 
@@ -105,7 +117,7 @@ all-ones fallback, signed or unsigned, at 16, 32 and 64 bits. The scalar-edge
 probe records those values as informational only; the rerun of
 `validation/ampere/intdiv_golden.cu` on the B200
 (`validation/blackwell/formats/ampere_replay`, NUM-12) compares them with
-Ampere's. Floating-point division by
+Ampere's, and was identical. Floating-point division by
 zero is a separate IEEE operation and does not trigger this integer diagnostic.
 
 ## TF32
@@ -130,7 +142,7 @@ is. A NaN is different: every NaN input, whatever its sign and payload, gives
 newer; all of this is **measured on a B200** (2026-11-25,
 `validation/blackwell/measured/b200/formats/tf32_modes.txt`, 715 inputs).
 
-`warplens.units.floating.explain_tf32(0.1)` shows one conversion bit by bit:
+`warplens.numerics.explain_tf32(0.1)` shows one conversion bit by bit:
 
 ```
 float32 -> TF32 with cvt.rna.tf32.f32
@@ -166,7 +178,7 @@ half-precision output.
 
 What this rests on. `validation/blackwell/measured/b200/mma/accumulation_order.txt`
 (3016 words) and `tf32_low_bits.txt` (256) are reproduced word for word
-(`tests/test_tcgen05.py::test_the_mma_sum_is_the_one_a_b200_computes`). The
+(`tests/memory/test_tcgen05.py::test_the_mma_sum_is_the_one_a_b200_computes`). The
 nine kernels of the book, captured on the same GPU with their inputs, then
 replay bit for bit: 311,296 half-precision elements. With any one rule
 changed some elements are a unit off: products normalized before lining up
@@ -203,7 +215,16 @@ significand; UE8M0 ties go to the next power of two, following the
 Encoding saturates at the largest finite value, like PTX's `.satfinite`.
 Negative inputs to unsigned formats and NaN inputs to E2M1 are rejected by
 this host API; it does not reproduce every CUDA conversion special case.
-None of this has been compared with a GPU's conversion instructions.
+
+What has been compared with a GPU is one layer down: the `cvt` forms for
+these formats that the simulator executes (`warplens/units/small_formats.py`),
+which `tests/numerics/test_small_format_cvt.py` holds against this host layer. On a
+B200 the GPU's conversions gave what those forms give for every code of E4M3,
+E5M2 and E2M1, for the E8M0 ties and for the special inputs (the runs
+`formats/fp8_codes`, `fp4_codes`, `e8m0_ties` and `special_inputs`, all
+identical). UE4M3 has not been compared with anything: ptxas 13.3 and 13.5
+have no conversion for it (NUM-05). The host API itself, and the block
+formats below, were not run on a GPU.
 
 | Block format | Elements | Scale | Per block |
 | --- | --- | --- | --- |

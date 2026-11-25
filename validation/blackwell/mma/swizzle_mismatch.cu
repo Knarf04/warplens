@@ -14,7 +14,7 @@
 //   layout 128B (leading offset 16, stride 1024)   honest: D[m][n] comes from (m, n)
 //   layout 64B  (leading offset 16, stride 512)    the mismatch
 //
-// Claim tested (docs/m3.md; warplens/units/tcgen05.py `_operand_bytes`, finding
+// Claim tested (docs/history/m3.md; warplens/units/tcgen05.py `_operand_bytes`, finding
 // `mma-swizzle-mismatch`): the tensor core reads by ITS descriptor. For the 64B descriptor
 // the simulator's answer is what the 64B K-major formula of mma/operand_layouts.cu selects
 // from the 128B-swizzled bytes. This can only agree with hardware if tma/swizzle_aligned

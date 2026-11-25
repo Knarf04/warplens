@@ -20,7 +20,7 @@
 // K * 0x3C3C^2 and a wrong result is reported as a BENCH_ERROR line.
 //
 // Prediction: predict.py times each launch with the active SMs of its shape, so the ctas=8
-// numbers are predicted with 8 SMs sharing HBM (the "8 SMs share HBM" case of docs/m4.md)
+// numbers are predicted with 8 SMs sharing HBM (the "8 SMs share HBM" case of docs/history/m4.md)
 // and the ctas=allsm numbers with all 148. That the 8 CTAs run on 8 different SMs is an
 // assumption about the scheduler (warplens/timing/placement.py).
 // Not verified on a B200: the kernel declares 98 KiB of STATIC shared memory and never calls

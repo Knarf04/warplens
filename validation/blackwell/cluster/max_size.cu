@@ -6,7 +6,7 @@
 // (cudaDeviceProp::sharedMemPerBlockOptin; printed on an info: line). For every launch the
 // program prints whether the launch call accepted it and how many CTAs ran.
 //
-// Claim tested (docs/m5.md; warplens/host/launch.py, warplens/host/shim_server.py): a
+// Claim tested (docs/history/m5.md; warplens/host/launch.py, warplens/host/shim_server.py): a
 // cluster holds up to 8 CTAs; one of 16 launches only for a kernel that was allowed
 // non-portable cluster sizes (cudaFuncAttributeNonPortableClusterSizeAllowed, which the
 // argument `nonportable` sets first, as CUTLASS does before every cluster launch); a larger

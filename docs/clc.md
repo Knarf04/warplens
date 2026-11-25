@@ -18,9 +18,12 @@ cancellations granted: 0 per cluster
   tile -> CTA that computed it: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
 ```
 
-**Nothing here has run on Blackwell hardware.** The instruction forms are those the
-toolchain accepts; what they do is taken from the PTX manual. What the manual leaves open
-is listed under [Assumptions](#assumptions-to-check-on-a-b200).
+**On hardware.** The instruction forms are those the toolchain accepts, and what they do
+is taken from the PTX manual. Nine probe runs of cluster launch control ran on a B200 on
+2026-11-25 and printed what the simulator had predicted (`cluster/clc_*` in
+`validation/blackwell/measured/b200/compare-pinned-nvcc-13.5.37.txt`; matrix rows CL-14 to
+CL-21). What the manual leaves open, and how far those runs settle each point, is under
+[Assumptions](#assumptions-to-check-on-a-b200).
 
 ## Instructions
 
@@ -50,7 +53,7 @@ spellings exist.
 
 | Rule | Source |
 | --- | --- |
-| The spellings above, and that the bare `get_first_ctaid` exists only as `.v4` | manual syntax; ptxas assembles the kernels of `tests/test_clc.py` and `examples/09_clc`, and rejects `get_first_ctaid.b32.b128 d, response` |
+| The spellings above, and that the bare `get_first_ctaid` exists only as `.v4` | manual syntax; ptxas assembles the kernels of `tests/memory/test_clc.py` and `examples/09_clc`, and rejects `get_first_ctaid.b32.b128 d, response` |
 | A request cancels a cluster "that has not started running yet", never one that runs | manual |
 | No two successful responses of a grid name the same cluster | manual |
 | The response is written asynchronously, and completion is a `complete_tx` of the bytes stored on `mbar` | manual. 16 bytes: the manual's example expects 16, as do CUTLASS and TIRx |
@@ -75,10 +78,11 @@ cluster now running, and not canceled already.
 - The launch answers a request when it is issued, so requests are served in program
   order. The response is readable later: it lands after `async_delay` scheduling rounds,
   like a TMA load, and then completes the mbarrier. In a timed launch it lands
-  `clc_latency_ns` after it was issued. How long a GPU takes to answer is not known: the
-  100 ns in the config files is an uncalibrated placeholder, set equal to `tma_latency_ns`.
-  It is one number for every request: granted or refused, with or without multicast, and
-  however many clusters are pending. `validation/blackwell_timing/fit.py` fits it from the
+  `clc_latency_ns` after it was issued. The 100 ns in the config files is a placeholder,
+  set equal to `tma_latency_ns`, and it is one number for every request: granted or
+  refused, with or without multicast, and however many clusters are pending. A B200
+  measured 236 ns for a failed request in one cluster and 423 to 493 ns for the other
+  forms (`docs/b200-rental-1.md`, Timing); the config was not changed. `validation/blackwell_timing/fit.py` fits it from the
   `clc_latency` benchmark (the round trip of a request that fails, minus the instructions
   of its loop) and reports what the other forms imply next to it; see that directory's
   README, "Cluster launch control latency".
@@ -120,7 +124,7 @@ That is what the manual calls undefined, so it is reported.
 
 ## Checked against
 
-- `tests/test_clc.py`: every form, the cases above, and each error.
+- `tests/memory/test_clc.py`: every form, the cases above, and each error.
 - `examples/09_clc`: CUDA C++ through nvcc, two-CTA clusters with multicast.
 - A TIRx kernel that uses TIRx's own `query_cancel_first_ctaid_x`, and a CuTe DSL kernel
   that uses `cute.arch.issue_clc_query` and `clc_response`, both under `warplens run`
@@ -147,6 +151,15 @@ That is what the manual calls undefined, so it is reported.
 
 ## Assumptions to check on a B200
 
+The list as it was written before the run of 2026-11-25. For 3, 6, 7 and 8 the matrix
+rows are bit-exact (CL-16, CL-19, CL-20, CL-21) and their runs were identical to the
+prediction. For 1, 2, 4 and 5 the rows are informational (CL-14, CL-15, CL-17, CL-18): the
+manual leaves the behaviour undefined, or it depends on how many clusters a device starts
+at once. Their runs were identical too, but that covers only what the manual promises; what
+the GPU did on these four points is on `info:` lines, which the comparison does not judge
+and which are not kept in the repository for an identical run. So those four are still
+assumptions. 9 was measured and is not one number.
+
 1. **Which cluster a request cancels.** Here: the next in launch order. The manual says
    only that it has not started.
 2. **When requests fail.** Here: only when no cluster is left, or by `clc_limit`. The book
@@ -164,7 +177,7 @@ That is what the manual calls undefined, so it is reported.
    (`clusterid * cluster shape`), also when the launch gave no cluster shape and each CTA
    is its own cluster.
 9. **Latency of a request**, for the timing model: `clc_latency_ns`, 100 ns, a placeholder
-   with nothing behind it. Also assumed: that it is the same for a request that is granted
+   that the measurement above has not replaced. Also assumed: that it is the same for a request that is granted
    and one that is refused, and with and without multicast. `fit.py` replaces the value
    from a B200 run and says "NOT ONE NUMBER" in the entry's note if the forms differ by
    more than 20%.

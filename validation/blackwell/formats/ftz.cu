@@ -4,7 +4,7 @@
 // sqrt with .rn.ftz on f32 operands around the subnormal range and prints
 // "op a b c result" in hex. Its output on an RTX 3080 Ti is validation/ampere/ftz_golden.txt,
 // which the simulator reproduces except for the payload of NaN results (the GPU gave
-// 7fffffff, the simulator gives ffc00000; tests/test_hardware_golden.py compares NaNs as
+// 7fffffff, the simulator gives ffc00000; tests/validation/golden_replay/test_hardware_golden.py compares NaNs as
 // NaNs). So this probe prints a NaN result as the word "nan" and its bits on an "info:"
 // line: the committed prediction is the golden file with its 642 NaN results spelled "nan".
 //

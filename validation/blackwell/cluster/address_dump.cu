@@ -6,7 +6,7 @@
 // Each CTA also writes a token to the symbol; after a cluster barrier, rank 0 reads the
 // symbol of every rank through the u32 and the u64 mapa address (ld.shared::cluster).
 //
-// Claims (docs/m5.md, "Distributed shared memory"; warplens/core/cta.py): the simulator's
+// Claims (docs/history/m5.md, "Distributed shared memory"; warplens/core/cta.py): the simulator's
 // cluster-wide address of offset o in rank r is r * 2^24 + o. That encoding is the
 // simulator's own and the raw addresses go on info: lines. Printed for comparison are the
 // facts kernels use:

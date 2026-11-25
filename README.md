@@ -59,7 +59,7 @@ an extra names is on PyPI:
 | `triton` | `triton` 3.9 or newer | Triton scripts (`warplens run script.py`) |
 | `tirx` | `apache-tvm-tirx` 0.1.0 or newer, `cuda-bindings` 13.5 or newer | TIRx scripts, and the book's kernels |
 | `cute-dsl` | `nvidia-cutlass-dsl` 4.8.1 or newer | CuTe DSL scripts |
-| `jupyter` | `notebook`, `nbclient`, `nbformat`, `ipykernel`, and the `tirx` extra | [notebooks/book_tour.ipynb](notebooks/book_tour.ipynb) |
+| `jupyter` | `notebook`, `nbclient`, `nbformat`, `ipykernel`, and the `tirx` extra | [examples/08_book/book_tour.ipynb](examples/08_book/book_tour.ipynb) |
 | `all` | all of the above | |
 
 ```bash
@@ -77,8 +77,8 @@ been tried. Three things a frontend needs do not come from pip:
   `warplens run` builds on first use.
 
 `env/setup.sh` creates a conda env with all three and no GPU driver
-([env/README.md](env/README.md)). The notebook also needs your own clone of
-the book. [Section 3 of the guide](docs/guide.md#3-installation) has the
+([env/README.md](env/README.md)). The book's kernels and the notebook also
+need your own clone of the book. [Section 3 of the guide](docs/guide.md#3-installation) has the
 details.
 
 ## Documentation
@@ -87,15 +87,21 @@ details.
   to get code in, how to read the results, limits, troubleshooting.
 - [docs/gallery.md](docs/gallery.md): three annotated pictures and how to
   read them: a bank conflict, a TMA copy that reads too early, a pipelined GEMM.
-- [notebooks/book_tour.ipynb](notebooks/book_tour.ipynb): the nine GEMM kernels
-  of the book *Modern GPU Programming for MLSys*, chapter by chapter, in the
-  simulator. It runs them from your own clone of the book.
+- [examples/08_book/](examples/08_book/README.md): the nine GEMM kernels of
+  the book *Modern GPU Programming for MLSys* in the simulator, run from your
+  own clone of the book, and a notebook
+  ([book_tour.ipynb](examples/08_book/book_tour.ipynb)) that goes through them
+  chapter by chapter. Jupyter is optional.
 - [docs/coverage.md](docs/coverage.md): the PTX that is supported.
   [docs/numerics.md](docs/numerics.md): what is computed exactly.
-- [validation/README.md](validation/README.md): the comparisons with a real GPU.
-- [PLAN.md](PLAN.md): goals, architecture and what is still owed.
-  [docs/m0.md](docs/m0.md) to [docs/m6.md](docs/m6.md) record the design
-  decisions of each milestone.
+  [docs/architecture.md](docs/architecture.md): how the simulator works.
+- [docs/b200-rental-1.md](docs/b200-rental-1.md): the run on a B200, what
+  agreed and what did not. [docs/validation-matrix.md](docs/validation-matrix.md):
+  every claim that run tested. [validation/README.md](validation/README.md):
+  the comparisons with an RTX 3080 Ti.
+- [PLAN.md](PLAN.md): what is still owed for v1.0, and the roadmap.
+  [docs/history/](docs/history/README.md) keeps the plan as first written and
+  the write-up of each milestone.
 
 ## Status
 
@@ -103,7 +109,9 @@ Version 0.0.1; not on PyPI. What runs today, unmodified and matching its
 reference: the first four CUTLASS Blackwell tutorials (the last two on
 clusters of 16 CTAs, with TMA multicast and a two-CTA MMA), a Triton matmul,
 and the nine GEMM kernels of the book, which are written in TIRx. CuTe DSL
-kernels run unless they use TMA.
+scripts run when their arrays do not need PyTorch; the kernel of CUTLASS's
+CuTe DSL tutorial with TMA runs from a capture of its launch, the tutorial
+script itself does not.
 
 What that rests on:
 
@@ -112,14 +120,24 @@ What that rests on:
   `printf`, calls to device functions, `ldmatrix`, `bfe`, `prmt`, `cp.async`,
   `.ftz` arithmetic and the float32-to-TF32 conversion match exactly, and so
   do the shared-memory bank-conflict counters.
-- **Not checked against any hardware**: everything specific to Hopper and
-  Blackwell. TMA, tensor maps, mbarriers, `tcgen05`, tensor memory and
-  clusters follow the PTX specification, the CUDA headers and the CUTLASS
-  sources, and the evidence for them is that real kernels from three
-  independent code generators produce correct output. Nothing has run on a
-  Blackwell GPU.
-- **Uncalibrated**: the timing model. Several of its parameters are
-  assumptions, and no simulated time has been compared with a measured one.
+- **Checked against a B200, on one day** (2026-11-25,
+  [docs/b200-rental-1.md](docs/b200-rental-1.md)): TMA, tensor maps,
+  mbarriers, `tcgen05`, tensor memory, clusters and the small number formats,
+  by 126 runs of probe programs whose output the simulator had predicted. 88
+  were identical and 8 differed; the rest have no pass or fail. The CUTLASS
+  tutorials and the Triton, TIRx and CuTe DSL scripts were bit-identical or
+  within tolerance. Of the book's nine kernels five were within tolerance
+  and four outside it; all nine replay bit for bit since the arithmetic of
+  `tcgen05.mma` was changed to what the GPU computes.
+- **Changed after that run and not run on hardware again**: everything that
+  differed. The simulator now reproduces the recorded B200 outputs; a second
+  run to confirm the changed predictions has not happened.
+- **Not calibrated**: the timing model. The parameters that ship are mostly
+  assumptions. The B200 run measured the benchmarks they would be fitted
+  from; the fit is recorded and not applied.
+
+[Section 2 of the guide](docs/guide.md#2-what-has-been-checked-and-against-what)
+has this area by area, with what it does not cover.
 
 PTX that is not implemented stops a launch with an error naming the
 instruction; [docs/guide.md](docs/guide.md#8-limits) lists the limits.

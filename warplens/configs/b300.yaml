@@ -69,7 +69,7 @@ smem_wavefront_clk:
   value: 1
   unit: clk
   source: "assumption: assumed equal to B200, uncalibrated"
-  note: Cost of one shared-memory wavefront (see docs/m1.md for what a wavefront is). An assumption for B200 as well.
+  note: Cost of one shared-memory wavefront (see docs/architecture.md for what a wavefront is). An assumption for B200 as well.
 global_access_latency_clk:
   value: 30
   unit: clk

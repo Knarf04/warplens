@@ -29,6 +29,9 @@ import numpy as np
 
 from .formats import E2M1, E4M3, E5M2, UE4M3, UE8M0, FloatFormat
 
+__all__ = ["BlockScaled", "MXFP4", "MXFP8_E4M3", "MXFP8_E5M2", "NVFP4", "choose_scales",
+           "compare_formats", "dequantize", "explain_block", "quantize"]
+
 
 @dataclass(frozen=True)
 class BlockScaled:

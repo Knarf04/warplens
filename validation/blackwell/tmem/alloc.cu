@@ -3,7 +3,7 @@
 // One warp (32 threads, as .sync.aligned requires) executes a list of operations and records
 // the address every allocation returned. Nothing else touches tensor memory.
 //
-// Claims tested (docs/m3.md, "TMEM"; warplens/units/tcgen05.py `Tmem.alloc`):
+// Claims tested (docs/history/m3.md, "TMEM"; warplens/units/tcgen05.py `Tmem.alloc`):
 //   * a column count must be a power of two from 32 to 512;
 //   * the address is (lane 0, first column), and an allocation takes the first free
 //     naturally aligned slot of its size (addresses are compared exactly; a different

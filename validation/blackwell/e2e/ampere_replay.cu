@@ -2,7 +2,7 @@
 //
 // Everything the simulator shares with Ampere was checked bit for bit on an RTX 3080 Ti:
 // each program of validation/ampere printed a golden file, and the simulator reproduces it
-// (tests/test_hardware_golden.py). This probe runs the SAME host programs and kernels (they
+// (tests/validation/golden_replay/test_hardware_golden.py). This probe runs the SAME host programs and kernels (they
 // are included, not copied) on the B200, so that an instruction the simulator took as
 // settled is seen to behave the same on Blackwell. The expected output of every case is its
 // Ampere golden file, validation/ampere/<case>_golden.txt, and the committed prediction

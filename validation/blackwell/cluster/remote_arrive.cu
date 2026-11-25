@@ -8,7 +8,7 @@
 //   4. cluster barrier
 //   5. both poll their own mbarrier (bounded) for the completion of phase 0
 //
-// Claim tested (docs/m5.md; warplens/units/mbarrier.py `_mbarrier`): the remote arrive
+// Claim tested (docs/history/m5.md; warplens/units/mbarrier.py `_mbarrier`): the remote arrive
 // counts on the TARGET CTA's mbarrier. So rank 0's phase completes (one local and one
 // remote arrival), and rank 1's own mbarrier, which nobody arrived on, stays open.
 // Nothing here waits without a bound; a GPU on which the remote arrival did not count

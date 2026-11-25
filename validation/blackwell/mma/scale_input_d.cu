@@ -9,7 +9,7 @@
 // value), and once with the six-operand form without a scale as the control. Every value is
 // an integer below 2^24, so the result is exact whatever the order of operations.
 //
-// Claim tested (docs/m3.md; warplens/units/tcgen05.py `_mma`: `scale`): scale-input-d = s
+// Claim tested (docs/history/m3.md; warplens/units/tcgen05.py `_mma`: `scale`): scale-input-d = s
 // multiplies the old accumulator by 2^-s before the addition, and nothing else.
 //
 //   scale_input_d

@@ -1,12 +1,18 @@
 # warplens user guide
 
+This is the manual: what warplens covers, how to install it, every way to get
+code into it, how a kernel is executed and what its numbers are, how to read
+the diagnostics and the pictures, what has been compared with a real GPU, and
+what is not supported. The other documents are references that this one links
+to (section 10 lists them).
+
 warplens executes GPU kernels on the CPU. It reads PTX, the assembly language
 that every CUDA compiler produces, and runs it under a model of a datacenter
 Blackwell GPU (B200 or B300): warps, shared memory, TMA, mbarriers, the
 `tcgen05` tensor core, tensor memory and clusters. No GPU is involved.
 
 Every command and program from section 4 on was run to write this guide, and
-the output shown is what it printed. `tests/test_guide.py` runs them again
+the output shown is what it printed. `tests/documentation/test_guide.py` runs them again
 with the test suite and compares the output, so a block that stops working
 fails a test. The installation commands of section 3 were run by hand.
 
@@ -32,7 +38,10 @@ Contents:
    - [6.6 Traces and views](#66-traces-and-views)
    - [6.7 The timing report, and how far to trust it](#67-the-timing-report-and-how-far-to-trust-it)
    - [6.8 Everything on one page: `warplens report`](#68-everything-on-one-page-warplens-report)
-7. [Models: B200 and B300](#7-models-b200-and-b300)
+7. [Execution, numerics and the two models](#7-execution-numerics-and-the-two-models)
+   - [7.1 How a kernel is executed](#71-how-a-kernel-is-executed)
+   - [7.2 Numerical behaviour](#72-numerical-behaviour)
+   - [7.3 Models: B200 and B300](#73-models-b200-and-b300)
 8. [Limits](#8-limits)
 9. [Troubleshooting](#9-troubleshooting)
 10. [Where to read more](#10-where-to-read-more)
@@ -54,9 +63,10 @@ It is three things in one run:
   order in which things happened to run.
 - **An approximate timing model**, on request. It gives each launch a
   simulated duration, a utilization per resource and a verdict on what limits
-  the kernel. It is **uncalibrated**: several of its parameters are
-  assumptions and none of its output has been compared with a real B200
-  (section 6.7).
+  the kernel. Its parameters are **not calibrated**: the configs that ship
+  hold assumed values for most of them. A B200 has since been measured and a
+  fit of those measurements is recorded, but it is not what the model runs
+  with (section 6.7).
 
 It is not:
 
@@ -78,41 +88,106 @@ It is not:
   names the instruction (sections 8 and 9). Nothing is skipped silently.
 - related to NVIDIA Warp.
 
+**Scope.** The input is PTX compiled for datacenter Blackwell: `sm_100a`
+(B200) or `sm_103a` (B300). The instructions that are in, form by form, are
+listed in [coverage.md](coverage.md); that list was frozen for v1 on
+2026-11-24 and amended once, by two forms a CUTLASS tutorial needs
+([PLAN.md](../PLAN.md)). Outside it for v1: multiple GPUs, machine code,
+consumer Blackwell (`sm_120`), and the tensor-core kinds other than `f16` and
+`tf32`. Section 8 has the limits in full.
+
 ## 2. What has been checked, and against what
 
-The development machine has an RTX 3080 Ti (Ampere, `sm_86`). Everything
-Ampere shares with Blackwell could be compared with it; nothing else could.
-The details are in [validation/README.md](../validation/README.md).
+Two GPUs have been compared with the simulator:
 
-| Area | Evidence | Status |
+- an **RTX 3080 Ti** (Ampere, `sm_86`), the development machine, for
+  everything Ampere shares with Blackwell
+  ([validation/README.md](../validation/README.md));
+- a rented **B200**, on one day, 2026-11-25, for the rest: 126 runs of small
+  probe programs whose output the simulator had predicted beforehand, 17
+  whole programs, and 14 timing benchmarks. [b200-rental-1.md](b200-rental-1.md)
+  is the record of that run, and the outputs that differed from a prediction
+  are in `validation/blackwell/measured/b200/`.
+
+Of the 126 probe runs, 88 printed exactly what the simulator had predicted
+and 8 did not. The other 30 have no pass or fail: 18 had no prediction to
+hold or ran what the simulator refuses, in 6 the GPU ended a kernel that the
+simulator let return, in 3 it faulted where the simulator has no model, 2
+timed out as predicted, and 1 could not be judged.
+
+**What "changed since" means below.** Every difference was taken into the
+simulator after the run, and for each one the simulator now prints the
+recorded B200 output line for line. That is a model fitted to one recording.
+The changed predictions have not been run on a GPU again; a second run that
+would confirm them is planned and has not happened
+([PLAN.md](../PLAN.md)). So a row marked *changed since* is "reproduces what
+the B200 printed", which is weaker than "predicted it".
+
+| Area | On the RTX 3080 Ti | On the B200 (2026-11-25) |
 | --- | --- | --- |
-| `shfl.sync`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive) | recorded outputs of the real GPU, replayed in `tests/test_hardware_golden.py` | match exactly |
-| `cvt.rna.tf32.f32`, `ldmatrix`, `bfe`, `bfi`, `shf`, `prmt`, `.ftz` arithmetic, `cp.async` zero fill | the same, bit for bit | match exactly |
-| Atomic updates (`atom`, `red`): every atomic function on 32- and 64-bit integers, `atomicAdd` on `float` and `double`, in global and shared memory, as compiled by nvcc 13.5 and by nvcc 12.4 (which writes `atom.global.add.u32` and `red`) | the same, for results that do not depend on the order of the threads | match exactly |
-| Shared-memory bank conflicts | Nsight Compute counters on the transpose example | conflict counters match exactly; the total wavefront counter matches once two per warp and one per CTA per barrier, which hardware also counts, are added |
-| TMA, tensor maps, mbarriers | PTX specification, CUDA headers, CUTLASS sources; real kernels give right answers | **not compared with hardware** |
-| `tcgen05.mma`, tensor memory, descriptors | the same | **not compared with hardware** |
-| Clusters, multicast, two-CTA MMA | the same | **not compared with hardware** |
-| `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32`; FP8/FP4 host-side formats | exact arithmetic only | **not compared with hardware** |
-| Timing model | some parameters from a published microbenchmark paper, the rest assumed | **uncalibrated** |
+| `shfl.sync`, `vote`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive), `[reg+offset]` on a wrapped register | recorded outputs, replayed in `tests/validation/golden_replay/test_hardware_golden.py`: match exactly | the same programs rerun: every recorded line reproduced. **Changed since:** `elect.sync` executed by a lane outside its member mask ends the kernel |
+| `cvt.rna.tf32.f32`, `ldmatrix`, `bfe`, `bfi`, `shf`, `prmt`, `.ftz` arithmetic and `cvt`, `min`/`max`, float-to-integer `cvt`, NaN bit patterns, integer division by zero, `cp.async` zero fill | the same, bit for bit | the same programs rerun: every recorded line reproduced |
+| Atomic updates (`atom`, `red`): every atomic function on 32- and 64-bit integers, `atomicAdd` on `float` and `double`, in global and shared memory, as compiled by nvcc 13.5 and by nvcc 12.4 | match exactly, for results that do not depend on the order of the threads | rerun: reproduced |
+| Shared-memory bank conflicts | Nsight Compute counters on the transpose example: conflict counters match exactly; the total wavefront counter matches once two per warp and one per CTA per barrier, which hardware also counts, are added | the same comparison: conflict counters equal, and the wavefront counter above the model's by the same amount |
+| Launch errors and the shared-memory opt-in under `warplens run` | codes and the opt-in rule measured at Ampere's limits | the limit, the opt-in and the device attributes identical to the prediction. **Changed since:** what `maxDynamicSharedSizeBytes` reports for a kernel with more than 48 KiB static (0), and that a cluster of more than 8 CTAs needs the non-portable attribute |
+| mbarriers | arrival tokens and `test_wait` predicates (`try_wait` and byte counts need Hopper or newer) | identical: phases and parity, arrival counts, `expect_tx` with bytes, tokens, `try_wait` on completed phases, completion before `expect_tx`. **Changed since:** a TMA copy larger than the bytes expected completes the phase; over-arrival ends the kernel. `try_wait` on a phase that never completes returned false; the simulator blocks, by decision (section 8) |
+| TMA, tensor maps | not possible | identical: every swizzle mode on aligned and misaligned buffers, ranks 1 to 5, element strides, zero fill, stores and `wait_group`, raw bulk copies, the missing fence. **Changed since:** the NaN of the out-of-bounds fill; two cases the GPU ends the kernel for (a tensor copy at an address aligned to 16 bytes only, a store at a negative coordinate). The driver's own tensor-map layout is read from this run's encoder sweep |
+| Tensor memory | not possible | identical: allocation addresses and order, the lane window, the layout of MMA results, every transfer shape and repeat count. **Changed since:** a larger allocation after a smaller one is made, as the GPU made it; a leak fails the launch. Still stricter than the GPU, on purpose: 48 columns, and an allocation after the permit was relinquished, are refused. Not modeled: three transfers past a warp's lane window faulted on the GPU and are refused here; tensor memory never written held an earlier launch's values on the GPU |
+| `tcgen05.mma`: where things go | not possible | identical: operand layouts, negation, `scale-input-d`, disabled lanes, `commit` arrivals, the swizzle mismatch, swizzle by absolute address |
+| `tcgen05.mma`: the arithmetic | not possible | **did not match, changed since.** An element is one sum cut toward zero, not a chain of float32 additions, and `kind::tf32` drops the low 13 bits of its operands. The simulator now reproduces both recordings word for word; three rules of the sum were inferred from the book's kernels and have a probe that has not run ([numerics.md](numerics.md)) |
+| Clusters | not possible | identical: the cluster barrier, multicast, remote arrive, the two-CTA MMA in all four forms, the address dump, every cluster-launch-control run |
+| `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | not possible (they need Hopper or newer) | identical for all finite inputs and infinities. **Changed since:** every NaN gives `0x7fffe000` (7 of 715 lines) |
+| FP8 and FP4 `cvt` conversions | not possible | identical: every code of E4M3, E5M2 and E2M1, the E8M0 ties, the special inputs. UE4M3 has no conversion in ptxas 13.3 or 13.5, so nothing to compare |
+| Whole programs (below) | not possible | bit-identical or within tolerance, except the book's `hgemm_v6` to `v9` at the time; all nine replay bit for bit since the MMA change |
+| Timing model | seven benchmarks, to show the measuring method is stable | 14 benchmarks measured and fitted. **The shipped config was not changed**: it still holds the assumed values (section 6.7) |
 
-What stands in for hardware on the Blackwell side is that code written
-against the real GPU by three independent code generators comes out right:
+Whole programs, each run on the B200 and then replayed in the simulator from
+the PTX the GPU ran:
 
-- the first four CUTLASS Blackwell tutorials, built from unmodified sources,
-  pass their own verification (section 5.2);
-- a Triton matmul, which Triton compiles to a `tcgen05.mma` (section 5.3);
-- the nine GEMM kernels of the book *Modern GPU Programming for MLSys*,
-  written in TIRx (section 5.6).
+- the first four CUTLASS Blackwell tutorials, built from unmodified sources
+  (section 5.2): bit-identical;
+- Triton (section 5.3): the vector add bit-identical, the matmul within its
+  tolerance;
+- the TIRx and CuTe DSL `saxpy` scripts (sections 5.4, 5.5): bit-identical;
+- the nine GEMM kernels of the book *Modern GPU Programming for MLSys*
+  (section 5.6): `hgemm_v1` to `v5` within one unit in the last place of the
+  half-precision output; `v6` to `v9` (K = 256) outside it, by up to 30
+  units. That difference is what showed how an MMA sums. With the changed
+  arithmetic all nine replay bit for bit against that day's captures
+  (311,296 elements);
+- the kernel of CUTLASS's CuTe DSL tutorial with TMA (`fp16_gemm_0.py`),
+  captured on the GPU with its parameters and memory: it replays with no byte
+  of its output different, after the two instruction forms it needs were
+  added.
 
-That is evidence, not validation. It says nothing about what those kernels do
-not exercise, and it has already been wrong once: the rule for which tensor
-memory lanes a warp can reach was implemented incorrectly until the book's
-kernels contradicted it ([PLAN.md](../PLAN.md), section 11). An MMA result is
-correct to float32 rounding and is not meant to match hardware bit for bit;
-[numerics.md](numerics.md) states each numerical rule and its status. The
-assumptions that most need a hardware check are listed in
-[m2.md](m2.md#assumptions-to-confirm-on-hardware) and in the plan.
+The captures of these programs are in the run's archive and not in this
+repository (they are 79 MB), so the replays against them cannot be repeated
+from a checkout; `tests/validation/golden_replay/test_rt11_replay.py` runs the last one when given
+the capture.
+
+What this evidence does not cover:
+
+- **Anything the probes and programs do not exercise.** The probes were
+  written from the simulator's own claims
+  ([validation-matrix.md](validation-matrix.md) has one row per claim), and a
+  rule nobody thought to state has no probe.
+- **The changes made after the run**, as said above, and three constants in
+  them that are assumptions: the size of the pieces in which a TMA copy
+  reports its bytes, the alignment a tensor copy needs, and three rules of
+  the MMA sum ([b200-rental-1.md](b200-rental-1.md), "What the second rental
+  has to confirm").
+- **What only a race could show**: when exactly a copy reads its source,
+  which synchronization a program may rely on. The checkers report these
+  instead of modeling an outcome (the matrix, "Claims not turned into a
+  probe").
+- **B300.** Nothing was measured on one (section 7.3).
+- **Timing**, beyond the label on every number: section 6.7.
+
+Kernels producing right answers is evidence too, and it has been wrong
+before: the rule for which tensor memory lanes a warp can reach was
+implemented incorrectly until the book's kernels contradicted it, and the
+MMA arithmetic passed every NumPy comparison while differing from hardware.
+[numerics.md](numerics.md) states each numerical rule and what it rests on.
 
 ## 3. Installation
 
@@ -135,7 +210,7 @@ file checked in under `examples/`. The other ways in need more:
 | Triton | `pip install -e ".[triton]"` (Triton 3.9 is what is tested). No shim: where it cannot be built, `warplens run script.py` says so and runs the script in its own process, with only the Triton driver. |
 | TIRx | `pip install -e ".[tirx]"` (`apache-tvm-tirx` and `cuda-bindings`; 0.1.0 and 13.5.0 are what is tested), and an NVRTC library that knows `sm_100a` (CUDA 12.8 or newer; the conda env has 13.5). |
 | The CuTe DSL | `pip install -e ".[cute-dsl]"` (`nvidia-cutlass-dsl`; 4.8.1 is what is tested). |
-| The tutorial notebook | `pip install -e ".[jupyter]"` (Jupyter's `notebook`, `nbclient` and `ipykernel` to execute it from a script, and the TIRx packages), and a clone of the book. |
+| The tutorial notebook (`examples/08_book/book_tour.ipynb`) | The TIRx row above and a clone of the book. To open it in Jupyter, `pip install -e ".[jupyter]"` (Jupyter's `notebook`, `nbclient`, `nbformat` and `ipykernel`, and the TIRx packages); without Jupyter its cells run as a plain Python script ([examples/08_book/README.md](../examples/08_book/README.md)). |
 | All of the above | `pip install -e ".[all]"`. Every package the extras name is on PyPI. |
 
 The repository's conda env, created by `env/setup.sh`, has the compiler side
@@ -182,7 +257,9 @@ compares with NumPy. The rest of `examples/` goes on from there:
 | `02_tma_copy` | TMA and mbarriers, then five deliberate bugs and their reports |
 | `03_cutlass_mma` | CUTLASS's four Blackwell tutorials (`build.sh` fetches and compiles them) |
 | `04_pipelined_gemm` | the timing model on a pipelined GEMM |
-| `05_triton`, `06_cute_dsl`, `07_tirx`, `08_book` | the other front ends |
+| `05_triton`, `06_cute_dsl`, `07_tirx` | the other front ends |
+| `08_book` | the nine GEMM kernels of the book *Modern GPU Programming for MLSys*, from your clone of it, and a notebook that tours them |
+| `09_clc` | cluster launch control |
 
 ## 5. Getting code into the simulator
 
@@ -473,7 +550,8 @@ warplens: kernel `smem_touch` was launched with 65536 bytes of dynamic shared me
 
 Static shared memory counts against the 48 KB; a kernel whose static shared
 memory alone is larger needs no opt-in. The details are in
-[m6.md](m6.md). `Device.launch` (section 5) has no such step: its `smem` is
+[architecture.md](architecture.md#9-warplens-run-the-shim-and-the-front-ends).
+`Device.launch` (section 5) has no such step: its `smem` is
 simply what the launch gets.
 
 The CUTLASS tutorials are programs of this kind. Built with those flags, they
@@ -658,10 +736,13 @@ does all nine, each on the smallest problem it does any work on; that takes
 about a minute and a half here, most of it compilation. `hgemm_v7` to `v9` get
 one finding each, `tmem-dealloc-repeated`, explained in section 6.4.
 
-[notebooks/book_tour.ipynb](../notebooks/book_tour.ipynb) goes through the
-nine kernels chapter by chapter and shows, for each, what the simulator can
+The notebook beside the runner,
+[examples/08_book/book_tour.ipynb](../examples/08_book/book_tour.ipynb), goes
+through the nine kernels chapter by chapter and shows, for each, what the simulator can
 see: the PTX the kernel became, which warp does what, the findings, the tensor
-memory layout and the timing model's account.
+memory layout and the timing model's account. Jupyter is optional: the
+notebook's code cells are plain Python and run as a script
+([examples/08_book/README.md](../examples/08_book/README.md)).
 
 The notebook gets those objects from `warplens.run_program`, which is
 `warplens run` as a Python function: it runs a command with its GPU work done
@@ -881,8 +962,8 @@ Two of these report the simulator's uncertainty more than a bug in the kernel:
 Known gaps in the checkers: synchronization is
 tracked per warp, not per thread; races between CTAs are not looked for; the
 generic-to-async proxy rule for MMA operands in shared memory is not checked.
-[m1.md](m1.md), [m2.md](m2.md), [m3.md](m3.md) and [m5.md](m5.md) have the
-details.
+[architecture.md](architecture.md) has the details, unit by unit (sections 3
+to 6).
 
 ### 6.5 The bank-conflict report
 
@@ -1089,7 +1170,7 @@ recover the layout a kernel computes with its own index arithmetic.
 
 <!-- test: run -->
 ```python
-from warplens.units.floating import explain_tf32
+from warplens.numerics import explain_tf32
 
 print(explain_tf32(0.1))
 ```
@@ -1237,15 +1318,30 @@ mma_latency_clk               11.3 clk       published
 
 The published values are from Jarmusch and Chandrasekaran, "Microbenchmarking
 NVIDIA's Blackwell Architecture" ([arXiv:2512.02189](https://arxiv.org/abs/2512.02189));
-the assumed ones are placeholders that nobody has measured, and they include
-the clock, which scales most of the others. Nothing has been calibrated: no
-simulated time has been compared with a measured one. What the model leaves
-out is in section 8. What it is good for is the question the example asks:
+the assumed ones are placeholders, and they include the clock, which scales
+most of the others.
+
+These values have been compared with a GPU once and were not changed by it.
+On the B200 run of 2026-11-25, 14 benchmarks measured the mechanisms the
+parameters stand for. With the config above, the model is within 10% of the
+measurement for 5 of 152 benchmark configurations and within a factor of two
+for 53. A fit of the parameters to that run is recorded
+(`validation/blackwell_timing/measured/b200/calibrated.yaml`, usable with
+`--timing-config`); with it the counts are 45 and 104. It is not the default,
+for reasons [b200-rental-1.md](b200-rental-1.md) gives ("The timing config is
+a decision, not a fix"): the fit itself shows where one number per mechanism
+cannot follow the GPU (the latency of cluster launch control differs by form
+of request, an mbarrier arrive and wait costs 33 ns where the model charges
+about 3), and the examples in this guide were written for the assumed values.
+The fit is of one day's measurements on one machine.
+
+What the model leaves out is in section 8. What it is good for is the question the example asks:
 with these parameters, is this pipeline limited by the copies, the memory
 bandwidth or the tensor core, and what happens to that when a parameter or the
 pipeline depth changes? Treat an answer as a hypothesis to test on hardware.
 `python examples/04_pipelined_gemm/run.py out/` runs that comparison for 1, 2
-and 4 stages in three scenarios. [m4.md](m4.md) describes the model.
+and 4 stages in three scenarios.
+[architecture.md](architecture.md#7-the-timing-model) describes the model.
 
 ### 6.8 Everything on one page: `warplens report`
 
@@ -1336,7 +1432,76 @@ index.html
 `write_report(directory, [(name, stats), ...], model="B200", title=...)` takes
 the `LaunchStats` of any launches, timed or not.
 
-## 7. Models: B200 and B300
+## 7. Execution, numerics and the two models
+
+### 7.1 How a kernel is executed
+
+The short version; [architecture.md](architecture.md) is the reference, unit
+by unit, and [scheduling.md](scheduling.md) is about the order warps run in.
+
+- **PTX is parsed, never translated.** Each function becomes a control-flow
+  graph. An opcode warplens does not implement is refused when the kernel is
+  launched, before anything runs; an unknown modifier when its instruction
+  executes.
+- **A warp is the unit of execution.** One instruction runs on all 32 lanes
+  at once, under an active mask. When lanes disagree at a branch the warp
+  splits, and the sides rejoin at the branch's immediate post-dominator.
+  Registers hold raw bits and each instruction chooses how to read them.
+- **Warps take turns.** In an untimed launch every warp that can run executes
+  one instruction per round, round-robin by default; `schedule=` chooses a
+  seeded or an adversarial order. A warp that waits (at a barrier, on an
+  mbarrier, for tensor memory) is skipped until what it waits for happens. If
+  nothing can run and nothing is pending, the launch stops with a
+  `DeadlockError` that says who waits on what.
+- **TMA copies and MMAs are asynchronous.** The instruction issues the work
+  and returns; the work completes later (`async_delay` rounds later in an
+  untimed run, when the timing model says in a timed one) and then signals
+  its mbarrier. The checkers do not depend on when that is: they track which
+  completions a warp has synchronized with, and report a use outside that
+  set even if the data happened to be there.
+- **CTAs of a cluster run together; clusters run one after another.** Without
+  `cluster=`, each CTA is a cluster of one, so CTAs run in turn.
+- **Memory.** Global allocations are separated by unmapped gaps, so a stray
+  access faults. Shared memory is per CTA, with 32 banks of 4 bytes. Tensor
+  memory is 128 lanes by 512 columns of 32 bits per CTA.
+- **A timed launch** (`timing=True`) runs the same kernel with the same
+  results and findings, in the order the timing model's clock gives.
+
+Other topics have a reference of their own: atomic updates
+([atomics.md](atomics.md)) and cluster launch control ([clc.md](clc.md)).
+
+### 7.2 Numerical behaviour
+
+[numerics.md](numerics.md) is the reference: each rule, and whether it was
+checked against a GPU, against exact arithmetic, or not at all. In outline:
+
+- **Scalar arithmetic** is IEEE round-to-nearest-even, done by NumPy. `fma`
+  rounds once. Integer arithmetic wraps; division by zero gives all ones and
+  a finding.
+- **NaN bit patterns and `.ftz`** are what an RTX 3080 Ti returned, bit for
+  bit, and the same programs gave the same lines on the B200. PTX does not
+  define them.
+- **TF32.** `cvt.rna.tf32.f32` matches the RTX 3080 Ti on 715 recorded
+  inputs. `cvt.rn` and `cvt.rz` to TF32 exist only on Hopper and newer and
+  are as measured on the B200.
+- **`tcgen05.mma` is not a chain of float32 additions.** One MMA computes
+  each element as one sum: the K products and the old accumulator are lined
+  up under the largest term, cut off toward zero 25 bits down, added exactly,
+  and cut toward zero to float32. `kind::tf32` drops the low 13 bits of its
+  operands. This is what a B200 was measured to do; the simulator reproduces
+  the two recordings word for word, and with it the book's nine kernels
+  replayed bit for bit against that GPU. A NumPy `A @ B.T` in float32
+  therefore differs from the simulator, as it does from the GPU, in the last
+  bits: compare with a tolerance.
+- **What is not known.** Three rules of that sum were inferred from whole
+  kernels and not yet probed directly; operands that are subnormal in half
+  precision, and elements with an infinity or a NaN among their terms, were
+  not measured. Bit-exact agreement of this model with itself does not by
+  itself establish bit-exact agreement with a GPU.
+- **FP8, FP4 and block-scaled formats** exist as `cvt` conversions and, on
+  the host, in `warplens.numerics`. They are not MMA kinds here.
+
+### 7.3 Models: B200 and B300
 
 `Device("B200")` and `Device("B300")`; `warplens run --model B300`;
 `warplens.triton_driver.install("B300")`. The model decides two things:
@@ -1388,7 +1553,7 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 
 **Instructions not implemented** (the common ones; see coverage.md)
 
-- Integer `.sat` and carry forms, `bfi`, `prmt` modes other than the default,
+- Integer `.sat` and carry forms, `prmt` modes other than the default,
   `brx.idx`, `bar.red`, `shfl.sync` on anything but `.b32`, rounding modes
   other than round-to-nearest for floating-point arithmetic.
 - TMA: im2col mode, interleaved layouts, `cp.reduce.async.bulk`,
@@ -1409,8 +1574,18 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 
 - CTAs of different clusters run one after another, so races between them on
   global memory are not explored. CTAs within a cluster do interleave.
-- An MMA's products are summed in NumPy's order, not the hardware's; results
-  agree to float32 rounding, not bit for bit.
+- An MMA element is computed as a B200 was measured to compute it (7.2).
+  Three rules of that sum are inferred, not probed, and subnormal
+  half-precision operands and elements with an infinity or NaN among their
+  terms were not measured: for those, agreement with a GPU is to float32
+  rounding at best.
+- Of the six cases in which a B200 ended a kernel that the simulator let
+  return, four are errors now and a tensor-memory leak fails the launch under
+  `warplens run`. The sixth, a repeated `tcgen05.dealloc`, stays a finding
+  (6.4). Three more tensor-memory behaviours of the GPU are not
+  modeled: allocations the PTX contract rules out and the GPU makes, transfers
+  past a warp's lane window, and the contents of tensor memory never written
+  (section 2).
 - Shuffles do not rendezvous lanes on separate divergent paths. Per-thread
   barrier semantics in divergent code are reported, not modeled.
 - TMEM loads and stores complete at once; `tcgen05.wait::ld/st` checks
@@ -1450,7 +1625,12 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 
 **Timing model**
 
-- Uncalibrated, with assumed parameters (6.7).
+- The parameters that ship are assumed, not calibrated; a fit to one B200
+  run is recorded and not applied (6.7).
+- One parameter per mechanism. The B200 measurements show two places where
+  that is not enough: cluster launch control (236 ns for a failed request in
+  one cluster, 423 to 493 ns for the other forms) and the cost of an mbarrier
+  arrive and wait.
 - CTAs do not interact in time; each starts at zero on its own SM.
 - L2 has no capacity or eviction: a byte fetched once counts as cached, and
   so does a byte a TMA store wrote. A store to lines L2 does not hold is
@@ -1548,7 +1728,8 @@ warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
 The NVRTC library that was loaded is older than CUDA 12.8 and does not know
 Blackwell. This could not be reproduced on the development machine (its older
 NVRTC has a different library name and is not picked up); the report is from
-[m6.md](m6.md). To see which NVRTC a script will get:
+the write-up of the front ends ([history/m6.md](history/m6.md)). To see
+which NVRTC a script will get:
 
 <!-- test: run needs=tirx -->
 ```python
@@ -1638,8 +1819,9 @@ source so that the compiler does not emit it.
 **PyTorch tensors do not work.** PyTorch links NVIDIA's CUDA runtime
 statically, so its allocations and copies never reach the shim, and it needs a
 real GPU to create a CUDA tensor at all. (PyTorch is not installed in the
-development environment; this is from [m6.md](m6.md) and from how the shim
-works, not from a run.) Use instead:
+development environment; this is from how the shim works
+([architecture.md](architecture.md#9-warplens-run-the-shim-and-the-front-ends)),
+not from a run.) Use instead:
 
 | Front end | Arrays that work |
 | --- | --- |
@@ -1742,16 +1924,42 @@ the PTX of modules a program loads itself, as TIRx does).
 
 ## 10. Where to read more
 
-- [notebooks/book_tour.ipynb](../notebooks/book_tour.ipynb): the book's GEMM
-  kernels, chapter by chapter, in the simulator.
+Tutorials:
+
+- [examples/08_book/book_tour.ipynb](../examples/08_book/book_tour.ipynb): the
+  book's GEMM kernels, chapter by chapter, in the simulator
+  ([how to run it](../examples/08_book/README.md)).
+- [gallery.md](gallery.md): three pictures read step by step: a bank
+  conflict, a TMA copy that is read too early, a pipelined GEMM.
+
+References, each the authority on its subject:
+
 - [coverage.md](coverage.md): every PTX construct and instruction supported.
 - [numerics.md](numerics.md): what is computed exactly and what is not; TF32;
-  the FP8/FP4 host-side formats.
-- [validation/README.md](../validation/README.md): the comparisons with a
-  real GPU.
-- [PLAN.md](../PLAN.md): goals, architecture, and the path to a hardware run.
-- The milestone write-ups record the design decisions and the state at each
-  milestone; where they disagree with this guide, the guide is newer:
-  [m0](m0.md) (executor), [m1](m1.md) (shared memory, barriers),
-  [m2](m2.md) (TMA, mbarriers), [m3](m3.md) (tcgen05, tensor memory),
-  [m4](m4.md) (timing), [m5](m5.md) (clusters), [m6](m6.md) (front ends).
+  the MMA sum; the FP8/FP4 host-side formats.
+- [architecture.md](architecture.md): how the simulator works, unit by unit.
+- [scheduling.md](scheduling.md): the order warps run in, and the schedules
+  that expose a race.
+- [atomics.md](atomics.md): `atom` and `red`.
+- [clc.md](clc.md): cluster launch control.
+
+Hardware evidence:
+
+- [b200-rental-1.md](b200-rental-1.md): the first run on a B200, 2026-11-25:
+  what ran, what agreed, what did not, what was changed.
+- [validation-matrix.md](validation-matrix.md): every claim about Blackwell
+  behaviour, with the probe that tests it and its pass criterion.
+- [validation/README.md](../validation/README.md): the comparisons with the
+  RTX 3080 Ti. `validation/blackwell/README.md` and
+  `validation/blackwell_timing/README.md` describe the two probe suites;
+  what a B200 printed is under their `measured/b200/` directories.
+- [hardware-capture.md](hardware-capture.md): how whole launches are captured
+  on a GPU and replayed, and the format they are kept in.
+
+The project:
+
+- [PLAN.md](../PLAN.md): what is still owed for v1.0, and the roadmap after
+  it.
+- [history/](history/README.md): the plan as first written and the write-up
+  of each milestone, M0 to M6. They are records and are not updated; where
+  they disagree with this guide, the guide is newer.

@@ -29,7 +29,7 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 # Whole, not abbreviated: a server gives a single commit only when it is named in full.
-# env/remote/pins.env (CUTLASS_COMMIT) names the same one; tests/test_remote_env.py checks.
+# env/remote/pins.env (CUTLASS_COMMIT) names the same one; tests/validation/remote/test_remote_env.py checks.
 COMMIT=f8acf1aa78f96ff2f1ba7662fe495e5535c461bf
 URL="${WARPLENS_CUTLASS_URL:-https://github.com/NVIDIA/cutlass.git}"
 NVCC="${NVCC:-nvcc}"

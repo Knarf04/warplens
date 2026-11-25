@@ -12,7 +12,7 @@
 // The host counts rows that do not hold their own counter: "stale" rows hold the counter of
 // the iteration before (or the initial sentinel, for row 0), anything else is "other".
 //
-// Claims tested (docs/m2.md, "Proxy fences"; warplens/units/tma.py `_store`):
+// Claims tested (docs/history/m2.md, "Proxy fences"; warplens/units/tma.py `_store`):
 //   * the simulator stores the current bytes in every variant: 0 stale, 0 other. Without the
 //     fence it reports `tma-store-missing-fence` once per store site;
 //   * a fence issued after a barrier also covers another warp's earlier writes (no finding

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A stand-in for `ncu`, for tests/test_ncu_scripts.py. NOT Nsight Compute and it measures
+# A stand-in for `ncu`, for tests/validation/probes/test_ncu_scripts.py. NOT Nsight Compute and it measures
 # nothing: it lets run_ncu.sh and compare_ncu.py be run from end to end on a machine where
 # counters cannot be read (the development machine: no root, RmProfilingAdminOnly=1).
 #

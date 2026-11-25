@@ -6,7 +6,7 @@
 // read back with every warp addressing its own 32 lanes. The probe prints, for every lane,
 // the row found there, or "." where the sentinel survived.
 //
-// Claims tested (docs/m3.md, acceptance; cute/atom/mma_traits_sm100_frag.hpp):
+// Claims tested (docs/history/m3.md, acceptance; cute/atom/mma_traits_sm100_frag.hpp):
 //   * M = 128: row m is on lane m;
 //   * M = 64 with L = 0: row m is on lane 32 (m / 16) + m % 16, the low 16 lanes of each
 //     warp's window; the other 64 lanes are not written;

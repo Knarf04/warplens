@@ -9,7 +9,7 @@
 // It runs the SAME host programs and kernels that recorded the Ampere golden files (they are
 // included, not copied), and prints the lines of the golden file, in its order. The
 // committed prediction (what this program prints under `warplens run`) is therefore the
-// golden file itself, byte for byte; tests/test_ampere_replay.py checks that. A line that differs on the B200 is a difference
+// golden file itself, byte for byte; tests/validation/golden_replay/test_ampere_replay.py checks that. A line that differs on the B200 is a difference
 // between Blackwell and Ampere, and says which instruction and operands.
 //
 //   ampere_replay nan         validation/ampere/nan_golden.cu: NaN results of add, sub, mul,
@@ -31,7 +31,7 @@
 //                             2925 lines "a b pos len" and the seven results (NUM-12)
 //
 // The whole of each file is printed, not a sample: a difference in NaN selection shows in
-// particular operand positions, the files are what tests/test_hardware_golden.py holds the
+// particular operand positions, the files are what tests/validation/golden_replay/test_hardware_golden.py holds the
 // simulator to line by line, and each case is one launch of well under a second.
 //
 // Nothing here is newer than Ampere: the Ampere build (build.sh --ampere) runs on the

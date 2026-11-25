@@ -54,7 +54,7 @@ jobs:
           "$RUNNER_TEMP/build-env/bin/python" -m build --outdir "$RUNNER_TEMP/dist"
           "$RUNNER_TEMP/build-env/bin/twine" check --strict "$RUNNER_TEMP"/dist/*
           ls -l "$RUNNER_TEMP/dist"
-      # pytest alone, not the dev extra: without `build`, tests/test_packaging.py checks the
+      # pytest alone, not the dev extra: without `build`, tests/packaging/test_packaging.py checks the
       # installed files and leaves building to the `test` and `full` jobs.
       - name: Install the ${{ matrix.artifact }} into a clean environment
         run: |
@@ -111,7 +111,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev,triton]"
       # Exercise the optional frontend, including install/cleanup, without a GPU.
-      - run: pytest -q tests/test_triton*.py
+      - run: pytest -q tests/runtime/test_triton*.py
 
   # Everything, with no test allowed to skip: the conda env from env/ supplies nvcc and the
   # CUDA headers (compile-only, no GPU), so the CUTLASS tutorials are fetched and built, the
@@ -147,7 +147,7 @@ jobs:
       - name: Build the shim libraries
         run: warplens/shim/build.sh
       # The book's kernels are run from its own repository, which has no license to copy from.
-      # The commit is the one tests/test_book.py was written against.
+      # The commit is the one tests/runtime/test_book.py was written against.
       - name: Fetch the MLSys book
         run: |
           git init -q "$RUNNER_TEMP/book"

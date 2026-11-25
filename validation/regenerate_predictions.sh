@@ -21,8 +21,8 @@
 # Nothing is committed: read `git diff` (the end-to-end predictions carry host addresses
 # and times, which change on every run and mean nothing), then run the tests:
 #
-#   PYTHONPATH=. python -m pytest -q tests/test_blackwell_probes.py tests/test_predict_path.py \
-#       tests/test_timing_calibration.py tests/test_rental_harness.py
+#   PYTHONPATH=. python -m pytest -q tests/validation/probes/test_blackwell_probes.py tests/validation/probes/test_predict_path.py \
+#       tests/timing/test_timing_calibration.py tests/validation/probes/test_rental_harness.py
 #   python tools/check_validation_matrix.py
 #
 # Uses the `warplens` conda env if there is one (for nvcc and Python), else nvcc and python3

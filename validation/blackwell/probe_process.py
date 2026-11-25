@@ -16,7 +16,7 @@ _main_spawning = False
 # How long a killed process is waited for. SIGKILL cannot be refused, but a process inside the
 # GPU driver (tearing down a context whose kernel never returned) can stay unreapable for as
 # long as the driver takes; the runner must not wait with it. Not observed: nothing here has
-# hung a real GPU yet. tests/test_probe_health.py stands a process in for it.
+# hung a real GPU yet. tests/validation/probes/test_probe_health.py stands a process in for it.
 REAP_SECONDS = 10
 NOT_REAPED = "timeout (process did not exit after SIGKILL)"
 

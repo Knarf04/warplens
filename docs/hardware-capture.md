@@ -93,8 +93,8 @@ before ending the rental, so missing artifacts are discovered while access remai
 CUTLASS's `fp16_gemm_0.py` cannot be one of the cases above. A case's tensor maps are
 recipes, the arguments of `cuTensorMapEncodeTiled`, and the CuTe DSL never calls the
 encoder: its compiled host code writes the 128-byte descriptors itself, in the driver's
-layout, which the simulator cannot read yet (`docs/m6.md`, "Not working: kernels that use
-TMA"). So its launch is captured from outside, by a debugger, and kept raw. It is in
+layout, which the simulator could not read when the capture was made (it can now: below).
+So its launch is captured from outside, by a debugger, and kept raw. It is in
 `out/blackwell/rows/e2e/cute_dsl_tma/` of the archive, not in `captures/`; the capture
 verifier above does not look at it and `compare.py` does not replay it.
 `validation/blackwell/e2e/cute_dsl_tma.py` writes it, `validation/blackwell/e2e/launch_capture.py verify`
@@ -117,13 +117,13 @@ descriptors here read back as the tutorial's tensors), and a replay of this dire
 
 ```bash
 python validation/blackwell/e2e/replay_launch.py /path/to/rows/e2e/cute_dsl_tma/capture
-WARPLENS_RT11_CAPTURE=/path/to/rows/e2e/cute_dsl_tma/capture python -m pytest -q tests/test_rt11_replay.py
+WARPLENS_RT11_CAPTURE=/path/to/rows/e2e/cute_dsl_tma/capture python -m pytest -q tests/validation/golden_replay/test_rt11_replay.py
 ```
 
 The capture of 2026-11-25 replays with no byte of the allocation different from the
 `after` dump, the 131,072 elements of `c` among them. The kernel needed two instruction
 forms that were added for it (`tcgen05.mma` with `.collector::a::discard`,
-`cvt.rn.f16x2.f32`: `PLAN.md`, section 3.5). It is not a `warplens.capture.v1` case in the
+`cvt.rn.f16x2.f32`: `docs/history/plan.md`, section 3.5). It is not a `warplens.capture.v1` case in the
 repository: the directory is 42 MB, and its PTX is CUTLASS's tutorial compiled.
 
 The address field of a driver-format tensor map is the first eight bytes, as the decoder

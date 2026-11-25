@@ -16,7 +16,7 @@
 # Order, so that a run cut short has done what is proven first:
 #   1. the benchmarks that are valid on Ampere (all of them have run on the RTX 3080 Ti)
 #   2. ncu for those programs (run_ncu.sh --group ampere), TIM-16/TIM-17 first
-#   3. the Blackwell-only benchmarks (never run on a GPU), then mma_rate_i8
+#   3. the Blackwell-only benchmarks (first run on a GPU on 2026-11-25), then mma_rate_i8
 #   4. ncu for the Blackwell-only programs (run_ncu.sh --group blackwell --continue)
 #   5. fit.py, and the archive
 #
@@ -246,7 +246,7 @@ if [[ $NCU -eq 1 ]]; then
   echo "ncu, first part (the programs valid on Ampere): $(head -n 1 "$OUT/ncu/STATUS.txt" 2>/dev/null || echo "no STATUS.txt, see $OUT/ncu.log")" \
     | tee -a "$OUT/status.txt" >&2
 fi
-# 3. Blackwell only: never run on a GPU. A hang costs its limit, and no longer the above.
+# 3. Blackwell only: the part that was unproven before the first B200 run. A hang costs its limit, and no longer the above.
 for b in "${BLACKWELL_ONLY[@]}"; do
   run_one "$b" "$BIN/$b"
 done

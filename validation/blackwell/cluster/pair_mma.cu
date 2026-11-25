@@ -8,7 +8,7 @@
 // tcgen05.commit multicast to both; every thread of both CTAs waits on it, and each CTA
 // dumps its 128 lanes x 16 columns.
 //
-// Claims tested (docs/m5.md, "Two-CTA MMA"):
+// Claims tested (docs/history/m5.md, "Two-CTA MMA"):
 //   * M = 256: the even CTA gets rows 0-127 on lanes 0-127, the odd CTA rows 128-255;
 //     all N = 16 columns in TMEM columns 0-15;
 //   * M = 128 (Layout B): each CTA gets 64 rows; columns 0-7 on lanes 0-63 and columns 8-15

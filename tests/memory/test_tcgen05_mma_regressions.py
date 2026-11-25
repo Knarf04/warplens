@@ -1,0 +1,174 @@
+"""Dense tcgen05 MMA regression cases from the PTX instruction contract.
+
+PTX ISA sections: tcgen05-mma-instructions-mma,
+tcgen05-shared-memory-descriptor, tcgen05-instruction-descriptor,
+and tcgen05-memory-consistency-model-shared-memory-accesses.
+"""
+
+from types import SimpleNamespace
+
+import numpy as np
+import pytest
+
+import warplens
+from warplens.frontend.ir import Imm, Instr, Vec
+from warplens.host.tensor_map import swizzle_offsets
+from warplens.units.tcgen05 import _operand_bytes
+
+from tests.support import kernel
+from tests.support.tcgen05 import mma_kernel, place
+
+
+def _run(sim, *, scale=None, kind="f16", first=True, mask=None, modifier=None,
+         descriptor_bit=None, idesc_bit=None, source="tma", wait_source=True,
+         async_delay=4):
+    dtype = np.float16 if kind == "f16" else np.float32
+    k = 32 // np.dtype(dtype).itemsize
+    image = np.zeros(32768, dtype=np.uint8)
+    da = place(np.ones((128, k), dtype=dtype), "128B", 0, image)
+    db = place(np.ones((8, k), dtype=dtype), "128B", 16384, image)
+    if descriptor_bit is not None:
+        da ^= 1 << descriptor_bit
+    fmt = 0 if kind == "f16" else 2
+    idesc = (1 << 4) | (fmt << 7) | (fmt << 10) | (1 << 17) | (8 << 24)
+    if idesc_bit is not None:
+        idesc |= 1 << idesc_bit
+    mod = mma_kernel(kind)
+    fn = mod.functions["k"]
+    mmas = [ins for ins in fn.instrs if ins.name.startswith("tcgen05.mma.")]
+    if scale is not None:
+        mmas[1].operands += (Imm("int", scale),)
+    if mask is not None:
+        for ins in mmas:
+            ins.operands = (*ins.operands[:4], Vec(tuple(Imm("int", x) for x in mask)),
+                            *ins.operands[5:])
+    if modifier is not None:
+        for ins in mmas:
+            ins.mods += (modifier,)
+    if not first:
+        # Predicate the initialization MMA with the always-false %no register.
+        mmas[0].pred = mmas[0].operands[-1]
+    original_instrs = list(fn.instrs)
+    if source == "uninitialized":
+        fn.instrs = [ins for ins in fn.instrs
+                     if not ins.name.startswith(("cp.async.bulk.", "mbarrier.arrive.expect_tx"))
+                     and not (ins.name.startswith("mbarrier.try_wait")
+                              and ins.operands[-1] == Imm("int", 0))]
+        # The MMA commit then completes phase zero, rather than phase one.
+        for ins in fn.instrs:
+            if ins.name.startswith("mbarrier.try_wait"):
+                ins.operands = (*ins.operands[:-1], Imm("int", 0))
+    elif not wait_source:
+        fn.instrs = [ins for ins in fn.instrs
+                     if not (ins.name.startswith("mbarrier.try_wait")
+                             and ins.operands[-1] == Imm("int", 0))]
+        # The completion barrier still has a pending TMA transaction at high delay.
+        # No consumer wait is needed to observe the issue-time diagnostic.
+        fn.instrs = [ins for ins in fn.instrs if not ins.name.startswith("mbarrier.try_wait")]
+    kept = {id(ins) for ins in fn.instrs}
+    fn.labels = {label: sum(id(ins) in kept for ins in original_instrs[:pc])
+                 for label, pc in fn.labels.items()}
+    out = sim.empty((128, 8), "f32")
+    stats = sim.launch(mod, "k", grid=1, block=128,
+                       args=[sim.from_numpy(image), out, da, db, idesc, len(image),
+                             32, 8, 1, 1, 0, 1, 0, 0], async_delay=async_delay)
+    return out.numpy(), stats, k
+
+
+@pytest.mark.parametrize("kind", ["f16", "tf32"])
+@pytest.mark.parametrize("scale", [0, 1, 4, 15])
+def test_scale_input_d_scales_only_prior_accumulator(sim, kind, scale):
+    got, stats, k = _run(sim, kind=kind, scale=scale)
+    np.testing.assert_array_equal(got, np.float32(k * (1 + 2 ** -scale)))
+    assert not stats.findings
+
+
+@pytest.mark.parametrize("scale", [-1, 16])
+def test_scale_input_d_must_be_within_isa_range(sim, scale):
+    with pytest.raises(warplens.ExecutionError, match="scale-input-d"):
+        _run(sim, scale=scale)
+
+
+@pytest.mark.parametrize("modifier", ["ws", "collector::a::use", "ashift", "sp"])
+def test_unimplemented_mma_modes_are_rejected(sim, modifier):
+    with pytest.raises(warplens.UnsupportedError, match=modifier):
+        _run(sim, modifier=modifier)
+
+
+@pytest.mark.parametrize("bit", [46, 47, 48, 52, 54])
+def test_unsupported_or_malformed_shared_descriptor_is_not_ignored(sim, bit):
+    with pytest.raises((warplens.ExecutionError, warplens.UnsupportedError), match="descriptor"):
+        _run(sim, descriptor_bit=bit)
+
+
+@pytest.mark.parametrize("bit", [6, 23, 29, 30])
+def test_malformed_instruction_descriptor_is_not_ignored(sim, bit):
+    with pytest.raises(warplens.ExecutionError, match="descriptor"):
+        _run(sim, idesc_bit=bit)
+
+
+@pytest.mark.parametrize("words", [[], [0], [0, 0, 0, 0, 0]])
+def test_disable_output_mask_has_exactly_four_words(sim, words):
+    with pytest.raises(warplens.ExecutionError, match="four|4"):
+        _run(sim, mask=words)
+
+
+def test_accumulating_uninitialized_tmem_is_reported(sim):
+    _, stats, _ = _run(sim, first=False)
+    assert "tmem-uninitialized-read" in {f.kind for f in stats.findings}
+
+
+def test_mma_reads_of_never_written_shared_operands_are_reported(sim):
+    _, stats, _ = _run(sim, source="uninitialized")
+    assert "smem-uninitialized-read" in {f.kind for f in stats.findings}
+
+
+@pytest.mark.parametrize("delay", [0, 1000])
+def test_mma_requires_synchronization_with_tma_operand_producer(sim, delay):
+    _, stats, _ = _run(sim, wait_source=False, async_delay=delay)
+    assert "tma-load-unsynchronized" in {f.kind for f in stats.findings}
+
+
+# -- the frozen v1 instruction scope (docs/history/plan.md section 3.5): what is in is pinned, what
+#    is out is refused by name, never run as something else
+
+MMA = Instr("tcgen05", ("mma", "cta_group::1", "kind::f16"), (), None, False, 7,
+            "tcgen05.mma.cta_group::1.kind::f16 [%d], %a, %b, %i;")
+WARP = SimpleNamespace(cta=SimpleNamespace(smem=SimpleNamespace(size=65536)))
+# layout name: (descriptor layout type, swizzled bits, bytes per operand row)
+LAYOUTS = {"32B": (6, 1, 32), "64B": (4, 2, 64), "128B": (2, 3, 128)}
+
+
+def descriptor(start, row_bytes, layout, base_offset=0):
+    """K-major, as validation/blackwell/common.h `mma_smem_desc`, plus the base-offset field."""
+    return ((start >> 4) | (1 << 16) | ((8 * row_bytes >> 4) << 32) | (1 << 46) | (base_offset << 49)
+            | (layout << 61))
+
+
+@pytest.mark.parametrize("name, start", [("128B", 128), ("128B", 384), ("128B", 896), ("128B", 64),
+                                         ("64B", 128), ("64B", 384), ("32B", 128)])
+def test_an_operand_off_the_swizzle_period_is_swizzled_by_address(name, start):
+    """What validation/blackwell/mma/base_offset predicts (matrix row MMA-12)."""
+    layout, bits, row_bytes = LAYOUTS[name]
+    idx = _operand_bytes(WARP, MMA, descriptor(start, row_bytes, layout), 128, np.dtype(np.float16), "A")
+    r = np.arange(128, dtype=np.uint64)[:, None, None]
+    k = np.arange(16, dtype=np.uint64)[None, :, None]
+    b = np.arange(2, dtype=np.uint64)[None, None, :]
+    offsets = (r % 8) * row_bytes + (r // 8) * 8 * row_bytes + (k % 8) * 2 + (k // 8) * 16 + b
+    by_address = swizzle_offsets(np.uint64(start) + offsets, bits)
+    relative = np.uint64(start) + swizzle_offsets(offsets, bits)
+    assert np.array_equal(idx, by_address)
+    assert not np.array_equal(idx, relative)  # the two rules differ in every case here
+
+
+@pytest.mark.parametrize("base_offset", range(1, 8))
+def test_a_nonzero_base_offset_is_refused(base_offset):
+    with pytest.raises(warplens.UnsupportedError, match="non-zero base offset.*outside the v1 scope"):
+        _operand_bytes(WARP, MMA, descriptor(128, 128, 2, base_offset), 128, np.dtype(np.float16), "A")
+
+
+def test_tcgen05_cp_is_refused_by_name():
+    mod = kernel(".reg .b32 %a; .reg .b64 %d;\nmov.b32 %a, 0;\nmov.b64 %d, 0;\n"
+                 "tcgen05.cp.cta_group::1.128x256b [%a], %d;\nret;")
+    with pytest.raises(warplens.UnsupportedError, match="tcgen05.cp"):
+        warplens.Device().launch(mod, "k", grid=1, block=32)

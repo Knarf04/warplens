@@ -18,6 +18,8 @@ def sim():
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "gpu: runs on this machine's own CUDA GPU; left out where there is none")
+    config.addinivalue_line("markers", "golden_replay: replays results recorded from a real GPU and committed under "
+                                       "validation/, in the simulator; needs no GPU and runs everywhere")
 
 
 def pytest_collection_modifyitems(config, items):

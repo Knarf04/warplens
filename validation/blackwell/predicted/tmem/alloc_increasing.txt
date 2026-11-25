@@ -1,3 +1,5 @@
 script: 32 columns, then 64 (a larger allocation after a smaller one)
-KERNEL FAILED: 32 columns, then 64 (a larger allocation after a smaller one)
-info: error cudaErrorLaunchFailure
+  step  0  alloc   32 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  1  alloc   64 columns -> allocation 1 at address 00000040 (lane 0, column 64)
+  step  2  dealloc allocation 1: executed
+  step  3  dealloc allocation 0: executed

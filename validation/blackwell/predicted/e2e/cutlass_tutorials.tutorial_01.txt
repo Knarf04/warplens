@@ -1,6 +1,6 @@
-host_tensor_A:	ptr[16b](0x7937c75ba010) o (512,256):(256,_1)
-host_tensor_B:	ptr[16b](0x7937c7539010) o (1024,256):(256,_1)
-host_tensor_C:	ptr[32b](0x7937c6fff010) o (512,1024):(1024,_1)
+host_tensor_A:	ptr[16b](0x7af4856d8010) o (512,256):(256,_1)
+host_tensor_B:	ptr[16b](0x7af48537f010) o (1024,256):(256,_1)
+host_tensor_C:	ptr[32b](0x7af484dff010) o (512,1024):(1024,_1)
 Running for problem shape (MxNxK): 512x1024x256
 TiledMMA
   ThrLayoutVMNK:  (_1,_1,_1,_1):(_0,_0,_0,_0)

@@ -1,5 +1,3 @@
 script: allocate 256 columns and return without releasing them
-  step  0  alloc  256 columns -> allocation 0 at address 00000000 (lane 0, column 0)
-script: a fresh launch afterwards
-  step  0  alloc  512 columns -> allocation 0 at address 00000000 (lane 0, column 0)
-  step  1  dealloc allocation 0: executed
+KERNEL FAILED: allocate 256 columns and return without releasing them
+info: error cudaErrorUnknown

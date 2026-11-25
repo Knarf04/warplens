@@ -1190,6 +1190,16 @@ def _elect(w, ins, mask):
         raise unsupported(ins)
     d, member = _operands(ins, 2)
     members = ((w.read(member, "u32")[:, None] >> _LANES.astype(np.uint32)) & 1).astype(bool)
+    outside = np.flatnonzero(mask & ~members[_LANES, _LANES])
+    if len(outside):
+        # Measured on a B200 (validation/blackwell/measured/b200/e2e/elect.all.txt): a mask
+        # of 0xffff0000 executed by all 32 lanes ends the kernel with
+        # cudaErrorIllegalInstruction (Xid 13, "Illegal Instruction Parameter"). A mask that
+        # names lanes which do not execute it is fine (e2e/elect.partial, as predicted).
+        raise ExecutionError(
+            f"elect.sync is executed by lane(s) {', '.join(map(str, outside.tolist()))} that its member mask "
+            f"{int(w.read(member, 'u32')[outside[0]]):#010x} does not name. Every lane that executes it must be in "
+            "the mask: a GPU ends the kernel here with cudaErrorIllegalInstruction")
     leader = np.zeros(len(mask), dtype=np.uint32)
     for lane in np.flatnonzero(mask):
         candidates = np.flatnonzero(members[lane] & mask)

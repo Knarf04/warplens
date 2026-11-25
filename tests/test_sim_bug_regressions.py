@@ -1,7 +1,8 @@
 """Regressions for three simulator bugs found while building the Blackwell probe suite
 (`validation/blackwell/README.md`, "Found in the simulator"):
 
-* arrivals beyond an mbarrier's count left its pending count negative for good;
+* arrivals beyond an mbarrier's count left its pending count negative for good (they end
+  the kernel since a B200 was seen to);
 * an M = 64 MMA accepted any destination lane offset, where Layout F has two positions;
 * a launch accepted 228 KB of shared memory per CTA while the shim reported 227 KB.
 """
@@ -48,54 +49,21 @@ def test_the_phase_token_helper_counts_phases(sim):
     assert phases == [0, 1, 2] and not findings
 
 
-def test_a_large_over_arrival_is_consumed_in_full(sim):
-    # Two expected, five arrive: two phases complete and one arrival is left over, so the
-    # barrier is in phase 2 needing one more. The probing arrival completes phase 2.
-    phases, findings = phases_after(sim, 2, [5, 1, 1])
-    assert phases == [2, 3, 4]
-    assert [f.kind for f in findings] == ["mbarrier-over-arrival"]  # only the arrive of 5
-    assert "needed only 2 more" in findings[0].message
-
-
-def test_arrivals_after_an_over_arrival_are_ordinary(sim):
-    """Two expected, five arrive. The pending count used to stay negative, so every later
-    arrival completed a phase by itself and was itself reported as an over-arrival (the
-    probe `mbarrier/over_arrival`, second script: "needed only -3 more")."""
-    mod = mb_kernel(f"""
-        mbarrier.init.shared::cta.b64 [%bar], 2;
-        mbarrier.arrive.shared::cta.b64 _, [%bar], 5;
-        mbarrier.arrive.shared::cta.b64 _, [%bar];
-        mbarrier.test_wait.parity.shared::cta.b64 %p, [%bar], 0;
-        {record(0)}
-        mbarrier.arrive.shared::cta.b64 _, [%bar];
-        mbarrier.test_wait.parity.shared::cta.b64 %p, [%bar], 0;
-        {record(1)}
-    """)
-    out = sim.empty(2, "u32")
-    stats = sim.launch(mod, "k", grid=1, block=1, args=[out])
-    # 5 = two phases and one over; the sixth arrival completes phase 2 (-> 3, odd), and the
-    # seventh is the first of two for phase 3.
-    assert out.numpy().tolist() == [1, 1]
-    assert [(f.kind, f.count) for f in stats.findings] == [("mbarrier-over-arrival", 1)]
-    assert not any("-" in re.sub(r"over-arrival", "", f.message) for f in stats.findings)
-
-
-def test_pending_count_is_never_negative_once_the_bytes_have_arrived(sim):
+def test_an_over_arrival_ends_the_kernel(sim):
+    """Two expected, five arrive. The first model consumed the surplus over the following
+    phases (and before that left the pending count negative for good); a B200 ends the
+    kernel (validation/blackwell/measured/b200/mbarrier/over_arrival.txt), and so does the
+    simulator now, at the arrival."""
+    with pytest.raises(warplens.ExecutionError, match=r"5 arrival\(s\).*needed only 2 more"):
+        phases_after(sim, 2, [5, 1, 1])
+    # An arrival while the phase still waits for its bytes is one too many as well.
     from warplens.units.mbarrier import Mbarrier
 
     class Cta:
-        class smem:
-            epoch = 0
         completed = 0
-        reported = []
 
         def phase_completed(self):
             self.completed += 1
-
-        class findings:
-            @staticmethod
-            def add(kind, message, *where):
-                Cta.reported.append(message)
 
     class Ins:
         mods = ("arrive", "relaxed")
@@ -103,13 +71,12 @@ def test_pending_count_is_never_negative_once_the_bytes_have_arrived(sim):
     cta = Cta()
     bar = Mbarrier(cta, 0, 3, warp_id=0)
     bar.expect_tx(64)
-    bar.arrive(10, None, Ins, [0])  # held back by the bytes: nothing completes yet
-    assert (bar.phase, cta.completed) == (0, 0)
+    bar.arrive(3, None, Ins, [0])  # held back by the bytes: nothing completes yet
+    assert (bar.phase, bar.pending, cta.completed) == (0, 0, 0)
+    with pytest.raises(warplens.ExecutionError, match="needed only 0 more"):
+        bar.arrive(1, None, Ins, [0])
     bar.complete_tx(64, None, Ins, [0])
-    assert (bar.phase, bar.pending, cta.completed) == (3, 2, 3)  # 10 = 3 phases and 1 over
-    bar.arrive(2, None, Ins, [0])
-    assert (bar.phase, bar.pending) == (4, 3)
-    assert len(Cta.reported) == 1 and "needed only 3 more" in Cta.reported[0]
+    assert (bar.phase, bar.pending, cta.completed) == (1, 3, 1)
 
 
 # -- M = 64 destination lane offset ---------------------------------------------------------

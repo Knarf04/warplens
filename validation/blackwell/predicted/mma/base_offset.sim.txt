@@ -1,18 +1,18 @@
 status: ok
 warplens: 16 kernel launch(es) simulated on B200, 0 finding(s)
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
-  mma_dump: 1 CTA(s), 2688 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions
+  mma_dump: 1 CTA(s), 2694 warp-instructions

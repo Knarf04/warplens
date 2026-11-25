@@ -3,7 +3,7 @@
 The first run of the probe suites on Blackwell hardware (plan steps E19 to E22,
 `PLAN.md` section 11). This file is the record: what ran, what agreed with the
 simulator, what did not, and what each difference asks of the simulator. The
-fixes are tracked at the end.
+fixes are at the end.
 
 What a statement rests on is marked where it matters: **measured** is in the
 archives below; **reading** is an interpretation of the output that no further
@@ -127,7 +127,7 @@ Each row is a claim of `docs/validation-matrix.md` that hardware contradicts.
 | CL-02 | bit-exact | `cluster/max_size` | a cluster of 16 CTAs launches | refused: `cudaErrorInvalidClusterSize`. 8 launch. With `cudaFuncAttributeNonPortableClusterSizeAllowed` set, 16 launch and 32 are refused (`measured/b200/cluster-optin/`) |
 | RT-15 | bit-exact | `e2e/smem_static` | a kernel with more than 48 KiB of static shared memory reports `227 KiB - static` as its maximum of dynamic shared memory | it reports 0. The launches themselves are as predicted: up to `227 KiB - static` dynamic bytes launch without opt-in, one 16-byte step more is refused |
 | MMA-08 | informational | `mma/tf32_low_bits` | `kind::tf32` multiplies the stored float32 values, low bits included | the low 13 bits of one operand do not take part (223 of 258 lines) |
-| TM-13 | informational | `tmem/fresh_contents` | tensor memory never written reads as zero | zero in a first launch; after a launch that wrote it, the next launch reads that launch's values, with the warps' quarters exchanged |
+| TM-13 | informational | `tmem/fresh_contents` | tensor memory never written reads as zero | zero in a first launch; after a launch that wrote it, the next launch reads that launch's values, each warp those another warp's lanes had stored (warp 0 read lane 64's, warp 2 lane 0's) |
 
 One more is outside its tolerance, and one could not be judged:
 
@@ -136,11 +136,13 @@ One more is outside its tolerance, and one could not be judged:
 | RT-08 | tolerance: 1 unit in the last place of the simulator's f16 output | `e2e/book_hgemm` | `hgemm_v1` to `v5` (K = 64) within 1 ulp. `v6`, `v7` (K = 256): 2 of 16384 elements, up to 5 ulp. `v8`: 10 of 65536, up to 30 ulp. `v9`: 18 of 131072, up to 27 ulp. All nine still match NumPy within the book's own tolerance |
 | MMA-04, MMA-05 | tolerance | `mma/accumulation_order` | 646 of 3016 float32 words differ. Where the simulator loses a 2^-10 term against 2^14 and gets 0, hardware keeps it: the sum is not a chain of float32 additions |
 
-**Reading**: TMA-06 and MB-05/06 look like one rule. The simulator completes a
-phase when the pending byte count is exactly zero; both results fit a phase
-that completes when the bytes delivered reach or pass the bytes expected.
-RT-08 and MMA-04/05 are probably one cause too (how the K products are
-summed), and it grows with K as the book's kernels show.
+TMA-06 and MB-05/06 are one rule, and RT-08 and MMA-04/05 one cause; both are
+worked out under "What this changed" below. The first is not "a phase
+completes when the bytes delivered reach the bytes expected": the instruction
+`mbarrier.complete_tx 64` against `expect_tx 32` completes nothing on the same
+GPU (`mbarrier/complete_before_expect`, identical to its prediction). A TMA
+copy reports its bytes in pieces, and the count passes through zero on the
+way.
 
 ### Where the simulator is more permissive than hardware
 
@@ -224,25 +226,77 @@ from it (the main run's are within a few percent).
   the RTX 3080 Ti showed (`validation/README.md`, "The wavefront offset"): the
   rule found on Ampere holds on Blackwell.
 
-## What this changes, and the state of each fix
+## What this changed
 
-| # | Change | State |
+Every difference above was taken to the simulator on the branch
+`work/b200-rental-1`. "Reproduces" means the simulator now prints, for the
+probe as it ran on the B200, the recorded output line for line
+(`validation/blackwell/measured/b200/`).
+
+| # | Row | Change | Check |
+| --- | --- | --- | --- |
+| 1 | NUM-07 | `cvt.rn/.rz.tf32.f32` of any NaN gives `7fffe000` | reproduces `formats/tf32_modes` |
+| 2 | TMA-05 | NaN fill is `0x7ff7` in every 16 bits of the element | reproduces `tma/oob_fill` |
+| 3 | CL-02 | under the shim a cluster of more than 8 CTAs needs `cudaFuncAttributeNonPortableClusterSizeAllowed`; a new run `cluster/max_size.nonportable` sets it | reproduces `cluster/max_size` and the diagnostic with the attribute |
+| 4 | RT-15 | `maxDynamicSharedSizeBytes` reads 0 for a kernel with more than 48 KiB static until the program sets it; what a launch may use is unchanged | reproduces `e2e/smem_static` |
+| 5 | TMA-06, MB-05, MB-06 | a TMA copy reports its bytes in pieces, so a count smaller than the copy passes through zero and completes the phase early; the instruction `mbarrier.complete_tx` still subtracts at once | reproduces `mbarrier/expect_tx_small` and `.wait`; `tma/oob_complete_tx` but for the one row the GPU had not yet written, for which the probe now settles before it reads |
+| 6 | MMA-08 | `kind::tf32` clears the low 13 bits of both operands | reproduces `mma/tf32_low_bits` (256 products) |
+| 7 | MMA-04, MMA-05, RT-08 | one MMA is one sum: terms lined up under the largest (by the operands' exponents), cut toward zero 25 bits down, added exactly, cut toward zero to float32; the old accumulator is one of the terms | reproduces `mma/accumulation_order` (3016 words); the book's nine kernels replay **bit for bit** against the day's captures (311,296 elements; before: up to 30 ulp off) |
+| 8 | TM-13 | no model change: the two read-only launches of the probe are no longer compared | - |
+| 9 | RT-05, TMA-10, TMA-04, MB-04, TM-11 | four of the six faults are errors now: `elect.sync` by a lane outside its mask, a tensor copy at an address that is not a multiple of 32, a store at a negative coordinate, more arrivals than the phase needs. A leak of tensor memory fails the launch under the shim (`cudaErrorTensorMemoryLeak`). The repeated dealloc stays a finding: the book's kernels do it and ran | reproduces `e2e/elect.all`, `tma/swizzle_misaligned.sixteen`, `tma/store_wait_group.edge`, `mbarrier/over_arrival`, `tmem/alloc_leak` |
+| 10 | TM-08 | a larger allocation after a smaller one is made and reported, not refused. 48 columns and an allocation after the relinquish stay refused: the PTX contract rules them out | reproduces `tmem/alloc_increasing` |
+| 11 | timing | **not applied.** The fit is recorded (`validation/blackwell_timing/measured/b200/calibrated.yaml`, usable today with `--timing-config`); `warplens/configs/b200.yaml` still has the assumed values. See below | `validation/blackwell_timing/measured/b200/report.md` |
+
+**The timing config is a decision, not a fix.** Tried on this branch and taken
+back: with `calibrated.yaml` in place of `b200.yaml` the predictions move
+toward the measurements (45 of 152 benchmark configurations within 10 %, from
+5; 104 within a factor of two, from 53), and three things break that are not
+mechanical to repair:
+
+- one property the model is meant to keep fails by a hair:
+  `tests/test_timing.py::test_more_stages_never_make_it_slower` (TIM-18's
+  ordering, 10888 ns against 10905 ns);
+- the worked examples of `docs/guide.md` print other numbers and another
+  verdict ("TMA engine-bound, 91 %" was written for the assumed config), so
+  the text around them has to be read again, not regenerated;
+- about twenty tests state the assumed values (`clc_latency_ns == 100`,
+  `clock_ghz == 1.5`) and several check `fit.py` against them.
+
+And the fit says of itself where one parameter per mechanism is not enough:
+`clc_latency_ns` is 236 ns for one form of the request and 423 to 493 ns for
+the others, `clock_ghz` is an effective issue rate of one warp (0.51) and not
+a clock, an mbarrier arrive and wait costs 33 ns against 3. Replacing the
+numbers without deciding those would trade assumed values for fitted ones
+that are known to be wrong elsewhere.
+
+Three numbers in these fixes are **assumptions**, each the weakest that the
+measurements allow, and each has a new probe run that asks a GPU:
+
+| Assumption | Where | Asked by |
 | --- | --- | --- |
-| 1 | NUM-07: `cvt.rn/.rz.tf32.f32` of a NaN gives `7fffe000` | open |
-| 2 | TMA-05: the NaN fill constants | open |
-| 3 | CL-02: a cluster above 8 CTAs needs the non-portable attribute | open |
-| 4 | RT-15: the reported maximum of dynamic shared memory above 48 KiB static | open |
-| 5 | TMA-06, MB-05, MB-06: when a phase with a byte count completes | open |
-| 6 | MMA-08: `kind::tf32` converts an operand | open |
-| 7 | MMA-04, MMA-05, RT-08: how the K products are summed | open |
-| 8 | TM-13: tensor memory across launches | open (the finding stays; the predicted value changes) |
-| 9 | The six faults the simulator does not report | open |
-| 10 | The three TMEM allocations the simulator refuses | open |
-| 11 | The timing config from the fit | open |
+| A TMA copy reports its bytes in pieces of 64 (measured: the size divides 64) | `TX_PIECE_BYTES` | `mbarrier/expect_tx_small.pieces` |
+| A tensor copy needs a shared address aligned to 32 bytes (measured: 16 faults, 128 runs) | `TENSOR_COPY_ALIGNMENT` | `tma/swizzle_misaligned.thirtytwo`, `.sixtyfour` |
+| In an MMA a negative term is cut toward zero, a product is lined up by its operands' exponents, and the old accumulator is cut like a product (from the book's kernels, not from a probe) | `mma_sum` | `mma/accumulation_order`, parts 4 to 6 |
 
-Fixes 1 to 7 change a prediction that a bit-exact or tolerance row needs
-hardware to confirm: they are trigger 1 for the second rental
-(`env/remote/RUNBOOK.md`, section 5).
+## What the second rental has to confirm
+
+Fixes 1 to 7 and 9 changed predictions of bit-exact and tolerance rows, which
+is trigger 1 of `env/remote/RUNBOOK.md`, section 5. The run is the same
+command; what to look for afterwards:
+
+- every run of the table above is `identical`, and `e2e/book_hgemm` is
+  bit-identical or within 1 ulp;
+- the three assumptions: `mbarrier/expect_tx_small.pieces`,
+  `tma/swizzle_misaligned.thirtytwo` and `.sixtyfour`, and parts 4 to 6 of
+  `mma/accumulation_order`. A difference there is an answer, and changes one
+  constant or one rule;
+- `tma/oob_complete_tx` with the settle: the whole box written;
+- the timing suite once more, for a second set of measurements to hold the
+  first fit against (the config is unchanged, so the predictions are too).
+
+Open, and not for a GPU to settle: what separates the repeated dealloc that
+faulted from the ones in the book's kernels that did not (TM-11); `kind::i8`
+arithmetic; half-precision subnormals in an MMA.
 
 Still to do without a GPU: the decoder of driver-format tensor maps, from the
 RT-11 capture and the TMA-12 sweep (`docs/hardware-capture.md`).

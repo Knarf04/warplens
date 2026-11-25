@@ -40,8 +40,9 @@ What is implemented, and where each rule comes from (CUTLASS/CuTe sources):
   unit; `transfer_cells` has the mapping (cute/atom/copy_traits_sm100.hpp).
   A warp may only touch the 32 lanes 32 * (warpid % 4) .. + 31.
 
-None of this has been run against hardware. Accumulation is float32; the order
-of additions inside one MMA is not meant to match the hardware bit for bit.
+The probes of this unit ran on a B200 on 2026-11-25 (docs/b200-rental-1.md). The
+arithmetic of an MMA is what that GPU was measured to do (`mma_sum` below), bit for bit
+on everything recorded.
 """
 
 from __future__ import annotations
@@ -56,7 +57,85 @@ from .alu import _address, op, unsupported
 from .smem import CLUSTER_WINDOW, GENERIC_WINDOW, local_shared_offset, resolve_shared
 
 LANES, COLUMNS = 128, 512
+
+# -- the arithmetic of one MMA -------------------------------------------------------------
+#
+# Measured on a B200 (docs/numerics.md, "tcgen05.mma"). An element of the result is not a
+# chain of float32 additions. The K products and the old accumulator are added as one sum:
+#
+#   1. every product is exact (two 11-bit significands; kind::tf32 clears the low 13 bits of
+#      both operands first, which leaves 11);
+#   2. the terms are lined up under the largest of them and each is cut off, toward zero,
+#      below bit 2^(E - MMA_ALIGN_BITS). E is the largest term's exponent, which for a
+#      product is the SUM of its operands' exponents (as if the product of two significands
+#      in [1, 2) were below 2: it is not normalized first) and for the old accumulator its
+#      own. A term more than 2^25 times smaller than the largest is lost whatever the order;
+#   3. the cut terms are added exactly;
+#   4. the sum is cut off, toward zero, to float32. Not rounded to nearest. A sum of 2^128
+#      or more is an infinity.
+#
+# What this rests on: validation/blackwell/measured/b200/mma/accumulation_order.txt (3016
+# words: the width of step 2, steps 3 and 4, the accumulator inside the sum) and
+# tf32_low_bits.txt (256 products) are reproduced word for word; and the nine kernels of the
+# book, captured on the same GPU with their inputs, replay bit for bit (311,296 half-precision
+# elements, K up to 256), where each of these alternatives leaves elements one unit off:
+# products normalized before lining up; negative terms cut toward minus infinity; the old
+# accumulator added without being cut; a width of 24, 26 or 27 bits
+# (tests/test_tcgen05.py::test_the_mma_sum_is_the_one_a_b200_computes).
+# Not measured: operands that are subnormal in half precision (their exponent is taken
+# from the value), and elements with an infinity or a NaN among their terms.
+MMA_ALIGN_BITS = 25
+
+
+def _toward_zero_float32(x: np.ndarray) -> np.ndarray:
+    """float64 values (finite, exactly representable sums) cut off toward zero to float32."""
+    with np.errstate(over="ignore"):
+        y = x.astype(np.float32)
+    # Rounding to nearest went away from zero: step back. A sum of 2^128 or more is an
+    # infinity all the same (measured: 0x7f7fe000 * 1.5 gives 0x7f800000, not the largest
+    # finite float32).
+    over = (np.abs(y.astype(np.float64)) > np.abs(x)) & (np.abs(x) < 2.0 ** 128)
+    return np.where(over, np.nextafter(y, np.float32(0)), y).astype(np.float32)
+
+
+def mma_sum(a: np.ndarray, b: np.ndarray, d: np.ndarray | None = None) -> np.ndarray:
+    """What one tcgen05.mma leaves in its accumulators: `a` is (M, K), `b` is (N, K), both
+    float32 arrays of values with at most 11 significant bits (half precision, or TF32);
+    `d`, if given, is the (M, N) float32 the sum starts from (the old accumulator, already
+    scaled, or negated products are the caller's business). Returns (M, N) float32.
+
+    Elements with an infinity or a NaN among their terms, and sums past the float32 range,
+    are computed in float32 as before: nothing was measured there."""
+    a64, b64 = a.astype(np.float64), b.astype(np.float64)
+    products = a64[:, None, :] * b64[None, :, :]  # exact
+    finite_ab = np.isfinite(a64).all(axis=1)[:, None] & np.isfinite(b64).all(axis=1)[None, :]
+    # frexp: |x| = f * 2^e with f in [0.5, 1), so x's leading bit is 2^(e - 1) and a product
+    # is lined up as if its leading bit were 2^(ea + eb - 2), whether or not it carries.
+    _, ea = np.frexp(np.where(np.isfinite(a64), a64, 0.0))
+    _, eb = np.frexp(np.where(np.isfinite(b64), b64, 0.0))
+    lead = np.where(products != 0, ea[:, None, :] + eb[None, :, :] - 2, -(2 ** 20))
+    terms = products
+    if d is not None:
+        d64 = d.astype(np.float64)
+        _, ed = np.frexp(np.where(np.isfinite(d64), d64, 0.0))
+        lead = np.concatenate([lead, np.where(d64 != 0, ed - 1, -(2 ** 20))[:, :, None]], axis=2)
+        terms = np.concatenate([products, d64[:, :, None]], axis=2)
+    finite = finite_ab & np.isfinite(terms).all(axis=2)
+    safe = np.where(np.isfinite(terms), terms, 0.0)
+    largest = lead.max(axis=2)
+    nonzero = largest > -(2 ** 20)
+    grid = np.ldexp(1.0, np.where(nonzero, largest, 0) - MMA_ALIGN_BITS)[:, :, None]
+    with np.errstate(invalid="ignore", divide="ignore", over="ignore"):
+        cut = np.trunc(safe / grid) * grid  # exact: a division and a product by a power of two
+    total = _toward_zero_float32(np.where(nonzero[:, :, None], cut, 0.0).sum(axis=2))
+    with np.errstate(all="ignore"):
+        plain = (a.astype(np.float32) @ b.astype(np.float32).T)
+        if d is not None:
+            plain = plain + d.astype(np.float32)
+    ok = finite & np.isfinite(total)
+    return np.where(ok, total, plain).astype(np.float32)
 _LAYOUTS = {0: (0, 16), 6: (1, 32), 4: (2, 64), 2: (3, 128)}  # layout type -> (swizzle bits, row bytes)
+_TF32_KEPT = np.uint32(0xFFFF_E000)  # what a kind::tf32 MMA keeps of an operand element
 _ELEMENT = {"f16": {0: np.dtype(np.float16)}, "tf32": {2: np.dtype(np.float32)}}
 _FENCES = {"fence::before_thread_sync", "fence::after_thread_sync"}
 
@@ -71,6 +150,7 @@ class Tmem:
         self.freed: set[tuple[int, int]] = set()  # (first column, columns) released and not reallocated
         self.alloc_permit = True
         self.last_alloc_size = COLUMNS
+        self.increased = False  # the last alloc() asked for more columns than the one before it
 
     def alloc(self, ncols: int) -> int | None:
         if not self.alloc_permit:
@@ -78,9 +158,11 @@ class Tmem:
         if ncols < 32 or ncols > COLUMNS or ncols & (ncols - 1):
             raise ExecutionError(f"tcgen05.alloc of {ncols} columns; the count must be a power of "
                                  f"two from 32 to {COLUMNS}")
-        if ncols > self.last_alloc_size:
-            raise ExecutionError(f"tcgen05.alloc of {ncols} columns increases the previous allocation "
-                                 f"size of {self.last_alloc_size} columns")
+        # A larger allocation after a smaller one: the PTX allocation contract asks for sizes
+        # that do not increase, and a B200 allocates all the same (32 columns, then 64 at
+        # column 64: validation/blackwell/measured/b200/tmem/alloc_increasing.txt). So it is
+        # reported by the caller (`tmem-alloc-increasing`) and not refused.
+        self.increased = ncols > self.last_alloc_size
         for start in range(0, COLUMNS - ncols + 1, ncols):
             if not self.allocated[start:start + ncols].any():
                 self.allocated[start:start + ncols] = True
@@ -314,23 +396,29 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
 
     def land():
         if kind == "tf32":
-            # The operands are used as the float32 values they hold. Real TF32 has only
-            # 10 fraction bits and what the hardware does with the rest is not specified,
-            # so say so rather than silently pick an answer.
+            # The MMA clears the low 13 bits of every operand element (toward zero, like
+            # cvt.rz.tf32.f32) and multiplies what is left: measured on a B200, all 256
+            # products of validation/blackwell/measured/b200/mma/tf32_low_bits.txt. A kernel
+            # that wanted rounding to nearest had to convert first, so say so.
             for member, _, idx_a, idx_b, _, _ in parts:
                 for which, idx in (("A", idx_a), ("B", idx_b)):
                     if (member.smem.data[idx].view(np.uint32) & np.uint32(0x1FFF)).any():
                         cta.findings.add(
                             "mma-tf32-operand-not-converted",
                             f"operand {which} of a kind::tf32 MMA holds float32 values with bits "
-                            "below TF32 precision (the low 13 fraction bits). warplens multiplies "
-                            "them as float32; hardware may not. Convert with cvt.rna.tf32.f32 first",
+                            "below TF32 precision (the low 13 fraction bits). The MMA drops them, "
+                            "toward zero, as a B200 does; for rounding to nearest convert with "
+                            "cvt.rna.tf32.f32 first",
                             w, ins, [lane])
         b = np.concatenate([member.smem.data[idx_b].view(formats[b_fmt])[..., 0]
                             for member, _, _, idx_b, _, _ in parts]).astype(np.float32)
+        if kind == "tf32":
+            b = (b.view(np.uint32) & _TF32_KEPT).view(np.float32)
         for member, tmem, idx_a, _, keep, cells in parts:
             a = member.smem.data[idx_a].view(formats[a_fmt])[..., 0].astype(np.float32)
-            result = (a @ b.T * np.float32(sign))[keep]
+            if kind == "tf32":
+                a = (a.view(np.uint32) & _TF32_KEPT).view(np.float32)
+            old = None
             if accumulate:
                 # Check on completion: an earlier pipelined MMA in the same thread
                 # may initialize these cells after this instruction is issued.
@@ -338,7 +426,9 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
                     member.findings.add("tmem-uninitialized-read",
                                         "tcgen05.mma accumulates tensor memory that was never written",
                                         w, ins, [lane])
-                result = result + tmem.data[cells].view(np.float32) * np.float32(2.0 ** -scale)
+                old = np.zeros(keep.shape, dtype=np.float32)
+                old[keep] = tmem.data[cells].view(np.float32) * np.float32(2.0 ** -scale)
+            result = mma_sum(a * np.float32(sign), b, old)[keep]
             tmem.data[cells] = result.astype(np.float32).view(np.uint32)
             tmem.written[cells] = True
 
@@ -536,7 +626,14 @@ def _tcgen05(w, ins, mask):
         offsets = np.unique(offsets)
         cta.smem.index(offsets, 4, "write")
         tmem = _tmem(cta)
+        previous = tmem.last_alloc_size
         column = tmem.alloc(ncols)
+        if column is not None and tmem.increased:
+            cta.findings.add(
+                "tmem-alloc-increasing",
+                f"tcgen05.alloc of {ncols} columns after one of {previous}: the PTX allocation contract "
+                "asks for sizes that do not increase. A B200 allocates it; whether every GPU and "
+                "every state of tensor memory does is not promised", w, ins, [lane])
         if column is None:
             w.blocked = Wait("tensor-memory allocation", ins, retry=True,
                              detail=lambda: f"waiting for {ncols} tensor-memory columns to become available")

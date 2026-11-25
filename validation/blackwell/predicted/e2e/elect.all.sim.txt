@@ -1,4 +1,7 @@
-status: ok
-warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
-  elect: 1 CTA(s), 20 warp-instructions
-  elect: 1 CTA(s), 20 warp-instructions
+status: exit 3
+warplens: elect.sync is executed by lane(s) 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 that its member mask 0xffff0000 does not name. Every lane that executes it must be in the mask: a GPU ends the kernel here with cudaErrorIllegalInstruction
+  at module0.ptx:39: elect.sync %r7|p, %r5;
+  in kernel `elect`, CTA (0, 0, 0), warp 0
+  lane 0 (thread (0, 0, 0)) and 31 more lane(s)
+KERNEL FAILED: member mask 0xffff0000, executed by the lanes of 0xffffffff: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
+warplens: the program launched no kernels

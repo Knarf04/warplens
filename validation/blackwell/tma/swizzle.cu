@@ -18,8 +18,14 @@
 //
 //   swizzle aligned          offset 0 for every mode: the permutation itself
 //   swizzle misaligned       offsets 128, 256, 512 for every mode
-//   swizzle sixteen          offset 16: the destination is not aligned to a 128-byte row
+//   swizzle sixteen          offset 16: the destination is not aligned to a 128-byte row.
+//                            A B200 ends the kernel: cudaErrorMisalignedAddress (2026-11-25)
+//   swizzle thirtytwo        offset 32, and
+//   swizzle sixtyfour        offset 64: where between 16 (faults) and 128 (runs) the line is.
+//                            The simulator refuses what is not a multiple of 32, which is an
+//                            assumption; each is its own process, as either may fault
 #include "tma_dump.h"
+#include <utility>
 
 static const int SPAN[4] = {128, 32, 64, 128};  // bytes per tensor row, by swizzle mode
 
@@ -76,10 +82,11 @@ int main(int argc, char** argv) {
     static uint16_t tensor[1024];
     for (int i = 0; i < 1024; ++i) tensor[i] = (uint16_t)(0x4000 + i);
     uint16_t* d_tensor = dev_copy(tensor, 1024);
-    if (argc > 1 && !strcmp(argv[1], "sixteen")) {
-        for (int mode = 0; mode < 4; ++mode) run(mode, 16, d_tensor);
-        return 0;
-    }
+    for (const auto& one : {std::pair<const char*, int>{"sixteen", 16}, {"thirtytwo", 32}, {"sixtyfour", 64}})
+        if (argc > 1 && !strcmp(argv[1], one.first)) {
+            for (int mode = 0; mode < 4; ++mode) run(mode, one.second, d_tensor);
+            return 0;
+        }
     bool aligned = argc > 1 && !strcmp(argv[1], "aligned");
     for (int mode = 0; mode < 4; ++mode)
         for (int offset : {0, 128, 256, 512})

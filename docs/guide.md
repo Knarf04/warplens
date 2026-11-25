@@ -63,8 +63,11 @@ It is not:
 - **cycle-accurate, or a performance predictor.** The timing model explains
   where time goes under stated parameters. It does not tell you how fast a
   kernel is on hardware.
-- **validated on Blackwell hardware.** Nothing Blackwell-specific in it has run
-  on a Blackwell GPU. Section 2 lists what was checked and how.
+- **validated on Blackwell hardware in full.** Its probes ran on a B200 once
+  (2026-11-25, [b200-rental-1.md](b200-rental-1.md)): most of what it does
+  matched, and what did not was changed to what the GPU did. Those changes
+  have not themselves been run on hardware yet. Section 2 lists what was
+  checked and how.
 - **a GPU emulator for whole applications.** It runs PTX. It does not run
   machine code (SASS), so a library that ships only compiled kernels (cuBLAS,
   cuDNN, PyTorch's own operators) cannot be simulated.
@@ -828,7 +831,7 @@ Every kind, by area:
 | `vote-membermask-mismatch` | a `vote.sync` caller is absent from its own mask, or a member executes it with another mask. (A member that is elsewhere is waited for; if it cannot arrive, the launch is refused) |
 | **mbarrier** | |
 | `mbarrier-tx-mismatch` | completion bytes not balanced by `expect_tx` when the kernel returned or deadlocked |
-| `mbarrier-over-arrival` | more arrivals than the phase needed |
+| `mbarrier-over-arrival` | more arrivals than the phase needed. An error, not a finding: a B200 ends the kernel |
 | `mbarrier-init-race` | an mbarrier used by another warp with no barrier since its `init` |
 | `mbarrier-invalid-token` | a state token is outside the current or immediately preceding phase; it grants no synchronization credit |
 | **TMA and `cp.async`** | |
@@ -845,7 +848,8 @@ Every kind, by area:
 | `tmem-dealloc-before-commit` | an allocation released before its MMAs were synchronized with |
 | `tmem-uninitialized-read` | a load or an accumulating MMA read TMEM cells never written |
 | `tmem-unallocated` | an MMA, load or store on columns that are not allocated |
-| `tmem-leak` | columns still allocated when the kernel returned |
+| `tmem-leak` | columns still allocated when the kernel returned. Under `warplens run` the launch then fails with `cudaErrorTensorMemoryLeak`, as on a B200 |
+| `tmem-alloc-increasing` | a `tcgen05.alloc` larger than the one before it, which the PTX contract rules out and a B200 allocates |
 | `tmem-dealloc-repeated` | a second `tcgen05.dealloc` of an allocation already released; the repeat is ignored |
 | `clc-canceled-cluster-lost` | a cluster finished having canceled another whose coordinate no thread read with `get_first_ctaid`: nobody did that cluster's work |
 | `clc-not-waited` | a CTA returned while its `clusterlaunchcontrol.try_cancel` request was in flight |
@@ -857,16 +861,20 @@ Every kind, by area:
 | `tcgen05-not-waited` | the kernel returned with an MMA or a commit in flight |
 | `mma-operand-overwritten` | shared memory written while an MMA was reading it |
 | `mma-swizzle-mismatch` | an operand's descriptor names a different swizzle than the TMA load that wrote the buffer |
-| `mma-tf32-operand-not-converted` | a `kind::tf32` operand has bits below TF32 precision; warplens uses the float32 values as they are |
+| `mma-tf32-operand-not-converted` | a `kind::tf32` operand has bits below TF32 precision; the MMA drops them, toward zero, as a B200 does |
 
 Two of these report the simulator's uncertainty more than a bug in the kernel:
 
 - **`tmem-dealloc-repeated`.** The book's `hgemm_v7` to `v9` release their
-  tensor memory once per warpgroup, and they run on real hardware. What a GPU
-  does with the repeated release is not known; warplens ignores it and says
-  so. Checking it is on the list for the first Blackwell run.
-- **`mma-tf32-operand-not-converted`.** What hardware does with the low
-  mantissa bits of a TF32 operand is not specified ([numerics.md](numerics.md)).
+  tensor memory once per warpgroup, and they run on real hardware: on a B200
+  they finished with the outputs warplens computes. A probe in which a single
+  warp releases the same allocation twice was ended by the same GPU
+  (`cudaErrorLaunchFailure`), so the repeat is not always harmless; warplens
+  ignores it and says so ([b200-rental-1.md](b200-rental-1.md)).
+- **`mma-tf32-operand-not-converted`.** A B200 drops the low mantissa bits of
+  a TF32 operand, toward zero, and warplens does the same
+  ([numerics.md](numerics.md)); the finding is there because a kernel that
+  meant rounding to nearest has to convert its operands first.
 
 Known gaps in the checkers: synchronization is
 tracked per warp, not per thread; races between CTAs are not looked for; the

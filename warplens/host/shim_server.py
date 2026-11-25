@@ -10,7 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
-from ..errors import CUDA_INVALID_CLUSTER_SIZE, CUDA_INVALID_VALUE, CUDA_LAUNCH_FAILURE, LaunchError, WarplensError
+from ..errors import (CUDA_INVALID_CLUSTER_SIZE, CUDA_INVALID_VALUE, CUDA_LAUNCH_FAILURE,
+                      CUDA_TENSOR_MEMORY_LEAK, LaunchError, WarplensError)
 from ..frontend.ptx_parser import parse_ptx
 from ..units.smem import MAX_SMEM_BYTES, default_max_dynamic, reported_max_dynamic
 from . import tensor_map
@@ -300,6 +301,14 @@ class ShimServer:
                                        active_sms=self.active_sms, clc_limit=self.clc_limit,
                                        cluster=(kx, ky, kz) if kx else None)
             self.launches.append((name, stats))
+            leaks = [f for f in stats.findings if f.kind == "tmem-leak"]
+            if leaks:
+                # The kernel ran to its end, and a GPU then reports the launch as failed
+                # (cudaErrorTensorMemoryLeak at the synchronize; a B200 did). The Python API
+                # keeps this as the finding it is; a program under the shim gets the error.
+                raise LaunchError(
+                    f"kernel `{name}` returned with tensor memory still allocated: {leaks[0].message}. "
+                    "A GPU reports cudaErrorTensorMemoryLeak for this launch", CUDA_TENSOR_MEMORY_LEAK)
             return stats.output.encode()
         if op in (SET_ATTRIBUTE, GET_ATTRIBUTES):
             (function,) = struct.unpack_from("<I", data)

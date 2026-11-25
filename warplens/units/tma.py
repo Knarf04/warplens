@@ -96,9 +96,19 @@ def _tensor_map(w, ins, operand: TensorRef, lane: int, nd: int):
     return info, coords
 
 
+# What the shared address of a tensor copy must be a multiple of. A B200 ends the kernel with
+# cudaErrorMisalignedAddress for a box 16 bytes into its buffer and runs every multiple of 128
+# (validation/blackwell/measured/b200/tma/swizzle_misaligned.sixteen.txt; tma/swizzle
+# misaligned was identical to its prediction). 32 is an ASSUMPTION: the smallest alignment
+# that refuses what was measured to fault. tma/swizzle thirtytwo and sixtyfour ask a GPU.
+TENSOR_COPY_ALIGNMENT = 32
+
+
 def _check_alignment(w, ins, info, start: int, lane: int) -> None:
-    if start % 16:
-        raise ExecutionError(f"TMA needs a 16-byte aligned shared-memory address, got offset {start}")
+    if start % TENSOR_COPY_ALIGNMENT:
+        raise ExecutionError(
+            f"a TMA tensor copy needs a shared-memory address aligned to {TENSOR_COPY_ALIGNMENT} bytes, got "
+            f"offset {start}: a GPU ends the kernel here with cudaErrorMisalignedAddress")
     if info.swizzle and start % info.swizzle_period:
         name = tm.SWIZZLE_MODES[info.swizzle][0]
         w.cta.findings.add(
@@ -430,6 +440,17 @@ def _cp(w, ins, mask):
             info, coords = _tensor_map(w, ins, ops[0], lane, nd)
             start = local_shared_offset(int(_address(w, ins, ops[1])[lane]))
             _check_alignment(w, ins, info, start, lane)
+            if min(coords) < 0:
+                # Measured on a B200 (validation/blackwell/measured/b200/tma/
+                # store_wait_group.edge.txt): a store whose box starts two rows above the
+                # tensor ends the kernel with cudaErrorIllegalInstruction, where the same box
+                # hanging over the last row is written as far as it is inside, and a load at a
+                # negative coordinate is filled (tma/oob_fill). Any negative coordinate of a
+                # store is refused; only dimension 1 was measured.
+                raise ExecutionError(
+                    f"a TMA store at coordinates {tuple(int(c) for c in coords)} starts outside the tensor: a "
+                    "store may hang over the far edge but not start before the first element of a "
+                    "dimension. A GPU ends the kernel here with cudaErrorIllegalInstruction")
             _note_tile(w, ins, "store", start, info)
             idx = _smem_bytes(w, ins, start, info.box_bytes, info.swizzle, "store")
             addrs, inside = tm.element_addresses(info, coords)

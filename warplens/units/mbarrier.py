@@ -251,12 +251,14 @@ class Mbarrier:
                 released = self.cta.clocks.release(warp.sync_id)
             self.released = join(self.released, released)
         if n > self.pending:
-            # The PTX manual gives no meaning to this. warplens carries the surplus into the
-            # following phases (docs/m2.md, an assumption) and reports it.
-            self.cta.findings.add(
-                "mbarrier-over-arrival",
-                f"{n} arrival(s) on an mbarrier that needed only {max(self.pending, 0)} more in "
-                "this phase; the extra ones count toward the following phases", warp, ins, lanes)
+            # The PTX manual gives no meaning to this, and a B200 ends the kernel: three
+            # arrivals at once on an mbarrier that expected two gave cudaErrorLaunchFailure
+            # (Xid 13; validation/blackwell/measured/b200/mbarrier/over_arrival.txt). The
+            # first model carried the surplus into the following phases and reported it.
+            raise ExecutionError(
+                f"{n} arrival(s) on the mbarrier at shared offset {self.offset}, which needed only "
+                f"{max(self.pending, 0)} more in this phase: a GPU ends the kernel here with "
+                "cudaErrorLaunchFailure (mbarrier-over-arrival)")
         self.pending -= n
         self._check()
 

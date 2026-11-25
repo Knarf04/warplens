@@ -4,10 +4,12 @@ What warplens computes exactly, what it approximates, and how each rule was
 checked. "Checked on a GPU" means an RTX 3080 Ti (Ampere); nothing here has
 been checked on Blackwell.
 
-**Bit-exact execution of this model does not establish bit-exact agreement
-with Blackwell.** PTX leaves TF32's internal representation
+**Bit-exact execution of this model does not by itself establish bit-exact
+agreement with Blackwell.** PTX leaves TF32's internal representation
 implementation-defined, and the `tcgen05.mma` contract does not say how the
-products inside one MMA are accumulated.
+products inside one MMA are accumulated. What the model does there is what a
+B200 was measured to do (`tcgen05.mma` below), not something a document
+promises.
 
 ## Scalar instructions
 
@@ -140,16 +142,43 @@ float32 -> TF32 with cvt.rna.tf32.f32
 
 ## `tcgen05.mma`
 
-| Aspect | What warplens does | Status |
-| --- | --- | --- |
-| Half-precision operands | converted to float32 exactly | exact by construction |
-| `kind::tf32` operands | used as the float32 values stored in shared memory. **No conversion is applied.** If any operand has bits below TF32 precision, the launch reports `mma-tf32-operand-not-converted` | an assumption; what hardware does with those bits is not specified |
-| Products and their sum | float32, in whatever order NumPy's matrix product uses | **not** the hardware's order; results can differ in the last bits |
-| Accumulating into D | one float32 addition of the new sum to the old value, scaled if a scale is given | an assumption |
-| Negation flags | sign applied to the product | from the descriptor layout |
+Measured on a B200 on 2026-11-25 (`docs/b200-rental-1.md`). An element of the
+result is **not** a chain of float32 additions; it is one sum, computed like
+this (`warplens/units/tcgen05.py:mma_sum`):
 
-So an MMA result is correct to float32 rounding error, and is not meant to
-match hardware bit for bit. Tests compare against NumPy with a tolerance.
+| Step | What happens | Status |
+| --- | --- | --- |
+| Operands | half precision: widened exactly. `kind::tf32`: the low 13 bits of every element are cleared, toward zero like `cvt.rz.tf32.f32`; a launch whose operands have such bits reports `mma-tf32-operand-not-converted`, because a kernel that wanted rounding to nearest had to convert first | measured: all 256 products of `mma/tf32_low_bits` |
+| Products | exact: two significands of 11 bits | by construction |
+| Lining up | every term (the K products and, when accumulating, the old value) is cut off, toward zero, 25 bits below the leading bit of the largest term. The leading bit of a product is taken from the **sum of its operands' exponents**, as if the product of the two significands had not carried into the next bit | the width: measured (`mma/accumulation_order`, part 1). The exponent rule and the direction for negative terms: from the book's kernels, below |
+| Sum | the cut terms are added exactly | measured (parts 1 and 2) |
+| Result | the sum is cut off **toward zero** to float32, not rounded to nearest. 2^128 or more is an infinity | measured (part 2; `mma/tf32_low_bits` for the infinity) |
+| Accumulating into D | the old value, scaled by 2^-s if a scale is given, is one more term of the same sum: not a separate float32 addition | measured (part 3) |
+| Negation flags | sign applied to the product | from the descriptor layout; `mma/negate` identical on the B200 |
+
+Two things follow that a float32 model gets wrong. A term more than 2^25
+times smaller than the largest is lost whatever its position: with products
+of 5 x 2^24, 5 and -5 x 2^24 the result is 4, in every order. And nothing is
+rounded to nearest, so results lean toward zero; over a long K the difference
+from a float32 sum grows, which is what the book's `hgemm_v6` to `v9` (K =
+256) showed against the first model: up to 30 units in the last place of the
+half-precision output.
+
+What this rests on. `validation/blackwell/measured/b200/mma/accumulation_order.txt`
+(3016 words) and `tf32_low_bits.txt` (256) are reproduced word for word
+(`tests/test_tcgen05.py::test_the_mma_sum_is_the_one_a_b200_computes`). The
+nine kernels of the book, captured on the same GPU with their inputs, then
+replay bit for bit: 311,296 half-precision elements. With any one rule
+changed some elements are a unit off: products normalized before lining up
+(9 elements of `v6`, `v8`, `v9`), negative terms cut toward minus infinity
+(495), the old value added without being cut (143), a width of 24, 26 or 27
+bits (204, 123, 146). Those captures are in the rental's archive and not in
+the repository, so parts 4 to 6 of `mma/accumulation_order` ask a GPU for the
+same three rules directly.
+
+**Not measured:** operands that are subnormal in half precision (their
+exponent is taken from the value), elements with an infinity or a NaN among
+their terms (computed in float32 as before), and `kind::i8`.
 
 ## Small formats and block scaling (host side only)
 

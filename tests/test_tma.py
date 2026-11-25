@@ -250,12 +250,24 @@ def test_swizzled_bytes_land_where_cute_says(sim, swizzle, bits, inner):
 def test_buffer_not_aligned_to_swizzle_period_is_reported(sim):
     data = np.arange(256, dtype=np.uint8).reshape(2, 128)
     src_map = sim.tensor_map_tiled(sim.from_numpy(data), (2, 128), swizzle="128B")
-    mod = kernel(DUMP.format(pad=16), DUMP_PARAMS)  # buf lands at offset 16
+    mod = kernel(DUMP.format(pad=32), DUMP_PARAMS)  # buf lands at offset 32
     stats = sim.launch(mod, "k", grid=1, block=256, args=[src_map, sim.empty(256, "u8"), 256])
     f = stats.findings[0]
     assert f.kind == "tma-swizzle-misaligned" and "not aligned to 1024 bytes" in f.message
     # The consequence: bytes are not where offset-based indexing looks for them.
     assert "smem-uninitialized-read" in {f.kind for f in stats.findings}
+
+
+def test_a_tensor_copy_16_bytes_into_a_row_ends_the_kernel_as_on_a_b200(sim):
+    """validation/blackwell/measured/b200/tma/swizzle_misaligned.sixteen.txt: a destination 16
+    bytes into the buffer is cudaErrorMisalignedAddress, with or without a swizzle. The
+    simulator refuses what is not a multiple of 32 (TENSOR_COPY_ALIGNMENT, an assumption)."""
+    data = np.arange(256, dtype=np.uint8).reshape(2, 128)
+    for swizzle in (None, "128B"):
+        src_map = sim.tensor_map_tiled(sim.from_numpy(data), (2, 128), swizzle=swizzle)
+        with pytest.raises(warplens.ExecutionError, match="aligned to 32 bytes, got offset 16.*cudaErrorMisalignedAddress"):
+            sim.launch(kernel(DUMP.format(pad=16), DUMP_PARAMS), "k", grid=1, block=256,
+                       args=[src_map, sim.empty(256, "u8"), 256])
 
 
 # -- mbarrier semantics ----------------------------------------------------------------
@@ -320,20 +332,26 @@ def test_phase_needs_both_arrivals_and_bytes(sim):
     assert out.numpy().tolist() == [0, 0, 1]
 
 
-def test_over_arrival_carries_into_next_phase_and_is_reported(sim):
+def test_over_arrival_ends_the_kernel_as_on_a_b200(sim):
+    """Three arrivals at once on an mbarrier that expected two: a B200 ends the kernel with
+    cudaErrorLaunchFailure (validation/blackwell/measured/b200/mbarrier/over_arrival.txt).
+    The first model carried the surplus into the next phase and reported a finding."""
     mod = mb_kernel(f"""
         mbarrier.init.shared::cta.b64 [%bar], 2;
         mbarrier.arrive.shared::cta.b64 _, [%bar], 3;
         mbarrier.test_wait.parity.shared::cta.b64 %p, [%bar], 0;
         {record(0)}
-        mbarrier.arrive.shared::cta.b64 _, [%bar];
-        mbarrier.test_wait.parity.shared::cta.b64 %p, [%bar], 1;
-        {record(1)}
+    """)
+    with pytest.raises(warplens.ExecutionError, match=r"3 arrival\(s\).*needed only 2 more.*mbarrier-over-arrival"):
+        sim.launch(mod, "k", grid=1, block=1, args=[sim.empty(2, "u32")])
+    exact = mb_kernel(f"""
+        mbarrier.init.shared::cta.b64 [%bar], 2;
+        mbarrier.arrive.shared::cta.b64 _, [%bar], 2;
+        mbarrier.test_wait.parity.shared::cta.b64 %p, [%bar], 0;
+        {record(0)}
     """)
     out = sim.empty(2, "u32")
-    stats = sim.launch(mod, "k", grid=1, block=1, args=[out])
-    assert out.numpy().tolist() == [1, 1]
-    assert [f.kind for f in stats.findings] == ["mbarrier-over-arrival"]
+    assert not sim.launch(exact, "k", grid=1, block=1, args=[out]).findings and out.numpy()[0] == 1
 
 
 def test_mbarrier_errors(sim):

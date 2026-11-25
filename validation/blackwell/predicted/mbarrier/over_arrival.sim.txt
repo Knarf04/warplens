@@ -1,10 +1,7 @@
-status: ok
-warplens: 2 kernel launch(es) simulated on B200, 2 finding(s)
-  mbar_script: 1 CTA(s), 168 warp-instructions
-    [mbarrier-over-arrival] 3 arrival(s) on an mbarrier that needed only 2 more in this phase; the extra ones count toward the following phases
-      line 130: mbarrier.arrive.shared::cta.b64 _, [%r26], %r4;
-      first in CTA (0, 0, 0), warp 0, lanes 0
-  mbar_script: 1 CTA(s), 109 warp-instructions
-    [mbarrier-over-arrival] 5 arrival(s) on an mbarrier that needed only 1 more in this phase; the extra ones count toward the following phases
-      line 130: mbarrier.arrive.shared::cta.b64 _, [%r26], %r4;
-      first in CTA (0, 0, 0), warp 0, lanes 0
+status: exit 3
+warplens: 3 arrival(s) on the mbarrier at shared offset 0, which needed only 2 more in this phase: a GPU ends the kernel here with cudaErrorLaunchFailure (mbarrier-over-arrival)
+  at module0.ptx:130: mbarrier.arrive.shared::cta.b64 _, [%r26], %r4;
+  in kernel `mbar_script`, CTA (0, 0, 0), warp 0
+  lane 0 (thread (0, 0, 0))
+KERNEL FAILED: two arrivals expected, three arrive at once, then one at a time: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
+warplens: the program launched no kernels

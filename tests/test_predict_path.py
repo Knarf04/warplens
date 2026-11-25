@@ -260,11 +260,12 @@ def test_the_book_is_predicted(run):
 
 
 def test_a_max_error_is_not_part_of_what_is_compared(tmp_path):
-    """CI's runner printed 0.0156 where the committed prediction says 0.0078, for the same
-    kernel output: the reference is NumPy's float32 product, and its BLAS sums in an order
-    that depends on the CPU and the thread count."""
+    """CI's runner printed another max error than the committed prediction says (0.0156
+    where it said 0.0078 at the time), for the same kernel output: the reference is NumPy's
+    float32 product, and its BLAS sums in an order that depends on the CPU and the thread
+    count."""
     committed = key_lines((COMMITTED / "e2e" / "book_hgemm.txt").read_text())
-    elsewhere = [line.replace("max error 0.0078", "max error 0.0156") for line in committed]
+    elsewhere = [line.replace("max error 0.0156", "max error 0.0078") for line in committed]
     assert elsewhere != committed and compare.claims(elsewhere) == compare.claims(committed)
     assert compare.claims(committed)[5] == "hgemm_v6 128x128x256: matches NumPy"
     # What is a claim still counts: another size, a failure, a missing kernel.
@@ -279,13 +280,13 @@ def test_a_max_error_is_not_part_of_what_is_compared(tmp_path):
     # they are not a difference.
     results = tmp_path / "results"
     (results / "e2e").mkdir(parents=True)
-    text = (COMMITTED / "e2e" / "book_hgemm.txt").read_text().replace("max error 0.0078", "max error 0.0156")
+    text = (COMMITTED / "e2e" / "book_hgemm.txt").read_text().replace("max error 0.0156", "max error 0.0078")
     (results / "e2e" / "book_hgemm.stdout").write_text(text)
     (results / "status.tsv").write_text("name\tstatus\ne2e/book_hgemm\tok\n")
     shown = subprocess.run([sys.executable, str(SUITE / "compare.py"), str(results)],
                            capture_output=True, text=True, timeout=120).stdout
-    assert "    GPU: hgemm_v6 128x128x256: matches NumPy (max error 0.0156)" in shown
-    assert "    sim: hgemm_v6 128x128x256: matches NumPy (max error 0.0078)" in shown
+    assert "    GPU: hgemm_v6 128x128x256: matches NumPy (max error 0.0078)" in shown
+    assert "    sim: hgemm_v6 128x128x256: matches NumPy (max error 0.0156)" in shown
     assert "the same claims: a max error is the distance to NumPy's result" in shown
 
 

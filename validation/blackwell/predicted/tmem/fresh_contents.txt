@@ -1,4 +1,5 @@
-launch 1, read only        cells reading zero: 4096 of 4096; cells holding launch 2's pattern:    0
+info: launch 1, read only        cells reading zero: 4096 of 4096; cells holding launch 2's pattern:    0
+info: launch 1, read only: cells holding a value some lane stored in launch 2:    0
 info: launch 1, read only, warp 0, lane 0, columns 0-3: 00000000 00000000 00000000 00000000
 info: launch 1, read only, warp 1, lane 0, columns 0-3: 00000000 00000000 00000000 00000000
 info: launch 1, read only, warp 2, lane 0, columns 0-3: 00000000 00000000 00000000 00000000
@@ -8,7 +9,8 @@ info: launch 2, write then read, warp 0, lane 0, columns 0-3: a5000000 a5000001 
 info: launch 2, write then read, warp 1, lane 0, columns 0-3: a5002000 a5002001 a5002002 a5002003
 info: launch 2, write then read, warp 2, lane 0, columns 0-3: a5004000 a5004001 a5004002 a5004003
 info: launch 2, write then read, warp 3, lane 0, columns 0-3: a5006000 a5006001 a5006002 a5006003
-launch 3, read only        cells reading zero: 4096 of 4096; cells holding launch 2's pattern:    0
+info: launch 3, read only        cells reading zero: 4096 of 4096; cells holding launch 2's pattern:    0
+info: launch 3, read only: cells holding a value some lane stored in launch 2:    0
 info: launch 3, read only, warp 0, lane 0, columns 0-3: 00000000 00000000 00000000 00000000
 info: launch 3, read only, warp 1, lane 0, columns 0-3: 00000000 00000000 00000000 00000000
 info: launch 3, read only, warp 2, lane 0, columns 0-3: 00000000 00000000 00000000 00000000

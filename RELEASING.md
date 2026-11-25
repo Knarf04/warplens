@@ -23,8 +23,8 @@ placeholder to reserve the PyPI name, and `1.0`, the public release. The tree is
 ## Before the release
 
 1. What `PLAN.md` still lists under "Still owed for v1.0" is done, or the owner has decided to
-   release without it. What has not been checked against hardware is said in the README
-   ("Not checked against any hardware"); the release does not change that.
+   release without it. What has and has not been checked against hardware is said in the
+   README ("Status") and in section 2 of `docs/guide.md`; the release does not change that.
 2. CI is green on the commit to be tagged, in all four jobs: `test` (the core suite on each
    supported Python), `dist` (the wheel and the sdist, installed in place of the checkout),
    `triton`, and `full` (everything, with no test allowed to skip).

@@ -4,11 +4,26 @@ Microbenchmarks that each isolate one parameter, or one group of parameters, of
 the approximate timing model (`warplens/timing/model.py`,
 `warplens/configs/b200.yaml`), for one unattended run on a rented B200.
 
-**Nothing here has run on a Blackwell GPU.** What exists today:
+**The suite ran on a B200 on 2026-11-25**, twice (once per toolkit;
+`docs/b200-rental-1.md`). `measured/b200/` has the benchmarks' output, the
+measurements and the fit of the run built with the pinned toolkit
+(`report.md`, `calibrated.yaml`), and under `fallback-nvcc-13.3.73/` the fit
+and the `ncu` counter tables of the other. Fourteen benchmarks ran in both.
+`ncu` read counters for all eleven programs it profiled in the run with the
+fallback toolkit, and for ten of eleven in the pinned one (`transpose` failed
+there). **The fit has not been applied**:
+`warplens/configs/b200.yaml` and the predictions in `predicted/` still hold
+the assumed values (`docs/b200-rental-1.md`, "The timing config is a decision,
+not a fix").
+
+The rest of this file describes the suite and how to run it, and most of it
+was written before that run: where it says a benchmark or a script has never
+run on a GPU, or has not read counters, it describes the state before
+2026-11-25 unless it names the B200. What exists besides the measurements:
 
 - every benchmark compiles and assembles for `sm_100a` (`build.sh`);
-- every benchmark runs in the simulator, and what the uncalibrated model predicts
-  for each configuration is committed in `predicted/`;
+- every benchmark runs in the simulator, and what the model predicts with the
+  assumed config for each configuration is committed in `predicted/`;
 - the benchmarks that are valid on Ampere ran on an RTX 3080 Ti Laptop GPU through
   the same `run_all.sh` and `fit.py` (`dryrun_3080ti/`); that shows the measuring
   method is stable, and says nothing about Blackwell;
@@ -45,7 +60,8 @@ stage limit of `env/remote/run.sh`, or Ctrl-C) has lost the unproven part:
    `gstream`, `cp_async`, `ncu_banks`);
 2. `run_ncu.sh --group ampere`: counters for those programs, the two comparisons
    with the simulator (TIM-16, TIM-17) first;
-3. the seven Blackwell-only benchmarks, which have never run on a GPU (`mbar`,
+3. the seven Blackwell-only benchmarks, which had never run on a GPU before the
+   rental (`mbar`,
    `tma`, `mma_rate`, `tmem_access`, `clc_latency`, `cluster_costs`,
    `pipelined_gemm`), then `mma_rate_i8`;
 4. `run_ncu.sh --group blackwell --continue`: counters for the Blackwell-only
@@ -291,8 +307,11 @@ and lets the rest run unprofiled, and it has 300 s (`--probe-timeout`,
 `NCU_PROBE_TIMEOUT`), the limit `env/remote/preflight.sh` gives its single
 kernel. What is known about that option: the machine's ncu 2024.1.1 and
 `ncu --help` accept `--launch-count 1` (as a normal user the run then stops at
-the permission error, as before). **It has not been run where counters can be
-read.** So if the probe ends without a table for a reason other than permission
+the permission error, as before). **Before the rental it had not been run
+where counters can be read.** On the B200 the run ended `ncu ok: 11
+benchmark(s) profiled, 0 failed` (`measured/b200/fallback-nvcc-13.3.73/status.txt`);
+which form of the probe got there is not in the files kept here. So if the
+probe ends without a table for a reason other than permission
 or its time limit, it is asked once more without the option, the form that read
 counters as root on the 3080 Ti, and `STATUS.txt` says so if only that form
 worked. A probe that reaches its limit is `ncu failed:` and is not repeated.
@@ -350,8 +369,9 @@ through this script**. What was done instead:
 
 The two runs below were made with the script as it was before the pre-rental
 review: the same counter lists and programs, in the old order, with the old
-probe. **The script as it is now has not been run where counters can be read**
-(no root in the session that changed it); as a normal user on the 3080 Ti it
+probe. **On the development machine the script as it is now has not been run
+where counters can be read** (no root in the session that changed it; on the
+B200 it read them, above); as a normal user on the 3080 Ti it
 ends in a second with `ncu not run: no permission ...`, inside `run_all.sh
 --ampere` (31 s, seven programs, `fit.py` ok), and with the `sm_100a` programs,
 none of which loads there, with `ncu not run: bin/hw/launch could not launch its
@@ -377,8 +397,9 @@ driver, the same six programs and the transpose, as many rows per program as wit
 no reduced counter list, both comparisons made inside the run and with the same result.
 `l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal` is `n/a` on this GPU with both.
 
-Still untested: what ncu prints for a rejected counter name, and whether the B200's ncu
-knows each counter at run time.
+Still untested: what ncu prints for a rejected counter name. The B200's ncu returned a
+table for every program; `l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal` is `n/a` there
+too (`measured/b200/fallback-nvcc-13.3.73/ncu/ncu_banks_compare.txt`).
 
 `ncu_banks` is the program for TIM-17: nine kernels, the three layouts in three block
 shapes, launched once each with `--trials 1`. `ncu_banks_compare.py NCU.csv` simulates the

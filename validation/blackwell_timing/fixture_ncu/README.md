@@ -6,8 +6,9 @@ so the tests cannot take the profiling path against a real ncu: `tests/test_ncu_
 runs the scripts against the files below instead. The path has run for real twice, as root
 on the RTX 3080 Ti on 2026-11-24, with ncu 2024.1.1 and with the pinned 2026.4.0, and read
 counters (`../README.md`); that was the previous version of `run_ncu.sh`, before its time
-limits, groups and `STATUS.txt`. **The version here has not run against a real ncu that
-returned counters**, and no version has on a B200.
+limits, groups and `STATUS.txt`. **On the development machine the version here has not run
+against a real ncu that returned counters.** On the B200 (2026-11-25) it did: eleven
+programs profiled (`../measured/b200/fallback-nvcc-13.3.73/ncu/`).
 
 | File | What it is | Recorded or made up |
 | --- | --- | --- |

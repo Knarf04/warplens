@@ -1,13 +1,30 @@
 # Validation matrix
 
-Every claim the simulator makes about Blackwell behaviour that has not been
-checked on Blackwell hardware, and how one scripted run on a rented B200 will
-test it. This is steps B5, B6 and F23 of `docs/history/plan.md` section 11.
+Every claim the simulator makes about Blackwell behaviour that only Blackwell
+hardware can check, and the probe that tests it in one scripted run on a
+rented B200. This is steps B5, B6 and F23 of `docs/history/plan.md` section 11.
 
-**Nothing in this document is a statement about what a B200 does.** The
-"predicted output" column is what the simulator does today. The only hardware
-results the repository holds are from an RTX 3080 Ti (Ampere), recorded in
-`validation/README.md`; rows that rest on them say so and cite the golden file.
+**The rows say what the simulator does, not what a B200 did.** The "predicted
+output" column is what the simulator does today, and there is no column for a
+verdict. The probes ran on a B200 on one day, 2026-11-25. Where to find what
+came of it:
+
+- the verdict of every run, with the rows it covers named in
+  `validation/blackwell/manifest.py`:
+  `validation/blackwell/measured/b200/compare-pinned-nvcc-13.5.37.txt` (88
+  identical, 8 differing, 30 with no pass or fail, of 126 runs), and
+  `compare-fallback-nvcc-13.3.73.txt` beside it for the end-to-end programs;
+- what the differences were and what was changed for each:
+  `docs/b200-rental-1.md`;
+- a row whose claim was changed to what that run showed says so in its claim
+  and has the basis `b200`. Its new prediction reproduces the recorded output
+  and has not itself been run on hardware.
+
+A row that keeps an earlier basis tag (`cutlass`, `ptx-manual`,
+`assumption`, ...) was not edited after the run: the tag says why the
+simulator does what it does, not whether the B200 agreed. For that, look the
+row's runs up in the comparison. Results from the RTX 3080 Ti (Ampere) are in
+`validation/README.md`; rows that rest on them cite the golden file.
 
 ## How to read the table
 
@@ -19,7 +36,7 @@ One row per claim, grouped by area. The columns:
 | Claim | What the simulator does, stated so that a probe can contradict it |
 | Code, docs, tests | `file:function` that implements it, the write-up that documents it, a test that pins it |
 | Basis | Why the simulator does this today; one tag from the list below, then details |
-| Probe | Planned location, then the kernel and its inputs. Locations are `<probe directory>/<short name>`; the files do not exist yet |
+| Probe | Location, then the kernel and its inputs. Locations are `<probe directory>/<short name>`, the names the rows were planned under; the runs that were built from them, and the rows each covers, are listed by `validation/blackwell/manifest.py` |
 | Predicted output | What the simulator produces for that probe, in words or as a formula |
 | Pass criterion | **bit-exact**, **tolerance** (stated) or **informational** (no pass or fail), then what a mismatch means for the simulator |
 
@@ -27,7 +44,7 @@ Basis tags:
 
 | Tag | Meaning |
 | --- | --- |
-| `ampere` | measured on the RTX 3080 Ti; the golden file is cited. Not yet confirmed on Blackwell |
+| `ampere` | measured on the RTX 3080 Ti; the golden file is cited. The golden programs that were replayed on the B200 gave the same lines there (rows RT-01, RT-02, RT-13, RT-14, RT-16, MB-03, NUM-09, NUM-11 to NUM-13; `docs/b200-rental-1.md`) |
 | `b200` | measured on a rented B200 (`docs/b200-rental-1.md`); the recorded output under `validation/blackwell/measured/b200/` is cited. Given to a row whose claim was changed to what that run showed; the changed prediction has not itself been run on hardware yet |
 | `cutlass` | read from CUTLASS or CuTe sources or NVIDIA's documentation of them |
 | `ptx-manual` | read from the PTX manual: a section the repository cites, or, where the row says "no section is cited", only the plan's general rule that instruction semantics follow the PTX ISA (`docs/history/plan.md` section 7, item 1) |
@@ -73,8 +90,10 @@ every cited path and symbol exists; `tests/test_validation_matrix.py` runs it.
 
 ## TMA (`TMA-nn`)
 
-Probes in `validation/blackwell/tma/`. The development GPU has no TMA, so no
-row here has any hardware result behind it (`docs/history/m2.md`).
+Probes in `validation/blackwell/tma/`. The development GPU has no TMA, so the
+only hardware results behind these rows are those of the B200 run
+(`docs/b200-rental-1.md`; the claims were first written down in
+`docs/history/m2.md`).
 
 | Id | Claim | Code, docs, tests | Basis | Probe | Predicted output | Pass criterion |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -241,9 +260,12 @@ Probes in `validation/blackwell/e2e/`.
 
 ## Timing (`TIM-nn`)
 
-Probes in `validation/blackwell_timing/`. The model is uncalibrated
-(`docs/history/m4.md`), so most rows produce a number to put in the config, not a
-verdict. Times are measured with a device timer around a loop long
+Probes in `validation/blackwell_timing/`. The config that ships is not
+calibrated (`docs/architecture.md`, section 7), so most rows produce a number
+to put in the config, not a verdict. The numbers a B200 gave are in
+`validation/blackwell_timing/measured/b200/report.md`; the config was not
+changed by them (`docs/b200-rental-1.md`, "The timing config is a decision,
+not a fix"). Times are measured with a device timer around a loop long
 enough to dominate launch overhead, on one SM and on all 148, at least 30
 repetitions, reporting the median and spread. Predictions use the B200 config:
 1.5 clocks per nanosecond.

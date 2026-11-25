@@ -2,7 +2,7 @@
 
 validation/blackwell_timing/run_ncu.sh and validation/ampere/run_ncu.sh need permission to
 read GPU performance counters, which the development machine does not give. So their
-profiling path has not run against a real ncu. Here they run against a stand-in
+profiling path does not run against a real ncu in the tests. Here they run against a stand-in
 (validation/blackwell_timing/fixture_ncu/fake_ncu.sh) that replays recorded ncu output: the
 permission error, the metric table of the pinned ncu for the B200's chip, and one complete
 counter table from the RTX 3080 Ti. What that covers is the scripts' own logic: argument

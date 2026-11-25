@@ -2,13 +2,17 @@
 
 Cross-checks of the simulator against a real GPU. Results recorded here came
 from an RTX 3080 Ti Laptop GPU (Ampere, `sm_86`), driver 580.173.02, CUDA 12.4.
-Only features that Ampere shares with Blackwell can be checked this way.
+Only features that Ampere shares with Blackwell can be checked this way. The
+comparison with a B200 is elsewhere: `blackwell/` and `blackwell_timing/` are
+the two probe suites, each with what the B200 printed on 2026-11-25 under
+`measured/b200/`, and `docs/b200-rental-1.md` is the record of that run.
 
 Build everything with `validation/ampere/build.sh`. It needs a full CUDA
 toolkit for the GPU binaries and the `warplens` conda env for the PTX.
 
 Every program below that records a `*_golden.txt` file is rerun on the rented
-B200 by the Blackwell probe suite, which includes these sources and predicts
+B200 by the Blackwell probe suite (on 2026-11-25 each one reproduced its file
+line for line), which includes these sources and predicts
 these files (`validation/blackwell/README.md`, "Reruns of the Ampere
 programs"; `tests/test_ampere_replay.py`). A new golden program needs a run
 there: write its host code with `CHECK` and `CHECK_LAUNCH` of `host_check.h`,

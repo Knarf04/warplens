@@ -102,7 +102,8 @@ def ncu_lines(status: list[str]) -> list[str]:
 
 def test_what_is_proven_runs_first(suite):
     """The Ampere-valid benchmarks, their counters (TIM-16/TIM-17 first), and only then what
-    has never run on a GPU: a run that is cut short has lost the unproven part."""
+    had never run on a GPU before the first rental: a run that is cut short has lost the unproven
+    part."""
     done, status = run_all(suite)
     assert done.returncode == 0, done.stderr
     ran = [(line.split()[0], "--trials 5 " in line) for line in (suite / "order.log").read_text().splitlines()]

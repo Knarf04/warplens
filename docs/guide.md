@@ -103,7 +103,7 @@ Two GPUs have been compared with the simulator:
 - an **RTX 3080 Ti** (Ampere, `sm_86`), the development machine, for
   everything Ampere shares with Blackwell
   ([validation/README.md](../validation/README.md));
-- a rented **B200**, once, on 2026-11-25, for the rest: 126 runs of small
+- a rented **B200**, on one day, 2026-11-25, for the rest: 126 runs of small
   probe programs whose output the simulator had predicted beforehand, 17
   whole programs, and 14 timing benchmarks. [b200-rental-1.md](b200-rental-1.md)
   is the record of that run, and the outputs that differed from a prediction

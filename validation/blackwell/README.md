@@ -4,10 +4,21 @@ Small kernels that test, on a real B200, what the simulator claims about TMA, mb
 tensor memory, `tcgen05.mma`, clusters and the small number formats; and the harness that
 runs them unattended and compares the results with predictions made beforehand.
 
-**Nothing in this directory has run on Blackwell hardware.** The development machine has an
-RTX 3080 Ti (Ampere). Every prediction is the simulator's output, committed so that a
-mismatch on the rented machine is unambiguous. What was run where is under
-[Dry run](#dry-run).
+**The suite ran on a B200 on 2026-11-25** (three runs that day, with two toolkits).
+`docs/b200-rental-1.md` is the record;
+`measured/b200/` has the verdict of every run (`compare-pinned-nvcc-13.5.37.txt`: of 126
+runs, 88 identical and 8 differing) and the output of each run that was not identical. The
+predictions in `predicted/` are no longer the ones that run was compared with: the
+differences were taken into the simulator and the predictions regenerated, so they now
+agree with the recorded outputs and have not themselves been run on hardware. Every
+prediction is the simulator's output, committed so that a mismatch on the rented machine is
+unambiguous.
+
+The rest of this file is the description of the suite and the instructions for a run, most
+of it written before that one. Where it speaks of what has not run on a GPU, or of "the
+rental" as something to come, it describes the state before 2026-11-25, unless it names the
+B200 result. The development machine has an RTX 3080 Ti (Ampere); what was run there is
+under [Dry run](#dry-run).
 
 ## How it works
 
@@ -100,8 +111,9 @@ Useful options: `--no-e2e` (probes only), `--only 'tmem/*'` (repeatable), `--no-
 ### GPU health and the order of a run
 
 A probe that faults or hangs can leave the GPU unable to run anything (an Xid that needs a
-reset). Nothing here has done that to a real GPU yet: no Blackwell probe has run on one. The
-runner is written so that when one does, the least is lost.
+reset). On the B200 the kernel logged Xids for the probes that fault
+(`measured/b200/xid.log`), and no run after them was left out (`measured/b200/status.tsv`). The runner is written so that
+when a probe does leave the GPU unusable, the least is lost.
 
 **Order** (GPU mode; the simulator modes keep the manifest's order, with the end-to-end
 programs last, and write the same files as before):

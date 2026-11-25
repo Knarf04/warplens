@@ -84,4 +84,7 @@ spellings and `red`). `tests/test_atomics.py` additionally
 compiles CUDA 13.5 integer, float, double and shared unsigned-long-long
 `atomicAdd` kernels for `sm_100a` and for `sm_86` and executes their PTX without a GPU, and checks flushing,
 masking, validation and proxy-fence regressions. Those compiler and simulator
-checks are not a Blackwell hardware comparison.
+checks are not a Blackwell hardware comparison. There is one: the RTX 3080 Ti
+atomic program was rerun on a B200 on 2026-11-25 and gave the same
+order-independent results (the run `e2e/ampere_atom`, identical in
+`validation/blackwell/measured/b200/compare-pinned-nvcc-13.5.37.txt`).

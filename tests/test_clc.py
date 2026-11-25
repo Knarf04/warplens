@@ -3,7 +3,7 @@ registers that carry a response, and the launch queue that decides what a reques
 
 The spellings are those of the PTX ISA 9.5 manual (sections 9.7.15.18 and 9.7.15.19), CUTLASS's
 `sm100_tile_scheduler.hpp` and what nvcc 13.5 emits; `test_the_kernels_assemble` runs them
-through ptxas when it is installed. What happens on a GPU has not been observed: see docs/clc.md.
+through ptxas when it is installed. What a B200 did with the probes of these forms: docs/clc.md.
 """
 
 import shutil

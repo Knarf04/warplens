@@ -622,9 +622,9 @@ which keeping the PTX causes.)
 
 `saxpy.py` holds its arrays as device memory from the CUDA driver, through the
 DSL's own helpers (`cutlass.base_dsl.runtime.cuda`), and passes them as
-pointers. **CuTe DSL kernels that use TMA do not run yet**: their tensor maps
-are read, and the tutorial's kernel then uses two instruction forms outside
-the supported set; see section 9.
+pointers. The kernel of CUTLASS's TMA tutorial (`fp16_gemm_0.py`) runs too,
+from the tensor maps the DSL writes itself; the script does not, because it
+keeps its arrays in PyTorch. See section 9.
 
 ### 5.6 The kernels of *Modern GPU Programming for MLSys*
 
@@ -1417,8 +1417,8 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 - Triton: no torch tensors, no benchmarking interface, no kernels that need a
   global or profile scratch buffer, no host tensor-descriptor arguments. Some
   multi-CTA Triton matmuls emit `tcgen05.st.16x32bx2` and fail on it.
-- CuTe DSL: the tutorial kernel that uses TMA does not run: two of its
-  instruction forms are not implemented (section 9).
+- CuTe DSL: the tutorial that uses TMA (`fp16_gemm_0.py`) does not run as a
+  script, because its arrays are PyTorch's; its kernel does (section 9).
 
 **Timing model**
 
@@ -1662,17 +1662,15 @@ finally:
 LaunchError: use a warplens tensor for simulated pointer arguments
 ```
 
-**A CuTe DSL kernel that uses TMA stops at an instruction that is not
-implemented.** The DSL does not ask the driver for its tensor maps; its
-compiled host code writes the descriptor itself, in the driver's undocumented
-layout. warplens reads that layout since the first Blackwell run, from which
-it was worked out ([b200-rental-1.md](b200-rental-1.md)), so the loads of
-CUTLASS's `fp16_gemm_0.py` go through. The kernel then stops at
-`tcgen05.mma` with `.collector::a::discard`, and after that would stop at
-`cvt.rn.f16x2.f32`: neither form is in the supported set
-([coverage.md](coverage.md)). With those two rewritten in the PTX text, the
-kernel as it was captured on a B200 replays with every byte of its output
-equal to the GPU's (`validation/blackwell/e2e/replay_launch.py`).
+**A CuTe DSL kernel that uses TMA.** The DSL does not ask the driver for its
+tensor maps; its compiled host code writes the descriptor itself, in the
+driver's undocumented layout. warplens reads that layout since the first
+Blackwell run, from which it was worked out
+([b200-rental-1.md](b200-rental-1.md)). The kernel of CUTLASS's
+`fp16_gemm_0.py`, as it was captured on a B200 with its parameters and its
+memory, replays with every byte of its output equal to the GPU's
+(`validation/blackwell/e2e/replay_launch.py`). The script itself has not been
+run under `warplens run`: it holds its arrays in PyTorch, which needs a GPU.
 
 Bytes that are neither kind of tensor map are still an error:
 

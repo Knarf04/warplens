@@ -121,7 +121,8 @@ Target users:
 form by form in `docs/coverage.md`, is the v1 surface. Nothing is added to it before v1.0;
 a result from the B200 run can change how an instruction in it behaves, not which
 instructions are in it. Anything outside it is a hard error that names the instruction,
-never something else run in its place. Three points that were open are settled as follows:
+never something else run in its place. Three points that were open are settled as follows
+(and one amendment was made by the owner on 2026-11-25, after the list):
 
 - **Descriptor base offset: 0 only.** The 3-bit matrix base offset of the shared-memory
   descriptor (bits 49-51) must be 0; a non-zero field is refused. CUTLASS and CuTe never set
@@ -140,6 +141,17 @@ never something else run in its place. Three points that were open are settled a
 - **`tcgen05.cp` is v2**, with the block-scaled formats it serves (section 10). It was
   listed here for M5 and never implemented; it is refused by name.
   `validation/blackwell/tmem/cp.cu` records what the one-CTA forms copy, for that later work.
+
+**Amendment (owner, 2026-11-25): two forms added, for CUTLASS's `fp16_gemm_0.py`.** The
+kernel of that CuTe DSL tutorial, the one with TMA that row RT-11 captured on the B200,
+uses `tcgen05.mma` with `.collector::a::discard` and `cvt.rn.f16x2.f32`. A tutorial of
+CUTLASS's own Blackwell set that stops at an unsupported instruction is not a scope worth
+keeping frozen, and both forms are small and now rest on hardware: `discard` is what an MMA
+without the modifier does, and the packed conversion's operand order is the one with which
+the captured launch replays byte for byte against the GPU (the other order leaves 129,920
+of 131,072 elements wrong). The collector forms that keep operand A (`fill`, `use`,
+`lastuse`) stay out, as does every other `x2` conversion that is not already listed. The
+freeze stands for everything else.
 
 Also out of v1, as before (`docs/coverage.md`, `docs/guide.md` "Instructions not
 implemented"): MMA kinds other than `f16` and `tf32`, operand A from tensor memory,
@@ -599,14 +611,16 @@ Owed before v1.0 because of it:
   the fixes are assumptions that new probe runs measure
   (`docs/b200-rental-1.md`, "What the second rental has to confirm").
 - Done since: the decoder of driver-format tensor maps, from the encoder
-  sweep (`warplens/host/tensor_map.py:decode_driver`). The RT-11 capture then
-  replays byte for byte against the B200 once two instruction forms that are
-  outside the frozen v1 scope are rewritten in its PTX
-  (`tcgen05.mma ... .collector::a::discard`, `cvt.rn.f16x2.f32`).
-- **A decision on those two forms**: add them to the v1 surface, so that
-  CUTLASS's `fp16_gemm_0.py` runs and its capture becomes a fixture, or leave
-  CuTe DSL kernels with TMA out of v1 (`docs/b200-rental-1.md`, "The
-  tensor-map decoder").
+  sweep (`warplens/host/tensor_map.py:decode_driver`), and the two instruction
+  forms the RT-11 kernel needed (section 3.5, the amendment). The capture
+  replays byte for byte against the B200
+  (`validation/blackwell/e2e/replay_launch.py`; `tests/test_rt11_replay.py`
+  with `WARPLENS_RT11_CAPTURE`).
+- Not done: `fp16_gemm_0.py` as a script under `warplens run`. Its kernel
+  runs; the script holds its arrays in PyTorch, which does not work without a
+  GPU, so what was replayed is the launch, not the program. And the capture is
+  not a committed fixture: it is 42 MB, and its PTX is CUTLASS's code compiled,
+  which wants a decision on carrying it.
 - **A decision on the timing config**: take the fit as it is and rewrite what
   depends on the assumed values, or first give the model what the fit says it
   lacks (a CLC latency per form of the request, the cost of an mbarrier

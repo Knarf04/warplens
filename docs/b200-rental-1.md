@@ -310,8 +310,7 @@ in the first 64 bytes only and sets one flag bit the driver does not.
 With that, the kernel captured for RT-11 gets past its TMA loads in the
 simulator and stops at two instruction forms **outside the v1 scope**:
 `tcgen05.mma` with `.collector::a::discard` (12 uses) and `cvt.rn.f16x2.f32`
-(32). As an experiment, with both rewritten in the PTX text
-(`validation/blackwell/e2e/replay_launch.py --rewrite-out-of-scope`: the
+(32). As a first experiment, with both rewritten in the PTX text (the
 modifier dropped, the packed conversion written as two scalar ones), the
 launch replays in 3 seconds and **no byte of the 2 MiB allocation differs
 from the B200's after the kernel**: 255,768 bytes the GPU changed, the 131,072
@@ -331,8 +330,11 @@ Two things it showed besides:
   takes dimension 0's stride as 1. They agree when the strides divide the box,
   which is all that has run on a GPU. Not changed; not measured.
 
-**A decision for the owner:** whether those two forms join the v1 surface.
-`PLAN.md` freezes it ("nothing is added to it before v1.0"), so they were not
-added. Both are small (`discard` is what an MMA without the modifier does; the
-conversion is two existing ones packed), and with them `fp16_gemm_0.py` would
-run under `warplens run` and its capture could be a committed fixture.
+**Decided by the owner the same day: both forms are in the v1 scope**
+(`PLAN.md`, section 3.5, the amendment). With them implemented the capture
+replays byte for byte with its PTX as compiled, no rewriting
+(`tests/test_rt11_replay.py`, given the capture). The operand order of the
+packed conversion is the GPU's: with the sources the other way round 129,920
+of the 131,072 elements are wrong. Still not done: the tutorial as a script
+under `warplens run` (its arrays are PyTorch's), and the capture as a
+committed fixture.

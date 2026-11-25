@@ -117,15 +117,14 @@ descriptors here read back as the tutorial's tensors), and a replay of this dire
 
 ```bash
 python validation/blackwell/e2e/replay_launch.py /path/to/rows/e2e/cute_dsl_tma/capture
-python validation/blackwell/e2e/replay_launch.py /path/to/rows/e2e/cute_dsl_tma/capture --rewrite-out-of-scope
+WARPLENS_RT11_CAPTURE=/path/to/rows/e2e/cute_dsl_tma/capture python -m pytest -q tests/test_rt11_replay.py
 ```
 
-The first stops where any run of this kernel stops, at an instruction form outside the v1
-scope (`tcgen05.mma` with `.collector::a::discard`; `cvt.rn.f16x2.f32` is the other). The
-second is an experiment that rewrites those two in the PTX text; with it the capture of
-2026-11-25 replays with no byte of the allocation different from the `after` dump, the
-131,072 elements of `c` among them. It is not a `warplens.capture.v1` case yet, and cannot
-be a passing one while the two forms are out of scope.
+The capture of 2026-11-25 replays with no byte of the allocation different from the
+`after` dump, the 131,072 elements of `c` among them. The kernel needed two instruction
+forms that were added for it (`tcgen05.mma` with `.collector::a::discard`,
+`cvt.rn.f16x2.f32`: `PLAN.md`, section 3.5). It is not a `warplens.capture.v1` case in the
+repository: the directory is 42 MB, and its PTX is CUTLASS's tutorial compiled.
 
 The address field of a driver-format tensor map is the first eight bytes, as the decoder
 established. When the tracer was written it was not known. The tracer therefore

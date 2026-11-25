@@ -283,7 +283,12 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
     kind = next((m.split("::")[1] for m in ins.mods if m.startswith("kind::")), None)
     if kind not in _ELEMENT:
         raise unsupported(ins, f"only kind::f16 and kind::tf32 are implemented")
-    extra = set(ins.mods) - {"mma", "cta_group::1", f"kind::{kind}"}
+    # `.collector::a::discard` says that operand A is not kept in the collector buffer for a
+    # later MMA, which is what an MMA without the modifier does: it changes nothing here.
+    # CUTLASS's CuTe DSL kernels write it out (fp16_gemm_0.py), and that kernel, captured on
+    # a B200, replays byte for byte with it read this way (docs/b200-rental-1.md). The forms
+    # that do keep A (fill, use, lastuse) are refused: the simulator has no collector.
+    extra = set(ins.mods) - {"mma", "cta_group::1", f"kind::{kind}", "collector::a::discard"}
     if extra:
         raise unsupported(ins, f"MMA modifier .{sorted(extra)[0]}")
     if len(ops) < 5 or not isinstance(ops[0], Mem):

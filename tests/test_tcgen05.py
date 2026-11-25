@@ -106,7 +106,7 @@ def place(matrix, layout, start, image):
 
 
 def run(sim, m=128, n=32, layout="128B", dtype=np.float16, twice=0, wait=1, shift=0, free=1,
-        negate_a=False, ncols=None, seed=0, block=128, dlane=0, to_tf32=True):
+        negate_a=False, ncols=None, seed=0, block=128, dlane=0, to_tf32=True, mods=""):
     rng = np.random.default_rng(seed)
     k = 32 // np.dtype(dtype).itemsize
     a = rng.uniform(-2, 2, (m, k)).astype(dtype)
@@ -120,7 +120,7 @@ def run(sim, m=128, n=32, layout="128B", dtype=np.float16, twice=0, wait=1, shif
     fmt = 0 if dtype == np.float16 else 2
     idesc = (1 << 4) | (fmt << 7) | (fmt << 10) | (int(negate_a) << 13) | ((n >> 3) << 17) | ((m >> 4) << 24)
     out = sim.from_numpy(np.full((128, n), np.nan, dtype=np.float32))
-    stats = sim.launch(mma_kernel("f16" if dtype == np.float16 else "tf32"), "k", grid=1, block=block,
+    stats = sim.launch(mma_kernel(("f16" if dtype == np.float16 else "tf32") + mods), "k", grid=1, block=block,
                        args=[sim.from_numpy(image), out, desc_a, desc_b, idesc, len(image),
                              ncols or max(32, 1 << (n - 1).bit_length()), n, twice, wait, shift, free, dlane, 0])
     expect = a.astype(np.float32) @ b.astype(np.float32).T * (-1 if negate_a else 1) * (2 if twice else 1)

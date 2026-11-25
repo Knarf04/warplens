@@ -59,7 +59,7 @@ an extra names is on PyPI:
 | `triton` | `triton` 3.9 or newer | Triton scripts (`warplens run script.py`) |
 | `tirx` | `apache-tvm-tirx` 0.1.0 or newer, `cuda-bindings` 13.5 or newer | TIRx scripts, and the book's kernels |
 | `cute-dsl` | `nvidia-cutlass-dsl` 4.8.1 or newer | CuTe DSL scripts |
-| `jupyter` | `notebook`, `nbclient`, `nbformat`, `ipykernel`, and the `tirx` extra | [examples/08_book/book_tour.ipynb](examples/08_book/book_tour.ipynb) |
+| `jupyter` | `notebook`, `nbclient`, `nbformat`, `ipykernel`, and the `tirx` extra | [examples/08_book/book_tour.ipynb](https://github.com/Knarf04/warplens/blob/main/examples/08_book/book_tour.ipynb) |
 | `all` | all of the above | |
 
 ```bash
@@ -77,30 +77,30 @@ been tried. Three things a frontend needs do not come from pip:
   `warplens run` builds on first use.
 
 `env/setup.sh` creates a conda env with all three and no GPU driver
-([env/README.md](env/README.md)). The book's kernels and the notebook also
-need your own clone of the book. [Section 3 of the guide](docs/guide.md#3-installation) has the
+([env/README.md](https://github.com/Knarf04/warplens/blob/main/env/README.md)). The book's kernels and the notebook also
+need your own clone of the book. [Section 3 of the guide](https://github.com/Knarf04/warplens/blob/main/docs/guide.md#3-installation) has the
 details.
 
 ## Documentation
 
-- **[docs/guide.md](docs/guide.md)**: the user guide. Installation, every way
+- **[docs/guide.md](https://github.com/Knarf04/warplens/blob/main/docs/guide.md)**: the user guide. Installation, every way
   to get code in, how to read the results, limits, troubleshooting.
-- [docs/gallery.md](docs/gallery.md): three annotated pictures and how to
+- [docs/gallery.md](https://github.com/Knarf04/warplens/blob/main/docs/gallery.md): three annotated pictures and how to
   read them: a bank conflict, a TMA copy that reads too early, a pipelined GEMM.
-- [examples/08_book/](examples/08_book/README.md): the nine GEMM kernels of
+- [examples/08_book/](https://github.com/Knarf04/warplens/blob/main/examples/08_book/README.md): the nine GEMM kernels of
   the book *Modern GPU Programming for MLSys* in the simulator, run from your
   own clone of the book, and a notebook
-  ([book_tour.ipynb](examples/08_book/book_tour.ipynb)) that goes through them
+  ([book_tour.ipynb](https://github.com/Knarf04/warplens/blob/main/examples/08_book/book_tour.ipynb)) that goes through them
   chapter by chapter. Jupyter is optional.
-- [docs/coverage.md](docs/coverage.md): the PTX that is supported.
-  [docs/numerics.md](docs/numerics.md): what is computed exactly.
-  [docs/architecture.md](docs/architecture.md): how the simulator works.
-- [docs/b200-rental-1.md](docs/b200-rental-1.md): the run on a B200, what
-  agreed and what did not. [docs/validation-matrix.md](docs/validation-matrix.md):
-  every claim that run tested. [validation/README.md](validation/README.md):
+- [docs/coverage.md](https://github.com/Knarf04/warplens/blob/main/docs/coverage.md): the PTX that is supported.
+  [docs/numerics.md](https://github.com/Knarf04/warplens/blob/main/docs/numerics.md): what is computed exactly.
+  [docs/architecture.md](https://github.com/Knarf04/warplens/blob/main/docs/architecture.md): how the simulator works.
+- [docs/b200-rental-1.md](https://github.com/Knarf04/warplens/blob/main/docs/b200-rental-1.md): the run on a B200, what
+  agreed and what did not. [docs/validation-matrix.md](https://github.com/Knarf04/warplens/blob/main/docs/validation-matrix.md):
+  every claim that run tested. [validation/README.md](https://github.com/Knarf04/warplens/blob/main/validation/README.md):
   the comparisons with an RTX 3080 Ti.
-- [PLAN.md](PLAN.md): what is still owed for v1.0, and the roadmap.
-  [docs/history/](docs/history/README.md) keeps the plan as first written and
+- [PLAN.md](https://github.com/Knarf04/warplens/blob/main/PLAN.md): what is still owed for v1.0, and the roadmap.
+  [docs/history/](https://github.com/Knarf04/warplens/blob/main/docs/history/README.md) keeps the plan as first written and
   the write-up of each milestone.
 
 ## Status
@@ -121,7 +121,7 @@ What that rests on:
   `.ftz` arithmetic and the float32-to-TF32 conversion match exactly, and so
   do the shared-memory bank-conflict counters.
 - **Checked against a B200, on one day** (2026-11-25,
-  [docs/b200-rental-1.md](docs/b200-rental-1.md)): TMA, tensor maps,
+  [docs/b200-rental-1.md](https://github.com/Knarf04/warplens/blob/main/docs/b200-rental-1.md)): TMA, tensor maps,
   mbarriers, `tcgen05`, tensor memory, clusters and the small number formats,
   by 126 runs of probe programs whose output the simulator had predicted. 88
   were identical and 8 differed; the rest have no pass or fail. The CUTLASS
@@ -136,12 +136,12 @@ What that rests on:
   assumptions. The B200 run measured the benchmarks they would be fitted
   from; the fit is recorded and not applied.
 
-[Section 2 of the guide](docs/guide.md#2-what-has-been-checked-and-against-what)
+[Section 2 of the guide](https://github.com/Knarf04/warplens/blob/main/docs/guide.md#2-what-has-been-checked-and-against-what)
 has this area by area, with what it does not cover.
 
 PTX that is not implemented stops a launch with an error naming the
-instruction; [docs/guide.md](docs/guide.md#8-limits) lists the limits.
+instruction; [docs/guide.md](https://github.com/Knarf04/warplens/blob/main/docs/guide.md#8-limits) lists the limits.
 
 ## License
 
-Apache-2.0; see [LICENSE](LICENSE). warplens is not related to NVIDIA Warp.
+Apache-2.0; see [LICENSE](https://github.com/Knarf04/warplens/blob/main/LICENSE). warplens is not related to NVIDIA Warp.

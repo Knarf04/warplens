@@ -4,7 +4,7 @@
 // after a barrier, the threads with index below `arrivers` each execute one
 // mbarrier.arrive; after another barrier thread 0 tests both parities.
 //
-// Claim tested (docs/m2.md "mbarrier": "Every lane that executes an arrive arrives"): the
+// Claim tested (docs/history/m2.md "mbarrier": "Every lane that executes an arrive arrives"): the
 // phase completes exactly when arrivers == count, including when only part of a warp
 // arrives; one short leaves it open.
 //

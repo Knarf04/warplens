@@ -276,7 +276,7 @@ class Mbarrier:
         copy larger than what was expected therefore completes the phase when the count
         reaches zero part of the way through, and the rest of its bytes count against the
         next phase. Measured on a B200 (validation/blackwell/measured/b200/mbarrier/
-        expect_tx_small.txt, tma/oob_complete_tx.txt; docs/m2.md, "Undersized expect_tx"):
+        expect_tx_small.txt, tma/oob_complete_tx.txt; docs/architecture.md, "TMA and mbarriers"):
         a waiter is released before all the data is there, which is reported."""
         before = self.tx
         if not (0 < before < n and before % TX_PIECE_BYTES == 0 and self.pending <= 0):

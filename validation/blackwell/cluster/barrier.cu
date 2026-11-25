@@ -11,7 +11,7 @@
 // each CTA reads its neighbour's token, however long the neighbour spun. If it did not,
 // CTAs with a slower neighbour would read 0.
 //
-// Claims tested (docs/m5.md, "Cluster barrier", "Distributed shared memory"):
+// Claims tested (docs/history/m5.md, "Cluster barrier", "Distributed shared memory"):
 //   * barrier.cluster.arrive + barrier.cluster.wait hold a thread until every running
 //     thread of the cluster has arrived;
 //   * mapa.shared::cluster gives the address of the same shared offset in the CTA of a

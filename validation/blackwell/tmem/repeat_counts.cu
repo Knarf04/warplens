@@ -1,6 +1,6 @@
 // Repeat counts of tcgen05.ld: every (shape, count) pair the simulator accepts.
 //
-// The claim (docs/m3.md; warplens/units/tcgen05.py `transfer_cells`): the repeat count is a
+// The claim (docs/history/m3.md; warplens/units/tcgen05.py `transfer_cells`): the repeat count is a
 // power of two that gives at most 128 registers per thread, i.e.
 //   32x32b  x1 .. x128     (count registers)
 //   16x64b  x1 .. x128     (count registers)

@@ -6,8 +6,9 @@ what is checked is that the capture is complete.
     validation/blackwell/e2e/cute_dsl_tma.py --out DIR [--tutorial FILE] [--python PROGRAM] [--force]
 
 Why: the DSL does not ask the driver for its tensor maps; its compiled host code writes the
-128-byte descriptors itself, in the driver's layout, and the simulator only reads maps it
-made (docs/m6.md, "Not working: kernels that use TMA"). The bytes saved here, next to the
+128-byte descriptors itself, in the driver's layout, and when this was written the simulator
+only read maps it made (docs/history/m6.md, "Not working: kernels that use TMA"; it reads the
+driver's layout since the first B200 run). The bytes saved here, next to the
 driver's own encodings from tma/tensormap_encode_sweep (TMA-12), are the test data for a
 decoder, after which such kernels can run in the simulator. Nothing else on the rental
 produces them. With the decoder written, the launch of step 3 can be replayed in the
@@ -61,7 +62,7 @@ sm_100 and PyTorch; the dry run on the development machine uses it with
 examples/06_cute_dsl/saxpy.py. Such a script has no tensor map and prints no PASS, so those
 two checks are left out unless --expect-descriptor or --expect-last-line ask for them.
 
-Not done here: the DSL's experimental `create_tensor_map_tiled`, which docs/m6.md says may
+Not done here: the DSL's experimental `create_tensor_map_tiled`, which docs/history/m6.md says may
 go through the driver. It needs a kernel written for it; env/remote/RUNBOOK.md lists it as
 an optional manual step.
 """

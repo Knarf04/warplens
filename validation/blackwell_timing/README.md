@@ -214,7 +214,8 @@ Per benchmark: method details are in the comment at the top of each `.cu` file.
 ### Expected run time
 
 Estimated from the predicted time per repetition (16 R repetitions per
-configuration) and from the Ampere run; not measured on a B200.
+configuration) and from the Ampere run, before any B200 run (what each program took on
+the B200 is in `measured/b200/out/status.txt`).
 
 | Program | Configurations | Estimate on B200 | 3080 Ti dry run |
 | --- | --- | --- | --- |
@@ -303,7 +304,7 @@ comparisons ran last and a profile could take three times 20 minutes):
   TIM-16, TIM-17) with their comparisons against the simulator, then
   `alu_chain`, `smem_wavefronts`, `global_load`, `cp_async`: the six programs
   that have been profiled on the 3080 Ti. Then `mbar`, `tma`, `mma_rate`,
-  `tmem_access`, `clc_latency`, which have never been profiled. `--group
+  `tmem_access`, `clc_latency`, which had never been profiled before the rental. `--group
   ampere` and `--group blackwell` select one half; `--continue` adds to an
   earlier call for the same directory without a second probe.
 - **Limit of one ncu run**: 300 s (`--timeout`, `NCU_PROFILE_TIMEOUT`;
@@ -660,7 +661,7 @@ Reported here; 1, 2, 3 and 13 have since been fixed, the rest have not.
    `predict.py` reads the launch records in-process instead.
 10. `%clock64` and `ld.volatile` are rejected by the simulator (found while
     writing the kernels).
-11. `docs/m4.md` says `tcgen05.wait` has a fixed cost; the code charges
+11. `docs/history/m4.md` says `tcgen05.wait` has a fixed cost; the code charges
     `tmem_access_clk` to `ld` and `st` only (noted by the matrix's author, TIM-19).
 12. `atom` (what `atomicAdd` compiles to: `atom.relaxed.gpu.global.add.u32`) was rejected
     by the simulator when this was written, so `clc_latency` does not sum over the clusters
@@ -668,7 +669,7 @@ Reported here; 1, 2, 3 and 13 have since been fixed, the rest have not.
     simulator runs `atom` now (branch `work/atom`); the kernel was left as it is.
 13. The simulator's `pipelined_gemm/*/ctas=8` rows were predicted as if all 148 SMs
     shared HBM. Fixed in `predict.py`: they are predicted with 8 active SMs (331 /
-    166 / 128 ns per K tile), which is the "8 SMs share HBM" case of `docs/m4.md`
+    166 / 128 ns per K tile), which is the "8 SMs share HBM" case of `docs/history/m4.md`
     for the code nvcc 13.5 makes of the benchmark.
 
 Items 5 to 8 are Ampere observations. They may not hold on Blackwell; the same

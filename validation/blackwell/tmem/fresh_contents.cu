@@ -8,7 +8,7 @@
 // For each launch: how many of the 4096 cells read as zero, and how many read as the
 // pattern of launch 2.
 //
-// Claim tested (docs/m3.md; warplens/units/tcgen05.py, finding `tmem-uninitialized-read`):
+// Claim tested (docs/history/m3.md; warplens/units/tcgen05.py, finding `tmem-uninitialized-read`):
 // the simulator gives zeros for never-written tensor memory, in launch 1 and in launch 3
 // (a launch starts with fresh tensor memory), and reports the read. Hardware promises
 // nothing, and a B200 showed as much on 2026-11-25 (validation/blackwell/measured/b200/tmem/

@@ -5,7 +5,7 @@
 // CUTLASS tutorials establish on hardware. All four warps then read with the SAME address,
 // base + (L << 16), and the probe prints which rows each warp saw.
 //
-// Claim tested (docs/m3.md, "tcgen05.ld"; the rule that was wrong before): warp w of a
+// Claim tested (docs/history/m3.md, "tcgen05.ld"; the rule that was wrong before): warp w of a
 // warpgroup reaches lanes 32 (w % 4) .. + 31 and nothing else. The lane field is a local
 // index: the physical lane is 32 (w % 4) + L % 32 + thread lane. So L = 0, 32, 64 and 96,
 // which "name" the four windows, all read the issuing warp's own window, and no warp can

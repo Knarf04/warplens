@@ -11,7 +11,7 @@
 // The host compares the second global buffer with the source and checks the guard words
 // after it.
 //
-// Claims tested (docs/m2.md; warplens/units/tma.py `_cp`):
+// Claims tested (docs/history/m2.md; warplens/units/tma.py `_cp`):
 //   * the copy is verbatim in both directions;
 //   * the load reports exactly `bytes` to the mbarrier (the phase completes with that expect_tx);
 //   * nothing past the range is written, in shared or in global memory.

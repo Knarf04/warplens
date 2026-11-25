@@ -1,4 +1,4 @@
-"""The frozen v1 instruction scope (PLAN.md section 3.5): what is in is pinned, what is out
+"""The frozen v1 instruction scope (docs/history/plan.md section 3.5): what is in is pinned, what is out
 is refused by name, never run as something else."""
 
 from types import SimpleNamespace

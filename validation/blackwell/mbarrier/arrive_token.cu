@@ -6,7 +6,7 @@
 //   b = arrive            the phase completes; test_wait(a), test_wait(b)
 // test_wait never blocks and nothing is asynchronous, so the output is deterministic.
 //
-// Claims tested (docs/m2.md, "mbarrier"; warplens/units/mbarrier.py `_mbarrier`):
+// Claims tested (docs/history/m2.md, "mbarrier"; warplens/units/mbarrier.py `_mbarrier`):
 //   * arrive returns a token for the phase it arrived in;
 //   * test_wait with that token is false while that phase is open and true once it has
 //     completed, also when asked during the next phase.

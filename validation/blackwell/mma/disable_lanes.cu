@@ -4,7 +4,7 @@
 // on TMEM lane m). Every cell is first set to the sentinel 0xEEEEEEEE; then one overwriting
 // MMA is issued with a mask of four 32-bit words, and every cell is read back.
 //
-// Claim tested (docs/m3.md; warplens/units/tcgen05.py `_mma`: `disabled`): bit l of word i
+// Claim tested (docs/history/m3.md; warplens/units/tcgen05.py `_mma`: `disabled`): bit l of word i
 // leaves lane 32 i + l unwritten; all other lanes get the result. Masks:
 //   {0, 0, 0, 0}                      nothing kept
 //   {1, 0, 0, 0}                      lane 0

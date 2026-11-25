@@ -7,7 +7,7 @@
 // The host reads the tensor back and prints, for every element, the buffer word it holds
 // ("." where the tensor was not written).
 //
-// Claims tested (docs/m2.md; warplens/units/tma.py `_cp`, `_store`):
+// Claims tested (docs/history/m2.md; warplens/units/tma.py `_cp`, `_store`):
 //   * after commit_group and wait_group 0 the data is in global memory;
 //   * an unswizzled store reads the box densely, dimension 0 fastest;
 //   * a 128B-swizzled store reads through the same permutation a load writes with;

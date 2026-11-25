@@ -6,7 +6,7 @@
 // The whole box is loaded to the address buffer + 1024 + offset, where the buffer is
 // aligned to 1024 bytes, and the buffer is printed as a map of 128-byte rows.
 //
-// Claim tested (docs/m2.md, "Assumptions"): the swizzle is a function of the shared-memory
+// Claim tested (docs/history/m2.md, "Assumptions"): the swizzle is a function of the shared-memory
 // ADDRESS (CuTe's Swizzle<B,4,3>, B = 1, 2, 3 for 32B, 64B, 128B: the 16-byte chunk index
 // within a 128-byte row is XORed with the low B bits of the row index), not of the offset
 // into the destination buffer. The two agree when the destination is aligned to the swizzle

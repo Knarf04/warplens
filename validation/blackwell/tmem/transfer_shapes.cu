@@ -12,7 +12,7 @@
 //               and the host finds where each value went.
 // Both are printed in the same form, so the two mappings can be compared with each other.
 //
-// Claims tested (docs/m3.md; warplens/units/tcgen05.py `transfer_cells`, derived from
+// Claims tested (docs/history/m3.md; warplens/units/tcgen05.py `transfer_cells`, derived from
 // cute/atom/copy_traits_sm100.hpp). Thread t, register q -> (lane offset, column offset):
 //   32x32b:   (t, q)
 //   16x64b:   (8 (t & 1) + (t >> 2), ((t >> 1) & 1) + 2 q)

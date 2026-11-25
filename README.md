@@ -96,7 +96,7 @@ details.
   [docs/numerics.md](docs/numerics.md): what is computed exactly.
 - [validation/README.md](validation/README.md): the comparisons with a real GPU.
 - [PLAN.md](PLAN.md): goals, architecture and what is still owed.
-  [docs/m0.md](docs/m0.md) to [docs/m6.md](docs/m6.md) record the design
+  [docs/history/m0.md](docs/history/m0.md) to [docs/history/m6.md](docs/history/m6.md) record the design
   decisions of each milestone.
 
 ## Status

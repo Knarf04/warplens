@@ -3,7 +3,7 @@
 //
 // Host only; no kernel is launched. This probe has NO predicted output: the simulator has
 // its own tensor-map encoding. Its output is the ground truth for writing a decoder of real
-// tensor maps (docs/m6.md, "Not working: kernels that use TMA": the CuTe DSL writes the
+// tensor maps (docs/history/m6.md, "Not working: kernels that use TMA": the CuTe DSL writes the
 // driver's layout itself). The driver encodes only on a GPU that has TMA, so this cannot be
 // produced on the development machine.
 //

@@ -14,7 +14,7 @@
 //   elect partial    mask 0xFFFFFFFF executed only by the odd lanes, so the mask names
 //                    lanes that do not execute it
 //
-// Claim tested (docs/m1.md; warplens/units/alu.py `_elect`): the lowest lane that is in the
+// Claim tested (docs/history/m1.md; warplens/units/alu.py `_elect`): the lowest lane that is in the
 // mask and executes the instruction is elected; every executing lane gets its id, and the
 // predicate is true only in that lane. Expected leaders: 0, 16, 0, 1; `all`: 16, 0;
 // `partial`: 1. The PTX manual defines only the well-formed cases, so `all` and `partial`

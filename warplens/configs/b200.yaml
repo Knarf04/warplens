@@ -56,7 +56,7 @@ smem_wavefront_clk:
   value: 1
   unit: clk
   source: assumption
-  note: Cost of one shared-memory wavefront (see docs/m1.md for what a wavefront is).
+  note: Cost of one shared-memory wavefront (see docs/architecture.md for what a wavefront is).
 global_access_latency_clk:
   value: 30
   unit: clk

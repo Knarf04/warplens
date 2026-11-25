@@ -12,7 +12,7 @@ of them is stepped first. Round-robin is a kind order: warps that execute the
 same code stay in step, so a kernel that writes in one phase and reads in the
 next finds everything written even when the `__syncthreads()` between the two
 is missing. The race check reports such a kernel whatever the order
-([m1.md](m1.md)); another schedule shows what the missing barrier does to the
+([architecture.md](architecture.md#3-shared-memory-barriers-and-the-race-check)); another schedule shows what the missing barrier does to the
 result.
 
 ## Choosing a schedule

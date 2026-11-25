@@ -4,7 +4,7 @@
 // it records mbarrier.test_wait.parity for parity 0 and parity 1. test_wait never blocks, and
 // nothing here is asynchronous, so the output is deterministic.
 //
-// Claims tested (docs/m2.md, "mbarrier"):
+// Claims tested (docs/history/m2.md, "mbarrier"):
 //   * a phase completes when its pending arrivals and its transaction count are both zero;
 //   * test_wait.parity p is true exactly when the current phase number has parity != p,
 //     so a new mbarrier answers (parity 0: no, parity 1: yes);

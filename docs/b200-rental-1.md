@@ -1,7 +1,7 @@
 # The first B200 rental (2026-11-25): what was measured
 
 The first run of the probe suites on Blackwell hardware (plan steps E19 to E22,
-`PLAN.md` section 11). This file is the record: what ran, what agreed with the
+`docs/history/plan.md` section 11). This file is the record: what ran, what agreed with the
 simulator, what did not, and what each difference asks of the simulator. The
 fixes are at the end.
 
@@ -174,7 +174,7 @@ and `.48` (`cudaErrorMisalignedAddress`; the simulator stops at an unsupported
 
 `mbarrier/try_wait.incomplete` (MB-11): `try_wait` on a phase that never
 completes returns false, each of 17 times. The simulator blocks, by the
-decision recorded in `PLAN.md` section 3.5.
+decision recorded in `docs/history/plan.md` section 3.5.
 
 ### Rows without a probe
 
@@ -331,7 +331,7 @@ Two things it showed besides:
   which is all that has run on a GPU. Not changed; not measured.
 
 **Decided by the owner the same day: both forms are in the v1 scope**
-(`PLAN.md`, section 3.5, the amendment). With them implemented the capture
+(`docs/history/plan.md`, section 3.5, the amendment). With them implemented the capture
 replays byte for byte with its PTX as compiled, no rewriting
 (`tests/test_rt11_replay.py`, given the capture). The operand order of the
 packed conversion is the GPU's: with the sources the other way round 129,920

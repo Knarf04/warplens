@@ -4,7 +4,7 @@
 // so every loaded word names the element it came from. One box is loaded at a non-zero
 // coordinate in every dimension and the shared buffer is printed in order.
 //
-// Claims tested (docs/m2.md; warplens/host/tensor_map.py `element_addresses`):
+// Claims tested (docs/history/m2.md; warplens/host/tensor_map.py `element_addresses`):
 //   * coordinates and box sizes are in elements, dimension 0 innermost;
 //   * the box lands in shared memory densely, dimension 0 fastest;
 //   * complete_tx reports box-size bytes (the mbarrier phase completes with that expect_tx);

@@ -4,7 +4,7 @@
 // in the tensor's type, never zero. A box of 4 rows x 8 columns is loaded at coordinates that
 // leave some of it outside, with out-of-bounds fill ZERO and NAN, and printed as raw bits.
 //
-// Claims tested (docs/m2.md, "Assumptions"):
+// Claims tested (docs/history/m2.md, "Assumptions"):
 //   * elements outside the tensor are filled, with zero or with a NaN, and elements inside
 //     are loaded; coordinates may be negative;
 //   * the NaN is 0x7ff7 in every 16 bits of the element (0x7ff7, 0x7ff77ff7,

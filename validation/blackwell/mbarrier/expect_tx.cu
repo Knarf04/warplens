@@ -7,7 +7,7 @@
 // test_wait for both parities is printed after every step except `load`, where it would
 // depend on timing.
 //
-// Claims tested (docs/m2.md, "Undersized expect_tx"):
+// Claims tested (docs/history/m2.md, "Undersized expect_tx"):
 //   * the transaction count is signed, and a phase completes only when pending arrivals
 //     and the count are both exactly zero;
 //   * a TMA load reports its bytes in pieces, so with one load and an undersized expect_tx

@@ -8,7 +8,7 @@
 //   4. tcgen05.commit again        the second arrival: the phase completes
 // Every thread then waits on the mbarrier and loads the accumulator.
 //
-// Claims tested (docs/m3.md; warplens/units/tcgen05.py `_commit`):
+// Claims tested (docs/history/m3.md; warplens/units/tcgen05.py `_commit`):
 //   * a commit makes exactly one arrival (phase 0 still open after the first, complete
 //     after the second);
 //   * what is loaded after waiting on the mbarrier is final: 8 P, bit for bit (exact:

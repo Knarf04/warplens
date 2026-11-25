@@ -1,6 +1,6 @@
 // tcgen05.cp: what it copies from shared memory to tensor memory. A RECORDING, not a test.
 //
-// tcgen05.cp is outside the v1 scope (PLAN.md, "v1 instruction scope"; it serves the
+// tcgen05.cp is outside the v1 scope (docs/history/plan.md, "v1 instruction scope"; it serves the
 // block-scaled MMAs, which are v2) and the simulator refuses it, so this run has NO
 // PREDICTION. It exists so that the rental brings back what an implementation will need:
 // which shared bytes each shape puts in which (lane, column) of tensor memory.

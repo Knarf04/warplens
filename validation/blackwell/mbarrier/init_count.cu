@@ -9,7 +9,7 @@
 //   init_count over      init 2^20, then arrive 2^20 - 1 and arrive 1
 //   init_count zero      init 0, then arrive 1 twice
 //
-// Claim tested (docs/m2.md; warplens/units/mbarrier.py `mbarrier_init`): the count must be
+// Claim tested (docs/history/m2.md; warplens/units/mbarrier.py `mbarrier_init`): the count must be
 // 1 to 2^20 - 1. The simulator refuses `over` and `zero`; what hardware does with them is
 // not known (the manual gives the range and nothing else), so both are informational.
 #include "../common.h"

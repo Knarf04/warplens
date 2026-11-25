@@ -20,7 +20,7 @@ nvcc -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared 
 ```
 
 That one file runs on a B200, where the driver compiles the PTX, and under `warplens run`,
-where the simulator executes it (`docs/m6.md`). The prediction of a probe is what it printed
+where the simulator executes it (`docs/history/m6.md`). The prediction of a probe is what it printed
 under `warplens run`.
 
 | File | What it is |
@@ -518,7 +518,8 @@ or in `rows/`; if more than one remains it lists them and compares nothing.
 
 `tma/tensormap_encode_sweep` has no prediction and never will: it prints, for 1380
 parameter sets, the 128 bytes the driver's `cuTensorMapEncodeTiled` wrote. That is the data
-a decoder of real tensor maps needs (`docs/m6.md`, "Not working: kernels that use TMA").
+a decoder of real tensor maps needs; the decoder was written from the B200's sweep
+(`warplens/host/tensor_map.py:decode_driver`; `docs/architecture.md`, section 4).
 Under `warplens run` it is skipped; the program itself was run once against the shim only
 to see that it runs to the end.
 
@@ -714,7 +715,7 @@ Those marked "fixed since" were fixed on other branches.
    `predicted/mbarrier/over_arrival.sim.txt` changed, from four to two. Hardware behaviour
    here is unknown and possibly undefined.
 5. **An M = 64 MMA accepted any destination lane offset** (fixed since, on branch
-   `work/sim-bugs`). `docs/m3.md` gives Layout F for offsets 0 and 16; the simulator added
+   `work/sim-bugs`). `docs/history/m3.md` gives Layout F for offsets 0 and 16; the simulator added
    whatever lane field the destination had (offset 8 put the rows on lanes 8-23 of each
    window). It now refuses any other lane, and `tmem/layout_f.64_8` predicts a failed
    kernel.
@@ -740,7 +741,7 @@ Those marked "fixed since" were fixed on other branches.
     `mbarrier-invalid-token` and grant no synchronization credit. The model's
     parity fallback now matches recorded RTX 3080 Ti results, including invalid
     inputs, without turning those observations into a Blackwell requirement.
-    Token bits and stale predicates remain on `info:` lines. See `docs/m2.md`
+    Token bits and stale predicates remain on `info:` lines. See `docs/history/m2.md`
     and matrix row MB-03.
 11. **Atomic updates are implemented.** The forms nvcc 13.5 emits for the
     atomic functions run and match the recorded RTX 3080 Ti results
@@ -767,10 +768,11 @@ Those marked "fixed since" were fixed on other branches.
     `cudaGetLastError` reports the refusal once; synchronization does not repeat
     it. Dynamic shared-memory attributes above the reported 227 KiB are refused.
     The shared-memory, block and grid error codes were measured on Ampere at its
-    own limits; the B200 cluster code follows CUDA headers and is not measured.
+    own limits; the cluster code was taken from the CUDA headers then, and a B200 gave it on
+    2026-11-25 (`measured/b200/cluster/max_size.txt`, `measured/b200/cluster-optin/`).
     Real kernel faults still become `cudaErrorLaunchFailure`. Clearing that fault
     with `cudaGetLastError` is a simulator recovery policy, not CUDA context recovery
-    (`docs/m6.md`). Programs run under the shim now need the shared-memory opt-in a
+    (`docs/history/m6.md`). Programs run under the shim now need the shared-memory opt-in a
     GPU needs: a launch with more dynamic shared memory than the 48 KiB default
     leaves after the kernel's static shared memory is refused with
     `cudaErrorInvalidValue` unless `cudaFuncSetAttribute` (`cuFuncSetAttribute`)

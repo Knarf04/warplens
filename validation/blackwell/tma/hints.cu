@@ -10,7 +10,7 @@
 //   prefetch bytes   after cp.async.bulk.prefetch.L2.global [tensor], 192
 // For each, the 8 loaded words and whether the phase completed with expect_tx 32.
 //
-// Claim tested (docs/m2.md; warplens/units/tma.py `_cp`, `_prefetch`): none of these has a
+// Claim tested (docs/history/m2.md; warplens/units/tma.py `_cp`, `_prefetch`): none of these has a
 // functional effect. Every variant must print the words of `plain`, which are the rank-2
 // words of tma/ranks.
 //

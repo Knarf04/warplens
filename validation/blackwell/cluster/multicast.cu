@@ -5,7 +5,7 @@
 // 256 bytes with .multicast::cluster and a mask. Every CTA polls its own mbarrier (bounded)
 // and reports whether its phase completed and what its buffer holds.
 //
-// Claims tested (docs/m5.md, "TMA multicast"):
+// Claims tested (docs/history/m5.md, "TMA multicast"):
 //   * the box is written at the same shared offset in every CTA whose rank bit is set in the
 //     mask, and in no other, whether or not the issuer is in the mask;
 //   * each receiving CTA's mbarrier at the same offset gets complete_tx of the box size.

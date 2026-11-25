@@ -1,7 +1,7 @@
 # Runbook: the B200 rental
 
 One rented machine, one command, one archive back. This is the checklist for
-the person doing it. Everything here is plan steps E19 to E22 (`PLAN.md`,
+the person doing it. Everything here is plan steps E19 to E22 (`docs/history/plan.md`,
 section 11).
 
 What the statements below rest on is marked: **measured** means on the
@@ -548,7 +548,7 @@ killed before it reaches the row leaves it too, and removed when the row ends as
 | Row | Step in `rows/status.tsv` | What runs | What to look for afterwards |
 | --- | --- | --- | --- |
 | NUM-05 (UE4M3) | `formats/ue4m3_ptxas` | `formats/ue4m3_ptxas.py`: asks the installed ptxas whether any `cvt` to or from UE4M3 exists, with the formats that do exist as controls. No GPU | `rows/formats/ue4m3_ptxas.stdout` ends with `NUM-05: no UE4M3 conversion in this toolkit; the row stays open`. Status `news (...)` means ptxas accepted one: the row can then be tested with a sweep like NUM-01's |
-| RT-10 (driver calls) | `e2e/driver_call_trace.tirx`, `e2e/driver_call_trace.cute_dsl` | `e2e/driver_call_trace.py`: `examples/07_tirx/run.py` and `examples/06_cute_dsl/saxpy.py` under gdb, a breakpoint on every export of `libcuda.so` and `libcudart.so` | `rows/e2e/driver_call_trace.<name>/summary.txt` (each call and how often) and `calls.txt` (in order) against the table of `docs/m6.md`; a call the shims lack is the news |
+| RT-10 (driver calls) | `e2e/driver_call_trace.tirx`, `e2e/driver_call_trace.cute_dsl` | `e2e/driver_call_trace.py`: `examples/07_tirx/run.py` and `examples/06_cute_dsl/saxpy.py` under gdb, a breakpoint on every export of `libcuda.so` and `libcudart.so` | `rows/e2e/driver_call_trace.<name>/summary.txt` (each call and how often) and `calls.txt` (in order) against the table of `docs/history/m6.md`; a call the shims lack is the news |
 | RT-11 (a CuTe DSL kernel with TMA: tensor maps, code, memory) | `e2e/cute_dsl_tma` | `e2e/cute_dsl_tma.py`: CUTLASS's `fp16_gemm_0.py`, unmodified, once plain, once under the same tracer, which reads every kernel parameter at the launch, and once more under it at a small size with the capture on: the code handed to the driver, the DSL's PTX, and the device memory the launch's parameters point into, before the kernel and after it. Then `e2e/launch_capture.py` checks that nothing is missing | `rows/e2e/cute_dsl_tma/summary.txt` starts with `RT-11 capture: COMPLETE`; the table below says what is where. **This is what unblocks CuTe DSL kernels with TMA in the simulator, and the only required row here: without it the stage fails** (below, and section 8) |
 
 What they need, and what `setup.sh` does about it: gdb with Python support. `setup.sh`
@@ -616,7 +616,7 @@ checks it again, there or at home.
   `CUTE_DSL_KEEP`/`CUTE_DSL_DUMP_DIR` in `capture/command.txt` before leaving.
 
 Still by hand, and optional (matrix row RT-11, last sentence): the DSL's experimental
-`create_tensor_map_tiled` (`cutlass.experimental.cuda.tensor_map`), which `docs/m6.md`
+`create_tensor_map_tiled` (`cutlass.experimental.cuda.tensor_map`), which `docs/history/m6.md`
 says may ask the driver for its tensor map instead of writing one. No script uses it,
 because it needs a kernel written against an experimental API that has not run anywhere
 here. If someone writes one, trace it the same way and keep the directory:

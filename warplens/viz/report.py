@@ -9,7 +9,7 @@
 For each launch the page has the findings of the checkers, the bank-conflict table and its
 heatmap (`viz.smem`), a layout picture of each shape of tile a TMA copy placed in shared
 memory (`viz.smem`), the TMEM layout of each shape of MMA (`viz.tmem`) and, for a timed
-launch, the timeline with the mbarrier phase completions (`viz.html_report`), with links to
+launch, the timeline with a row per mbarrier (`viz.html_report`), with links to
 the full timing report and the Perfetto trace. The pictures are inline in the page and also
 written beside it as SVG files.
 """
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from ..host.tensor_map import SWIZZLE_MODES
 from . import smem, tmem
-from .html_report import _STYLE, timeline_svg
+from .html_report import _STYLE, TIMELINE_NOTE, timeline_svg
 
 MAX_PICTURES = 6  # of one kind per launch; the rest are listed, not drawn
 _PAGE_STYLE = _STYLE + """
@@ -134,9 +134,11 @@ def launch_section(name: str, stats, directory=None, stem: str | None = None) ->
     heatmap = smem.bank_heatmap_svg(stats.smem, "Banks loaded by each shared-memory instruction")
     if heatmap:
         out.append(view("banks", heatmap))
-        out.append('<p class="note">A cell is the most distinct 4-byte words one execution of the instruction '
-                   'put in that bank. A wavefront serves each bank once, so that is the number of wavefronts '
-                   'the execution needed; 1 in every bank is a conflict-free access.</p>')
+        out.append('<p class="note">Colour shows conflict, not load. A wavefront serves each bank once, so an '
+                   'execution needs as many wavefronts as its fullest bank holds distinct 4-byte words; its '
+                   'ideal is what a conflict-free layout of the same words needs (4 for a warp loading 16 '
+                   'bytes per lane, which is not a conflict). A cell in the lightest shade stays within the '
+                   'ideal. A darker cell exceeds it and shows its number of words.</p>\n')
         out.append(f"<pre>{escape(stats.smem.format())}</pre>")
     else:
         out.append('<p class="note">No instruction of this launch loaded or stored shared memory '
@@ -180,13 +182,12 @@ def launch_section(name: str, stats, directory=None, stem: str | None = None) ->
                    'from Python, launch with <code>timing=True</code>.</p>')
     else:
         out.append(f'<p><b>{escape(timing.verdict)}.</b> Simulated time {timing.time_ns:,.0f} ns on '
-                   f'{escape(timing.config.name)}, from an approximate and uncalibrated model: an '
-                   'illustration of where time goes, not a prediction.</p>')
+                   f'{escape(timing.config.name)} by an approximate model ({escape(timing.config.basis)}). '
+                   f'{escape(timing.config.caveat)}</p>')
         timeline = timeline_svg(timing)
         if timeline:
             out.append(view("timeline", timeline))
-            out.append('<p class="note">Each red line is an mbarrier completing a phase; hover for which. '
-                       'A warp\'s orange bar is a wait and names the instruction it waits at.</p>')
+            out.append(f'<p class="note">{TIMELINE_NOTE}</p>')
         else:
             out.append('<p class="note">Nothing in this launch took simulated time.</p>')
         if directory is not None:

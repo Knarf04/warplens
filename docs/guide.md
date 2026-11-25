@@ -921,13 +921,21 @@ are the totals.
 
 **The same as a picture.** `warplens.viz.smem.bank_heatmap_svg(stats.smem)`
 returns an SVG with a row per shared-memory instruction and a column per bank.
-A cell holds the most distinct words that one execution of the instruction put
-in that bank, which is the number of wavefronts the bank alone demanded: 1 in
-every bank is a conflict-free access, and the linear transpose's load shows 32
-in every bank. (The words summed over all executions would not tell the two
-apart: each warp of the linear load hits a different bank, so every bank ends
-up with the same total as in the conflict-free store.) Banks an instruction
-never touched are grey. Each cell has a tooltip with the numbers.
+The colour of a cell shows conflict, not load. It compares the most distinct
+words one execution of the instruction put in that bank, which is the number
+of wavefronts the bank alone demanded, with that execution's ideal. A cell
+within the ideal has the lightest shade: every cell of a conflict-free scalar
+access, and also every cell of a warp that loads 16 bytes per lane, which puts
+four words in each bank and needs four wavefronts in any layout. A darker cell
+exceeds the ideal and shows its number of words: the linear transpose's load
+shows 32 in every bank. Beside the grid are the wavefronts the worst execution
+needed and its ideal ("32 needed, ideal 1"), the conflict that makes, and the
+extra wavefronts over all executions. (The words summed over all executions
+would not tell a conflict from none: each warp of the linear load hits a
+different bank, so every bank ends up with the same total as in the
+conflict-free store.) Banks an instruction never touched are grey. Each cell
+has a tooltip with the numbers. [The gallery](gallery.md) reads one of these
+pictures step by step.
 
 <!-- test: run -->
 ```python
@@ -1098,9 +1106,18 @@ float32 -> TF32 with cvt.rna.tf32.f32
 **Timeline of a timed launch.** A launch with `timing=True` can write a trace
 for [ui.perfetto.dev](https://ui.perfetto.dev) and a self-contained HTML
 report (next section). The trace has a process per CTA, a track per warp with
-run and wait slices (a wait names the instruction it waits at), tracks for the
-TMA engine and the tensor core, instants for mbarrier phase completions and a
-counter of TMA bytes in flight.
+run and wait slices, tracks for the TMA engine and the tensor core, tracks
+for the time this SM's share of HBM and of L2 was busy, and a counter of TMA
+bytes in flight. Each mbarrier has a track of its own, named by its shared
+offset, with an instant per completed phase. A wait names the instruction it
+waits at and, for an mbarrier, which phase of which barrier it waits for; a
+TMA load names the barrier it reports to.
+
+`timeline_svg(stats.timing)` draws the same for the first CTA as one picture:
+a row per warp, engine and mbarrier, a numbered diamond for each phase
+completion, and a line from it to the warps whose wait it ended. The barriers
+are lettered by shared offset, so `B2` on a wait bar is "phase 2 of mbarrier
+B". [The gallery](gallery.md) reads two such pictures.
 
 Section 6.8 puts all of these on one page.
 
@@ -1140,6 +1157,7 @@ print(f"\nwith a TMA engine 4x faster: {faster.time_ns:,.0f} ns, {faster.bottlen
 <!-- test: output -->
 ```text
 Approximate timing on B200 (model, not a measurement)
+  parameters: illustrative parameters, 8 of 13 assumed and none fitted to hardware
   1 CTA(s), each alone on one SM; 8 SMs assumed to share HBM
   kernel time 2,611 ns (3,917 clocks at 1.5 GHz, an assumed clock)
   verdict: TMA engine-bound: the TMA engine is busy 91% of the time
@@ -1158,6 +1176,15 @@ with a TMA engine 4x faster: 1,819 ns, Tensor Core-bound
 
 How to read it:
 
+- `parameters` says where the config's numbers come from. The configs that
+  ship with warplens are *illustrative*: plausible values, most of them
+  assumed. A config written by the fit of `validation/blackwell_timing`
+  (`--timing-config validation/blackwell_timing/measured/b200/calibrated.yaml`)
+  is labelled an *experimental fit*, with the number of fitted entries. The
+  HTML report, the page of `warplens report`, the timeline and the trace carry
+  the same label. Either way the result is simulated and approximate, never
+  hardware evidence: what was measured on a B200 is in
+  [b200-rental-1.md](b200-rental-1.md).
 - `kernel time` is the simulated duration of the slowest CTA. Each CTA is
   simulated alone on one SM, starting at zero.
 - `busy` is the fraction of time a resource was working: for the TMA engine,
@@ -1255,7 +1282,7 @@ For each launch the page has, in this order:
 | Shared-memory banks | the heatmap and the table of 6.5 | `NAME.banks.svg` |
 | Shared-memory layout | one picture (6.6) per shape of tile that a TMA tensor copy loaded or stored, with the PTX lines and shared offsets of the copies | `NAME.smem_layout_N.svg` |
 | Tensor memory | the TMEM layout (6.6) of each shape of `tcgen05.mma` the launch issued, both CTAs for a `cta_group::2` MMA | `NAME.tmem_N.svg` |
-| Timeline and mbarrier phases | the timeline of the first CTA with a red line at each mbarrier phase completion, and the verdict | `NAME.timeline.svg`, `NAME.timing.html` (6.7), `NAME.trace.json` |
+| Timeline and mbarrier phases | the timeline of the first CTA with a row per mbarrier, each phase completion joined to the waits it ended, and the verdict | `NAME.timeline.svg`, `NAME.timing.html` (6.7), `NAME.trace.json` |
 
 `NAME` is the launch's number and the kernel's name, cut to a safe file name;
 launches made by a Triton driver in another process also carry that process's
@@ -1268,8 +1295,9 @@ timing model off, which drops the timeline, and the options of `warplens run`
 exit status is the program's. If the program launches nothing, no page is
 written.
 
-The timeline, verdict and timing report come from the uncalibrated timing
-model; section 6.7 says how far to trust them. The other parts do not depend
+The timeline, verdict and timing report come from the approximate timing
+model and say which parameters they used; section 6.7 says how far to trust
+them. The other parts do not depend
 on it.
 
 A script that launches through the Python API is not a program `warplens

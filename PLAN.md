@@ -195,7 +195,7 @@ Each finding is reported with the PTX line, the warp/lane, and a short explanati
   - warp issue slots (4 sub-partitions per SM).
 - **GPU configs** in YAML (`configs/b200.yaml`, `configs/b300.yaml`): SM count, clock, HBM bandwidth and capacity, L2 size, SMEM/TMEM sizes, Tensor Core rates. Values come from public specs and microbenchmark papers (e.g. [arXiv 2512.02189](https://arxiv.org/pdf/2512.02189)), with a `source:` field on every number.
 - **Outputs:**
-  - a Perfetto/Chrome trace with tracks per warp, TMA, Tensor Core, and HBM, plus mbarrier phase flips as instant events and counters for bytes in flight;
+  - a Perfetto/Chrome trace with tracks per warp, TMA, Tensor Core, and HBM (the busy time of one SM's share; L2 likewise), plus mbarrier phase flips as instant events on a track per barrier and counters for bytes in flight;
   - a summary table of utilization per resource and the bottleneck verdict;
   - roofline placement.
 

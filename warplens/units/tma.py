@@ -153,7 +153,8 @@ def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
     operation.swizzle = swizzle
     operation.work = {"bytes": len(idx),
                       "global_bytes": len(idx) if global_bytes is None else global_bytes,
-                      "lines": None if source is None else np.unique(source >> np.uint64(7))}
+                      "lines": None if source is None else np.unique(source >> np.uint64(7)),
+                      "mbarrier": bar.offset}
     cta.smem.begin_async_write(idx, operation.id)
     bar.in_flight += 1
 

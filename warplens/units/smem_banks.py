@@ -53,6 +53,10 @@ class InstrBanks:
     # bank alone demanded. The sum above cannot show a conflict whose bank moves from one
     # execution to the next. Read by warplens.viz.smem.
     bank_peak: np.ndarray = field(default_factory=lambda: np.zeros(BANKS, dtype=np.int64))
+    # Per bank, the most a single execution asked of it relative to the ideal of that
+    # execution: words in the bank / wavefronts a conflict-free layout needs. 1 or less is
+    # no conflict, whatever the width of the access; N is the bank's share of an N-way one.
+    bank_ratio: np.ndarray = field(default_factory=lambda: np.zeros(BANKS, dtype=np.float64))
 
     @property
     def conflicts(self) -> int:
@@ -105,6 +109,7 @@ class SmemReport:
         entry.ideal += ideal
         entry.bank_words += per_bank
         np.maximum(entry.bank_peak, per_bank, out=entry.bank_peak)
+        np.maximum(entry.bank_ratio, per_bank / ideal, out=entry.bank_ratio)
         if waves * entry.worst_ideal > entry.worst * ideal:
             entry.worst, entry.worst_ideal = waves, ideal
         return waves

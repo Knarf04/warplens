@@ -26,6 +26,7 @@ TIMING_PARAMS = POSITIVE_PARAMS | NONNEGATIVE_PARAMS
 INFORMATIONAL_PARAMS = frozenset({"hbm_capacity_gb", "max_power_w"})
 # How a config marks a value it borrows from B200 because none is public for its GPU.
 ASSUMED_EQUAL_TO_B200 = "assumption: assumed equal to B200, uncalibrated"
+OVERRIDE = "override passed by the caller"
 
 
 def _number(key, value) -> float:
@@ -53,6 +54,10 @@ class Param:
     def is_assumption(self) -> bool:
         return self.source.strip().lower().startswith("assumption")
 
+    @property
+    def is_fitted(self) -> bool:
+        return self.source.strip().lower().startswith("measured:")
+
 
 class GpuConfig:
     def __init__(self, name: str, params: dict[str, Param]):
@@ -72,6 +77,37 @@ class GpuConfig:
             checked[key] = replace(param, value=value)
         self.params = checked
 
+    @property
+    def fitted(self) -> list[str]:
+        """The timing entries fitted to measurements of a GPU (`validation/blackwell_timing/fit.py`
+        writes their source as "measured: ...")."""
+        return sorted(k for k in TIMING_PARAMS if self.params[k].is_fitted)
+
+    @property
+    def basis(self) -> str:
+        """Where the timing entries come from, in a few words, for the label of every report:
+        the default configs are illustrative, a config written by the fit is experimental. In
+        both cases the result is simulated and approximate."""
+        total = len(TIMING_PARAMS)
+        assumed = sum(self.params[k].is_assumption for k in TIMING_PARAMS)
+        overridden = sum(self.params[k].source == OVERRIDE for k in TIMING_PARAMS)
+        if self.fitted:
+            text = (f"experimental fit, {len(self.fitted)} of {total} timing parameters fitted to "
+                    f"microbenchmarks of one GPU, {assumed} assumed")
+        else:
+            text = (f"illustrative parameters, {assumed} of {total} assumed and none fitted to "
+                    "hardware")
+        return text + (f", {overridden} overridden by the caller" if overridden else "")
+
+    @property
+    def caveat(self) -> str:
+        """One sentence on how far a result under this config can be trusted."""
+        if self.fitted:
+            return ("The fit moves the model toward the microbenchmarks of one GPU; it is the same "
+                    "simplified model, the fit is experimental, and the result is not a measurement.")
+        return ("The parameters are plausible values, not calibrated against hardware: an "
+                "illustration of where time goes, not a prediction.")
+
     def __getitem__(self, key: str) -> float:
         try:
             return self.params[key].value
@@ -85,7 +121,7 @@ class GpuConfig:
             if key not in params:
                 raise LaunchError(f"timing config `{self.name}` has no entry `{key}`")
             old = self.params[key]
-            params[key] = Param(key, _number(key, value), old.unit, "override passed by the caller",
+            params[key] = Param(key, _number(key, value), old.unit, OVERRIDE,
                                 note=f"config file value: {old.value:g}")
         return GpuConfig(self.name, params)
 

@@ -62,7 +62,7 @@ def test_an_over_arrival_ends_the_kernel(sim):
     class Cta:
         completed = 0
 
-        def phase_completed(self):
+        def phase_completed(self, offset=None, phase=None):
             self.completed += 1
 
     class Ins:

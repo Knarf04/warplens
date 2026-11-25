@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1370" height="166" font-family="sans-serif" font-size="11">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<text x="10" y="18" font-size="14">transpose_padded: banks loaded by each shared-memory instruction</text>
+<text x="650.0" y="36" text-anchor="middle" fill="#666666">bank</text>
+<text x="982" y="36" fill="#666666">wavefronts of the</text>
+<text x="982" y="50" fill="#666666">worst execution</text>
+<text x="1120" y="50" fill="#666666">conflict</text>
+<text x="1192" y="36" fill="#666666">extra wavefronts,</text>
+<text x="1192" y="50" fill="#666666">all executions</text>
+<text x="340.0" y="50" text-anchor="middle">0</text>
+<text x="420.0" y="50" text-anchor="middle">4</text>
+<text x="500.0" y="50" text-anchor="middle">8</text>
+<text x="580.0" y="50" text-anchor="middle">12</text>
+<text x="660.0" y="50" text-anchor="middle">16</text>
+<text x="740.0" y="50" text-anchor="middle">20</text>
+<text x="820.0" y="50" text-anchor="middle">24</text>
+<text x="900.0" y="50" text-anchor="middle">28</text>
+<text x="960.0" y="50" text-anchor="middle">31</text>
+<text x="322" y="72" text-anchor="end" font-family="monospace">line 90  st.shared.b32 [%r11], %r7;<title>transpose_padded: st.shared.b32 [%r11], %r7;</title></text>
+<rect x="330" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 0: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="350" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 1: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="370" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 2: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="390" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 3: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="410" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 4: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="430" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 5: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="450" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 6: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="470" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 7: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="490" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 8: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="510" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 9: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="530" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 10: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="550" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 11: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="570" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 12: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="590" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 13: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="610" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 14: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="630" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 15: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="650" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 16: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="670" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 17: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="690" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 18: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="710" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 19: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="730" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 20: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="750" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 21: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="770" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 22: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="790" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 23: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="810" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 24: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="830" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 25: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="850" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 26: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="870" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 27: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="890" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 28: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="910" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 29: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="930" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 30: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="950" y="58" width="19" height="19" fill="#cde2fb"><title>line 90, bank 31: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<text x="982" y="72">1 needed, ideal 1</text>
+<text x="1120" y="72">none</text>
+<text x="1192" y="72">0 in 64 execution(s)</text>
+<text x="322" y="94" text-anchor="end" font-family="monospace">line 95  ld.shared.b32 %r15, [%r14];<title>transpose_padded: ld.shared.b32 %r15, [%r14];</title></text>
+<rect x="330" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 0: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="350" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 1: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="370" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 2: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="390" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 3: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="410" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 4: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="430" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 5: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="450" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 6: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="470" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 7: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="490" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 8: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="510" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 9: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="530" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 10: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="550" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 11: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="570" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 12: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="590" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 13: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="610" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 14: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="630" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 15: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="650" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 16: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="670" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 17: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="690" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 18: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="710" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 19: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="730" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 20: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="750" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 21: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="770" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 22: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="790" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 23: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="810" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 24: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="830" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 25: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="850" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 26: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="870" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 27: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="890" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 28: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="910" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 29: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="930" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 30: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<rect x="950" y="80" width="19" height="19" fill="#cde2fb"><title>line 95, bank 31: at most 1 distinct word(s) in one execution, 1.00 on average over 64; no more than a conflict-free layout needs</title></rect>
+<text x="982" y="94">1 needed, ideal 1</text>
+<text x="1120" y="94">none</text>
+<text x="1192" y="94">0 in 64 execution(s)</text>
+<rect x="330" y="112" width="19" height="12" fill="#f1f1f1"/>
+<text x="354" y="122" fill="#666666">not touched</text>
+<rect x="430" y="112" width="19" height="12" fill="#cde2fb"/>
+<text x="454" y="122" fill="#666666">no conflict: the bank holds no more words than the ideal number of wavefronts</text>
+<rect x="354" y="130" width="8" height="12" fill="#7eb2ef"/>
+<rect x="362" y="130" width="8" height="12" fill="#70a9ed"/>
+<rect x="370" y="130" width="8" height="12" fill="#61a0ea"/>
+<rect x="378" y="130" width="8" height="12" fill="#5296e8"/>
+<rect x="386" y="130" width="8" height="12" fill="#438de6"/>
+<rect x="394" y="130" width="8" height="12" fill="#3784e1"/>
+<rect x="402" y="130" width="8" height="12" fill="#317cd6"/>
+<rect x="410" y="130" width="8" height="12" fill="#2b73cb"/>
+<rect x="418" y="130" width="8" height="12" fill="#266bc0"/>
+<rect x="426" y="130" width="8" height="12" fill="#2263b4"/>
+<rect x="434" y="130" width="8" height="12" fill="#1e5ba8"/>
+<rect x="442" y="130" width="8" height="12" fill="#1a539c"/>
+<rect x="450" y="130" width="8" height="12" fill="#174c90"/>
+<rect x="458" y="130" width="8" height="12" fill="#134583"/>
+<rect x="466" y="130" width="8" height="12" fill="#103d77"/>
+<rect x="474" y="130" width="8" height="12" fill="#0d366b"/>
+<text x="349" y="140" text-anchor="end" fill="#666666">2x</text>
+<text x="487" y="140" fill="#666666">32x the ideal: a conflict. The number in the cell is the distinct words in the bank, each needing a wavefront</text>
+</svg>

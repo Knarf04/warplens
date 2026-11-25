@@ -41,7 +41,7 @@ def test_timed_exit_reports_copy_still_in_flight(sim):
     assert {finding.kind for finding in timed.findings} == {finding.kind for finding in plain.findings}
     copy, = [s for s in timed.timing.slices if s.track == "TMA engine"]
     phase, = timed.timing.instants
-    assert phase[1] == pytest.approx(copy.end)
+    assert phase.when == pytest.approx(copy.end)
 
 
 def test_warps_issue_only_when_their_shared_slot_is_free(sim):

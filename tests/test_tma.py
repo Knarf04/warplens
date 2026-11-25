@@ -63,7 +63,7 @@ def test_an_undersized_expect_tx_completes_only_at_a_whole_number_of_pieces():
         def __init__(self):
             self.completed, self.findings = 0, self
             self.kinds = []
-        def phase_completed(self):
+        def phase_completed(self, offset=None, phase=None):
             self.completed += 1
         def add(self, kind, *rest):
             self.kinds.append(kind)

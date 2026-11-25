@@ -153,7 +153,8 @@ def _mbarrier(w, ins, mask):
                 waiting.append(bar)
         if blocking and waiting:
             w.blocked = Wait("mbarrier", ins, retry=True,
-                             detail=lambda: "; ".join(b.describe() for b in dict.fromkeys(waiting)))
+                             detail=lambda: "; ".join(b.describe() for b in dict.fromkeys(waiting)),
+                             on=dict.fromkeys((b.offset, b.phase) for b in waiting))
             return
         w.write(ops[0], result, mask)
     elif kind == ("inval",) and len(ops) == 1:
@@ -314,7 +315,7 @@ class Mbarrier:
         while self.pending <= 0:
             self.phase += 1
             self.pending += self.expected
-            self.cta.phase_completed()
+            self.cta.phase_completed(self.offset, self.phase - 1)
 
 
 def mbarrier_init(cta, offset: int, count: int, warp, ins) -> None:

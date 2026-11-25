@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1016" height="300" font-family="sans-serif" font-size="11" fill="#222222">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<line x1="190.00" y1="8" x2="190.00" y2="204" stroke="#e1e0d9"/>
+<text x="190.00" y="217" text-anchor="middle" fill="#666666">0 ns</text>
+<line x1="342.03" y1="8" x2="342.03" y2="204" stroke="#e1e0d9"/>
+<text x="342.03" y="217" text-anchor="middle" fill="#666666">50</text>
+<line x1="494.06" y1="8" x2="494.06" y2="204" stroke="#e1e0d9"/>
+<text x="494.06" y="217" text-anchor="middle" fill="#666666">100</text>
+<line x1="646.10" y1="8" x2="646.10" y2="204" stroke="#e1e0d9"/>
+<text x="646.10" y="217" text-anchor="middle" fill="#666666">150</text>
+<line x1="798.13" y1="8" x2="798.13" y2="204" stroke="#e1e0d9"/>
+<text x="798.13" y="217" text-anchor="middle" fill="#666666">200</text>
+<line x1="950.16" y1="8" x2="950.16" y2="204" stroke="#e1e0d9"/>
+<text x="950.16" y="217" text-anchor="middle" fill="#666666">250</text>
+<text x="182" y="21" text-anchor="end">warp 0</text>
+<rect x="190" y="8" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="43" text-anchor="end">warp 1</text>
+<rect x="190" y="30" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="65" text-anchor="end">warp 2</text>
+<rect x="190" y="52" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="87" text-anchor="end">warp 3</text>
+<rect x="190" y="74" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="109" text-anchor="end">TMA engine</text>
+<rect x="190" y="96" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="131" text-anchor="end">TMA engine (overlap 2)</text>
+<rect x="190" y="118" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="153" text-anchor="end">HBM</text>
+<rect x="190" y="140" width="810" height="17" fill="#f4f4f2"/>
+<rect x="246.76" y="140" width="222.56" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 19 to 92 ns, bytes=2048, line=73</title></rect>
+<text x="358.04" y="152" text-anchor="middle" font-size="10" fill="#0b0b0b" pointer-events="none">fetch</text>
+<rect x="469.32" y="140" width="222.56" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM write: 92 to 165 ns, bytes=2048, line=117</title></rect>
+<text x="580.60" y="152" text-anchor="middle" font-size="10" fill="#0b0b0b" pointer-events="none">write</text>
+<rect x="246.76" y="96" width="526.63" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier A (shared offset 8192): 19 to 192 ns, bytes=2048, issued_ns=19, line=73, from_hbm=2048</title></rect>
+<text x="510.07" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →A</text>
+<rect x="364.33" y="118" width="631.62" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA store: 57 to 265 ns, bytes=2048, issued_ns=57, line=117, to_hbm=2048</title></rect>
+<text x="680.14" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">store</text>
+<rect x="190.00" y="8" width="40.54" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 0 to 13 ns</title></rect>
+<rect x="230.54" y="8" width="129.73" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 13 to 56 ns</title></rect>
+<rect x="360.28" y="8" width="14.19" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 56 to 61 ns</title></rect>
+<rect x="374.47" y="8" width="621.48" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: bulk group: 61 to 265 ns, line=127, instruction=cp.async.bulk.wait_group.read 0;</title></rect>
+<text x="685.21" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">bulk group</text>
+<rect x="995.95" y="8" width="4.05" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 265 to 266 ns</title></rect>
+<rect x="190.00" y="30" width="32.43" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 0 to 11 ns</title></rect>
+<rect x="222.43" y="30" width="8.11" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: barrier: 11 to 13 ns, line=56, instruction=bar.sync 0;</title></rect>
+<rect x="230.54" y="30" width="115.54" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 13 to 51 ns</title></rect>
+<rect x="346.09" y="30" width="14.19" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: barrier: 51 to 56 ns, line=113, instruction=bar.sync 0;</title></rect>
+<rect x="360.28" y="30" width="4.05" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 56 to 57 ns</title></rect>
+<rect x="190.00" y="52" width="32.43" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 0 to 11 ns</title></rect>
+<rect x="222.43" y="52" width="8.11" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 2, wait: barrier: 11 to 13 ns, line=56, instruction=bar.sync 0;</title></rect>
+<rect x="230.54" y="52" width="117.57" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 13 to 52 ns</title></rect>
+<rect x="348.11" y="52" width="12.16" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 2, wait: barrier: 52 to 56 ns, line=113, instruction=bar.sync 0;</title></rect>
+<rect x="360.28" y="52" width="4.05" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 56 to 57 ns</title></rect>
+<rect x="190.00" y="74" width="32.43" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 0 to 11 ns</title></rect>
+<rect x="222.43" y="74" width="8.11" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 3, wait: barrier: 11 to 13 ns, line=56, instruction=bar.sync 0;</title></rect>
+<rect x="230.54" y="74" width="119.60" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 13 to 53 ns</title></rect>
+<rect x="350.14" y="74" width="10.14" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 3, wait: barrier: 53 to 56 ns, line=113, instruction=bar.sync 0;</title></rect>
+<rect x="360.28" y="74" width="4.05" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 56 to 57 ns</title></rect>
+<text x="182" y="176" text-anchor="end" fill="#666666" font-size="10">mbarrier, by shared offset</text>
+<text x="182" y="193" text-anchor="end"><tspan font-weight="bold">A</tspan> at 8192</text>
+<line x1="190" y1="188.5" x2="1000" y2="188.5" stroke="#e1e0d9"/>
+<path d="M773.38 183.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier A (shared offset 8192): phase 0 completes at 192 ns; no warp was waiting for it</title></path>
+<text x="781.38" y="192.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<rect x="190" y="226" width="12" height="12" fill="#2a78d6"/>
+<text x="207" y="236">warp runs</text>
+<rect x="279.9" y="226" width="12" height="12" fill="#eb6834"/>
+<text x="296.9" y="236">warp waits</text>
+<rect x="375.9" y="226" width="12" height="12" fill="#1baf7a"/>
+<text x="392.9" y="236">TMA or cp.async copy, start to landing</text>
+<rect x="642.6999999999999" y="226" width="12" height="12" fill="#eda100"/>
+<text x="659.6999999999999" y="236">HBM busy</text>
+<path d="M196 244l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222"/>
+<text x="207" y="254">an mbarrier completes the numbered phase; the line rises to the warps whose wait it ends</text>
+<text x="190" y="270">On a wait, B2: the warp waits for phase 2 of mbarrier B. On a TMA load, →B: it reports its bytes to B.</text>
+<text x="190" y="290" fill="#666666">CTA (0, 0, 0). Simulated time from warplens's approximate model, not a measurement. B200: illustrative parameters, 8 of 13 assumed and none fitted to hardware.</text>
+</svg>

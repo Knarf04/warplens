@@ -1,0 +1,466 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1016" height="542" font-family="sans-serif" font-size="11" fill="#222222">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<line x1="190.00" y1="8" x2="190.00" y2="446" stroke="#e1e0d9"/>
+<text x="190.00" y="459" text-anchor="middle" fill="#666666">0 ns</text>
+<line x1="345.10" y1="8" x2="345.10" y2="446" stroke="#e1e0d9"/>
+<text x="345.10" y="459" text-anchor="middle" fill="#666666">500</text>
+<line x1="500.19" y1="8" x2="500.19" y2="446" stroke="#e1e0d9"/>
+<text x="500.19" y="459" text-anchor="middle" fill="#666666">1,000</text>
+<line x1="655.29" y1="8" x2="655.29" y2="446" stroke="#e1e0d9"/>
+<text x="655.29" y="459" text-anchor="middle" fill="#666666">1,500</text>
+<line x1="810.38" y1="8" x2="810.38" y2="446" stroke="#e1e0d9"/>
+<text x="810.38" y="459" text-anchor="middle" fill="#666666">2,000</text>
+<line x1="965.48" y1="8" x2="965.48" y2="446" stroke="#e1e0d9"/>
+<text x="965.48" y="459" text-anchor="middle" fill="#666666">2,500</text>
+<text x="182" y="21" text-anchor="end">warp 0</text>
+<rect x="190" y="8" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="43" text-anchor="end">warp 1</text>
+<rect x="190" y="30" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="65" text-anchor="end">warp 2</text>
+<rect x="190" y="52" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="87" text-anchor="end">warp 3</text>
+<rect x="190" y="74" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="109" text-anchor="end">TMA engine</text>
+<rect x="190" y="96" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="131" text-anchor="end">TMA engine (overlap 2)</text>
+<rect x="190" y="118" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="153" text-anchor="end">TMA engine (overlap 3)</text>
+<rect x="190" y="140" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="175" text-anchor="end">Tensor Core</text>
+<rect x="190" y="162" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="197" text-anchor="end">Tensor Core (overlap 2)</text>
+<rect x="190" y="184" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="219" text-anchor="end">HBM</text>
+<rect x="190" y="206" width="810" height="17" fill="#f4f4f2"/>
+<rect x="208.40" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 59 to 91 ns, bytes=16384, line=475</title></rect>
+<rect x="218.22" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 91 to 107 ns, bytes=8192, line=479</title></rect>
+<rect x="223.13" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 107 to 138 ns, bytes=16384, line=514</title></rect>
+<rect x="232.95" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 138 to 154 ns, bytes=8192, line=518</title></rect>
+<rect x="237.86" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 154 to 186 ns, bytes=16384, line=552</title></rect>
+<rect x="247.68" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 186 to 202 ns, bytes=8192, line=556</title></rect>
+<rect x="252.59" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 202 to 233 ns, bytes=16384, line=591</title></rect>
+<rect x="262.41" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 233 to 249 ns, bytes=8192, line=595</title></rect>
+<rect x="311.38" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 391 to 423 ns, bytes=16384, line=475</title></rect>
+<rect x="321.19" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 423 to 439 ns, bytes=8192, line=479</title></rect>
+<rect x="350.46" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 517 to 549 ns, bytes=16384, line=514</title></rect>
+<rect x="360.28" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 549 to 565 ns, bytes=8192, line=518</title></rect>
+<rect x="390.58" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 647 to 678 ns, bytes=16384, line=552</title></rect>
+<rect x="400.40" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 678 to 694 ns, bytes=8192, line=556</title></rect>
+<rect x="429.87" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 773 to 805 ns, bytes=16384, line=591</title></rect>
+<rect x="439.69" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 805 to 821 ns, bytes=8192, line=595</title></rect>
+<rect x="470.19" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 903 to 935 ns, bytes=16384, line=475</title></rect>
+<rect x="480.01" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 935 to 951 ns, bytes=8192, line=479</title></rect>
+<rect x="509.28" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,029 to 1,061 ns, bytes=16384, line=514</title></rect>
+<rect x="519.10" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,061 to 1,077 ns, bytes=8192, line=518</title></rect>
+<rect x="549.40" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,159 to 1,190 ns, bytes=16384, line=552</title></rect>
+<rect x="559.21" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,190 to 1,206 ns, bytes=8192, line=556</title></rect>
+<rect x="588.69" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,285 to 1,317 ns, bytes=16384, line=591</title></rect>
+<rect x="598.50" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,317 to 1,333 ns, bytes=8192, line=595</title></rect>
+<rect x="629.01" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,415 to 1,447 ns, bytes=16384, line=475</title></rect>
+<rect x="638.83" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,447 to 1,463 ns, bytes=8192, line=479</title></rect>
+<rect x="668.10" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,541 to 1,573 ns, bytes=16384, line=514</title></rect>
+<rect x="677.91" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,573 to 1,589 ns, bytes=8192, line=518</title></rect>
+<rect x="708.21" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,671 to 1,702 ns, bytes=16384, line=552</title></rect>
+<rect x="718.03" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,702 to 1,718 ns, bytes=8192, line=556</title></rect>
+<rect x="747.50" y="206" width="9.82" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,797 to 1,829 ns, bytes=16384, line=591</title></rect>
+<rect x="757.32" y="206" width="4.91" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 1,829 to 1,845 ns, bytes=8192, line=595</title></rect>
+<rect x="208.40" y="96" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier A (shared offset 98304): 59 to 245 ns, bytes=16384, issued_ns=59, line=475, from_hbm=16384</title></rect>
+<text x="237.15" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →A</text>
+<rect x="234.87" y="118" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier A (shared offset 98304): 145 to 287 ns, bytes=8192, issued_ns=61, line=479, from_hbm=8192</title></rect>
+<text x="257.00" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→A</text>
+<rect x="248.11" y="140" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier B (shared offset 98312): 187 to 373 ns, bytes=16384, issued_ns=71, line=514, from_hbm=16384</title></rect>
+<text x="276.85" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →B</text>
+<rect x="274.58" y="96" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier B (shared offset 98312): 273 to 415 ns, bytes=8192, issued_ns=72, line=518, from_hbm=8192</title></rect>
+<text x="296.71" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→B</text>
+<rect x="287.81" y="118" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier C (shared offset 98320): 315 to 501 ns, bytes=16384, issued_ns=81, line=552, from_hbm=16384</title></rect>
+<text x="316.56" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →C</text>
+<rect x="314.28" y="140" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier C (shared offset 98320): 401 to 543 ns, bytes=8192, issued_ns=83, line=556, from_hbm=8192</title></rect>
+<text x="336.41" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→C</text>
+<rect x="327.52" y="96" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier D (shared offset 98328): 443 to 629 ns, bytes=16384, issued_ns=93, line=591, from_hbm=16384</title></rect>
+<text x="356.26" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →D</text>
+<rect x="353.99" y="118" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier D (shared offset 98328): 529 to 671 ns, bytes=8192, issued_ns=94, line=595, from_hbm=8192</title></rect>
+<text x="376.11" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→D</text>
+<rect x="367.22" y="140" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier A (shared offset 98304): 571 to 757 ns, bytes=16384, issued_ns=391, line=475, from_hbm=16384</title></rect>
+<text x="395.97" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →A</text>
+<rect x="393.69" y="96" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier A (shared offset 98304): 657 to 799 ns, bytes=8192, issued_ns=393, line=479, from_hbm=8192</title></rect>
+<text x="415.82" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→A</text>
+<rect x="406.93" y="118" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier B (shared offset 98312): 699 to 885 ns, bytes=16384, issued_ns=517, line=514, from_hbm=16384</title></rect>
+<text x="435.67" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →B</text>
+<rect x="433.40" y="140" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier B (shared offset 98312): 785 to 927 ns, bytes=8192, issued_ns=519, line=518, from_hbm=8192</title></rect>
+<text x="455.52" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→B</text>
+<rect x="446.63" y="96" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier C (shared offset 98320): 827 to 1,013 ns, bytes=16384, issued_ns=647, line=552, from_hbm=16384</title></rect>
+<text x="475.38" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →C</text>
+<rect x="473.10" y="118" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier C (shared offset 98320): 913 to 1,055 ns, bytes=8192, issued_ns=648, line=556, from_hbm=8192</title></rect>
+<text x="495.23" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→C</text>
+<rect x="486.34" y="140" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier D (shared offset 98328): 955 to 1,141 ns, bytes=16384, issued_ns=773, line=591, from_hbm=16384</title></rect>
+<text x="515.08" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →D</text>
+<rect x="512.81" y="96" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier D (shared offset 98328): 1,041 to 1,183 ns, bytes=8192, issued_ns=775, line=595, from_hbm=8192</title></rect>
+<text x="534.93" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→D</text>
+<rect x="526.04" y="118" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier A (shared offset 98304): 1,083 to 1,269 ns, bytes=16384, issued_ns=903, line=475, from_hbm=16384</title></rect>
+<text x="554.78" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →A</text>
+<rect x="552.51" y="140" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier A (shared offset 98304): 1,169 to 1,311 ns, bytes=8192, issued_ns=905, line=479, from_hbm=8192</title></rect>
+<text x="574.64" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→A</text>
+<rect x="565.74" y="96" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier B (shared offset 98312): 1,211 to 1,397 ns, bytes=16384, issued_ns=1,029, line=514, from_hbm=16384</title></rect>
+<text x="594.49" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →B</text>
+<rect x="592.21" y="118" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier B (shared offset 98312): 1,297 to 1,439 ns, bytes=8192, issued_ns=1,031, line=518, from_hbm=8192</title></rect>
+<text x="614.34" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→B</text>
+<rect x="605.45" y="140" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier C (shared offset 98320): 1,339 to 1,525 ns, bytes=16384, issued_ns=1,159, line=552, from_hbm=16384</title></rect>
+<text x="634.19" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →C</text>
+<rect x="631.92" y="96" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier C (shared offset 98320): 1,425 to 1,567 ns, bytes=8192, issued_ns=1,160, line=556, from_hbm=8192</title></rect>
+<text x="654.05" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→C</text>
+<rect x="645.15" y="118" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier D (shared offset 98328): 1,467 to 1,653 ns, bytes=16384, issued_ns=1,285, line=591, from_hbm=16384</title></rect>
+<text x="673.90" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →D</text>
+<rect x="671.62" y="140" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier D (shared offset 98328): 1,553 to 1,695 ns, bytes=8192, issued_ns=1,287, line=595, from_hbm=8192</title></rect>
+<text x="693.75" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→D</text>
+<rect x="684.86" y="96" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier A (shared offset 98304): 1,595 to 1,781 ns, bytes=16384, issued_ns=1,415, line=475, from_hbm=16384</title></rect>
+<text x="713.60" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →A</text>
+<rect x="711.33" y="118" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier A (shared offset 98304): 1,681 to 1,823 ns, bytes=8192, issued_ns=1,417, line=479, from_hbm=8192</title></rect>
+<text x="733.46" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→A</text>
+<rect x="724.56" y="140" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier B (shared offset 98312): 1,723 to 1,909 ns, bytes=16384, issued_ns=1,541, line=514, from_hbm=16384</title></rect>
+<text x="753.31" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →B</text>
+<rect x="751.03" y="96" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier B (shared offset 98312): 1,809 to 1,951 ns, bytes=8192, issued_ns=1,543, line=518, from_hbm=8192</title></rect>
+<text x="773.16" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→B</text>
+<rect x="764.27" y="118" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier C (shared offset 98320): 1,851 to 2,037 ns, bytes=16384, issued_ns=1,671, line=552, from_hbm=16384</title></rect>
+<text x="793.01" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →C</text>
+<rect x="790.74" y="140" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 3), TMA load, reports to mbarrier C (shared offset 98320): 1,937 to 2,079 ns, bytes=8192, issued_ns=1,672, line=556, from_hbm=8192</title></rect>
+<text x="812.86" y="152" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→C</text>
+<rect x="803.97" y="96" width="57.49" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier D (shared offset 98328): 1,979 to 2,165 ns, bytes=16384, issued_ns=1,797, line=591, from_hbm=16384</title></rect>
+<text x="832.72" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →D</text>
+<rect x="830.44" y="118" width="44.25" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine (overlap 2), TMA load, reports to mbarrier D (shared offset 98328): 2,065 to 2,207 ns, bytes=8192, issued_ns=1,799, line=595, from_hbm=8192</title></rect>
+<text x="852.57" y="130" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">→D</text>
+<rect x="282.02" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 297 to 324 ns, flops=262,144, line=199</title></rect>
+<rect x="288.26" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 317 to 344 ns, flops=262,144, line=214</title></rect>
+<rect x="294.50" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 337 to 365 ns, flops=262,144, line=229</title></rect>
+<rect x="300.73" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 357 to 385 ns, flops=262,144, line=244</title></rect>
+<rect x="321.11" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 423 to 450 ns, flops=262,144, line=280</title></rect>
+<rect x="327.34" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 443 to 470 ns, flops=262,144, line=294</title></rect>
+<rect x="333.58" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 463 to 491 ns, flops=262,144, line=309</title></rect>
+<rect x="339.82" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 483 to 511 ns, flops=262,144, line=324</title></rect>
+<rect x="361.43" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 553 to 580 ns, flops=262,144, line=199</title></rect>
+<rect x="367.67" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 573 to 600 ns, flops=262,144, line=214</title></rect>
+<rect x="373.91" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 593 to 621 ns, flops=262,144, line=229</title></rect>
+<rect x="380.14" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 613 to 641 ns, flops=262,144, line=244</title></rect>
+<rect x="400.52" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 679 to 706 ns, flops=262,144, line=280</title></rect>
+<rect x="406.75" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 699 to 726 ns, flops=262,144, line=294</title></rect>
+<rect x="412.99" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 719 to 747 ns, flops=262,144, line=309</title></rect>
+<rect x="419.23" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 739 to 767 ns, flops=262,144, line=324</title></rect>
+<rect x="440.84" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 809 to 836 ns, flops=262,144, line=199</title></rect>
+<rect x="447.08" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 829 to 856 ns, flops=262,144, line=214</title></rect>
+<rect x="453.31" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 849 to 877 ns, flops=262,144, line=229</title></rect>
+<rect x="459.55" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 869 to 897 ns, flops=262,144, line=244</title></rect>
+<rect x="479.93" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 935 to 962 ns, flops=262,144, line=280</title></rect>
+<rect x="486.16" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 955 to 982 ns, flops=262,144, line=294</title></rect>
+<rect x="492.40" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 975 to 1,003 ns, flops=262,144, line=309</title></rect>
+<rect x="498.64" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 995 to 1,023 ns, flops=262,144, line=324</title></rect>
+<rect x="520.25" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,065 to 1,092 ns, flops=262,144, line=199</title></rect>
+<rect x="526.49" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,085 to 1,112 ns, flops=262,144, line=214</title></rect>
+<rect x="532.72" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,105 to 1,133 ns, flops=262,144, line=229</title></rect>
+<rect x="538.96" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,125 to 1,153 ns, flops=262,144, line=244</title></rect>
+<rect x="559.33" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,191 to 1,218 ns, flops=262,144, line=280</title></rect>
+<rect x="565.57" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,211 to 1,238 ns, flops=262,144, line=294</title></rect>
+<rect x="571.81" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,231 to 1,259 ns, flops=262,144, line=309</title></rect>
+<rect x="578.04" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,251 to 1,279 ns, flops=262,144, line=324</title></rect>
+<rect x="599.66" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,321 to 1,348 ns, flops=262,144, line=199</title></rect>
+<rect x="605.90" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,341 to 1,368 ns, flops=262,144, line=214</title></rect>
+<rect x="612.13" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,361 to 1,389 ns, flops=262,144, line=229</title></rect>
+<rect x="618.37" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,381 to 1,409 ns, flops=262,144, line=244</title></rect>
+<rect x="638.74" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,447 to 1,474 ns, flops=262,144, line=280</title></rect>
+<rect x="644.98" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,467 to 1,494 ns, flops=262,144, line=294</title></rect>
+<rect x="651.22" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,487 to 1,515 ns, flops=262,144, line=309</title></rect>
+<rect x="657.45" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,507 to 1,535 ns, flops=262,144, line=324</title></rect>
+<rect x="679.07" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,577 to 1,604 ns, flops=262,144, line=199</title></rect>
+<rect x="685.31" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,597 to 1,624 ns, flops=262,144, line=214</title></rect>
+<rect x="691.54" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,617 to 1,645 ns, flops=262,144, line=229</title></rect>
+<rect x="697.78" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,637 to 1,665 ns, flops=262,144, line=244</title></rect>
+<rect x="718.15" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,703 to 1,730 ns, flops=262,144, line=280</title></rect>
+<rect x="724.39" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,723 to 1,750 ns, flops=262,144, line=294</title></rect>
+<rect x="730.63" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,743 to 1,771 ns, flops=262,144, line=309</title></rect>
+<rect x="736.86" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,763 to 1,791 ns, flops=262,144, line=324</title></rect>
+<rect x="758.48" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,833 to 1,860 ns, flops=262,144, line=199</title></rect>
+<rect x="764.71" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,853 to 1,880 ns, flops=262,144, line=214</title></rect>
+<rect x="770.95" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,873 to 1,901 ns, flops=262,144, line=229</title></rect>
+<rect x="777.19" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,893 to 1,921 ns, flops=262,144, line=244</title></rect>
+<rect x="797.56" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,959 to 1,986 ns, flops=262,144, line=280</title></rect>
+<rect x="803.80" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 1,979 to 2,006 ns, flops=262,144, line=294</title></rect>
+<rect x="810.03" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 1,999 to 2,027 ns, flops=262,144, line=309</title></rect>
+<rect x="816.27" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 2,019 to 2,047 ns, flops=262,144, line=324</title></rect>
+<rect x="837.89" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 2,089 to 2,116 ns, flops=262,144, line=199</title></rect>
+<rect x="844.12" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 2,109 to 2,136 ns, flops=262,144, line=214</title></rect>
+<rect x="850.36" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 2,129 to 2,157 ns, flops=262,144, line=229</title></rect>
+<rect x="856.60" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 2,149 to 2,177 ns, flops=262,144, line=244</title></rect>
+<rect x="876.97" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 2,215 to 2,242 ns, flops=262,144, line=280</title></rect>
+<rect x="883.21" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 2,235 to 2,262 ns, flops=262,144, line=294</title></rect>
+<rect x="889.44" y="162" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core, MMA 128x64x16: 2,255 to 2,283 ns, flops=262,144, line=309</title></rect>
+<rect x="895.68" y="184" width="8.57" height="17" fill="#6250d6" stroke="#ffffff" stroke-width="0.5"><title>Tensor Core (overlap 2), MMA 128x64x16: 2,275 to 2,303 ns, flops=262,144, line=324</title></rect>
+<rect x="190.00" y="8" width="12.82" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 0 to 41 ns</title></rect>
+<rect x="202.82" y="8" width="20.06" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 41 to 106 ns</title></rect>
+<rect x="222.88" y="8" width="86.43" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier E0 (phase 0 of the mbarrier at shared offset 98336): 106 to 385 ns, line=457, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r128], %r129;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="266.09" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">E0</text>
+<rect x="309.31" y="8" width="5.17" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 385 to 401 ns</title></rect>
+<rect x="314.48" y="8" width="33.91" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier F0 (phase 0 of the mbarrier at shared offset 98344): 401 to 511 ns, line=496, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r142], %r143;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="331.43" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">F0</text>
+<rect x="348.39" y="8" width="5.17" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 511 to 527 ns</title></rect>
+<rect x="353.56" y="8" width="35.16" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier G0 (phase 0 of the mbarrier at shared offset 98352): 527 to 641 ns, line=535, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r156], %r157;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="371.14" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">G0</text>
+<rect x="388.72" y="8" width="4.96" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 641 to 657 ns</title></rect>
+<rect x="393.68" y="8" width="34.12" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier H0 (phase 0 of the mbarrier at shared offset 98360): 657 to 767 ns, line=573, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r169], %r170;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="410.74" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">H0</text>
+<rect x="427.80" y="8" width="6.20" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 767 to 787 ns</title></rect>
+<rect x="434.00" y="8" width="34.12" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier E1 (phase 1 of the mbarrier at shared offset 98336): 787 to 897 ns, line=457, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r128], %r129;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="451.06" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">E1</text>
+<rect x="468.13" y="8" width="5.17" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 897 to 913 ns</title></rect>
+<rect x="473.30" y="8" width="33.91" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier F1 (phase 1 of the mbarrier at shared offset 98344): 913 to 1,023 ns, line=496, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r142], %r143;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="490.25" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">F1</text>
+<rect x="507.21" y="8" width="5.17" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 1,023 to 1,039 ns</title></rect>
+<rect x="512.38" y="8" width="35.16" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier G1 (phase 1 of the mbarrier at shared offset 98352): 1,039 to 1,153 ns, line=535, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r156], %r157;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="529.96" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">G1</text>
+<rect x="547.53" y="8" width="4.96" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 1,153 to 1,169 ns</title></rect>
+<rect x="552.50" y="8" width="34.12" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier H1 (phase 1 of the mbarrier at shared offset 98360): 1,169 to 1,279 ns, line=573, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r169], %r170;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="569.56" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">H1</text>
+<rect x="586.62" y="8" width="6.20" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 1,279 to 1,299 ns</title></rect>
+<rect x="592.82" y="8" width="34.12" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier E2 (phase 2 of the mbarrier at shared offset 98336): 1,299 to 1,409 ns, line=457, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r128], %r129;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="609.88" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">E2</text>
+<rect x="626.94" y="8" width="5.17" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 1,409 to 1,425 ns</title></rect>
+<rect x="632.11" y="8" width="33.91" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier F2 (phase 2 of the mbarrier at shared offset 98344): 1,425 to 1,535 ns, line=496, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r142], %r143;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="649.07" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">F2</text>
+<rect x="666.03" y="8" width="5.17" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 1,535 to 1,551 ns</title></rect>
+<rect x="671.20" y="8" width="35.16" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier G2 (phase 2 of the mbarrier at shared offset 98352): 1,551 to 1,665 ns, line=535, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r156], %r157;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="688.77" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">G2</text>
+<rect x="706.35" y="8" width="4.96" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 1,665 to 1,681 ns</title></rect>
+<rect x="711.32" y="8" width="34.12" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier H2 (phase 2 of the mbarrier at shared offset 98360): 1,681 to 1,791 ns, line=573, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r169], %r170;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="728.38" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">H2</text>
+<rect x="745.44" y="8" width="5.38" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 1,791 to 1,808 ns</title></rect>
+<rect x="750.81" y="8" width="153.44" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier I0 (phase 0 of the mbarrier at shared offset 98368): 1,808 to 2,303 ns, line=661, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r197], %r198;; woken 7 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="827.53" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">I0</text>
+<rect x="904.25" y="8" width="94.92" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 2,303 to 2,609 ns</title></rect>
+<rect x="999.17" y="8" width="0.83" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 2,609 to 2,611 ns</title></rect>
+<rect x="190.00" y="30" width="3.52" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 0 to 11 ns</title></rect>
+<rect x="193.52" y="30" width="9.31" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: barrier: 11 to 41 ns, line=152, instruction=bar.sync 0;</title></rect>
+<rect x="202.82" y="30" width="4.76" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 41 to 57 ns</title></rect>
+<rect x="207.58" y="30" width="71.55" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier A0 (phase 0 of the mbarrier at shared offset 98304): 57 to 287 ns, line=178, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r46], %r47;</title></rect>
+<text x="243.35" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">A0</text>
+<rect x="279.13" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 287 to 324 ns</title></rect>
+<rect x="290.50" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier B0 (phase 0 of the mbarrier at shared offset 98312): 324 to 415 ns, line=262, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r55], %r56;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="304.67" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">B0</text>
+<rect x="318.83" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 415 to 452 ns</title></rect>
+<rect x="330.21" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier C0 (phase 0 of the mbarrier at shared offset 98320): 452 to 543 ns, line=178, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r46], %r47;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="344.37" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">C0</text>
+<rect x="358.54" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 543 to 580 ns</title></rect>
+<rect x="369.91" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier D0 (phase 0 of the mbarrier at shared offset 98328): 580 to 671 ns, line=262, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r55], %r56;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="384.08" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">D0</text>
+<rect x="398.24" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 671 to 708 ns</title></rect>
+<rect x="409.62" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier A1 (phase 1 of the mbarrier at shared offset 98304): 708 to 799 ns, line=178, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r46], %r47;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="423.78" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">A1</text>
+<rect x="437.95" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 799 to 836 ns</title></rect>
+<rect x="449.32" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier B1 (phase 1 of the mbarrier at shared offset 98312): 836 to 927 ns, line=262, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r55], %r56;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="463.49" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">B1</text>
+<rect x="477.65" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 927 to 964 ns</title></rect>
+<rect x="489.02" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier C1 (phase 1 of the mbarrier at shared offset 98320): 964 to 1,055 ns, line=178, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r46], %r47;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="503.19" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">C1</text>
+<rect x="517.36" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 1,055 to 1,092 ns</title></rect>
+<rect x="528.73" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier D1 (phase 1 of the mbarrier at shared offset 98328): 1,092 to 1,183 ns, line=262, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r55], %r56;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="542.89" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">D1</text>
+<rect x="557.06" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 1,183 to 1,220 ns</title></rect>
+<rect x="568.43" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier A2 (phase 2 of the mbarrier at shared offset 98304): 1,220 to 1,311 ns, line=178, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r46], %r47;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="582.60" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">A2</text>
+<rect x="596.76" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 1,311 to 1,348 ns</title></rect>
+<rect x="608.14" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier B2 (phase 2 of the mbarrier at shared offset 98312): 1,348 to 1,439 ns, line=262, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r55], %r56;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="622.30" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">B2</text>
+<rect x="636.47" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 1,439 to 1,476 ns</title></rect>
+<rect x="647.84" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier C2 (phase 2 of the mbarrier at shared offset 98320): 1,476 to 1,567 ns, line=178, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r46], %r47;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="662.01" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">C2</text>
+<rect x="676.17" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 1,567 to 1,604 ns</title></rect>
+<rect x="687.55" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier D2 (phase 2 of the mbarrier at shared offset 98328): 1,604 to 1,695 ns, line=262, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r55], %r56;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="701.71" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">D2</text>
+<rect x="715.88" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 1,695 to 1,732 ns</title></rect>
+<rect x="727.25" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier A3 (phase 3 of the mbarrier at shared offset 98304): 1,732 to 1,823 ns, line=178, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r46], %r47;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="741.42" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">A3</text>
+<rect x="755.58" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 1,823 to 1,860 ns</title></rect>
+<rect x="766.96" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier B3 (phase 3 of the mbarrier at shared offset 98312): 1,860 to 1,951 ns, line=262, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r55], %r56;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="781.12" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">B3</text>
+<rect x="795.29" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 1,951 to 1,988 ns</title></rect>
+<rect x="806.66" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier C3 (phase 3 of the mbarrier at shared offset 98320): 1,988 to 2,079 ns, line=178, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r46], %r47;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="820.83" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">C3</text>
+<rect x="834.99" y="30" width="11.37" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 2,079 to 2,116 ns</title></rect>
+<rect x="846.36" y="30" width="28.33" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier D3 (phase 3 of the mbarrier at shared offset 98328): 2,116 to 2,207 ns, line=262, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r55], %r56;; woken 1 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="860.53" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">D3</text>
+<rect x="874.70" y="30" width="11.99" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 2,207 to 2,246 ns</title></rect>
+<rect x="886.69" y="30" width="17.56" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier I0 (phase 0 of the mbarrier at shared offset 98368): 2,246 to 2,303 ns, line=661, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r197], %r198;</title></rect>
+<text x="895.47" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">I0</text>
+<rect x="904.25" y="30" width="94.92" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 2,303 to 2,609 ns</title></rect>
+<rect x="999.17" y="30" width="0.60" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 2,609 to 2,610 ns</title></rect>
+<rect x="190.00" y="52" width="3.52" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 0 to 11 ns</title></rect>
+<rect x="193.52" y="52" width="9.31" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 2, wait: barrier: 11 to 41 ns, line=152, instruction=bar.sync 0;</title></rect>
+<rect x="202.82" y="52" width="2.48" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 41 to 49 ns</title></rect>
+<rect x="205.30" y="52" width="698.95" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 2, wait: mbarrier I0 (phase 0 of the mbarrier at shared offset 98368): 49 to 2,303 ns, line=661, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r197], %r198;; woken 31 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="554.78" y="64" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">I0</text>
+<rect x="904.25" y="52" width="94.92" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 2,303 to 2,609 ns</title></rect>
+<rect x="999.17" y="52" width="0.60" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 2,609 to 2,610 ns</title></rect>
+<rect x="190.00" y="74" width="3.52" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 0 to 11 ns</title></rect>
+<rect x="193.52" y="74" width="9.31" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 3, wait: barrier: 11 to 41 ns, line=152, instruction=bar.sync 0;</title></rect>
+<rect x="202.82" y="74" width="2.69" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 41 to 50 ns</title></rect>
+<rect x="205.51" y="74" width="698.74" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 3, wait: mbarrier I0 (phase 0 of the mbarrier at shared offset 98368): 50 to 2,303 ns, line=661, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r197], %r198;; woken 31 time(s) by the completion of another mbarrier and waited again</title></rect>
+<text x="554.88" y="86" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">I0</text>
+<rect x="904.25" y="74" width="94.92" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 2,303 to 2,609 ns</title></rect>
+<rect x="999.17" y="74" width="0.60" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 2,609 to 2,610 ns</title></rect>
+<text x="182" y="242" text-anchor="end" fill="#666666" font-size="10">mbarrier, by shared offset</text>
+<text x="182" y="259" text-anchor="end"><tspan font-weight="bold">A</tspan> at 98304</text>
+<line x1="190" y1="254.5" x2="1000" y2="254.5" stroke="#e1e0d9"/>
+<text x="182" y="281" text-anchor="end"><tspan font-weight="bold">B</tspan> at 98312</text>
+<line x1="190" y1="276.5" x2="1000" y2="276.5" stroke="#e1e0d9"/>
+<text x="182" y="303" text-anchor="end"><tspan font-weight="bold">C</tspan> at 98320</text>
+<line x1="190" y1="298.5" x2="1000" y2="298.5" stroke="#e1e0d9"/>
+<text x="182" y="325" text-anchor="end"><tspan font-weight="bold">D</tspan> at 98328</text>
+<line x1="190" y1="320.5" x2="1000" y2="320.5" stroke="#e1e0d9"/>
+<text x="182" y="347" text-anchor="end"><tspan font-weight="bold">E</tspan> at 98336</text>
+<line x1="190" y1="342.5" x2="1000" y2="342.5" stroke="#e1e0d9"/>
+<text x="182" y="369" text-anchor="end"><tspan font-weight="bold">F</tspan> at 98344</text>
+<line x1="190" y1="364.5" x2="1000" y2="364.5" stroke="#e1e0d9"/>
+<text x="182" y="391" text-anchor="end"><tspan font-weight="bold">G</tspan> at 98352</text>
+<line x1="190" y1="386.5" x2="1000" y2="386.5" stroke="#e1e0d9"/>
+<text x="182" y="413" text-anchor="end"><tspan font-weight="bold">H</tspan> at 98360</text>
+<line x1="190" y1="408.5" x2="1000" y2="408.5" stroke="#e1e0d9"/>
+<text x="182" y="435" text-anchor="end"><tspan font-weight="bold">I</tspan> at 98368</text>
+<line x1="190" y1="430.5" x2="1000" y2="430.5" stroke="#e1e0d9"/>
+<line x1="279.13" y1="47" x2="279.13" y2="249.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="279.13" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M279.13 249.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier A (shared offset 98304): phase 0 completes at 287 ns; ends the wait of warp 1</title></path>
+<text x="287.13" y="258.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<line x1="309.31" y1="25" x2="309.31" y2="337.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="309.31" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M309.31 337.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier E (shared offset 98336): phase 0 completes at 385 ns; ends the wait of warp 0</title></path>
+<text x="317.31" y="346.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<line x1="318.83" y1="47" x2="318.83" y2="271.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="318.83" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M318.83 271.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier B (shared offset 98312): phase 0 completes at 415 ns; ends the wait of warp 1</title></path>
+<text x="326.83" y="280.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<line x1="348.39" y1="25" x2="348.39" y2="359.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="348.39" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M348.39 359.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier F (shared offset 98344): phase 0 completes at 511 ns; ends the wait of warp 0</title></path>
+<text x="356.39" y="368.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<line x1="358.54" y1="47" x2="358.54" y2="293.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="358.54" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M358.54 293.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier C (shared offset 98320): phase 0 completes at 543 ns; ends the wait of warp 1</title></path>
+<text x="366.54" y="302.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<line x1="388.72" y1="25" x2="388.72" y2="381.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="388.72" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M388.72 381.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier G (shared offset 98352): phase 0 completes at 641 ns; ends the wait of warp 0</title></path>
+<text x="396.72" y="390.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<line x1="398.24" y1="47" x2="398.24" y2="315.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="398.24" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M398.24 315.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier D (shared offset 98328): phase 0 completes at 671 ns; ends the wait of warp 1</title></path>
+<text x="406.24" y="324.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<line x1="427.80" y1="25" x2="427.80" y2="403.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="427.80" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M427.80 403.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier H (shared offset 98360): phase 0 completes at 767 ns; ends the wait of warp 0</title></path>
+<text x="435.80" y="412.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<line x1="437.95" y1="47" x2="437.95" y2="249.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="437.95" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M437.95 249.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier A (shared offset 98304): phase 1 completes at 799 ns; ends the wait of warp 1</title></path>
+<text x="445.95" y="258.5" font-size="10" fill="#666666" pointer-events="none">1</text>
+<line x1="468.13" y1="25" x2="468.13" y2="337.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="468.13" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M468.13 337.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier E (shared offset 98336): phase 1 completes at 897 ns; ends the wait of warp 0</title></path>
+<text x="476.13" y="346.5" font-size="10" fill="#666666" pointer-events="none">1</text>
+<line x1="477.65" y1="47" x2="477.65" y2="271.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="477.65" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M477.65 271.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier B (shared offset 98312): phase 1 completes at 927 ns; ends the wait of warp 1</title></path>
+<text x="485.65" y="280.5" font-size="10" fill="#666666" pointer-events="none">1</text>
+<line x1="507.21" y1="25" x2="507.21" y2="359.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="507.21" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M507.21 359.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier F (shared offset 98344): phase 1 completes at 1,023 ns; ends the wait of warp 0</title></path>
+<text x="515.21" y="368.5" font-size="10" fill="#666666" pointer-events="none">1</text>
+<line x1="517.36" y1="47" x2="517.36" y2="293.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="517.36" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M517.36 293.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier C (shared offset 98320): phase 1 completes at 1,055 ns; ends the wait of warp 1</title></path>
+<text x="525.36" y="302.5" font-size="10" fill="#666666" pointer-events="none">1</text>
+<line x1="547.53" y1="25" x2="547.53" y2="381.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="547.53" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M547.53 381.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier G (shared offset 98352): phase 1 completes at 1,153 ns; ends the wait of warp 0</title></path>
+<text x="555.53" y="390.5" font-size="10" fill="#666666" pointer-events="none">1</text>
+<line x1="557.06" y1="47" x2="557.06" y2="315.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="557.06" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M557.06 315.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier D (shared offset 98328): phase 1 completes at 1,183 ns; ends the wait of warp 1</title></path>
+<text x="565.06" y="324.5" font-size="10" fill="#666666" pointer-events="none">1</text>
+<line x1="586.62" y1="25" x2="586.62" y2="403.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="586.62" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M586.62 403.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier H (shared offset 98360): phase 1 completes at 1,279 ns; ends the wait of warp 0</title></path>
+<text x="594.62" y="412.5" font-size="10" fill="#666666" pointer-events="none">1</text>
+<line x1="596.76" y1="47" x2="596.76" y2="249.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="596.76" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M596.76 249.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier A (shared offset 98304): phase 2 completes at 1,311 ns; ends the wait of warp 1</title></path>
+<text x="604.76" y="258.5" font-size="10" fill="#666666" pointer-events="none">2</text>
+<line x1="626.94" y1="25" x2="626.94" y2="337.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="626.94" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M626.94 337.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier E (shared offset 98336): phase 2 completes at 1,409 ns; ends the wait of warp 0</title></path>
+<text x="634.94" y="346.5" font-size="10" fill="#666666" pointer-events="none">2</text>
+<line x1="636.47" y1="47" x2="636.47" y2="271.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="636.47" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M636.47 271.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier B (shared offset 98312): phase 2 completes at 1,439 ns; ends the wait of warp 1</title></path>
+<text x="644.47" y="280.5" font-size="10" fill="#666666" pointer-events="none">2</text>
+<line x1="666.03" y1="25" x2="666.03" y2="359.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="666.03" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M666.03 359.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier F (shared offset 98344): phase 2 completes at 1,535 ns; ends the wait of warp 0</title></path>
+<text x="674.03" y="368.5" font-size="10" fill="#666666" pointer-events="none">2</text>
+<line x1="676.17" y1="47" x2="676.17" y2="293.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="676.17" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M676.17 293.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier C (shared offset 98320): phase 2 completes at 1,567 ns; ends the wait of warp 1</title></path>
+<text x="684.17" y="302.5" font-size="10" fill="#666666" pointer-events="none">2</text>
+<line x1="706.35" y1="25" x2="706.35" y2="381.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="706.35" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M706.35 381.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier G (shared offset 98352): phase 2 completes at 1,665 ns; ends the wait of warp 0</title></path>
+<text x="714.35" y="390.5" font-size="10" fill="#666666" pointer-events="none">2</text>
+<line x1="715.88" y1="47" x2="715.88" y2="315.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="715.88" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M715.88 315.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier D (shared offset 98328): phase 2 completes at 1,695 ns; ends the wait of warp 1</title></path>
+<text x="723.88" y="324.5" font-size="10" fill="#666666" pointer-events="none">2</text>
+<line x1="745.44" y1="25" x2="745.44" y2="403.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="745.44" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M745.44 403.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier H (shared offset 98360): phase 2 completes at 1,791 ns; ends the wait of warp 0</title></path>
+<text x="753.44" y="412.5" font-size="10" fill="#666666" pointer-events="none">2</text>
+<line x1="755.58" y1="47" x2="755.58" y2="249.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="755.58" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M755.58 249.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier A (shared offset 98304): phase 3 completes at 1,823 ns; ends the wait of warp 1</title></path>
+<text x="763.58" y="258.5" font-size="10" fill="#666666" pointer-events="none">3</text>
+<path d="M785.76 337.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier E (shared offset 98336): phase 3 completes at 1,921 ns; no warp was waiting for it</title></path>
+<text x="793.76" y="346.5" font-size="10" fill="#666666" pointer-events="none">3</text>
+<line x1="795.29" y1="47" x2="795.29" y2="271.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="795.29" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M795.29 271.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier B (shared offset 98312): phase 3 completes at 1,951 ns; ends the wait of warp 1</title></path>
+<text x="803.29" y="280.5" font-size="10" fill="#666666" pointer-events="none">3</text>
+<path d="M824.85 359.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier F (shared offset 98344): phase 3 completes at 2,047 ns; no warp was waiting for it</title></path>
+<text x="832.85" y="368.5" font-size="10" fill="#666666" pointer-events="none">3</text>
+<line x1="834.99" y1="47" x2="834.99" y2="293.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="834.99" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M834.99 293.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier C (shared offset 98320): phase 3 completes at 2,079 ns; ends the wait of warp 1</title></path>
+<text x="842.99" y="302.5" font-size="10" fill="#666666" pointer-events="none">3</text>
+<path d="M865.17 381.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier G (shared offset 98352): phase 3 completes at 2,177 ns; no warp was waiting for it</title></path>
+<text x="873.17" y="390.5" font-size="10" fill="#666666" pointer-events="none">3</text>
+<line x1="874.70" y1="47" x2="874.70" y2="315.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="874.70" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M874.70 315.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier D (shared offset 98328): phase 3 completes at 2,207 ns; ends the wait of warp 1</title></path>
+<text x="882.70" y="324.5" font-size="10" fill="#666666" pointer-events="none">3</text>
+<path d="M904.25 403.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier H (shared offset 98360): phase 3 completes at 2,303 ns; no warp was waiting for it</title></path>
+<text x="912.25" y="412.5" font-size="10" fill="#666666" pointer-events="none">3</text>
+<line x1="904.25" y1="25" x2="904.25" y2="425.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="904.25" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<circle cx="904.25" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<circle cx="904.25" cy="69" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<circle cx="904.25" cy="91" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M904.25 425.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier I (shared offset 98368): phase 0 completes at 2,303 ns; ends the wait of warp 0, warp 1, warp 2, warp 3</title></path>
+<text x="912.25" y="434.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<rect x="190" y="468" width="12" height="12" fill="#2a78d6"/>
+<text x="207" y="478">warp runs</text>
+<rect x="279.9" y="468" width="12" height="12" fill="#eb6834"/>
+<text x="296.9" y="478">warp waits</text>
+<rect x="375.9" y="468" width="12" height="12" fill="#1baf7a"/>
+<text x="392.9" y="478">TMA or cp.async copy, start to landing</text>
+<rect x="642.6999999999999" y="468" width="12" height="12" fill="#6250d6"/>
+<text x="659.6999999999999" y="478">MMA</text>
+<rect x="695.9999999999999" y="468" width="12" height="12" fill="#eda100"/>
+<text x="712.9999999999999" y="478">HBM busy</text>
+<path d="M196 486l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222"/>
+<text x="207" y="496">an mbarrier completes the numbered phase; the line rises to the warps whose wait it ends</text>
+<text x="190" y="512">On a wait, B2: the warp waits for phase 2 of mbarrier B. On a TMA load, →B: it reports its bytes to B.</text>
+<text x="190" y="532" fill="#666666">CTA (0, 0, 0). Simulated time from warplens's approximate model, not a measurement. B200: illustrative parameters, 8 of 13 assumed and none fitted to hardware.</text>
+</svg>

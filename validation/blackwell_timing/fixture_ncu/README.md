@@ -1,16 +1,20 @@
 # Fixtures for the ncu scripts
 
 `run_ncu.sh` here and `validation/ampere/run_ncu.sh` need permission to read GPU performance
-counters. The development machine does not give it (no root, `RmProfilingAdminOnly: 1`), so
-the profiling path of these scripts **has never run against a real ncu that returned
-counters from them**. `tests/test_ncu_scripts.py` runs them against the files below instead.
+counters. The development machine does not give it to a normal user (`RmProfilingAdminOnly: 1`),
+so the tests cannot take the profiling path against a real ncu: `tests/test_ncu_scripts.py`
+runs the scripts against the files below instead. The path has run for real twice, as root
+on the RTX 3080 Ti on 2026-11-24, with ncu 2024.1.1 and with the pinned 2026.4.0, and read
+counters (`../README.md`); that was the previous version of `run_ncu.sh`, before its time
+limits, groups and `STATUS.txt`. **The version here has not run against a real ncu that
+returned counters**, and no version has on a B200.
 
 | File | What it is | Recorded or made up |
 | --- | --- | --- |
 | `permission_denied.txt` | what `ncu --csv --metrics smsp__inst_executed.sum <program>` printed on the development machine as a normal user (ncu 2024.1.1.0; the pinned 2026.4.0.0 prints the same two lines), with the program's path replaced | recorded, 2026-11-23 |
 | `query_metrics_gb100.txt` | the rows of `ncu --query-metrics --chips gb100` (ncu 2026.4.0.0, the pinned release, which needs no GPU for this) for the counters the scripts ask for | recorded, 2026-11-23 |
 | `../../ampere/transpose_ncu_3080ti_grid64.csv` | a complete `ncu --csv` run of `transpose_hw 64` on the RTX 3080 Ti (ncu 2024.1), from an earlier session that had permission | recorded |
-| `fake_ncu.sh` | a stand-in for `ncu` that replays the files above and, for every other program, prints a counter table in ncu's CSV layout with the value `1,234` everywhere | made up, apart from what it replays |
+| `fake_ncu.sh` | a stand-in for `ncu` that replays the files above and, for every other program, prints a counter table in ncu's CSV layout with the value `1,234` everywhere. On request it never ends for named programs (`FAKE_NCU_HANG`), ends without a table (`FAKE_NCU_FAIL`) or takes seconds per profile (`FAKE_NCU_SLEEP`), for the tests of the limits, the budget and of stopping | made up, apart from what it replays |
 
 What the recordings established before the rental:
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from test_remote_env import REMOTE, archive_of, bash, checkout, fake_smi, members, read_pins, suite
+from test_remote_env import REMOTE, archive_of, bash, checkout, fake_smi, members, read_pins, stand_in_cutlass, suite
 
 
 def ready_suites(root, tmp_path):
@@ -191,6 +191,9 @@ def test_failed_source_snapshot_still_preserves_raw_results(checkout, tmp_path):
     (root / "env/remote/freeze_source.py").write_text('raise RuntimeError("snapshot test failure")\n')
     done = bash(root / "env/remote/run.sh", *args, env=env)
     assert done.returncode == 1
+    # Its own warning, and not a failed archive: that was written, with its checksum.
+    assert "source snapshot: FAILED" in done.stdout and "snapshot test failure" in done.stdout
+    assert "archive:" in done.stdout and "archive or checksum failed" not in done.stdout
     files = members(archive_of(tmp_path / "home"))
     assert "SOURCE-SNAPSHOT-FAILED.txt" in files
     assert b"snapshot test failure" in files["source-snapshot.log"]
@@ -414,9 +417,9 @@ def machine(tmp_path):
     return with_ncu
 
 
-def preflight(tmp_path, env, *args):
+def preflight(tmp_path, env, *args, script=REMOTE / "preflight.sh"):
     status = tmp_path / "status"
-    done = clean(REMOTE / "preflight.sh", *args, "--status", str(status), env=env)
+    done = clean(script, *args, "--status", str(status), env=env)
     checks = dict(line.split() for line in status.read_text().splitlines())
     # Only the disk check may depend on the machine running the tests.
     failed = {check for check, result in checks.items() if result == "FAIL"} - {"disk"}
@@ -437,6 +440,8 @@ def test_a_counter_that_was_not_read_fails_preflight_unless_told_otherwise(tmp_p
     assert "env/remote/run.sh --no-ncu" in done.stdout              # the way on, said where it fails
     if outcome == "permission":
         assert "ERR_NVGPUCTRPERM" in done.stdout and "--cap-add=SYS_ADMIN" in done.stdout   # the remedies stay
+        # sudo resets HOME and drops the variable: the remedy names this install, or root would make another.
+        assert f'sudo env "PATH=$PATH" WARPLENS_REMOTE_HOME={tmp_path}/home env/remote/run.sh' in done.stdout
 
     done, checks, failed = preflight(tmp_path, env, "--no-ncu")
     assert checks["ncu"] == "WARN" and not failed, done.stdout
@@ -472,7 +477,13 @@ def rental(root, tmp_path, machine_env):
         f'#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "{tmp_path}/setup-args"\n')
     for name in ("blackwell", "blackwell_timing"):
         suite(root, name, "echo built\n",
-              f'echo "ncu=$WARPLENS_NCU book=${{WARPLENS_BOOK-unset}}" >> "{tmp_path}/{name}-runs"\n')
+              f'echo "ncu=$WARPLENS_NCU book=${{WARPLENS_BOOK-unset}}" >> "{tmp_path}/{name}-runs"\n'
+              # The timing suite says itself what came of its ncu profiles (its ncu/STATUS.txt);
+              # this stand-in profiles when preflight read a counter, as the suite does.
+              + ('mkdir -p "$WARPLENS_RESULTS_DIR/ncu"\n'
+                 'if [[ "$WARPLENS_NCU" == ok ]]; then echo "ncu ok: 7 of 7 profiles read counters"\n'
+                 'else echo "ncu not run: WARPLENS_NCU=$WARPLENS_NCU"; fi > "$WARPLENS_RESULTS_DIR/ncu/STATUS.txt"\n'
+                 if name == "blackwell_timing" else ""))
     return {**machine_env, "WARPLENS_RUN_MINUTES": "1"}, ["--skip", "selftest"]
 
 
@@ -623,13 +634,16 @@ def test_run_uses_the_book_setup_fetched_and_never_packs_it(checkout, tmp_path, 
     assert "env/remote/setup.sh installs the one and fetches the other" in none.stdout
 
 
-def test_setups_clone_at_another_commit_fails_preflight(tmp_path, machine):
+def test_setups_clone_at_another_commit_fails_preflight(checkout, tmp_path, machine):
+    root, _, _ = checkout                       # with CUTLASS as setup.sh and build-cutlass leave it
+    stand_in_cutlass(root, built=True)
     home = tmp_path / "home"
     fake_book(home / "book", "2" * 40)
-    done, checks, failed = preflight(tmp_path, machine(True, FAKE_NCU="ok"), "--e2e")
+    done, checks, failed = preflight(tmp_path, machine(True, FAKE_NCU="ok"), "--e2e", script=root / "env/remote/preflight.sh")
     assert checks["native-e2e"] == "PASS" and checks["book"] == "FAIL" and failed == {"book"}, done.stdout
     assert read_pins()["BOOK_COMMIT"] in done.stdout and "setup.sh fetches the pinned commit again" in done.stdout
     # --book overrides the default too.
     other = fake_book(tmp_path / "other", read_pins()["BOOK_COMMIT"])
-    done, checks, failed = preflight(tmp_path, machine(True, FAKE_NCU="ok"), "--e2e", "--book", str(other))
+    done, checks, failed = preflight(tmp_path, machine(True, FAKE_NCU="ok"), "--e2e", "--book", str(other),
+                                     script=root / "env/remote/preflight.sh")
     assert checks["book"] == "PASS" and not failed, done.stdout

@@ -47,6 +47,34 @@ book_path() {
   fi
 }
 
+# The clone of CUTLASS whose Blackwell tutorials are matrix rows RT-06 (the four C++ tutorials)
+# and RT-11 (the CuTe DSL's fp16_gemm_0.py). It lies inside the checkout, git-ignored, because
+# that is where validation/blackwell/e2e/run_e2e.py and cute_dsl_tma.py look for it, and for
+# the programs built from it in bin/ next to it; neither takes another place from run.sh.
+# setup.sh fetches it at the commit pins.env names (CUTLASS_COMMIT), run.sh builds the
+# programs in its stage build-cutlass, and preflight.sh --e2e checks both, so that nothing
+# is fetched or compiled while the GPU stages run.
+# WARPLENS_CUTLASS_URL names another place to fetch it from (a mirror; the tests use a stand-in).
+CUTLASS_EXAMPLE="$REPO_DIR/examples/03_cutlass_mma"
+CUTLASS_DIR="$CUTLASS_EXAMPLE/.cutlass"
+CUTLASS_URL="${WARPLENS_CUTLASS_URL:-https://github.com/NVIDIA/cutlass.git}"
+# What the end-to-end programs read from a clone: the first C++ tutorial, the headers, the
+# DSL's GEMM tutorial.
+is_cutlass_clone() {
+  [[ -n "${1:-}" && -f "$1/examples/cute/tutorial/blackwell/01_mma_sm100.cu" && -f "$1/include/cutlass/cutlass.h" \
+     && -f "$1/examples/python/CuTeDSL/cute/blackwell/tutorial/tutorial_gemm/fp16_gemm_0.py" ]]
+}
+# Where run_e2e.py looks for the four tutorial programs (it honors CUTLASS_BIN).
+cutlass_bin_dir() { echo "${CUTLASS_BIN:-$CUTLASS_EXAMPLE/bin}"; }
+# cutlass_programs_missing -> the names of the tutorial programs that are not built, on one line.
+cutlass_programs_missing() {
+  local n absent=()
+  for n in 1 2 3 4; do
+    [[ -f "$(cutlass_bin_dir)/tutorial_0$n" ]] || absent+=("tutorial_0$n")
+  done
+  echo "${absent[*]:-}"
+}
+
 # Load pins.env into PIN_<KEY> variables. The file is parsed, not sourced: a
 # line that is not KEY=VALUE is an error.
 load_pins() {
@@ -312,10 +340,14 @@ env_installed() {
 utc_now() { date -u +%Y-%m-%dT%H:%M:%SZ; }
 
 # git_head DIR -> the commit checked out in DIR, or "unknown". Without a git
-# program (a bare container) it is read from DIR/.git directly.
+# program (a bare container), or when git refuses (a checkout that belongs to
+# another user), it is read from DIR/.git directly.
 git_head() {
-  local dir="$1" head ref
-  if command -v git >/dev/null 2>&1 && head="$(git -C "$dir" rev-parse HEAD 2>/dev/null)"; then
+  local dir="$1" head ref above
+  # The ceiling: git must answer for DIR itself. Without it a DIR whose .git is not a whole
+  # repository (a fetch that was cut short) gets the commit of the checkout it lies in.
+  above="$(cd "$dir/.." 2>/dev/null && pwd -P)" || above=""
+  if command -v git >/dev/null 2>&1 && head="$(GIT_CEILING_DIRECTORIES="$above" git -C "$dir" rev-parse HEAD 2>/dev/null)"; then
     echo "$head"
     return 0
   fi
@@ -348,10 +380,52 @@ book_commit() {
 
 # git, the machine's or the one setup.sh put into the env when the machine had none.
 # Never asks for a name or password: a repository that wants one is a failed fetch.
+# GIT_RUN_LIMIT, when set, is a time limit for the command (as `timeout` takes it).
 git_run() {
-  if command -v git >/dev/null 2>&1; then GIT_TERMINAL_PROMPT=0 git "$@"
-  else GIT_TERMINAL_PROMPT=0 env_run git "$@"
+  local limit=()
+  [[ -n "${GIT_RUN_LIMIT:-}" ]] && limit=(timeout --kill-after=10 "$GIT_RUN_LIMIT")
+  if command -v git >/dev/null 2>&1; then GIT_TERMINAL_PROMPT=0 "${limit[@]}" git "$@"
+  else GIT_TERMINAL_PROMPT=0 env_run "${limit[@]}" git "$@"
   fi
+}
+
+# A path as a git config file takes it: in double quotes, with \\ and " escaped.
+git_config_quote() { local v="${1//\\/\\\\}"; printf '"%s"' "${v//\"/\\\"}"; }
+
+# repo_git DIR ARGS...: git in a checkout that may belong to another user (uploaded as one
+# user and run as root, or a mounted directory in a container). git then refuses with "dubious
+# ownership" unless the directory is named safe. It is named both ways there are: on the command
+# line, which git 2.38 and later accept, and in a global config file of its own, which is the
+# only way the patched older releases accept (Ubuntu 22.04's 2.34.1); that file includes the
+# user's own. Read-only use: nothing is written to the checkout or to the user's config.
+# Not tried with a checkout of another owner or with a git older than 2.43 (RUNBOOK.md, section 9).
+repo_git() {
+  local dir="$1" real config status own="${GIT_CONFIG_GLOBAL:-$HOME/.gitconfig}"
+  shift
+  real="$(cd "$dir" 2>/dev/null && pwd -P)" || real="$dir"
+  config="$(mktemp 2>/dev/null)" || { git_run -c "safe.directory=$dir" -c "safe.directory=$real" -C "$dir" "$@"; return; }
+  {
+    printf '[safe]\n\tdirectory = %s\n\tdirectory = %s\n' "$(git_config_quote "$dir")" "$(git_config_quote "$real")"
+    [[ -f "$own" ]] && printf '[include]\n\tpath = %s\n' "$(git_config_quote "$own")"
+  } > "$config"
+  GIT_CONFIG_GLOBAL="$config" git_run -c "safe.directory=$dir" -c "safe.directory=$real" -C "$dir" "$@"
+  status=$?
+  rm -f "$config"
+  return "$status"
+}
+
+# fetch_commit URL COMMIT DIR: make DIR a clone of URL at COMMIT alone, no history (--depth 1).
+# COMMIT must be the whole 40 characters: a server gives a commit by name only when it is
+# named in full (measured on github.com: an abbreviated one is "couldn't find remote ref").
+# A stalled connection is given up on after 30 s below 1 kB/s, and each git command after
+# GIT_RUN_LIMIT (the callers set it): nothing here may hang the setup. What git prints goes
+# to stderr. Leaves DIR in whatever state the failure left it; the caller removes it.
+fetch_commit() {
+  local url="$1" commit="$2" dir="$3"
+  { git_run init -q "$dir" \
+      && git_run -C "$dir" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
+           fetch -q --depth 1 "$url" "$commit" \
+      && git_run -C "$dir" checkout -q --detach FETCH_HEAD; } >&2
 }
 
 # ensure_book COMMIT -> one line "status|explanation": make $BOOK_DIR a clone of the book
@@ -374,11 +448,7 @@ ensure_book() {
     had="; $BOOK_DIR is left as it was, at commit $head"
   fi
   rm -rf "$part"
-  # A stalled connection is given up on after 30 s below 1 kB/s: nothing here may hang the setup.
-  if ! { git_run init -q "$part" \
-         && git_run -C "$part" -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=30 \
-              fetch -q --depth 1 "$BOOK_URL" "$commit" \
-         && git_run -C "$part" checkout -q --detach FETCH_HEAD; } >&2; then
+  if ! GIT_RUN_LIMIT="${GIT_RUN_LIMIT:-300}" fetch_commit "$BOOK_URL" "$commit" "$part"; then
     rm -rf "$part"
     echo "failed|could not fetch commit $commit from $BOOK_URL (is there network access to it? does the repository still have that commit?)$had"
     return 1
@@ -410,4 +480,97 @@ provide_book() {
   else
     ensure_book "$2"
   fi
+}
+
+# ensure_cutlass COMMIT -> one line "status|explanation": make $CUTLASS_DIR a clone of CUTLASS
+# at exactly COMMIT. Returns non-zero when it is not one afterwards. As ensure_book:
+#
+#   present   it already was; nothing was fetched. Also a clone at another commit that has
+#             COMMIT in it (a developer's full clone), which is checked out there
+#   fetched   fetched from $CUTLASS_URL (also over a clone at another commit, which is replaced)
+#   failed    the fetch failed or did not give COMMIT; what was there before is left as it was
+#
+# The fetch goes into a directory beside $CUTLASS_DIR and replaces it only when it is right.
+# One commit, no history: 5.5 s and 244 MB on disk from github.com on a fast link (measured
+# 2026-11-24), where a clone with history is 281 MB and takes as long as the link allows.
+# Each git command is given up on after 10 minutes.
+ensure_cutlass() {
+  local commit="$1" part="$CUTLASS_DIR.part" head had="" lacks=""
+  if [[ -e "$CUTLASS_DIR/.git" ]]; then
+    head="$(git_head "$CUTLASS_DIR")"
+    if [[ "$head" != "$commit" ]] && git_run -C "$CUTLASS_DIR" checkout -q --detach "$commit" >/dev/null 2>&1; then
+      head="$(git_head "$CUTLASS_DIR")"
+    fi
+    if [[ "$head" == "$commit" ]] && is_cutlass_clone "$CUTLASS_DIR"; then
+      echo "present|$CUTLASS_DIR is at commit $commit"
+      return 0
+    fi
+    had="; $CUTLASS_DIR is left as it was, at commit $head"
+  fi
+  rm -rf "$part"
+  if ! GIT_RUN_LIMIT="${GIT_RUN_LIMIT:-600}" fetch_commit "$CUTLASS_URL" "$commit" "$part"; then
+    rm -rf "$part"
+    echo "failed|could not fetch commit $commit from $CUTLASS_URL (is there network access to it? does the repository still have that commit?)$had"
+    return 1
+  fi
+  head="$(git_head "$part")"
+  is_cutlass_clone "$part" || lacks=" and lacks the Blackwell tutorials"
+  if [[ "$head" != "$commit" || -n "$lacks" ]]; then
+    rm -rf "$part"
+    echo "failed|what $CUTLASS_URL gave for $commit is at commit $head$lacks: not CUTLASS at the pinned commit$had"
+    return 1
+  fi
+  rm -rf "$CUTLASS_DIR"
+  mv "$part" "$CUTLASS_DIR" || { echo "failed|could not move $part to $CUTLASS_DIR"; return 1; }
+  echo "fetched|$CUTLASS_DIR is at commit $commit, from $CUTLASS_URL"
+}
+
+# save_dmesg FILE: the kernel's log into FILE, where the driver reports a GPU fault (a line
+# with "Xid") and its own errors ("NVRM"). When it cannot be read (a container, or
+# kernel.dmesg_restrict for a user who is not root), `journalctl -k` is tried, as the probe
+# suite does for its xid.log; when that fails too, FILE says "not readable" and why, and
+# the function returns non-zero. Never hangs: 20 s.
+save_dmesg() {
+  local out="$1" why
+  if command -v dmesg >/dev/null 2>&1; then
+    timeout --kill-after=5 20 dmesg > "$out.part" 2> "$out.err"
+  else
+    echo "there is no dmesg program on this machine" > "$out.err"; false
+  fi
+  # shellcheck disable=SC2181  # the status of either branch above
+  if (( $? != 0 )); then
+    # The journal's copy of the same log, which some machines let a user read (this one does).
+    if command -v journalctl >/dev/null 2>&1 \
+       && timeout --kill-after=5 20 journalctl -k -b --no-pager -o short-monotonic > "$out.part" 2>/dev/null \
+       && [[ -s "$out.part" ]]; then
+      rm -f "$out.err"
+      mv -f "$out.part" "$out"
+      return 0
+    fi
+    why="$(head -n 2 "$out.err" | tr '\n' ' ')"
+    echo "not readable: dmesg failed as uid $EUID (container: $(container_kind)): ${why:-no message}" > "$out"
+    rm -f "$out.part" "$out.err"
+    return 1
+  fi
+  rm -f "$out.err"
+  mv -f "$out.part" "$out"
+}
+
+# session_pids SID -> the processes of session SID that are still running, one pid per line
+# (from /proc: a bare container image has no ps or pkill). Field 6 of /proc/PID/stat, counted
+# after the program's name, which may itself hold spaces and brackets. A process that has
+# ended and only waits to be reaped (state Z) is not running: in a container whose first
+# process reaps nothing it would stay listed for good.
+session_pids() {
+  local sid="$1" stat line rest state pid_sid
+  for stat in /proc/[0-9]*/stat; do
+    { IFS= read -r line < "$stat"; } 2>/dev/null || continue
+    rest="${line##*) }"
+    read -r state _ _ pid_sid _ <<<"$rest"
+    if [[ "$pid_sid" == "$sid" && "$state" != Z ]]; then
+      stat="${stat#/proc/}"
+      echo "${stat%/stat}"
+    fi
+  done
+  return 0
 }

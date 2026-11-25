@@ -398,8 +398,8 @@ nothing Blackwell-specific has run on a GPU.
 | Steps | Where | State |
 | --- | --- | --- |
 | B5, B6, F23 | `docs/validation-matrix.md` | one row per claim with its probe, prediction and pass criterion; a test keeps its citations valid |
-| C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 119 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 27 runs also match the 3080 Ti. Every matrix row outside timing has a run. NUM-05, RT-10 and RT-11 are not probes: `run_rows.py` runs them at the end of a GPU run (ptxas asked for a UE4M3 conversion; the driver calls of TIRx and the CuTe DSL logged under gdb; the kernel parameters of a CuTe DSL TMA kernel saved, its tensor maps among them). On the 3080 Ti the first two run and the third is skipped for want of `sm_100`. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
-| C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema (`clc_latency_ns` included), predictions committed, each launch timed with the active SMs its shape implies; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output; reading a counter is untested (needs root here) |
+| C7 to C13, D15 to D18 | `validation/blackwell/` | 60 probe programs, 126 runs, predictions committed (the book's nine kernels included), the whole predict path run by a test; 27 runs also match the 3080 Ti. Every matrix row outside timing has a run. NUM-05, RT-10 and RT-11 are not probes: `run_rows.py` runs them in a GPU run after the probes without a risk and the end-to-end programs, RT-11 first, before the probes that may fault or hang (ptxas asked for a UE4M3 conversion; the driver calls of TIRx and the CuTe DSL logged under gdb; the kernel parameters of a CuTe DSL TMA kernel saved, its tensor maps among them). On the 3080 Ti the first two run and the third is skipped for want of `sm_100`. Includes the `cuTensorMapEncodeTiled` sweep that step 3 needs |
+| C14 | `validation/blackwell_timing/` | fourteen microbenchmarks (cluster launch control, cluster costs, the pipelined GEMM and the bank counters by block shape among them), a fit to the config schema (`clc_latency_ns` included), predictions committed, each launch timed with the active SMs its shape implies; seven ran on the 3080 Ti. The `ncu` scripts have a dry run, a check of their counter names against the pinned ncu's table for the B200's chip, and tests against recorded ncu output. Reading counters was tried as root on the 3080 Ti (2026-11-24), with the machine's ncu 2024.1.1 and with the pinned 2026.4.0: `run_ncu.sh` read them for six programs and the transpose, equal to the model's (`validation/blackwell_timing/README.md`; `env/remote/RUNBOOK.md`, section 9). Not tried: on a B200, and `PASS ncu` of `preflight.sh` |
 | E19 to E22 | `env/remote/` | pinned setup (PyTorch in an env of its own), preflight, one `run.sh`, a runbook. The toolkit policy for an older driver is decided and built into `run.sh` (below). Run for real into a throwaway home on the development machine, and `run.sh` end to end against the 3080 Ti with everything Blackwell failing loudly |
 | F24 | `env/remote/RUNBOOK.md`, section 5 | **decided by the owner (2026-11-24)**: 6 GPU-hours on a single B200 in all, 2 for the first rental and 4 in reserve. The reserve is for a second rental (same run, `--skip selftest`), only when a fix changes a prediction hardware must confirm, when probes tested nothing, when the tensor maps of RT-11 were not captured, or when `ncu` could not read counters. An 8-GPU node needs an explicit yes |
 
@@ -427,10 +427,36 @@ To settle before renting:
   env its CUDA wheels change which NVRTC `cuda-bindings` loads.
   `validation/blackwell/e2e/triton_gpu.py` ran whole on the 3080 Ti. With a
   12.x driver there is no PyTorch for it and the step is skipped.
-  `setup.sh` installs it; the book is the one thing to fetch by hand
-  (`env/remote/RUNBOOK.md`, section 3).
+  `setup.sh` installs it, and fetches the book and CUTLASS at their pinned
+  commits as well: nothing is fetched by hand (`env/remote/RUNBOOK.md`,
+  section 3; the by-hand fetch there is only for a machine that cannot reach
+  github.com).
 - The budget (F24) is decided: 6 GPU-hours on one B200, 2 for the first rental
   and 4 in reserve (`env/remote/RUNBOOK.md`, section 5).
+
+Pre-rental hardening (2026-11-24), after a review of the paths no rehearsal had
+taken. Nothing here has run on a B200; what was and was not tried is in
+`env/remote/RUNBOOK.md`, section 9, and in the two suites' READMEs.
+
+- `env/remote/`: Ctrl-C under `run.sh | tee` still writes the archive; each
+  stage runs in a session of its own and nothing it started outlives it; CUTLASS
+  is fetched by `setup.sh` at a pinned commit and its tutorials are built in a
+  stage before the preflight, which checks both, so nothing is cloned or
+  compiled for them inside a GPU stage; a preflight that failed for what
+  `setup.sh` provides makes the next run repeat setup by itself; `ncu_counters`
+  in the archive is the timing suite's own word once it has run; with the
+  pinned toolkit the self-test runs after the GPU stages; the kernel's log
+  (Xid, NVRM) is archived with a baseline from before the GPU was used; the
+  source snapshot and the archive survive a checkout of another owner, a
+  machine without `python3`, and a file that changes while it is packed.
+  When the probe suite finds the GPU unhealthy (`GPU-UNHEALTHY.txt`) the
+  timing suite is not started, and the next `run.sh` resumes the probes.
+- `validation/blackwell/` (intent; see its README for what was done): the
+  order in which probes run, health checks between them, matrix row RT-11
+  first, and the verdicts `compare.py` gives.
+- `validation/blackwell_timing/` (intent; see its README): time limits that
+  reach every process a benchmark starts, and the order of the `ncu` profiles,
+  with a status file (`ncu/STATUS.txt`) that says what they read.
 
 Found by this work in the simulator, and fixed since unless marked open:
 

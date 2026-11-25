@@ -5,7 +5,9 @@
     validation/blackwell/e2e/run_e2e.py --mode sim --out DIR [--book CLONE]   in the simulator
 
 Each step runs in its own process under a timeout; its output goes to DIR/e2e/<step>.stdout
-and .stderr, and one line per step is appended to DIR/status.tsv. run_all.py calls this.
+and .stderr, and one line per step (name, status, seconds, command, UTC start) is appended
+to DIR/status.tsv. run_all.py calls this. The steps run in the order below: the one that may
+fault on hardware, the book's, is last, so the others' results and captures are on disk first.
 
   cutlass_tutorials   host-instrumented copies of the four pinned CUTLASS tutorials;
                       capture_cutlass.py preserves the kernels and dumps full tensors/ABI.
@@ -28,6 +30,8 @@ and .stderr, and one line per step is appended to DIR/status.tsv. run_all.py cal
                       examples/08_book/run.py. The book has no license and is never copied:
                       pass your clone with --book (or WARPLENS_BOOK). Skipped without it.
                       v7 to v9 release tensor memory twice; on hardware that may fault.
+                      They are the last kernels of the last step (examples/08_book/run.py
+                      runs v1 to v9 in order, in one process).
 
 --predicted DIR (simulator mode) also writes DIR/e2e/<step>.txt and .sim.txt.
 """
@@ -153,7 +157,10 @@ def main() -> int:
 
     status_file = out / "status.tsv"
     if not status_file.exists():
-        status_file.write_text("name\tstatus\tseconds\tcommand\n")
+        status_file.write_text("name\tstatus\tseconds\tcommand\tstarted_utc\n")
+    # The order of `steps` is the order of execution. The book's step stays last: it is the one
+    # with kernels that may fault on hardware (the docstring), and a fault can cost the GPU.
+    assert steps[-1][0] == "e2e/book_hgemm"
     for name, command, why in steps:
         capture_dir = out / "captures" / name.removeprefix("e2e/")
         if capture_dir.exists():
@@ -168,6 +175,7 @@ def main() -> int:
                 shutil.rmtree(raw_dir)
             raw_dir.mkdir(parents=True)
             step_env["WARPLENS_CAPTURE_RAW_DIR"] = str(raw_dir)
+        begun = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
         if command is None:
             status, seconds, stdout, stderr = f"skipped ({why})", 0.0, b"", b""
         else:
@@ -198,7 +206,7 @@ def main() -> int:
         (out / (name + ".stderr")).write_bytes(stderr)
         shown = " ".join(command) if command else "-"
         with status_file.open("a") as f:
-            f.write(f"{name}\t{status}\t{seconds:.1f}\t{shown}\n")
+            f.write(f"{name}\t{status}\t{seconds:.1f}\t{shown}\t{begun}\n")
         print(f"{name:42} {status:10} {seconds:6.1f} s", flush=True)
         if args.predicted and sim and command is not None:
             target = Path(args.predicted) / (name + ".txt")

@@ -13,6 +13,13 @@ _lock = threading.RLock()
 _interrupted = 0
 _main_spawning = False
 
+# How long a killed process is waited for. SIGKILL cannot be refused, but a process inside the
+# GPU driver (tearing down a context whose kernel never returned) can stay unreapable for as
+# long as the driver takes; the runner must not wait with it. Not observed: nothing here has
+# hung a real GPU yet. tests/test_probe_health.py stands a process in for it.
+REAP_SECONDS = 10
+NOT_REAPED = "timeout (process did not exit after SIGKILL)"
+
 
 def _descendant_groups(children):
     """Snapshot detached descendants too: nested runners create new process groups."""
@@ -102,7 +109,11 @@ def forward_interrupts():
 
 
 def run_process(command, timeout, env=None, cwd=None):
-    """Return (status, elapsed seconds, stdout bytes, stderr bytes)."""
+    """Return (status, elapsed seconds, stdout bytes, stderr bytes).
+
+    Status: ok, exit N, signal N, timeout (killed at the limit; what it had written is
+    returned), `timeout (process did not exit after SIGKILL)` (killed and not gone
+    REAP_SECONDS later), or `not run (why)`."""
     global _main_spawning
     start = time.monotonic()
     child = None
@@ -130,8 +141,13 @@ def run_process(command, timeout, env=None, cwd=None):
             status = "ok" if code == 0 else f"exit {code}" if code > 0 else f"signal {-code}"
         except subprocess.TimeoutExpired:
             _terminate([child])
-            out, err = child.communicate()
             status = "timeout"
+            try:
+                out, err = child.communicate(timeout=REAP_SECONDS)
+            except subprocess.TimeoutExpired as stuck:
+                # Killed and still there. What it wrote before is kept; the pipes are closed
+                # so that nothing of ours waits on it again.
+                out, err, status = stuck.output or b"", stuck.stderr or b"", NOT_REAPED
         return status, time.monotonic() - start, out, err
     finally:
         if child is not None:
@@ -139,4 +155,11 @@ def run_process(command, timeout, env=None, cwd=None):
                 _active.discard(child)
             if child.poll() is None:
                 _terminate([child])
-            child.wait()
+            try:
+                child.wait(timeout=REAP_SECONDS)
+            except subprocess.TimeoutExpired:
+                for pipe in (child.stdout, child.stderr):
+                    try:
+                        pipe.close()
+                    except (OSError, ValueError):
+                        pass

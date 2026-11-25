@@ -29,6 +29,10 @@
 //   base_offset field    NO PREDICTION (the simulator refuses the field): the same starts
 //                        with the field PTX prescribes, plus the field set on an aligned
 //                        start and a wrong field. MAY FAULT.
+//   base_offset field K  only case K (0-7) of those. The program stops at the first kernel
+//                        that fails (probe_sync), and a fault leaves the context unusable,
+//                        so the manifest runs the eight cases as eight processes: one that
+//                        faults does not take the others' answers with it.
 #include "../tcgen05_common.h"
 
 #define N 16
@@ -98,7 +102,14 @@ int main(int argc, char** argv) {
     static uint16_t b[N * 16];
     for (int n = 0; n < N; ++n) b[n * 16 + n] = half_bits(1.0f);
     uint64_t desc_b = place_k_major(image, B_AT, b, N, 2, LAYOUTS[3]);
-    if (with_field)
+    int only = argc > 2 ? atoi(argv[2]) : -1;
+    if (with_field && only >= (int)(sizeof WITH_FIELD / sizeof WITH_FIELD[0])) {
+        printf("HOST ERROR: no case %d with the field set\n", only);
+        return 2;
+    }
+    if (with_field && only >= 0)
+        run_case(WITH_FIELD[only], desc_b);
+    else if (with_field)
         for (const Case& c : WITH_FIELD) run_case(c, desc_b);
     else
         for (const Case& c : ZERO_FIELD) run_case(c, desc_b);

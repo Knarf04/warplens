@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""The matrix rows that are not probes: NUM-05, RT-10 and RT-11. run_all.py calls this at
-the end of a GPU run; it can also be run alone.
+"""The matrix rows that are not probes: RT-11, NUM-05 and RT-10. run_all.py calls this in a
+GPU run, after the probes without a risk and the end-to-end programs and before the probes
+that may fault or hang; it can also be run alone.
 
     validation/blackwell/run_rows.py --out DIR [--no-e2e] [--only STEP] [--timeout-scale X]
                                      [--rt11 auto|required|optional]
@@ -8,16 +9,25 @@ the end of a GPU run; it can also be run alone.
 These rows have no prediction to compare with (RT-10 and RT-11 are informational, NUM-05
 is open until a GPU conversion exists), so nothing here is a manifest entry. Each step runs
 in its own process under a timeout; its output goes to DIR/rows/, one line per step to
-DIR/rows/status.tsv.
+DIR/rows/status.tsv. They run in this order: the one whose result is required first, so
+that an optional trace that hangs cannot take its time.
 
-  formats/ue4m3_ptxas            NUM-05  does the installed ptxas have a UE4M3 conversion?
-                                         (formats/ue4m3_ptxas.py; no GPU)
-  e2e/driver_call_trace.tirx     RT-10   the driver calls of examples/07_tirx/run.py
-  e2e/driver_call_trace.cute_dsl RT-10   and of examples/06_cute_dsl/saxpy.py, under gdb
-                                         (e2e/driver_call_trace.py)
   e2e/cute_dsl_tma               RT-11   CUTLASS's fp16_gemm_0.py on the GPU: the tensor maps
                                          it is handed, its code, and the memory it reads and
-                                         writes (e2e/cute_dsl_tma.py)
+                                         writes (e2e/cute_dsl_tma.py). Limit 3000 s: the
+                                         script runs the tutorial three times, two of them
+                                         under gdb, each under its own limit of 900 s
+  formats/ue4m3_ptxas            NUM-05  does the installed ptxas have a UE4M3 conversion?
+                                         (formats/ue4m3_ptxas.py; no GPU). Limit 300 s
+  e2e/driver_call_trace.tirx     RT-10   the driver calls of examples/07_tirx/run.py
+  e2e/driver_call_trace.cute_dsl RT-10   and of examples/06_cute_dsl/saxpy.py, under gdb
+                                         (e2e/driver_call_trace.py). 240 s for the traced
+                                         script, 300 s for the step
+
+The limits of the optional steps are a choice, not a measurement on a B200. On the
+development machine (RTX 3080 Ti, 2026-11-24, inside run_all.py) NUM-05 took 0.2 s, the CuTe
+DSL trace 2.5 s, and the TIRx trace 2.8 s to fail where it must there (the driver refuses
+NVRTC 13.5's PTX); a complete TIRx trace and RT-11 itself were not timed anywhere.
 
 Statuses: ok; `skipped (why)` when a step says it cannot run here (no gdb, no PyTorch, not
 a B200: on the development machine RT-11 is "skipped (needs sm_100 ...)"); `news (...)` for
@@ -50,6 +60,11 @@ from probe_process import forward_interrupts, run_process  # noqa: E402
 
 
 RT11 = "e2e/cute_dsl_tma"
+# Seconds a step may take (times --timeout-scale). RT-11 is three times its script's own limit
+# and some: cute_dsl_tma.py runs the tutorial plain, traced, and traced again with the capture.
+# The others are informational and must not hold the run up: a few minutes each.
+LIMITS = {"RT-11": 3000, "NUM-05": 300, "RT-10": 300}
+TRACE_LIMIT = 240   # of those 300: what driver_call_trace.py gives the traced script itself
 
 
 def tvm_library_path(env: dict) -> str:
@@ -78,10 +93,13 @@ def main() -> int:
     env["PYTHONPATH"] = f"{REPO}:{env.get('PYTHONPATH', '')}".rstrip(":")
     tvm_env = dict(env, LD_LIBRARY_PATH=tvm_library_path(env))
     python = sys.executable
-    trace = [python, str(HERE / "e2e" / "driver_call_trace.py")]
+    trace = [python, str(HERE / "e2e" / "driver_call_trace.py"), "--timeout", str(TRACE_LIMIT * args.timeout_scale)]
 
-    # (name, matrix row, command, environment, launches kernels)
+    # (name, matrix row, command, environment, launches kernels). RT-11 first: it is the only
+    # one a rental cannot end without.
     steps = [
+        (RT11, "RT-11",
+         [python, str(HERE / "e2e" / "cute_dsl_tma.py"), "--out", str(rows / "e2e" / "cute_dsl_tma")], env, True),
         ("formats/ue4m3_ptxas", "NUM-05", [python, str(HERE / "formats" / "ue4m3_ptxas.py")], env, False),
         ("e2e/driver_call_trace.tirx", "RT-10",
          trace + ["--out", str(rows / "e2e" / "driver_call_trace.tirx"), "--",
@@ -89,8 +107,6 @@ def main() -> int:
         ("e2e/driver_call_trace.cute_dsl", "RT-10",
          trace + ["--out", str(rows / "e2e" / "driver_call_trace.cute_dsl"), "--",
                   python, str(REPO / "examples" / "06_cute_dsl" / "saxpy.py")], env, True),
-        (RT11, "RT-11",
-         [python, str(HERE / "e2e" / "cute_dsl_tma.py"), "--out", str(rows / "e2e" / "cute_dsl_tma")], env, True),
     ]
     statuses = {}
     # With --only, the lines of the steps that are not run again stay as they were.
@@ -105,9 +121,8 @@ def main() -> int:
         if launches and args.no_e2e:
             status, seconds, stdout, stderr = "skipped (--no-e2e)", 0.0, b"", b""
         else:
-            # Three times the tracer's own limit and some: cute_dsl_tma.py runs the tutorial plain,
-            # traced, and traced again with the capture.
-            status, seconds, stdout, stderr = run_process(command, 3000 * args.timeout_scale, env=step_env, cwd=REPO)
+            status, seconds, stdout, stderr = run_process(command, LIMITS[row] * args.timeout_scale, env=step_env,
+                                                          cwd=REPO)
             first = (stdout.decode(errors="replace").splitlines() or [""])[0]
             if status == "exit 2" and first.startswith("SKIPPED:"):
                 status = f"skipped ({first[len('SKIPPED:'):].strip()[:300]})"

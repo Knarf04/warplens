@@ -20,6 +20,7 @@ the approximate timing model (`warplens/timing/model.py`,
 cd validation/blackwell_timing
 NVCC=nvcc ./build.sh hw          # needs CUDA 12.8 or newer (sm_100a); or copy bin/hw from here
 ./run_all.sh                     # no interaction; 2 to 5 minutes plus ncu (estimate, below)
+                                 # ncu at most 20 minutes; a benchmark that hangs costs 3 minutes
 # -> results_<host>_<time>/ and results_<host>_<time>.tar.gz: bring the archive back
 ```
 
@@ -29,12 +30,86 @@ Then, anywhere with Python and PyYAML (the simulator is not needed):
 python fit.py results_<host>_<time>          # report.md, derived.yaml, calibrated.yaml, ...
 ```
 
-`run_all.sh` runs every benchmark in its own process under a timeout (900 s each,
-`--timeout`), records the exit status and goes on after a failure or a hang. It
-saves `env.txt` (driver, `nvidia-smi`, other processes on the GPU, compiler,
-checksums of the programs), runs `run_ncu.sh`, runs `fit.py` if it can, and packs
-the directory. `--scale 4` makes every launch four times longer if the spread in
-`report.md` is too large; `--trials N` changes the number of trials (default 5).
+`run_all.sh` runs every benchmark in its own process under a timeout, records the
+exit status and goes on after a failure or a hang. It saves `env.txt` (driver,
+`nvidia-smi`, other processes on the GPU, compiler, checksums of the programs),
+runs `run_ncu.sh`, runs `fit.py` if it can, and packs the directory. `--scale 4`
+makes every launch four times longer if the spread in `report.md` is too large;
+`--trials N` changes the number of trials (default 5).
+
+The order puts what is proven first, so that a run cut short (the 60-minute
+stage limit of `env/remote/run.sh`, or Ctrl-C) has lost the unproven part:
+
+1. the seven benchmarks that are valid on Ampere, all of which have run on the
+   RTX 3080 Ti (`launch`, `alu_chain`, `smem_wavefronts`, `global_load`,
+   `gstream`, `cp_async`, `ncu_banks`);
+2. `run_ncu.sh --group ampere`: counters for those programs, the two comparisons
+   with the simulator (TIM-16, TIM-17) first;
+3. the seven Blackwell-only benchmarks, which have never run on a GPU (`mbar`,
+   `tma`, `mma_rate`, `tmem_access`, `clc_latency`, `cluster_costs`,
+   `pipelined_gemm`), then `mma_rate_i8`;
+4. `run_ncu.sh --group blackwell --continue`: counters for the Blackwell-only
+   programs, added to the same `ncu/STATUS.txt`;
+5. `fit.py` and the archive. `fit.py` reads the `<bench>.out` files by name, so
+   the order does not matter to it.
+
+**The limit of a benchmark is 180 s** (`--timeout SECONDS`; it was 900 s). Where
+the number comes from: the slowest benchmark measured takes 13 s
+(`smem_wavefronts` on the 3080 Ti; the seven Ampere-valid ones take 1 to 13 s,
+29 s together), and the longest estimate for the B200 is 30 s (`mma_rate`, not
+measured; table below). 180 s is six times that estimate. With `--scale X` above
+1 the default limit is 180 s times X, because the run was asked to take X times
+as long. The limit matters because the Blackwell-only kernels wait on an
+mbarrier in a loop without a bound (`mbarrier_wait` in `blackwell.h`): a wrong
+descriptor or tensor map is a hang, not an error. Worst cases, by arithmetic and
+not measured: all eight Blackwell-only runs hang, 8 x 190 s = 25 minutes, plus
+the ncu budget of 20 minutes, is inside the 60-minute stage limit; all fifteen
+runs hang, 48 minutes plus ncu, is not. A benchmark that reaches its limit is
+`TIMED OUT after 180s` in `status.txt`, with the number of BENCH lines it had
+printed (`lines=`); those lines are in its `.out` file, because the programs
+write stdout line by line (`setvbuf` in `common.h`; the bytes are unchanged, and
+the predictions regenerated from the rebuilt `bin/sim` are identical to the
+committed ones).
+
+**Stopping.** `timeout` puts its command in a process group of its own, so a
+signal to `run_all.sh` or to its group does not reach the benchmark. Until the
+pre-rental review that left the benchmark (or ncu and the program under it)
+running on the GPU after the stage limit or Ctrl-C, next to the rerun and
+writing the same output file. Now every command runs in the background and
+`run_all.sh` and `run_ncu.sh` trap SIGTERM, SIGINT, SIGHUP and exit: they send
+SIGTERM to the command's process group, SIGKILL after 8 s (`run_ncu.sh`: 3 s),
+write what was stopped and what was not run to `status.txt`, and exit with 143,
+130 or 129 without making an archive. Measured on the 3080 Ti: SIGTERM to
+`run_all.sh --ampere` during `smem_wavefronts` ended it at once with status 143
+and no benchmark process left, the 52 lines printed until then in the output
+file. Not tried: a benchmark that hangs inside the driver; whether SIGTERM ends
+it or the SIGKILL after 8 s is needed is unknown, and a process that ignores
+SIGTERM was only a stand-in (`tests/test_timing_run_all.py`).
+
+**Counters.** `<out>/ncu/STATUS.txt` exists at the end of every run, and its
+first line starts with exactly one of
+
+| First line starts with | Meaning |
+| --- | --- |
+| `ncu ok:` | every profile that was attempted produced a counter table |
+| `ncu partial:` | some did; the line names each one that did not, with the reason (timed out, ncu's exit status, budget used up, stopped) |
+| `ncu failed:` | ncu was run and no counter table was read (the probe gave none, or no profile did) |
+| `ncu not run:` | nothing was attempted: ncu not installed, no permission, the probe program could not launch, nothing built, or `--no-ncu` (`not requested`) |
+
+The lines after the first are for people. `status.txt` repeats the first line
+(after step 2 it also has a line `ncu, first part (...)` with the state at that
+point). With the outer runner that file is `out/timing/ncu/STATUS.txt` in the
+run directory.
+
+**Exit status**: the number of benchmarks that failed, plus 1 if
+`WARPLENS_NCU=ok` is in the environment (`env/remote/run.sh` sets it when
+preflight read a counter with ncu) and the verdict is nevertheless `ncu
+failed:` or `ncu not run:`. Then counters were known to be readable and none
+was read, which is a failure of the run and not a property of the machine.
+`ncu partial:` adds nothing (read `STATUS.txt`), and neither does any verdict
+under `--no-ncu` or without `WARPLENS_NCU=ok`. Either way every benchmark and
+`fit.py` have run before the script exits. `run_ncu.sh` itself exits 0 whatever
+its verdict.
 
 Build with the same compiler as the predictions if possible (nvcc 13.5 here). The
 loops are written so that the compiler has little freedom (the timed accesses are
@@ -157,7 +232,7 @@ configuration) and from the Ampere run; not measured on a B200.
 | `cluster_costs` | 10 | 5 s | |
 | `pipelined_gemm` | 6 | 10 s (up to 2.5 GiB allocated and filled per CTA count) | |
 | `ncu_banks` | 9 (one launch each per trial) | 1 s | 1 s |
-| `run_ncu.sh` | 11 profiled programs | 5 to 15 min if counters are readable, seconds if not | refused (no permission) |
+| `run_ncu.sh` | 11 profiled programs | 5 to 15 min if counters are readable (guess), never more than its budget of 20 min; seconds if not | refused (no permission) |
 
 ### Confounders
 
@@ -196,18 +271,59 @@ configuration) and from the Ampere run; not measured on a B200.
 
 ## ncu counters
 
-`run_ncu.sh [BIN] [OUT]` first profiles one empty kernel with one counter. If
-`ncu` is missing, lacks permission (`ERR_NVGPUCTRPERM`; it needs root or a driver
-set up for non-admin profiling) or prints no counter table, it says why, writes
-`STATUS.txt` and exits 0; `run_all.sh` continues. It never uses sudo. Otherwise
+`run_ncu.sh [options] [BIN] [OUT]` first profiles one kernel with one counter
+(the probe). If `ncu` is missing, lacks permission (`ERR_NVGPUCTRPERM`; it needs
+root or a driver set up for non-admin profiling) or prints no counter table, it
+says why in the first line of `OUT/STATUS.txt` (the four beginnings are in the
+table above) and exits 0; `run_all.sh` continues. It never uses sudo. Otherwise
 it saves raw `ncu --csv` output per benchmark (instructions executed, cycles,
 shared-memory wavefronts and bank conflicts, cache hit rates, DRAM bytes), run
-with one trial and 1% of the repetitions because every launch is profiled. If
-ncu rejects a counter list, the run is repeated without the names the device
-does not list (`ncu --query-metrics`), and only then with
-`smsp__inst_executed.sum` alone; `STATUS.txt` names every benchmark whose list
-was reduced. It also profiles `validation/ampere/transpose_hw`
-(TIM-16) and compares with the simulator when Python and warplens are present.
+with one trial and 1% of the repetitions because every launch is profiled.
+`OUT/profiles.tsv` has one row per program (name, state, detail), and
+`STATUS.txt` is rewritten after every profile, so it is true also for a run
+that was killed.
+
+The probe. `launch --trials 1 --only ctas=1` starts 42 kernels (the spin-up on
+every SM of `common.h`, a warm-up launch and 40 empty kernels), and the probe
+used to profile every one of them inside 60 s. It now passes `--launch-count 1`, so ncu profiles the first kernel
+and lets the rest run unprofiled, and it has 300 s (`--probe-timeout`,
+`NCU_PROBE_TIMEOUT`), the limit `env/remote/preflight.sh` gives its single
+kernel. What is known about that option: the machine's ncu 2024.1.1 and
+`ncu --help` accept `--launch-count 1` (as a normal user the run then stops at
+the permission error, as before). **It has not been run where counters can be
+read.** So if the probe ends without a table for a reason other than permission
+or its time limit, it is asked once more without the option, the form that read
+counters as root on the 3080 Ti, and `STATUS.txt` says so if only that form
+worked. A probe that reaches its limit is `ncu failed:` and is not repeated.
+
+Order and limits (changed in the pre-rental review; before it the two proven
+comparisons ran last and a profile could take three times 20 minutes):
+
+- **Order**: `ncu_banks` and the transpose (`validation/ampere/transpose_hw`,
+  TIM-16, TIM-17) with their comparisons against the simulator, then
+  `alu_chain`, `smem_wavefronts`, `global_load`, `cp_async`: the six programs
+  that have been profiled on the 3080 Ti. Then `mbar`, `tma`, `mma_rate`,
+  `tmem_access`, `clc_latency`, which have never been profiled. `--group
+  ampere` and `--group blackwell` select one half; `--continue` adds to an
+  earlier call for the same directory without a second probe.
+- **Limit of one ncu run**: 300 s (`--timeout`, `NCU_PROFILE_TIMEOUT`;
+  `run_all.sh --ncu-timeout`). A choice, not a measurement: how long a profile
+  takes was not recorded in the runs as root on the 3080 Ti, and the estimate
+  of 5 to 15 minutes for all eleven on a B200 is a guess. 300 s is the whole of
+  the lower estimate for a single program.
+- **No retry after a timeout.** A run that reaches its limit (`timeout` returns
+  124 or 137) is recorded as timed out and the script goes to the next program.
+  Only a run that ncu ended itself without a table is repeated: without the
+  names the device does not list (`ncu --query-metrics`), and only then with
+  `smsp__inst_executed.sum` alone; `STATUS.txt` names every benchmark whose
+  list was reduced.
+- **Budget**: 1200 s for everything the script does for one output directory,
+  both calls of `run_all.sh` together (`--budget`, `NCU_BUDGET`; `run_all.sh
+  --ncu-budget`). When it is used up, the running profile is cut at the budget,
+  the remaining programs are not started, and `STATUS.txt` names them (`ncu
+  partial:`). The script ends within the budget plus the 10 s of `timeout
+  --kill-after`. A comparison with the simulator (about 9 s each, measured)
+  counts against the budget and has 120 s.
 
 On this machine the real ncu stops at the permission check, with the installed
 2024.1.1.0 and with the pinned 2026.4.0.0 alike, so **no counter has been read
@@ -224,7 +340,24 @@ through this script**. What was done instead:
   for ncu that replays recorded output (`fixture_ncu/`, whose README says what is
   recorded and what is invented): the permission error, a full run, a rejected
   counter list and its retry, and `compare_ncu.py` on the table recorded from
-  the 3080 Ti.
+  the 3080 Ti; and, with a stand-in that hangs, fails or is slow: no second run
+  after a timeout, the budget, the four first lines of `STATUS.txt`, the two
+  calls of `run_all.sh`, and that SIGTERM or SIGINT to the script leaves neither
+  ncu nor the profiled program. `tests/test_timing_run_all.py` does the same for
+  `run_all.sh` with stand-in benchmarks: the order, the three endings of a
+  benchmark, stopping, and the exit status with `WARPLENS_NCU=ok`.
+
+The two runs below were made with the script as it was before the pre-rental
+review: the same counter lists and programs, in the old order, with the old
+probe. **The script as it is now has not been run where counters can be read**
+(no root in the session that changed it); as a normal user on the 3080 Ti it
+ends in a second with `ncu not run: no permission ...`, inside `run_all.sh
+--ampere` (31 s, seven programs, `fit.py` ok), and with the `sm_100a` programs,
+none of which loads there, with `ncu not run: bin/hw/launch could not launch its
+kernels on this GPU (cudaErrorNoKernelImageForDevice)`. Seen with the real ncu
+2024.1.1 as that user: ncu, its `TreeLauncherSubreaper` and the profiled program
+are all in the process group of `timeout`, which is the group the scripts
+signal when they are stopped.
 
 Run for real on 2026-11-24, as root on the RTX 3080 Ti (driver 580.173.02, the machine's
 ncu 2024.1.1, not the pinned one): `sudo env NCU_BIN=/usr/local/cuda/bin/ncu ./run_ncu.sh
@@ -437,7 +570,11 @@ copy used by `tests/test_timing_calibration.py`. Every file in it says SYNTHETIC
 ### Dry run on the RTX 3080 Ti (Ampere, 2026-11-23)
 
 `./build.sh ampere && ./run_all.sh --ampere`: 28 s, all six programs exit 0, ncu
-refused. `dryrun_3080ti/` has the raw outputs and the report. Over the 36
+refused. `dryrun_3080ti/` has the raw outputs and the report (its `status.txt`
+is in the format of that day: no `ncu_banks`, and the ncu line begins `ncu: ncu
+not run:`). Again on 2026-11-24 with the runner as it is now and `ncu_banks`
+among the programs: 31 s, seven programs exit 0, `ncu not run: no permission`;
+not committed. Over the 36
 configurations, the spread of per-trial slopes was 0.02% to 5.9% (median 1.7%;
 only `cp_async/cold` above 5%), and min and median slopes agree within 1.3%.
 `%clock64` gave 1.88 ticks per ns.

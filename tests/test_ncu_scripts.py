@@ -28,6 +28,11 @@ BENCHES = ["launch", "alu_chain", "smem_wavefronts", "global_load", "cp_async", 
            "tmem_access", "clc_latency", "ncu_banks"]
 
 
+# The order run_ncu.sh profiles in: the programs valid on Ampere, then the Blackwell-only ones.
+PROFILED = ["ncu_banks", "transpose", "alu_chain", "smem_wavefronts", "global_load", "cp_async",
+            "mbar", "tma", "mma_rate", "tmem_access", "clc_latency"]
+
+
 def metric_lists(text: str) -> dict[str, list[str]]:
     return {name: value.split(",") for name, value in re.findall(r"^(SMEM|CORE|GLOBAL|BASIC)=(\S+)$", text, flags=re.M)}
 
@@ -80,7 +85,22 @@ def test_dry_run_prints_every_command_and_runs_nothing(work):
     banks = next(l for l in lines if "bin/hw/ncu_banks " in l)
     assert f"--metrics {','.join(lists['SMEM'])} bin/hw/ncu_banks --trials 1" in banks
     assert "ncu_banks_compare.py" in lines[lines.index(banks) + 1]
-    assert "transpose_hw 64" in lines[-2] and "compare_ncu.py" in lines[-1]
+    # The probe profiles one kernel. Then what has been proven on the 3080 Ti comes first:
+    # the two comparisons with the simulator (TIM-16, TIM-17), the other programs that are
+    # valid on Ampere, and only then the Blackwell-only ones. (Until the pre-rental review
+    # ncu_banks and the transpose were the last two.)
+    assert "--launch-count 1 " in lines[0] and "bin/hw/launch --trials 1 --only ctas=1" in lines[0]
+    assert lines.index(banks) == 1
+    assert "transpose_hw 64" in lines[3] and "compare_ncu.py" in lines[4]
+    order = [re.search(r"bin/hw/(\w+) ", line).group(1) for line in lines[5:]]
+    assert order == ["alu_chain", "smem_wavefronts", "global_load", "cp_async",
+                     "mbar", "tma", "mma_rate", "tmem_access", "clc_latency"]
+    assert all("limit 300 s" in line for line in lines if "--metrics" in line)
+    # One group at a time, as run_all.sh asks for them.
+    ampere, _ = run_ncu(work, "--dry-run", "--group", "ampere", "bin/hw", str(work / "out"))
+    assert "bin/hw/cp_async " in ampere.stdout and "bin/hw/mbar " not in ampere.stdout
+    blackwell, _ = run_ncu(work, "--dry-run", "--group", "blackwell", "bin/hw", str(work / "out"))
+    assert "bin/hw/mbar " in blackwell.stdout and "ncu_banks" not in blackwell.stdout
     # A program that is not there is said to be missing, not silently left out.
     (work / "validation" / "blackwell_timing" / "bin" / "hw" / "mbar").unlink()
     done, _ = run_ncu(work, "--dry-run", "bin/hw", str(work / "out"))
@@ -129,17 +149,33 @@ def test_missing_ncu_or_programs(work):
     out = work / "out"
     done, _ = run_ncu(work, "bin/hw", str(out), NCU_BIN="no-such-ncu")
     assert done.returncode == 0 and "is not installed or not on PATH" in (out / "STATUS.txt").read_text()
+    assert (out / "STATUS.txt").read_text().startswith("ncu not run: ")
     done, _ = run_ncu(work, "bin/elsewhere", str(out))
     assert "bin/elsewhere/launch is not built" in (out / "STATUS.txt").read_text()
-    done, _ = run_ncu(work, "bin/hw", str(out), mode="none")
-    assert "the probe produced no counter table" in (out / "STATUS.txt").read_text()
+    assert (out / "STATUS.txt").read_text().startswith("ncu not run: ")
+    done, commands = run_ncu(work, "bin/hw", str(out), mode="none")
+    status = (out / "STATUS.txt").read_text()
+    # ncu ran and read nothing: "failed", not "not run". The probe is asked a second time
+    # without --launch-count, the form that has read counters on the 3080 Ti.
+    assert status.startswith("ncu failed: the probe produced no counter table (exit 0)")
+    assert done.returncode == 0 and len(commands) == 2
+    assert "--launch-count" in commands[0] and "--launch-count" not in commands[1]
 
 
 def test_profiling_writes_a_table_and_the_programs_own_lines(work):
     out = work / "out"
     done, commands = run_ncu(work, "bin/hw", str(out))
     assert done.returncode == 0, done.stderr
-    assert (out / "STATUS.txt").read_text() == f"ncu: 11 benchmark(s) profiled, 0 failed; raw CSVs in {out}\n"
+    # The first line is the contract (ncu ok / partial / failed / not run); before the
+    # pre-rental review it began with "ncu: " whatever had happened.
+    first, *rest = (out / "STATUS.txt").read_text().splitlines()
+    assert first == f"ncu ok: 11 benchmark(s) profiled, 0 failed; raw CSVs in {out}"
+    assert len(rest) == 1 and re.fullmatch(rf"ncu: \d+ s of the budget of 1200 s used; one row per program in {out}/profiles.tsv", rest[0])
+    assert done.stdout.splitlines()[-2] == first
+    assert [row.split("\t")[:2] for row in (out / "profiles.tsv").read_text().splitlines()] == [
+        [name, "ok"] for name in PROFILED]
+    # The probe asks ncu for one kernel, not for the 42 that `launch --trials 1` starts.
+    assert commands[0] == "--csv --launch-count 1 --metrics smsp__inst_executed.sum bin/hw/launch --trials 1 --only ctas=1"
     lists = metric_lists((TIMING / "run_ncu.sh").read_text())
     for bench, which in (("alu_chain", "CORE"), ("smem_wavefronts", "SMEM"), ("tma", "BASIC")):
         table = (out / f"{bench}.csv").read_text()
@@ -159,7 +195,7 @@ def test_a_rejected_counter_list_is_retried_without_the_unlisted_names(work):
     done, commands = run_ncu(work, "bin/hw", str(out), mode="strict")
     assert done.returncode == 0, done.stderr
     status = (out / "STATUS.txt").read_text()
-    assert status.startswith("ncu: 11 benchmark(s) profiled, 0 failed")
+    assert status.startswith("ncu ok: 11 benchmark(s) profiled, 0 failed")
     assert "reduced counter list for smem_wavefronts: without l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum" in status
     assert "reduced counter list for ncu_banks: without" in status
     assert "reduced counter list for transpose: without" in status
@@ -215,3 +251,186 @@ def test_a_table_with_ncu_chatter_before_it_and_no_table_at_all(tmp_path):
     denied = subprocess.run([sys.executable, str(AMPERE / "compare_ncu.py"), str(FIXTURE / "permission_denied.txt"), "64"],
                             capture_output=True, text=True, env={**os.environ, "PYTHONPATH": str(ROOT)})
     assert denied.returncode != 0 and "no ncu CSV table found" in denied.stderr and "ERR_NVGPUCTRPERM" in denied.stderr
+
+
+# ---------------------------------------------------------------------------------------------
+# Limits, the budget, the status contract, stopping (pre-rental review, 2026-11-24)
+# ---------------------------------------------------------------------------------------------
+
+def gone(pid: int) -> bool:
+    """No such process, or one that has ended and only waits for its parent to collect it."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] == "Z"
+    except (FileNotFoundError, ProcessLookupError):
+        return True
+
+
+def wait_until(condition, seconds: float = 10.0) -> bool:
+    import time
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if condition():
+            return True
+        time.sleep(0.05)
+    return condition()
+
+
+def first_line(out: Path) -> str:
+    return (out / "STATUS.txt").read_text().splitlines()[0]
+
+
+def states(out: Path) -> dict[str, str]:
+    return dict(row.split("\t")[:2] for row in (out / "profiles.tsv").read_text().splitlines())
+
+
+def test_a_profile_that_reaches_its_limit_is_not_run_again(work):
+    """A kernel that waits for ever under ncu costs one limit, not three: exit status 124 is
+    not a rejected counter list."""
+    import time
+    out, pids = work / "out", work / "pids"
+    start = time.monotonic()
+    done, commands = run_ncu(work, "--timeout", "2", "bin/hw", str(out), FAKE_NCU_HANG="mbar", FAKE_NCU_PIDS=str(pids))
+    assert done.returncode == 0, done.stderr
+    assert time.monotonic() - start < 20
+    assert len([c for c in commands if "bin/hw/mbar" in c]) == 1
+    assert first_line(out) == ("ncu partial: 10 benchmark(s) profiled, 1 failed; no counter table from: "
+                               f"mbar (timed out after 2 s; not run again); raw CSVs in {out}")
+    assert states(out)["mbar"] == "timeout" and states(out)["tma"] == "ok"      # and it went on
+    assert not (out / "mbar.first_attempt.csv").exists()
+    # `timeout` stopped ncu and what ncu had started.
+    assert all(wait_until(lambda pid=pid: gone(int(pid))) for pid in pids.read_text().split())
+
+
+def test_a_run_that_ncu_ends_without_a_table_is_still_retried(work):
+    """The other half: ncu ending by itself without a table is retried with fewer counters
+    (twice at most), and named when that does not help either."""
+    out = work / "out"
+    done, commands = run_ncu(work, "bin/hw", str(out), FAKE_NCU_FAIL="tma")
+    assert done.returncode == 0, done.stderr
+    assert len([c for c in commands if "bin/hw/tma" in c]) == 2     # the full list is all listed: one retry
+    assert first_line(out) == ("ncu partial: 10 benchmark(s) profiled, 1 failed; no counter table from: "
+                               f"tma (ncu exit 1, no counter table); raw CSVs in {out}")
+
+
+def test_the_four_first_lines_of_status(work):
+    out = work / "out"
+    run_ncu(work, "bin/hw", str(out))
+    assert first_line(out).startswith("ncu ok: 11 benchmark(s) profiled, 0 failed; ")
+    run_ncu(work, "bin/hw", str(out), FAKE_NCU_FAIL="cp_async clc_latency")
+    assert first_line(out).startswith("ncu partial: 9 benchmark(s) profiled, 2 failed; no counter table from: "
+                                      "cp_async (ncu exit 1, no counter table), clc_latency (ncu exit 1, no counter table); ")
+    done, _ = run_ncu(work, "bin/hw", str(out), FAKE_NCU_FAIL=" ".join(PROFILED) + " transpose_hw")
+    assert first_line(out).startswith("ncu failed: 0 benchmark(s) profiled, 11 failed; no counter table from: ncu_banks (")
+    assert done.returncode == 0                               # the verdict is the line, not the exit status
+    run_ncu(work, "bin/hw", str(out), mode="permission")
+    assert first_line(out).startswith("ncu not run: no permission to read GPU performance counters")
+    assert not (out / "profiles.tsv").exists()                # nothing of the earlier run is left to mislead
+    # A program that is not built is not an attempt: it is named on a line of its own.
+    (work / "validation" / "blackwell_timing" / "bin" / "hw" / "mbar").unlink()
+    run_ncu(work, "bin/hw", str(out))
+    status = (out / "STATUS.txt").read_text().splitlines()
+    assert status[0].startswith("ncu ok: 10 benchmark(s) profiled, 0 failed; ")
+    assert status[1] == "ncu: not built in bin/hw, so not profiled: mbar"
+    for line in [first_line(out)]:
+        assert re.match(r"ncu (ok|partial|failed|not run): ", line)
+
+
+def test_the_budget_ends_the_run_and_names_what_was_not_profiled(work):
+    """Every profile takes a second here and the budget is four: the script stops starting
+    programs, says which, and the proven comparisons were the first to run."""
+    import time
+    out = work / "out"
+    start = time.monotonic()
+    done, commands = run_ncu(work, "--budget", "4", "bin/hw", str(out), FAKE_NCU_SLEEP="1")
+    took = time.monotonic() - start
+    assert done.returncode == 0, done.stderr
+    assert took < 4 + 10 + 3                                  # the budget, `timeout --kill-after=10`, start-up
+    got = states(out)
+    assert got["ncu_banks"] == "ok"
+    assert got["clc_latency"] == "budget" and got["tmem_access"] == "budget"
+    assert set(got.values()) <= {"ok", "timeout", "budget"}
+    order = [got[name] for name in PROFILED]
+    assert order == sorted(order, key=["ok", "timeout", "budget"].index)   # nothing was started after the budget ran out
+    line = first_line(out)
+    assert line.startswith("ncu partial: ") and "clc_latency (not started: the budget of 4 s was used up)" in line
+    assert not any("bin/hw/clc_latency" in c for c in commands)
+    bad = subprocess.run(["bash", str(work / "validation" / "blackwell_timing" / "run_ncu.sh"), "--budget", "soon"],
+                         capture_output=True, text=True)
+    assert bad.returncode == 2 and "whole number of seconds" in bad.stderr
+
+
+def test_two_calls_for_one_directory_make_one_status(work):
+    """run_all.sh profiles the Ampere-valid programs, runs the Blackwell-only benchmarks, and
+    comes back for their counters: one probe, one budget, one STATUS.txt."""
+    out = work / "out"
+    done, commands = run_ncu(work, "--group", "ampere", "bin/hw", str(out))
+    assert done.returncode == 0, done.stderr
+    assert first_line(out).startswith("ncu partial: 6 benchmark(s) profiled, 0 failed, 5 not profiled; no counter table from: "
+                                      "mbar (not in this run: --group ampere), ")
+    assert not any("bin/hw/mbar" in c for c in commands)
+    (out / "budget_used").write_text("7\n")
+    done, commands = run_ncu(work, "--group", "blackwell", "--continue", "bin/hw", str(out))
+    assert first_line(out).startswith("ncu ok: 11 benchmark(s) profiled, 0 failed; ")
+    assert len([c for c in commands if "bin/hw/launch" in c]) == 1            # no second probe
+    assert len([c for c in commands if "bin/hw/alu_chain" in c]) == 1         # nor a second profile
+    used = int(re.search(r"ncu: (\d+) s of the budget", (out / "STATUS.txt").read_text()).group(1))
+    assert used >= 7                                                          # the first call's time counts
+    # Without permission the first call's verdict stands, and ncu is not asked again.
+    done, commands = run_ncu(work, "--group", "ampere", "bin/hw", str(out), mode="permission")
+    before = len(commands)
+    done, commands = run_ncu(work, "--group", "blackwell", "--continue", "bin/hw", str(out), mode="permission")
+    assert len(commands) == before and first_line(out).startswith("ncu not run: no permission")
+    assert done.stdout.startswith("ncu not run: no permission")
+
+
+def test_the_probe_profiles_one_kernel_and_has_the_limit_of_preflight(work, tmp_path):
+    """A `timeout` that records its arguments and reports a timeout: the probe is one kernel
+    (--launch-count 1) under 300 s, as env/remote/preflight.sh allows its single kernel, and a
+    probe that does not end is "failed" and is not asked a second time."""
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    log = tmp_path / "timeout.log"
+    shim = tools / "timeout"
+    shim.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$*\" >> {log}\nexit 124\n")
+    shim.chmod(0o755)
+    out = work / "out"
+    done, commands = run_ncu(work, "bin/hw", str(out), PATH=str(tools) + os.pathsep + os.environ["PATH"])
+    assert done.returncode == 0 and commands == []
+    (probe,) = log.read_text().splitlines()
+    assert probe.startswith("--kill-after=10 300 ") and "--csv --launch-count 1 --metrics smsp__inst_executed.sum" in probe
+    assert first_line(out).startswith("ncu failed: the probe produced no counter table (exit 124: it did not end within its limit of 300 s)")
+    log.unlink()
+    run_ncu(work, "--probe-timeout", "45", "bin/hw", str(out), PATH=str(tools) + os.pathsep + os.environ["PATH"])
+    assert log.read_text().startswith("--kill-after=10 45 ")
+
+
+@pytest.mark.parametrize("signum, status", [(15, 143), (2, 130)])
+def test_stopping_the_script_stops_ncu_and_the_program_it_profiles(work, signum, status):
+    """SIGTERM (the stage limit of env/remote/run.sh) or SIGINT (Ctrl-C) to run_ncu.sh alone:
+    ncu and the program under it are in the process group of `timeout`, not in the script's,
+    and must not be left running on the GPU."""
+    out, pids = work / "out", work / "pids"
+    env = {**os.environ, "NCU_BIN": str(FIXTURE / "fake_ncu.sh"), "FAKE_NCU_HANG": "alu_chain",
+           "FAKE_NCU_PIDS": str(pids), "FAKE_NCU_TRANSPOSE_CSV": str(RECORDED), "PYTHON": "false"}
+    script = subprocess.Popen(["bash", str(work / "validation" / "blackwell_timing" / "run_ncu.sh"), "bin/hw", str(out)],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env, start_new_session=True)
+    try:
+        assert wait_until(lambda: pids.exists() and len(pids.read_text().split()) == 2, 30)
+        ncu, program = (int(pid) for pid in pids.read_text().split())
+        assert not gone(ncu) and not gone(program)
+        script.send_signal(signum)
+        assert script.wait(timeout=15) == status
+        assert wait_until(lambda: gone(ncu) and gone(program), 5)
+    finally:
+        if script.poll() is None:
+            script.kill()
+        for pid in pids.read_text().split() if pids.exists() else []:
+            try:
+                os.kill(int(pid), 9)
+            except ProcessLookupError:
+                pass
+    lines = (out / "STATUS.txt").read_text().splitlines()
+    name = "SIGTERM" if signum == 15 else "SIGINT"
+    assert lines[0].startswith("ncu partial: 2 benchmark(s) profiled, 0 failed, 9 not profiled; no counter table from: "
+                               "alu_chain (not reached: run_ncu.sh was stopped, or is still running), ")
+    assert f"ncu: run_ncu.sh was stopped by {name}" in lines

@@ -27,7 +27,8 @@ under `warplens run`.
 | --- | --- |
 | `manifest.py` | every run: name, program, arguments, matrix ids, claim, risk, timeout. `python manifest.py` prints it |
 | `build.sh` | builds every probe; needs only nvcc. Also assembles each one to `sm_100a` machine code, which is what proves ptxas accepts it |
-| `run_all.py` | runs everything, one process per run, each under a timeout; records the environment; packs an archive |
+| `run_all.py` | runs everything, one process per run, each under a timeout; on a GPU in an order that puts what may hurt the GPU last, with a canary kernel after every risky or failed run ([GPU health](#gpu-health-and-the-order-of-a-run)); records the environment; packs an archive |
+| `probe_process.py` | how every runner here starts a process: its own process group, a timeout, a kill of the whole group, and a bound on waiting for a killed process |
 | `predict.sh` | rewrites `predicted/` from the simulator |
 | `../regenerate_predictions.sh` | everything that is predicted, here and in `validation/blackwell_timing`, in one command: `predict.sh`, the tables of this file, the repeat-count table, the timing predictions |
 | `predicted/<name>.txt` | the predicted standard output of a run |
@@ -36,11 +37,12 @@ under `warplens run`.
 | `compare.py` | compares an archive with `predicted/` and prints one verdict per run |
 | `common.h`, `tcgen05_common.h`, `tma/tma_dump.h` | the PTX wrappers and the shared kernels |
 | `e2e/run_e2e.py`, `e2e/triton_gpu.py` | the end-to-end programs |
-| `run_rows.py` | the three matrix rows that are not probes, run at the end of a GPU run into `rows/`: `formats/ue4m3_ptxas.py` (NUM-05), `e2e/driver_call_trace.py` with `e2e/gdb_driver_trace.py` (RT-10), `e2e/cute_dsl_tma.py` with `e2e/launch_capture.py` (RT-11). See [Rows without a probe](#rows-without-a-probe) |
+| `run_rows.py` | the three matrix rows that are not probes, run in a GPU run after the end-to-end programs into `rows/`, RT-11 first: `formats/ue4m3_ptxas.py` (NUM-05), `e2e/driver_call_trace.py` with `e2e/gdb_driver_trace.py` (RT-10), `e2e/cute_dsl_tma.py` with `e2e/launch_capture.py` (RT-11). See [Rows without a probe](#rows-without-a-probe) |
 | `tests/test_blackwell_probes.py` (in the repository's `tests/`) | fails when a committed prediction is no longer what the simulator prints |
 | `tests/test_predict_path.py` | runs `run_all.py --mode predict` whole (probes, small formats, end to end) into a temporary directory and holds it against `predicted/` |
 | `tests/test_rental_harness.py` | a probe that does not launch is never a result; a run built by another toolkit is flagged |
 | `tests/test_rows_without_probes.py` | the rows without a probe say `skipped` with a reason where they cannot run, and never fail a run |
+| `tests/test_probe_health.py` | the order of a GPU run, the canary and the circuit breaker (with stand-in programs), `--resume`, the bound on a killed process, line-buffered output, and the verdicts of `compare.py` that depend on what the simulator predicts |
 
 Conventions the probes share:
 
@@ -52,6 +54,13 @@ Conventions the probes share:
   that budget is the suite's; a `0` that should be a `1` would point at it.
 - A kernel that is refused or faults: the program prints `KERNEL FAILED: ...` and exits with
   status 3. On a GPU nothing after a fault can be trusted, so anything risky is its own run.
+  The CUDA error's name is on an `info:` line; where it was reported (`at launch`,
+  `at synchronize`, `after synchronize`) is on standard error only, because the simulator
+  reports at the launch what a GPU reports at the synchronize. `compare.py` shows both.
+- Standard output is line-buffered (`setvbuf` in `common.h`, before anything prints): the
+  runner reads it through a pipe, and a program killed at its timeout would otherwise lose
+  the lines of the cases it had finished. The bytes are the same; the predictions did not
+  change (`tests/test_blackwell_probes.py`, `tests/test_predict_path.py`).
 - A program whose kernels the driver could not load at all (PTX newer than the driver, no
   code for this GPU, no device) prints `LAUNCH FAILED: ...` and exits with status 4. That is
   not an outcome of the test and is never read as one; see
@@ -78,13 +87,78 @@ validation/blackwell/compare.py validation/blackwell/results/gpu-<host>-<time>.t
 ```
 
 One command, no interaction. `run_all.py` builds (`build.sh --native`), records
-`nvidia-smi`, driver, toolkit and device, runs the 119 probe runs in manifest order, then the
-end-to-end programs, and writes `results/gpu-<host>-<time>.tar.gz` with every run's standard
-output, standard error and status (`status.tsv`), the build log and the environment. Bring
-the archive back; `compare.py` needs the pinned Python environment and this directory.
+`nvidia-smi`, driver, toolkit and device, runs the 126 probe runs, the end-to-end programs
+and the rows without a probe (in the order of the next section), and writes
+`results/gpu-<host>-<time>.tar.gz` with every run's standard output, standard error and
+status (`status.tsv`: name, status, seconds, command, UTC start time, in the order the runs
+were made), the build log and the environment. Bring the archive back; `compare.py` needs
+the pinned Python environment and this directory.
 
 Useful options: `--no-e2e` (probes only), `--only 'tmem/*'` (repeatable), `--no-build`,
-`--timeout-scale 2`, `--binaries native`.
+`--timeout-scale 2`, `--binaries native`, `--resume` (below).
+
+### GPU health and the order of a run
+
+A probe that faults or hangs can leave the GPU unable to run anything (an Xid that needs a
+reset). Nothing here has done that to a real GPU yet: no Blackwell probe has run on one. The
+runner is written so that when one does, the least is lost.
+
+**Order** (GPU mode; the simulator modes keep the manifest's order, with the end-to-end
+programs last, and write the same files as before):
+
+1. the 80 runs the manifest gives no risk, in manifest order;
+2. the end-to-end programs (`e2e/run_e2e.py`; inside it the book's step is last, because
+   `hgemm_v7` to `v9` release tensor memory twice and may fault);
+3. the rows without a probe (`run_rows.py`), RT-11 first;
+4. the 33 runs that may fault by design;
+5. the 13 runs that may hang by design.
+
+`--only` keeps that order among the probes it selects and leaves 2 and 3 out; `--no-e2e`
+leaves 2 out and the launching steps of 3.
+
+**Canary.** `mbarrier/script basic` from the chosen binaries (one CTA, no TMA, no tensor
+memory; under a second on the development machine, limit 30 s) runs once before the probes,
+then after every run that did not end as `ok`, after every run with a risk, after the
+end-to-end programs and after the rows. Each check is a line of `health.tsv`: after which
+run, how the canary ended, seconds, attempts, UTC time, a note. At each check the new lines
+of `dmesg` that name `Xid` or `NVRM` are appended to `xid.log` under the run's name; if
+`dmesg` (and `journalctl -k`) cannot be read, `xid.log` says so once and the run goes on.
+
+**Circuit breaker.** A canary that fails is tried again after 5, 10, 15 and 30 s
+(`nvidia-smi` is saved to `health/` before the first retry and after the last). If one
+passes, `health.tsv` says `FAILED THEN RECOVERED`, `compare.py` lists the event, and the run
+goes on: results after it are results. If none passes, nothing more is launched:
+
+| Where | What you see |
+| --- | --- |
+| `status.tsv` | every remaining run as `not run (GPU unhealthy after <run>)`; the end-to-end runs too if they had not run |
+| `GPU-UNHEALTHY.txt` | at the top of the results: the run after which the canary stopped passing, and what to do |
+| `run_all.py` | the same text between rows of `!` at the end, exit status 1; `run_rows.py` is not started, and `RT-11-NOT-CAPTURED.txt` says why if the capture was required and not yet made |
+| `compare.py` | the text first, then `NOT RUN, GPU unhealthy` for those runs: not findings about them, but the comparison exits 1 because the run is incomplete |
+
+The breaker is armed only once the canary has passed in the run. Where it never does
+(`bin/` on the development machine: `sm_100a` programs on an RTX 3080 Ti) each failure is
+recorded with the note "the breaker is not armed" and stops nothing; on a B200 the canary
+passing is what `--binaries auto` already depends on.
+
+**After a reset** (or on a new instance with the results directory copied over):
+`run_all.py --no-build --resume --out <the same directory>` keeps every run that has a
+status other than `not run`, including the one after which the GPU was unhealthy, which is
+not repeated, and runs the rest. The end-to-end programs are repeated unless all eight have
+a status; the rows are left alone once RT-11 has a line in `rows/status.tsv`.
+
+**A process that does not die.** A timed-out run is killed with its process group
+(SIGTERM, 5 s, SIGKILL). A process stuck inside the driver can outlive the kill; the runner
+waits 10 s for it, records `timeout (process did not exit after SIGKILL)` with whatever it
+had printed, and goes on to the canary. Tried only with a stand-in
+(`tests/test_probe_health.py`).
+
+**What fails the stage.** `run_all.py` exits 1 for an incomplete collection: a run that did
+not launch, a host error, a crash, a fault or timeout the manifest does not allow, a
+missing capture, an unhealthy GPU. A fault or a hang the manifest allows is an observation
+and does not, also when the simulator predicts otherwise: a run that may hang, timed out,
+and is predicted to finish is printed as `TIMED OUT, PREDICTED TO FINISH` (and the canary
+runs after it), and it is `compare.py` that counts it as a mismatch.
 
 **PTX or machine code.** `bin/` holds the PTX-carrying programs, the very files the
 simulator ran. The driver can compile them only if it is at least as new as the toolkit that
@@ -135,17 +209,19 @@ The driver then refuses the PTX and the machine-code programs run (`bin-native/`
 **Expected run time** (estimated; nothing here has been timed on a B200): the build takes a
 few minutes (60 programs, three compilations each with `--native`). Most runs take well
 under a second of GPU time plus process start-up. Runs that hang are killed at their
-timeout, 30 s each; 12 runs are allowed to hang, and two of them (`mbarrier/expect_tx_large`,
-`tmem/alloc_blocks`) are expected to. So the probes take between 3 and 10 minutes. The
+timeout, 30 s each; 13 runs are allowed to hang, three of them are predicted to
+(`mbarrier/expect_tx_small.wait`, `mbarrier/expect_tx_large`, `tmem/alloc_blocks`), and
+`mbarrier/try_wait.incomplete` has no prediction. The canary adds one short process after
+each of the 46 runs with a risk. So the probes take between 3 and 10 minutes. The
 end-to-end part is dominated by fetching and compiling CUTLASS and by Triton's, PyTorch's
 and TVM's start-up and compilers: allow 15 minutes. In the simulator the whole suite takes a
 few minutes on the development machine (the book's nine kernels are about one of them).
 
 **After a hang or fault.** Each run is a separate process, killed with its process group on
 timeout, so the next run starts with a fresh CUDA context. If a fault leaves the GPU itself
-unusable (an Xid that needs a reset), every later run fails at its first CUDA call and says
-`HOST ERROR`; `status.tsv` shows where that began. The runs most likely to do that are at the
-end of each area in the manifest, and can be left out with `--only`.
+unusable (an Xid that needs a reset), the canary after that run fails and the run stops
+there: [GPU health and the order of a run](#gpu-health-and-the-order-of-a-run). The runs
+that may do that are the last ones made.
 
 ## What each run tests
 
@@ -266,7 +342,14 @@ run is isolated for that reason.
 | `commit_arrival` | `commit_arrival` | MMA-10 | tcgen05.commit makes exactly one arrival; data loaded after waiting on it is the sum of all eight chained MMAs | runs | - |
 | `swizzle_mismatch` | `swizzle_mismatch` | MMA-11, TMA-01, MMA-02 | an operand loaded with a 128B swizzle and described as 64B is read by the descriptor's formula | runs (2 finding(s)) | - |
 | `base_offset` | `base_offset` | MMA-12 | with the base-offset field 0 (all CUTLASS emits) an operand that starts off a swizzle period is read through the swizzle of its absolute shared address | runs | - |
-| `base_offset.field` | `base_offset field` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what it selects, against three candidate rules | not run (no prediction) | fault |
+| `base_offset.field.0` | `base_offset field 0` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what field 1 selects for a 128B operand starting at byte 128, against three candidate rules | not run (no prediction) | fault |
+| `base_offset.field.1` | `base_offset field 1` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what field 3 selects for a 128B operand starting at byte 384, against three candidate rules | not run (no prediction) | fault |
+| `base_offset.field.2` | `base_offset field 2` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what field 7 selects for a 128B operand starting at byte 896, against three candidate rules | not run (no prediction) | fault |
+| `base_offset.field.3` | `base_offset field 3` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what field 1 selects for a 64B operand starting at byte 128, against three candidate rules | not run (no prediction) | fault |
+| `base_offset.field.4` | `base_offset field 4` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what field 3 selects for a 64B operand starting at byte 384, against three candidate rules | not run (no prediction) | fault |
+| `base_offset.field.5` | `base_offset field 5` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what field 1 selects for a 32B operand starting at byte 128, against three candidate rules | not run (no prediction) | fault |
+| `base_offset.field.6` | `base_offset field 6` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what field 1 selects for a 128B operand starting at byte 0, against three candidate rules | not run (no prediction) | fault |
+| `base_offset.field.7` | `base_offset field 7` | MMA-12 | none: a non-zero base-offset field is outside v1 and refused. Records what field 7 selects for a 128B operand starting at byte 128, against three candidate rules | not run (no prediction) | fault |
 
 ### `cluster/`
 
@@ -375,9 +458,13 @@ probe                              verdict                     detail
 tma/swizzle_misaligned             identical
 mma/accumulation_order             unverified                    812 of 2968 float32 words differ, by at most 2 ulp
 tmem/lane_window.16                informational               the GPU ran what the simulator refuses (...)
-mbarrier/expect_tx_large           timed out (by design)
-tmem/alloc_increasing              kernel failed (by design)   ...
+mbarrier/expect_tx_large           timed out (as predicted)    simulator: deadlock in CTA (0, 0, 0): ...
+cluster/pair_mma.m256_issuer0      TIMED OUT, predicted to finish  the simulator's kernel returns
+tmem/alloc_increasing              identical                   both refuse the kernel; GPU: cudaError... at synchronize; simulator: tcgen05.alloc of 64 columns ...
+tmem/lane_window.1                 GPU faulted, not modelled   GPU: cudaError... at synchronize; the simulator does not model this (unsupported instruction ...)
+tma/store_wait_group.edge          kernel failed (by design)   GPU: cudaError... at synchronize; the simulator's kernel returns
 tma/oob_fill                       DIFFERS
+tmem/alloc_leak                    NOT RUN, GPU unhealthy      GPU unhealthy after tmem/dealloc_mismatch
 ```
 
 (The lines above illustrate the format; they are not results.) `FAILED TO LAUNCH` and
@@ -388,9 +475,42 @@ finite values differ in `mma/accumulation_order`, which the simulator does not c
 bit for bit (`docs/numerics.md`). The reported ULP distance is an observation, not an accepted
 tolerance or proof that rounding explains the difference. Unequal infinities or NaNs are
 `DIFFERS`. The comparison exits 1 for failures, 2 for unverified numeric differences without
-other failures, and 0 otherwise. `informational`: no prediction; read the output. A run that is refused
-in the simulator and *also* fails on the GPU counts as `identical`: both print the same
-`KERNEL FAILED` line. The error names differ (`info:` lines) and are in the archive.
+other failures, and 0 otherwise. `informational`: no prediction; read the output.
+
+**A failed kernel.** The compared lines of a kernel that failed are `KERNEL FAILED: <label>`
+and nothing else: the error's name is on an `info:` line and the place on standard error. So
+the same lines on both sides say only that both failed, for whatever reason, and what the
+verdict is depends on what the simulator's side was (`predicted/<name>.sim.txt`):
+
+- the simulator stopped the kernel for a rule it models and names (12 runs, e.g. an
+  allocation of 48 columns): `identical`, detail `both refuse the kernel`, with the GPU's
+  error and where it was reported, and the simulator's rule. Whether that error is the one
+  the rule implies is for the reader: the simulator reports every refusal as
+  `cudaErrorLaunchFailure` at the launch.
+- the simulator said `unsupported instruction` (4 runs: `tmem/lane_window.16`, `.1`, `.48`,
+  `mma/operand_layouts.tf32_mn`): `GPU faulted, not modelled`. Nothing is confirmed; if the
+  GPU runs the kernel instead, the run is `informational`. (Results that are a simulator's
+  own run, `run_all.py --mode sim`, carry the simulator's message on standard error and
+  stay `identical`: they are the prediction.)
+- the simulator reported a deadlock (3 runs) and the GPU printed the same `KERNEL FAILED`
+  line: still `identical` by its lines, with a detail saying that a GPU does not report a
+  deadlock, so its error is something else. The predicted outcome there is a timeout.
+- a run without a prediction that prints `KERNEL FAILED` is `kernel failed`, with the error,
+  not `informational`; it counts as a failure unless the manifest lets the run fault.
+
+**A timeout.** `timed out (as predicted)`: the manifest lets the run hang and the simulator
+predicts a deadlock. `timed out (by design)`: the manifest lets it hang and the simulator
+predicts no kernel that returns (no prediction: `mbarrier/try_wait.incomplete`; a refusal:
+`tmem/dealloc_mismatch`). `TIMED OUT, predicted to finish`: the manifest lets it hang, but
+the simulator's kernel returns (8 of the 13: the four `cluster/pair_mma` runs,
+`tmem/dealloc_repeated`, `tmem/alloc_leak`, `cluster/clc_failed_response.again` and
+`.again_grid`); counted as a mismatch, with what the GPU had printed under Details.
+`timed out`: the manifest does not let it; a failure.
+
+**Which results.** Given the archive of a whole rental (`env/remote/run.sh`) or its unpacked
+directory, `compare.py` takes `out/blackwell/`. It never takes a `status.tsv` under
+`predicted-toolkit/` (the simulator's run on the rented machine, where everything is `ok`)
+or in `rows/`; if more than one remains it lists them and compares nothing.
 
 `tma/tensormap_encode_sweep` has no prediction and never will: it prints, for 1380
 parameter sets, the 128 bytes the driver's `cuTensorMapEncodeTiled` wrote. That is the data
@@ -408,7 +528,7 @@ Partly covered, and how: MMA-01 (only the M, N, format and major-ness fields are
 MMA-05 (repeated accumulation of the same product; no case that isolates "one float32
 addition"); MB-11 (`mbarrier/try_wait.incomplete` prints what a single `try_wait` on an open phase
 returns, without a prediction: the simulator's `try_wait` blocks by design); MMA-12 (the field 0
-is predicted; `mma/base_offset.field` records a non-zero field without a prediction); CL-01 (ranks along x only); CL-09 and CL-13 (exercised
+is predicted; `mma/base_offset.field.0` to `.7` record a non-zero field without a prediction, one case per process, because the program stops at its first failed kernel); CL-01 (ranks along x only); CL-09 and CL-13 (exercised
 inside `pair_mma`, not isolated); TMA-10 (the unaligned coordinate; an unaligned shared
 address is `tma/swizzle_misaligned.sixteen`, which is 16-byte aligned, so a shared address
 that is not a multiple of 16 is not tried); TMA-13 (2000 stores per variant in the predicted
@@ -493,14 +613,23 @@ a B200's; RT-04 and RT-12 test the same refusals at Blackwell's limits
 ### Rows without a probe
 
 Three rows are not a kernel with a predicted output, so they are not in the manifest and
-`compare.py` does not read them. `run_all.py` ends a GPU run (not `--only`) with
-`run_rows.py`, which runs each as a step under a timeout and writes `rows/status.tsv`
+`compare.py` does not read them. In a GPU run (not `--only`) `run_all.py` runs
+`run_rows.py` after the end-to-end programs and before the probes that may fault or hang.
+It runs each as a step under a timeout and writes `rows/status.tsv`
 (`ok`, `skipped (why)`, `news (...)`, or what failed) and the outputs under `rows/`. NUM-05
 and RT-10 never fail the run. RT-11 does where its capture is required, which is on a GPU
 of compute capability 10.x: anything but `ok` there is exit status 1 from `run_rows.py`
 and `run_all.py`, a banner, and `RT-11-NOT-CAPTURED.txt` in the results, which `compare.py`
 repeats. `--rt11 required` and `--rt11 optional` override; `--no-e2e` and `--only` leave
 the rows out and are not failures.
+
+RT-11 is the first step (limit 3000 s: its script runs the tutorial three times, two of
+them under gdb, each under its own 900 s). NUM-05 and the two RT-10 traces follow with
+300 s each (240 s for the traced script), so that a trace that hangs costs minutes. Those
+limits are a choice, not a measurement on a B200. Where the capture is required,
+`run_all.py` writes `RT-11-NOT-CAPTURED.txt` before the first probe ("not captured yet") and
+`run_rows.py` removes it when the step ends as `ok`: a run that is killed before it reaches
+the row (the stage's limit in `env/remote/run.sh`) leaves the file too.
 
 | Row | Step | Script | What it does | Without a B200 |
 | --- | --- | --- | --- | --- |
@@ -531,6 +660,7 @@ What was done on the development machine (RTX 3080 Ti Laptop GPU, `sm_86`, drive
 | **on the GPU**, 2026-11-24, after `[reg+offset]` with a wrapped 32-bit register was given a golden file: `build.sh --ampere`, then `run_all.py --binaries ampere --no-build --no-e2e --only 'e2e/ampere_replay.addrwrap'`, and `compare.py` on the archive | **identical** to the prediction, which is `validation/ampere/addrwrap_golden.txt`. Built by nvcc 12.4, the two C++ kernels have no wrapped register; the four inline-PTX kernels do. The same day every run an Ampere GPU can execute was rerun in one command (the programs of `AMPERE_PROBES` in `build.sh`, 31 runs): 27 are identical to their predictions, `formats/fma.all` has none, and `e2e/device_attributes`, `mbarrier/arrivals_and_bytes` and `mbarrier/complete_before_expect` differ (another device; `-DPROBE_AMPERE` leaves `expect_tx` and `complete_tx` out of the two mbarrier programs) |
 | **another compiler**: every probe built by nvcc 13.0.88 (the toolkit `env/remote/setup.sh` falls back to on this machine's driver), then `run_all.py --mode predict` on those programs | all 98 predictions byte-identical to the committed ones, which come from nvcc 13.5.37 code. Before the barriers of finding 16 were added, 16 differed |
 | **the whole rental, rehearsed**: `env/remote/run.sh --keep-going` on the 3080 Ti with `PREFLIGHT_EXPECT_CAP=8.6`, env from `setup.sh` (fallback toolkit 13.0, PyTorch env) | 13 min 52 s. Preflight: the new `predictions` check warns, `torch` passes, the three Blackwell checks fail as they must. Both suites build. `run-blackwell`: the canary fails from `bin/` and `bin-native/` (`cudaErrorNoKernelImageForDevice`: `sm_100a` code on `sm_86`), `NEITHER BUILD RUNS`; 71 runs `launch-failed`, 28 `host-error` (no tensor maps on Ampere), 2 `ok`; the stage fails with the count in capitals. `compare.py`: 71 `FAILED TO LAUNCH`, 28 `HOST ERROR`, none "by design". `run-timing`: every benchmark `LAUNCH FAILED`. The archive has `PREDICTIONS-NOT-COMPARABLE.txt` at its top and the banner is the last thing printed. An interrupt (Ctrl-C) during the self-test stopped the stage and still wrote the archive |
+| **the order, the canary and the kernel log, on the GPU**, 2026-11-24: `run_all.py` whole (GPU mode, `bin/`), then `run_all.py --binaries ampere --no-build --no-e2e --only ...` (37 runs), and `compare.py` on both | With `bin/` (189 s, the build included): the 80 runs without a risk ran first, then the eight end-to-end steps, then `run_rows.py` (RT-11 first: skipped on compute capability 8.6, so no `RT-11-NOT-CAPTURED.txt`; NUM-05 0.2 s; the two traces under 3 s each), then the 33 runs that may fault and the 13 that may hang; `status.tsv` has all 126 with their start times. 95 failed to launch and 28 had a host error, as they must here. The canary failed at the start (`launch-failed`), so the breaker was never armed: 126 lines in `health.tsv`, each with that note, and nothing was stopped. `dmesg` is not readable by this user; `journalctl -k` was, and `xid.log` got 192 `NVRM` lines that appeared during the end-to-end programs (a register the user may not read; none an Xid). With `bin-ampere/`: the canary passed at the start and after `mbarrier/complete_before_expect` and `mbarrier/over_arrival`, the two runs with a risk that are built there (0.4 s each). A real probe killed part-way (`bin-ampere/e2e/ampere_replay vote`, limit 0.25 s of its 0.28 s) kept 1452 of its 2220 lines, ending on a whole line. **Not done on any GPU:** a canary that fails after having passed, the retries, `GPU-UNHEALTHY.txt`, `--resume`, and a process that survives the kill; those ran only against stand-in programs (`tests/test_probe_health.py`) |
 | end to end in the simulator | tutorials 1-4 pass their own check; Triton, the TIRx script and the CuTe DSL script match NumPy; the book's `hgemm_v1` to `v9` match NumPy |
 | **end to end on the GPU** (`run_e2e.py --mode gpu`, in an env made by `env/remote/setup.sh`: toolkit 13.0 to match the driver, PyTorch 2.15.0+cu132 in its own venv) | `triton`: ran whole, vector add error 0, matmul error 5.72e-06 (on `sm_86` Triton emits `mma.sync`, not `tcgen05`). `unchanged_scripts.tirx` and `.cute_dsl`: ran, match NumPy. `book_hgemm`: every kernel was compiled by NVRTC and reached the driver, then failed as it must on Ampere (`CUDA_ERROR_INVALID_PTX` for v1 to v3, `cuTensorMapEncodeTiled: operation not supported` for v4 to v9), each with its own `FAILED` line. The CUTLASS tutorials were not tried on the GPU (`sm_100a` only) |
 

@@ -85,6 +85,11 @@ __global__ void bench_spin_kernel(int reps, uint64_t* sink) {
 }
 
 inline Opts bench_init(int argc, char** argv, const char* bench) {
+    // run_all.sh sends stdout to a file, where it would be block-buffered: a program killed
+    // at its time limit would lose the lines still in the buffer. Line-buffered, every
+    // DEVICE, BENCH and BENCH_ERROR line is in the file when its printf returns. The bytes
+    // printed are the same.
+    setvbuf(stdout, nullptr, _IOLBF, 0);
     Opts o;
     for (int i = 1; i < argc; ++i) {
         if (!strcmp(argv[i], "--sim")) o.sim = true;

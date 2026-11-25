@@ -13,6 +13,12 @@
 #                                counter the GPU does not have)
 #                   none         run the program and print no table
 #   FAKE_NCU_LOG    append each command line to this file
+#   FAKE_NCU_HANG   program names (space-separated): profiling one of them never ends, as
+#                   ncu on a kernel that waits for ever. The stand-in starts a child that
+#                   sleeps, as ncu starts the program, and writes both process ids to
+#                   $FAKE_NCU_PIDS if that is set
+#   FAKE_NCU_FAIL   program names: ncu ends with status 1 and no table, whatever the counters
+#   FAKE_NCU_SLEEP  seconds every profile takes before its table (default 0)
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 mode="${FAKE_NCU_MODE:-ok}"
 [[ -n "${FAKE_NCU_LOG:-}" ]] && echo "$*" >> "$FAKE_NCU_LOG"
@@ -37,6 +43,7 @@ while [[ $# -gt 0 ]]; do
       exit 0 ;;
     --csv) csv=1 ;;
     --metrics) metrics="$2"; shift ;;
+    --launch-count|-c) shift ;;      # takes a number; the stand-in "profiles" one kernel anyway
     --*) ;;
     *) break ;;
   esac
@@ -44,6 +51,7 @@ while [[ $# -gt 0 ]]; do
 done
 [[ $# -gt 0 && $csv == 1 ]] || { echo "fake_ncu: expected --csv --metrics LIST program [arguments]" >&2; exit 2; }
 program="$1"
+base="$(basename "$program")"
 
 if [[ "$mode" == permission ]]; then
   cat "$here/permission_denied.txt"
@@ -59,9 +67,21 @@ if [[ "$mode" == strict ]]; then
   done
 fi
 
+if [[ " ${FAKE_NCU_HANG:-} " == *" $base "* ]]; then
+  echo "==PROF== Connected to process $$ ($program)"
+  sleep 600 &
+  [[ -z "${FAKE_NCU_PIDS:-}" ]] || echo "$$ $!" >> "$FAKE_NCU_PIDS"
+  wait
+  exit 0
+fi
+if [[ " ${FAKE_NCU_FAIL:-} " == *" $base "* ]]; then
+  echo "==ERROR== (stand-in) profiling $base failed"
+  exit 1
+fi
 echo "==PROF== Connected to process $$ ($program)"
 "$@"
 echo "==PROF== Disconnected from process $$"
+sleep "${FAKE_NCU_SLEEP:-0}"
 [[ "$mode" == none ]] && { echo "==WARNING== No kernels were profiled."; exit 0; }
 if [[ "$(basename "$program")" == transpose_hw && -n "${FAKE_NCU_TRANSPOSE_CSV:-}" ]]; then
   cat "$FAKE_NCU_TRANSPOSE_CSV"     # a recording of the real ncu for this very program

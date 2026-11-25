@@ -48,7 +48,7 @@ def test_tirx_script_needs_no_python_in_front_of_it():
 
 def test_run_program_returns_what_the_command_only_prints(monkeypatch):
     """`warplens.run_program` is `warplens run` from Python: the same launch, with its
-    statistics, PTX and timing report kept (notebooks/book_tour.ipynb is built on it)."""
+    statistics, PTX and timing report kept (examples/08_book/book_tour.ipynb is built on it)."""
     import warplens
     from warplens.viz import timeline_svg
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")

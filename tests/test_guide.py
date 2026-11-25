@@ -1,4 +1,4 @@
-"""Keep `docs/guide.md`, `README.md` and `notebooks/book_tour.ipynb` true.
+"""Keep `docs/guide.md`, `README.md` and `examples/08_book/book_tour.ipynb` true.
 
 The code in the guide and the README is executed. A fenced block is picked up when the line before it is an HTML
 comment (invisible in the rendered page) of one of these forms:
@@ -15,8 +15,8 @@ comment (invisible in the rendered page) of one of these forms:
                                          not compared (numbers that depend on the machine).
 
 Blocks without such a comment are illustrations and are not executed. All blocks run in one
-scratch directory, in document order, with `examples/`, `docs/`, `validation/` and
-`notebooks/` linked into it, so the paths in the guide are the paths a reader types at the
+scratch directory, in document order, with `examples/`, `docs/`, `validation/` and `env/`
+linked into it, so the paths in the guide are the paths a reader types at the
 top of a checkout, and files a block writes do not land in the repository. `warplens` and
 `python` resolve to this interpreter.
 
@@ -55,10 +55,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 GUIDE = ROOT / "docs" / "guide.md"
 README = ROOT / "README.md"
-NOTEBOOK = ROOT / "notebooks" / "book_tour.ipynb"
+NOTEBOOK = ROOT / "examples" / "08_book" / "book_tour.ipynb"
 BOOK = os.environ.get("WARPLENS_BOOK", "")
 MARK = re.compile(r"<!--\s*test:\s*(file|run|output)\b(.*?)-->\s*$")
-LINKED = ("examples", "docs", "validation", "notebooks", "env", "PLAN.md", "README.md")
+LINKED = ("examples", "docs", "validation", "env", "PLAN.md", "README.md")
 
 
 @dataclass

@@ -135,7 +135,7 @@ file checked in under `examples/`. The other ways in need more:
 | Triton | `pip install -e ".[triton]"` (Triton 3.9 is what is tested). No shim: where it cannot be built, `warplens run script.py` says so and runs the script in its own process, with only the Triton driver. |
 | TIRx | `pip install -e ".[tirx]"` (`apache-tvm-tirx` and `cuda-bindings`; 0.1.0 and 13.5.0 are what is tested), and an NVRTC library that knows `sm_100a` (CUDA 12.8 or newer; the conda env has 13.5). |
 | The CuTe DSL | `pip install -e ".[cute-dsl]"` (`nvidia-cutlass-dsl`; 4.8.1 is what is tested). |
-| The tutorial notebook | `pip install -e ".[jupyter]"` (Jupyter's `notebook`, `nbclient` and `ipykernel` to execute it from a script, and the TIRx packages), and a clone of the book. |
+| The tutorial notebook (`examples/08_book/book_tour.ipynb`) | The TIRx row above and a clone of the book. To open it in Jupyter, `pip install -e ".[jupyter]"` (Jupyter's `notebook`, `nbclient`, `nbformat` and `ipykernel`, and the TIRx packages); without Jupyter its cells run as a plain Python script ([examples/08_book/README.md](../examples/08_book/README.md)). |
 | All of the above | `pip install -e ".[all]"`. Every package the extras name is on PyPI. |
 
 The repository's conda env, created by `env/setup.sh`, has the compiler side
@@ -182,7 +182,9 @@ compares with NumPy. The rest of `examples/` goes on from there:
 | `02_tma_copy` | TMA and mbarriers, then five deliberate bugs and their reports |
 | `03_cutlass_mma` | CUTLASS's four Blackwell tutorials (`build.sh` fetches and compiles them) |
 | `04_pipelined_gemm` | the timing model on a pipelined GEMM |
-| `05_triton`, `06_cute_dsl`, `07_tirx`, `08_book` | the other front ends |
+| `05_triton`, `06_cute_dsl`, `07_tirx` | the other front ends |
+| `08_book` | the nine GEMM kernels of the book *Modern GPU Programming for MLSys*, from your clone of it, and a notebook that tours them |
+| `09_clc` | cluster launch control |
 
 ## 5. Getting code into the simulator
 
@@ -658,10 +660,13 @@ does all nine, each on the smallest problem it does any work on; that takes
 about a minute and a half here, most of it compilation. `hgemm_v7` to `v9` get
 one finding each, `tmem-dealloc-repeated`, explained in section 6.4.
 
-[notebooks/book_tour.ipynb](../notebooks/book_tour.ipynb) goes through the
-nine kernels chapter by chapter and shows, for each, what the simulator can
+The notebook beside the runner,
+[examples/08_book/book_tour.ipynb](../examples/08_book/book_tour.ipynb), goes
+through the nine kernels chapter by chapter and shows, for each, what the simulator can
 see: the PTX the kernel became, which warp does what, the findings, the tensor
-memory layout and the timing model's account.
+memory layout and the timing model's account. Jupyter is optional: the
+notebook's code cells are plain Python and run as a script
+([examples/08_book/README.md](../examples/08_book/README.md)).
 
 The notebook gets those objects from `warplens.run_program`, which is
 `warplens run` as a Python function: it runs a command with its GPU work done
@@ -1742,8 +1747,9 @@ the PTX of modules a program loads itself, as TIRx does).
 
 ## 10. Where to read more
 
-- [notebooks/book_tour.ipynb](../notebooks/book_tour.ipynb): the book's GEMM
-  kernels, chapter by chapter, in the simulator.
+- [examples/08_book/book_tour.ipynb](../examples/08_book/book_tour.ipynb): the
+  book's GEMM kernels, chapter by chapter, in the simulator
+  ([how to run it](../examples/08_book/README.md)).
 - [coverage.md](coverage.md): every PTX construct and instruction supported.
 - [numerics.md](numerics.md): what is computed exactly and what is not; TF32;
   the FP8/FP4 host-side formats.

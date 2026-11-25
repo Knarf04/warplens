@@ -13,7 +13,7 @@ Only warplens's public API is used: `warplens.run_program` and what it returns
 (`ProgramRun`, `ProgramLaunch`, `LaunchStats`).
 
 Nothing in this file comes from the book. `run_book_kernel()` executes the kernel definitions
-found in the reader's clone, through `examples/08_book/run.py`.
+found in the reader's clone, through `run.py` next to this file.
 """
 
 from __future__ import annotations
@@ -25,8 +25,7 @@ from pathlib import Path
 
 from warplens import ProgramLaunch as Launch, ProgramRun as Run, run_program
 
-REPOSITORY = Path(__file__).resolve().parent.parent
-RUNNER = REPOSITORY / "examples" / "08_book" / "run.py"
+RUNNER = Path(__file__).resolve().parent / "run.py"  # the example this notebook sits beside
 
 # The child process: take the kernel builders from the clone with the runner's own function,
 # and run one of them at a size the notebook chooses.

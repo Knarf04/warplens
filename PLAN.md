@@ -632,6 +632,6 @@ Owed before v1.0 because of it:
 ### Still owed for v1.0 besides the above
 
 - Done: a tutorial notebook that follows the book's GEMM chapters
-  (`notebooks/book_tour.ipynb`) and a single user guide (`docs/guide.md`).
+  (`examples/08_book/book_tour.ipynb`) and a single user guide (`docs/guide.md`).
   The `jupyter` extra installs the notebook tools and TIRx dependencies.
 - Reserve the PyPI name.

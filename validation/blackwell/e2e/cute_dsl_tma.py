@@ -37,7 +37,8 @@ Steps, each under a timeout:
                            before the kernel and after cuCtxSynchronize
        mem/<sha256>.bin    the dumps. PyTorch's allocator keeps many tensors in one
                            allocation; the dump is the whole allocation
-     PyTorch's own kernels (C++ names, `_Z...`) are launched too; their parameters are saved,
+     PyTorch's own kernels (C++ names, `_Z...`) and the reference GEMM's
+     `cutlass3x_sm100_simt_sgemm_...` are launched too; their parameters are saved,
      their memory is not read, and their modules (a megabyte each) are listed and not kept.
   4. e2e/launch_capture.py checks that nothing is missing and writes DIR/summary.txt and
      DIR/capture.sha256. An incomplete capture fails this script.
@@ -177,8 +178,12 @@ def main() -> int:
     expect = {"descriptor": args.expect_descriptor, "ptx": True, "last_line": args.expect_last_line or ""}
     if not args.script:
         expect.update(descriptor=True, last_line="PASS")
-        # PyTorch's own kernels (and cuBLAS's, for the reference result): parameters, no memory, no code.
-        capture_env["WARPLENS_TRACE_MEMORY_SKIP"] = "^_Z"
+        # The tutorial's torch.einsum reference can launch an unmangled cuBLAS SGEMM
+        # on B200. Its 384-byte argument is not one of the DSL's tensor maps, and its
+        # library supplies no PTX dump. Keep its launch/parameters but skip its memory,
+        # just as for PyTorch's mangled kernels. Do not exclude other large arguments:
+        # an unexpected kernel must still fail the completeness check.
+        capture_env["WARPLENS_TRACE_MEMORY_SKIP"] = "^(?:_Z|cutlass3x_sm100_simt_sgemm_)"
         capture_env["WARPLENS_TRACE_MODULE_SKIP_WRAPPED"] = "1"
         if args.capture_mnk:
             capture_command += ["--mnk", args.capture_mnk]

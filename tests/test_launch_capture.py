@@ -18,6 +18,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -274,6 +275,53 @@ def test_a_script_without_descriptors_is_checked_for_what_it_has(tmp_path):
     # Held to the tutorial's expectations, it is not complete.
     write(tmp_path, capture, [launch], expect=launch_capture.EXPECT)
     assert len(launch_capture.verify(tmp_path)[0]) == 3
+
+
+@pytest.mark.parametrize("extra_kernel, remove_dsl_ptx, expected", [
+    ("cutlass3x_sm100_simt_sgemm_f32_f32_f32_f32_f32_32x32x16_1x1x1_3_tnn_align1_bias_f32_relu", False, 0),
+    ("another_large_parameter_kernel", False, 1),
+    ("cutlass3x_sm100_simt_sgemm_f32_f32_f32_f32_f32_32x32x16_1x1x1_3_tnn_align1_bias_f32_relu", True, 1),
+])
+def test_tutorial_reference_gemm_is_excluded_but_other_capture_checks_remain(
+        tmp_path, monkeypatch, extra_kernel, remove_dsl_ptx, expected):
+    """B200's reference GEMM has an unmangled name and a 384-byte ordinary struct.
+    Its absent PTX is irrelevant; an unexpected launch or missing DSL PTX is still fatal."""
+    tutorial = load("cute_dsl_tma_reference_test", E2E / "cute_dsl_tma.py")
+    fixture = tmp_path / "fixture"
+    capture, launch = tutorial_like(fixture)
+    extra = {"index": 1, "call": "cuLaunchKernelEx", "kernel": extra_kernel,
+             "grid": [16, 8, 1], "block": [64, 1, 1],
+             "parameters": [{"index": 0, "offset": 0, "size": 384, "hex": "00" * 384}]}
+    out = tmp_path / "run"
+    program = tmp_path / "fp16_gemm_0.py"
+    program.touch()
+
+    def trace(command, directory, timeout, env, **options):
+        if options.get("capture"):
+            # The tracer records a skip only when the actual harness configuration
+            # matches the launch; keep the reference's launch and parameter bytes.
+            if re.search(env["WARPLENS_TRACE_MEMORY_SKIP"], extra_kernel):
+                extra["memory"] = {"skipped": "the kernel's name matches WARPLENS_TRACE_MEMORY_SKIP"}
+            shutil.copytree(fixture / "capture", directory, dirs_exist_ok=True)
+            (directory / "launch01.param00.bin").write_bytes(bytes(384))
+            write(out, capture, [launch, extra])
+            if remove_dsl_ptx:
+                (directory / "dsl_dump" / "host.sm_100a.ptx").unlink()
+        return "ok", {"launches": [launch]}
+
+    monkeypatch.setattr(tutorial, "find_gdb", lambda: ("gdb", ""))
+    monkeypatch.setattr(tutorial, "compute_capability", lambda: "10.0")
+    monkeypatch.setattr(tutorial.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=0))
+    monkeypatch.setattr(tutorial, "run_process", lambda *args, **kwargs: ("ok", 0, b"PASS\n", b""))
+    monkeypatch.setattr(tutorial, "trace", trace)
+    monkeypatch.setattr(sys, "argv", ["cute_dsl_tma.py", "--out", str(out), "--tutorial", str(program)])
+    assert tutorial.main() == expected
+    summary = (out / "summary.txt").read_text()
+    assert ("RT-11 capture: COMPLETE\n" in summary) == (expected == 0)
+    if expected:
+        assert "no PTX with `.entry" in summary
+    else:
+        assert launch["kernel"] in summary and "changed by the kernel" in summary
 
 
 def test_a_directory_without_a_capture_is_incomplete(tmp_path, capsys):

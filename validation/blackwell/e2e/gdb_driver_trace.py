@@ -56,7 +56,8 @@ sets both, e2e/launch_capture.py checks the result):
            and SHA-256 are recorded, the bytes are not kept.
            WARPLENS_TRACE_MEMORY_SKIP is a regular expression: a launch whose kernel name it
            matches has its parameters saved as always and no memory read (cute_dsl_tma.py
-           gives `^_Z`: PyTorch's own kernels, whose names are C++ ones).
+           gives `^(?:_Z|cutlass3x_sm100_simt_sgemm_)`: PyTorch's C++ names and the
+           B200 cuBLAS SGEMM used for the tutorial's reference result).
            Threads. The calls this script makes for `memory`, and cuKernelGetParamInfo, run
            with the program's other threads running too. With only the stopped thread
            running (gdb's scheduler-locking, which the questions about a CUfunction have

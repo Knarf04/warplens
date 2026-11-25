@@ -21,7 +21,7 @@
 
 enum Bug {
     NONE = 0,
-    EXPECT_TOO_FEW = 1,   // step 2 announces half the bytes: the byte count never balances
+    EXPECT_TOO_FEW = 1,   // step 2 announces half the bytes: the wait returns with half the tile still on its way
     EXPECT_TOO_MANY = 2,  // step 2 announces twice the bytes: the phase never completes
     NO_WAIT = 3,          // step 3 skipped: threads read the tile while TMA is writing it
     NO_FENCE = 4,         // step 5 skipped: TMA may not see the doubled values

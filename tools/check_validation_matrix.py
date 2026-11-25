@@ -30,7 +30,7 @@ MATRIX = ROOT / "docs" / "validation-matrix.md"
 COLUMNS = ("id", "claim", "where", "basis", "probe", "predicted", "criterion")
 AREAS = {"TMA": "TMA", "MB": "mbarrier", "TM": "TMEM", "MMA": "MMA (tcgen05)", "CL": "clusters",
          "NUM": "numerics and small formats", "RT": "launch and runtime", "TIM": "timing"}
-BASES = ("ampere", "cutlass", "ptx-manual", "kernel-output", "review", "assumption", "published")
+BASES = ("ampere", "b200", "cutlass", "ptx-manual", "kernel-output", "review", "assumption", "published")
 CRITERIA = ("bit-exact", "tolerance", "informational")
 PROBE = re.compile(r"`(validation/blackwell/(?:tma|mbarrier|tmem|mma|cluster|formats|e2e)/[a-z0-9_]+"
                    r"|validation/blackwell_timing/[a-z0-9_]+)`")
@@ -131,6 +131,9 @@ def check(text: str) -> list[str]:
             errors.append(f"{where}: the basis must start with one of {', '.join(BASES)} in backticks")
         if row.basis == "ampere" and "`validation/ampere/" not in row.cells["basis"]:
             errors.append(f"{where}: an ampere basis must cite its golden file")
+        if row.basis == "b200" and "`validation/blackwell/measured/b200/" not in row.cells["basis"] \
+                and "`validation/blackwell_timing/measured/b200/" not in row.cells["basis"]:
+            errors.append(f"{where}: a b200 basis must cite its recorded output under measured/b200/")
         if not re.search(r"`warplens/", row.cells["where"]):
             errors.append(f"{where}: no code citation")
         if not PROBE.search(row.cells["probe"]):

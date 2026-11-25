@@ -197,6 +197,14 @@ def token_of(phase: int) -> int:
     return (phase & 1) << 63 | phase & 0xFFFFFFFF
 
 
+# The size of the pieces in which a TMA copy reports its bytes to an mbarrier (Mbarrier.deliver).
+# What was measured on a B200 fixes only that it divides 64 (a 256-byte load against
+# expect_tx 128, and a 128-byte box against expect_tx 64, both complete the phase): 64 is
+# an ASSUMPTION, the largest size the measurements allow, and so the one that completes
+# the fewest phases early. validation/blackwell/mbarrier/expect_tx `pieces` asks a GPU.
+TX_PIECE_BYTES = 64
+
+
 class Mbarrier:
     __slots__ = ("cta", "offset", "expected", "pending", "tx", "phase", "init_warp",
                  "init_stamp", "knowledge", "completed_knowledge", "released",
@@ -257,6 +265,28 @@ class Mbarrier:
         if self.tx < 0:
             self.tx_source = (warp, ins, lanes)
         self._check()
+
+    def deliver(self, n: int, warp, ins, lanes) -> None:
+        """A TMA copy of `n` bytes has landed. Unlike the instruction `mbarrier.complete_tx`,
+        which subtracts its whole count at once, the copy engine reports its bytes in pieces,
+        so the tx-count passes through every multiple of TX_PIECE_BYTES on its way down. A
+        copy larger than what was expected therefore completes the phase when the count
+        reaches zero part of the way through, and the rest of its bytes count against the
+        next phase. Measured on a B200 (validation/blackwell/measured/b200/mbarrier/
+        expect_tx_small.txt, tma/oob_complete_tx.txt; docs/m2.md, "Undersized expect_tx"):
+        a waiter is released before all the data is there, which is reported."""
+        before = self.tx
+        if not (0 < before < n and before % TX_PIECE_BYTES == 0 and self.pending <= 0):
+            self.complete_tx(n, warp, ins, lanes)
+            return
+        self.cta.findings.add(
+            "mbarrier-tx-mismatch",
+            f"a copy of {n} byte(s) landed on the mbarrier at shared offset {self.offset}, which expected "
+            f"only {before} more: the phase completed after {before} byte(s), so a wait on it returns "
+            f"before the other {n - before} are there; expect_tx is too small", warp, ins, lanes)
+        self.tx = 0
+        self._check()
+        self.complete_tx(n - before, warp, ins, lanes)
 
     def finish(self, when: str = "the kernel returned") -> None:
         # Completions may precede expect_tx, so a temporary negative tx-count is

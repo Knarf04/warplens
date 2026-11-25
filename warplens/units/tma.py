@@ -26,6 +26,11 @@ from .smem import local_shared_offset, resolve_shared
 _LOAD_FLAGS = frozenset({"mbarrier::complete_tx::bytes", "L2::cache_hint", "multicast::cluster"})
 _STORE_FLAGS = frozenset({"bulk_group", "L2::cache_hint"})
 _UINT = {1: np.dtype(np.uint8), 2: np.dtype(np.uint16), 4: np.dtype(np.uint32), 8: np.dtype(np.uint64)}
+# What a load with NaN fill puts in an element outside the tensor: the 16-bit pattern 0x7FF7
+# in every half of the element, for f16, f32 and f64 alike. Measured on a B200
+# (validation/blackwell/measured/b200/tma/oob_fill.txt); it is a quiet NaN in each type,
+# and not the default NaN of NumPy or of the arithmetic instructions (0x7FC00000).
+NAN_FILL = {2: 0x7FF7, 4: 0x7FF7_7FF7, 8: 0x7FF7_7FF7_7FF7_7FF7}
 
 
 def _scalar(w, ins, operand, lane: int, ty: str = "u32") -> int:
@@ -146,7 +151,7 @@ def _load(w, ins, lane: int, start: int, idx: np.ndarray, data: np.ndarray, bar,
         cta.smem.finish_async_write(idx, data)
         bar.in_flight -= 1
         bar.knowledge.add(operation.id)
-        bar.complete_tx(len(idx), w, ins, [lane])
+        bar.deliver(len(idx), w, ins, [lane])
 
     cta.schedule(operation, land)
 
@@ -398,7 +403,7 @@ def _cp(w, ins, mask):
             dt = _UINT[info.elem_size]
             values = np.zeros(len(addrs), dtype=dt)
             if info.nan_fill:
-                values[:] = np.array(np.nan, dtype=f"f{info.elem_size}").view(dt)
+                values[:] = NAN_FILL[info.elem_size]
             values[inside] = w.mem.read(addrs[inside], dt)
             for (target, bar), idx in zip(targets, indices):
                 _load(w, ins, lane, start, idx, values.view(np.uint8), bar, swizzle=info.swizzle,

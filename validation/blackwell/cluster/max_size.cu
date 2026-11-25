@@ -6,16 +6,24 @@
 // (cudaDeviceProp::sharedMemPerBlockOptin; printed on an info: line). For every launch the
 // program prints whether the launch call accepted it and how many CTAs ran.
 //
-// Claim tested (docs/m5.md; warplens/host/launch.py): a cluster holds up to 16 CTAs; a
-// larger shape is refused at the launch. Only "16 CTAs at 1 KB" is something a kernel in
-// this repository relies on (CUTLASS tutorial 3); the rest is recorded.
+// Claim tested (docs/m5.md; warplens/host/launch.py, warplens/host/shim_server.py): a
+// cluster holds up to 8 CTAs; one of 16 launches only for a kernel that was allowed
+// non-portable cluster sizes (cudaFuncAttributeNonPortableClusterSizeAllowed, which the
+// argument `nonportable` sets first, as CUTLASS does before every cluster launch); a larger
+// shape is refused at the launch either way. "16 CTAs at 1 KB with the attribute" is what a
+// kernel in this repository relies on (CUTLASS tutorial 3); the rest is recorded.
+//
+// Measured on a B200 (2026-11-25): without the attribute 8 launch, 16 and 32 are refused
+// with cudaErrorInvalidClusterSize; with it 8 and 16 launch and 32 is refused
+// (validation/blackwell/measured/b200/cluster/max_size.txt, cluster-optin/optin.txt). The
+// first prediction had 16 launch without it.
 //
 // A refused launch is an error returned by cudaLaunchKernelEx, which leaves the context
 // usable; its name goes on an info: line. A launch that is accepted and then fails ends the
 // program (KERNEL FAILED), as in every probe. An error that says the program's kernels
 // could not be loaded is never counted as "refused" (LAUNCH FAILED).
 //
-//   max_size
+//   max_size [nonportable]
 #include "../common.h"
 
 extern "C" __global__ void cluster_touch(uint32_t bytes, uint32_t* ran) {
@@ -26,12 +34,15 @@ extern "C" __global__ void cluster_touch(uint32_t bytes, uint32_t* ran) {
     }
 }
 
-int main() {
+int main(int argc, char** argv) {
+    bool nonportable = argc > 1 && !strcmp(argv[1], "nonportable");
     cudaDeviceProp prop;
     HOST_CHECK(cudaGetDeviceProperties(&prop, 0));
     uint32_t most = (uint32_t)prop.sharedMemPerBlockOptin;
     printf("info: sharedMemPerBlockOptin %u bytes\n", most);
     HOST_CHECK(cudaFuncSetAttribute(cluster_touch, cudaFuncAttributeMaxDynamicSharedMemorySize, (int)most));
+    if (nonportable)
+        HOST_CHECK(cudaFuncSetAttribute(cluster_touch, cudaFuncAttributeNonPortableClusterSizeAllowed, 1));
     uint32_t* d_ran = dev_alloc<uint32_t>(32);
     uint32_t ran[32];
     for (int pass = 0; pass < 2; ++pass)

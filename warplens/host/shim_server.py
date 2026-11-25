@@ -10,15 +10,17 @@ from pathlib import Path
 
 import numpy as np
 
-from ..errors import CUDA_INVALID_VALUE, CUDA_LAUNCH_FAILURE, LaunchError, WarplensError
+from ..errors import CUDA_INVALID_CLUSTER_SIZE, CUDA_INVALID_VALUE, CUDA_LAUNCH_FAILURE, LaunchError, WarplensError
 from ..frontend.ptx_parser import parse_ptx
-from ..units.smem import MAX_SMEM_BYTES, default_max_dynamic
+from ..units.smem import MAX_SMEM_BYTES, default_max_dynamic, reported_max_dynamic
 from . import tensor_map
 from .device import Device
+from .launch import MAX_CLUSTER_CTAS, MAX_PORTABLE_CLUSTER_CTAS
 
 (REGISTER_FATBIN, REGISTER_FUNCTION, MALLOC, FREE, WRITE, READ, COPY, FILL, LAUNCH,
  TENSOR_MAP, REGISTER_MODULE, SET_ATTRIBUTE, GET_ATTRIBUTES) = range(1, 14)
 MAX_DYNAMIC_SMEM = 8  # cudaFuncAttributeMaxDynamicSharedMemorySize, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES
+NONPORTABLE_CLUSTER = 14  # cudaFuncAttributeNonPortableClusterSizeAllowed, CU_FUNC_ATTRIBUTE_NON_PORTABLE_CLUSTER_SIZE_ALLOWED
 LAUNCH_FAILURE = CUDA_LAUNCH_FAILURE  # cudaErrorLaunchFailure: the kernel started and failed
 INVALID_VALUE = CUDA_INVALID_VALUE  # cudaErrorInvalidValue
 MEMORY_ALLOCATION = 2  # cudaErrorMemoryAllocation
@@ -87,6 +89,8 @@ class ShimServer:
         # The maximum dynamic shared memory of each kernel the program set it for, by index
         # into `functions`; the others have `default_max_dynamic` of their static shared memory.
         self.max_dynamic: dict[int, int] = {}
+        # The kernels the program allowed non-portable cluster sizes (more than 8 CTAs).
+        self.nonportable_cluster: set[int] = set()
         self.launches: list[tuple[str, object]] = []  # (kernel name, LaunchStats)
         self.needs_ptx = False
         self.machine_code = False  # a runtime handed over a compiled module instead of PTX
@@ -278,6 +282,15 @@ class ShimServer:
                 raise WarplensError(f"kernel `{name}` launch needs {expected - 48} argument bytes, "
                                     f"got {len(data) - 48}")
             self.check_opt_in(function, smem)
+            if kx * ky * kz > MAX_PORTABLE_CLUSTER_CTAS and function not in self.nonportable_cluster \
+                    and kx * ky * kz <= MAX_CLUSTER_CTAS:
+                raise LaunchError(
+                    f"kernel `{name}` was launched with a cluster of {kx * ky * kz} CTAs {(kx, ky, kz)}. A GPU "
+                    f"launches clusters of more than {MAX_PORTABLE_CLUSTER_CTAS} CTAs only for a kernel that was "
+                    f"allowed them and refuses this launch with cudaErrorInvalidClusterSize. Before launching, "
+                    f"call cudaFuncSetAttribute(kernel, cudaFuncAttributeNonPortableClusterSizeAllowed, 1), or "
+                    f"with the driver API cuFuncSetAttribute(function, "
+                    f"CU_FUNC_ATTRIBUTE_NON_PORTABLE_CLUSTER_SIZE_ALLOWED, 1)", CUDA_INVALID_CLUSTER_SIZE)
             args, at = [], 48
             for p in parsed.functions[name].params:
                 args.append(data[at:at + p.size])
@@ -294,8 +307,13 @@ class ShimServer:
                 raise WarplensError(f"unknown kernel function {function}")
             static, allowed = self.shared_memory(function) or (0, self.max_dynamic.get(function, default_max_dynamic(0)))
             if op == GET_ATTRIBUTES:
-                return struct.pack("<II", static, allowed)
+                # Before the program sets it, a GPU reports the rest of the default (0 above
+                # it), which is less than a launch may use: reported_max_dynamic.
+                return struct.pack("<II", static, self.max_dynamic.get(function, reported_max_dynamic(static)))
             attribute, value = struct.unpack_from("<ii", data, 4)
+            if attribute == NONPORTABLE_CLUSTER:
+                (self.nonportable_cluster.add if value else self.nonportable_cluster.discard)(function)
+                return b""
             if attribute != MAX_DYNAMIC_SMEM:
                 raise WarplensError(f"function attribute {attribute} is not kept by the server")
             if not 0 <= value <= MAX_SMEM_BYTES - static:

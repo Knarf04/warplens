@@ -1,11 +1,11 @@
 info: sharedMemPerBlock 49152, sharedMemPerBlockOptin 232448
-48 KiB + 16 static, not opted in: 49168 static bytes, at most 183280 dynamic
+48 KiB + 16 static, not opted in: 49168 static bytes, at most 0 dynamic
 48 KiB + 16 static, not opted in, 0 dynamic bytes: launched; last byte a5
 48 KiB + 16 static, not opted in, 16 dynamic bytes: launched; last byte a5
 48 KiB + 16 static, not opted in, 183280 dynamic bytes: launched; last byte a5
 48 KiB + 16 static, not opted in, 183296 dynamic bytes: launch refused
 info: 48 KiB + 16 static, not opted in, 183296 dynamic bytes: the launch returned cudaErrorInvalidValue; cudaDeviceSynchronize then cudaSuccess
-98 KiB static, not opted in: 100352 static bytes, at most 132096 dynamic
+98 KiB static, not opted in: 100352 static bytes, at most 0 dynamic
 98 KiB static, not opted in, 0 dynamic bytes: launched; last byte a5
 98 KiB static, not opted in, 16 dynamic bytes: launched; last byte a5
 98 KiB static, not opted in, 132096 dynamic bytes: launched; last byte a5

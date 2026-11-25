@@ -41,15 +41,46 @@ def test_round_trip_does_not_depend_on_async_timing(delay):
 
 
 def test_expect_tx_too_small_is_caught():
-    with pytest.raises(warplens.DeadlockError) as info:
-        tma_copy("128B", (16, 32), EXPECT_TOO_FEW)
-    msg = str(info.value)
-    assert "1024 completion byte(s) have not been accounted for" in msg
-    assert "expect_tx too small or missing" in msg
-    # The accounting problem is also available as a structured finding, not only as text.
-    (f,) = [f for f in info.value.findings if f.kind == "mbarrier-tx-mismatch"]
-    assert "the kernel deadlocked with 1024 completion byte(s) not accounted for" in f.message
+    """A copy reports its bytes in pieces, so a count of half the copy reaches zero part of
+    the way through and the phase completes: the wait returns early, as on a B200
+    (validation/blackwell/measured/b200/mbarrier/expect_tx_small.txt), and that is reported.
+    The other half is charged to a phase that never comes."""
+    ok, stats = tma_copy("128B", (16, 32), EXPECT_TOO_FEW)
+    (f,) = stats.findings
+    assert f.kind == "mbarrier-tx-mismatch"
+    assert "a copy of 2048 byte(s) landed" in f.message and "expected only 1024 more" in f.message
+    assert "a wait on it returns before the other 1024 are there" in f.message
     assert "cp.async.bulk.tensor.2d.shared" in f.text and f.cta == (0, 0, 0)
+    assert ok  # the simulator delivers a copy whole; on a GPU the tile may be read half written
+
+
+def test_an_undersized_expect_tx_completes_only_at_a_whole_number_of_pieces():
+    """TX_PIECE_BYTES is an assumption (64, the largest size the B200's results allow): a
+    count that is not a multiple of it is passed over, and the wait deadlocks as before."""
+    from warplens.units.mbarrier import Mbarrier, TX_PIECE_BYTES
+
+    class Cta:
+        def __init__(self):
+            self.completed, self.findings = 0, self
+            self.kinds = []
+        def phase_completed(self):
+            self.completed += 1
+        def add(self, kind, *rest):
+            self.kinds.append(kind)
+
+    def phases(expect, copy=256):
+        cta = Cta()
+        bar = Mbarrier(cta, 0, 1, 0)
+        bar.expect_tx(expect)
+        bar.pending = 0  # the arrival that came with expect_tx
+        bar.deliver(copy, None, None, [0])
+        return cta.completed, bar.tx, cta.kinds
+
+    assert TX_PIECE_BYTES == 64
+    assert phases(256) == (1, 0, [])
+    assert phases(128) == (1, -128, ["mbarrier-tx-mismatch"]) and phases(64) == (1, -192, ["mbarrier-tx-mismatch"])
+    assert phases(96) == (0, -160, []) and phases(32) == (0, -224, [])
+    assert phases(512) == (0, 256, [])
 
 
 def test_expect_tx_too_large_is_a_deadlock_that_names_the_mbarrier():
@@ -157,6 +188,9 @@ def test_element_strides_and_nan_fill(sim):
                        args=[src_map, sim.tensor_map_tiled(dst, expect.shape), 128, *origin[::-1]])
     np.testing.assert_array_equal(dst.numpy(), expect)
     assert np.isnan(expect).any() and not stats.findings
+    # The bits of the fill are the B200's (validation/blackwell/measured/b200/tma/oob_fill.txt):
+    # 0x7FF7 in every 16 bits of the element, not NumPy's default NaN.
+    assert set(dst.numpy().view(np.uint32)[np.isnan(expect)].tolist()) == {0x7FF77FF7}
 
 
 # -- swizzle ---------------------------------------------------------------------------

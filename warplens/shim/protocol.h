@@ -22,6 +22,12 @@
  * and the driver's enumeration. */
 #define WL_ATTRIBUTE_MAX_DYNAMIC_SMEM 8  /* cudaFuncAttributeMaxDynamicSharedMemorySize */
 #define WL_ATTRIBUTE_SMEM_CARVEOUT 9     /* cudaFuncAttributePreferredSharedMemoryCarveout */
+/* cudaFuncAttributeNonPortableClusterSizeAllowed, CU_FUNC_ATTRIBUTE_NON_PORTABLE_CLUSTER_SIZE_ALLOWED.
+ * A B200 refuses a cluster of more than 8 CTAs (cudaErrorInvalidClusterSize) unless the
+ * program set this to 1 for the kernel first; with it, 16 launch and 32 are refused
+ * (validation/blackwell/measured/b200/cluster/max_size.txt and cluster-optin/). The server
+ * keeps it per kernel (WL_SET_ATTRIBUTE) and holds launches to it. */
+#define WL_ATTRIBUTE_NONPORTABLE_CLUSTER 14
 
 /* Whether a function attribute may be set to `value` whatever the kernel is, as
  * cudaFuncSetAttribute and cuFuncSetAttribute decide it: the maximum dynamic shared memory is
@@ -29,8 +35,9 @@
  * Ti refuses other values of the two, the attributes that can only be read (0 to 7) and
  * numbers that name no attribute with cudaErrorInvalidValue / CUDA_ERROR_INVALID_VALUE (at
  * its own opt-in maximum in place of ours). A maximum that passes here is then held against
- * the kernel's static shared memory by the server (WL_SET_ATTRIBUTE). The cluster
- * attributes (10 to 17: required cluster shape, non-portable sizes, scheduling policy, shared
+ * the kernel's static shared memory by the server (WL_SET_ATTRIBUTE). Of the cluster
+ * attributes (10 to 17), the non-portable cluster size (14) goes to the server too, any
+ * non-zero value allowing it; the others (required cluster shape, scheduling policy, shared
  * memory mode) are accepted unchecked, as before: the CuTe DSL sets them, and what a GPU
  * with clusters says to each value was not measured. */
 static inline int wl_function_attribute_is_valid(int attribute, int value) {
@@ -58,7 +65,7 @@ enum {
   WL_LAUNCH = 9,            /* uint32 function, grid[3], block[3], cluster[3], uint64 smem, argument bytes -> printed text */
   WL_TENSOR_MAP = 10,       /* uint32 type, rank, swizzle, fill, interleave; uint64 address; uint64 dim[5], stride[4]; uint32 box[5], step[5] -> 128 bytes */
   WL_REGISTER_MODULE = 11,  /* PTX text, a fat binary, or the first bytes of machine code -> uint32 module */
-  WL_SET_ATTRIBUTE = 12,    /* uint32 function, int32 attribute, int32 value (the maximum dynamic shared memory) */
+  WL_SET_ATTRIBUTE = 12,    /* uint32 function, int32 attribute, int32 value (the maximum dynamic shared memory, or non-portable cluster sizes) */
   WL_GET_ATTRIBUTES = 13    /* uint32 function                      -> uint32 static shared bytes, uint32 maximum dynamic */
 };
 

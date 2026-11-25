@@ -7,11 +7,15 @@
 // test_wait for both parities is printed after every step except `load`, where it would
 // depend on timing.
 //
-// Claims tested (docs/m2.md, "Assumptions to confirm on hardware", first item):
+// Claims tested (docs/m2.md, "Undersized expect_tx"):
 //   * the transaction count is signed, and a phase completes only when pending arrivals
 //     and the count are both exactly zero;
-//   * so with one load and an undersized expect_tx the phase never completes, and a later
-//     expect_tx for the missing bytes completes it;
+//   * a TMA load reports its bytes in pieces, so with one load and an undersized expect_tx
+//     the count reaches zero part of the way through the load and the phase completes
+//     early; the rest of the load is charged to the next phase. (Measured on a B200,
+//     2026-11-25: validation/blackwell/measured/b200/mbarrier/expect_tx_small.txt. The first
+//     prediction was that the phase never completes, as it does not for one
+//     mbarrier.complete_tx instruction: mbarrier/complete_before_expect.);
 //   * with two loads and an expect_tx for one, the first completion ends the phase early
 //     and the second is charged to the next phase;
 //   * an oversized expect_tx waits for more data.
@@ -19,9 +23,14 @@
 //
 //   expect_tx               the polled scripts (never hangs)
 //   expect_tx wait-small    expect_tx 128 for a 256-byte load, then the unbounded
-//                                try_wait loop real kernels use. MAY HANG: the simulator
-//                                reports a deadlock; run under a timeout.
+//                                try_wait loop real kernels use. Returns on a B200.
 //   expect_tx wait-large    expect_tx 512 for a 256-byte load, same loop. Expected to hang.
+//   expect_tx pieces        how large the pieces are: one 256-byte load against expect_tx
+//                                of 4, 8, 16, 32, 48, 64, 96, 192 and 255 bytes, each polled
+//                                and then settled (never hangs). The phase completes where
+//                                the count is a whole number of pieces. The simulator takes
+//                                64 bytes, the largest size the first measurements allow,
+//                                which is an assumption: a difference here is the answer.
 #include "../common.h"
 
 enum Op { ARRIVE_EXPECT = 1, EXPECT = 2, ARRIVE = 3, LOAD = 4, POLL = 5, SETTLE = 6, WAIT = 7 };
@@ -122,6 +131,12 @@ int main(int argc, char** argv) {
         RUN("expect_tx 512 for a 256-byte load, then wait without a bound",
             {ARRIVE_EXPECT, 512}, {LOAD, 0}, {WAIT, 0});
         printf("the wait returned\n");
+    } else if (!strcmp(which, "pieces")) {
+        for (int bytes : {4, 8, 16, 32, 48, 64, 96, 192, 255}) {
+            char title[96];
+            snprintf(title, sizeof title, "pieces: expect_tx %d, one load of 256 bytes", bytes);
+            RUN(title, {ARRIVE_EXPECT, bytes}, {LOAD, 0}, {POLL, 0}, {SETTLE, 0});
+        }
     } else {
         RUN("exact: expect_tx 256, one load", {ARRIVE_EXPECT, 256}, {LOAD, 0}, {POLL, 0});
         RUN("too small: expect_tx 128, one load; then expect_tx for the other 128",

@@ -121,9 +121,12 @@ TF32 value has its low 13 fraction bits zero.
   Infinity stays infinity. A NaN whose payload was only in those bits becomes
   infinity; other NaNs keep their high payload bits.
 
-`.rn` (ties to even) and `.rz` (toward zero) are modeled the same way with a
-different tie rule. They need Hopper or newer, so they are **not checked on
-hardware**; that they treat subnormals and NaNs like `.rna` is an assumption.
+`.rn` (ties to even) and `.rz` (toward zero) round finite values and
+subnormals the same way with a different tie rule, and leave an infinity as it
+is. A NaN is different: every NaN input, whatever its sign and payload, gives
+`0x7FFFE000`, so these two never turn a NaN into infinity. They need Hopper or
+newer; all of this is **measured on a B200** (2026-11-25,
+`validation/blackwell/measured/b200/formats/tf32_modes.txt`, 715 inputs).
 
 `warplens.units.floating.explain_tf32(0.1)` shows one conversion bit by bit:
 

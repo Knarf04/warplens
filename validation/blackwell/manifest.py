@@ -118,8 +118,11 @@ def _mbarrier() -> list[Probe]:
         Probe("mbarrier/expect_tx_small", "mbarrier/expect_tx", (), ("MB-05", "MB-06", "MB-07", "MB-08"),
               "undersized, oversized and missing expect_tx against real TMA loads, with bounded polls"),
         Probe("mbarrier/expect_tx_small.wait", "mbarrier/expect_tx", ("wait-small",), ("MB-05", "MB-11"),
-              "an undersized expect_tx with one load never completes: the usual wait loop deadlocks",
-              risk="hang", timeout=30),
+              "an undersized expect_tx with one load completes part of the way through it: the usual wait "
+              "loop returns", risk="hang", timeout=30),
+        Probe("mbarrier/expect_tx_small.pieces", "mbarrier/expect_tx", ("pieces",), ("MB-05",),
+              "a load reports its bytes in pieces of 64 (an assumption): an undersized expect_tx completes "
+              "the phase only when it is a whole number of pieces"),
         Probe("mbarrier/expect_tx_large", "mbarrier/expect_tx", ("wait-large",), ("MB-08", "MB-11"),
               "an oversized expect_tx never completes: the usual wait loop deadlocks", risk="hang", timeout=30),
     ]
@@ -220,8 +223,11 @@ def _cluster() -> list[Probe]:
         Probe("cluster/pair_accounting", "cluster/pair_accounting", (), ("CL-08",),
               "with .cta_group::2 a pair's completions go to the member with the mbarrier address's parity"),
         Probe("cluster/max_size", "cluster/max_size", (), ("CL-02",),
-              "clusters of 8 and 16 CTAs launch and one of 32 is refused, with 1 KiB and with the most "
-              "shared memory per CTA"),
+              "without the non-portable attribute a cluster of 8 CTAs launches and those of 16 and 32 are "
+              "refused, with 1 KiB and with the most shared memory per CTA"),
+        Probe("cluster/max_size.nonportable", "cluster/max_size", ("nonportable",), ("CL-02",),
+              "with cudaFuncAttributeNonPortableClusterSizeAllowed clusters of 8 and 16 CTAs launch and one "
+              "of 32 is refused"),
         Probe("cluster/address_dump", "cluster/address_dump", (), ("CL-05",),
               "mapa addresses each rank's copy of a shared symbol; in the simulator's encoding clearing "
               "bit 24 names the even member of a pair"),

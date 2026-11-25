@@ -432,7 +432,7 @@ int main(int argc, char **argv) {
 
     /* static shared memory over the default needs no opt-in, and leaves the rest of the maximum */
     CHECK(cudaFuncGetAttributes(&attributes, large) == cudaSuccess && attributes.sharedSizeBytes == 61440);
-    CHECK(attributes.maxDynamicSharedSizeBytes == limit - 61440);
+    CHECK(attributes.maxDynamicSharedSizeBytes == 0);  /* a B200 reports 0 and launches all the same (below) */
     CHECK(cudaLaunchKernel(large, grid, block, arguments, 0, NULL) == cudaSuccess);
     CHECK(cudaLaunchKernel(large, grid, block, arguments, (size_t)limit - 61440, NULL) == cudaSuccess);
     CHECK(cudaLaunchKernel(large, grid, block, arguments, (size_t)limit - 61440 + 16, NULL) == cudaErrorInvalidValue);

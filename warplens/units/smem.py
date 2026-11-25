@@ -59,6 +59,19 @@ def default_max_dynamic(static: int) -> int:
     Only programs run under the shim are held to it: `Device.launch` has no such step."""
     return max((DEFAULT_SMEM_BYTES if static <= DEFAULT_SMEM_BYTES else MAX_SMEM_BYTES) - static, 0)
 
+
+def reported_max_dynamic(static: int) -> int:
+    """What cudaFuncGetAttributes reports as maxDynamicSharedSizeBytes for a kernel whose
+    maximum the program has not set: the rest of the default, and 0 for a kernel whose
+    static shared memory is larger than the default.
+
+    That is not what a launch of such a kernel may use, which is `default_max_dynamic`:
+    measured on a B200 (validation/blackwell/measured/b200/e2e/smem_static.txt), a kernel with
+    98 KiB of static shared memory reports 0 and launches with up to 129 KiB of dynamic shared
+    memory. The two agree for a kernel inside the default. Once the program sets the
+    attribute, the value it set is both."""
+    return max(DEFAULT_SMEM_BYTES - static, 0)
+
 # Shadow "writer" value for bytes last written by TMA rather than by a warp.
 ASYNC_PROXY = -2
 

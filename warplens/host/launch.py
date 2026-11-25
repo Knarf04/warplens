@@ -23,6 +23,12 @@ MAX_THREADS_PER_BLOCK = 1024
 MAX_BLOCK_DIM = (1024, 1024, 64)
 MAX_GRID_DIM = (2**31 - 1, 65535, 65535)
 MAX_CLUSTER_CTAS = 16  # a multicast mask has 16 bits
+# The largest cluster a B200 launches for a kernel that was not allowed non-portable cluster
+# sizes (cudaFuncAttributeNonPortableClusterSizeAllowed): measured, 8 launch and 16 are
+# refused with cudaErrorInvalidClusterSize (validation/blackwell/measured/b200/cluster/
+# max_size.txt). Only programs run under the shim are held to it (shim_server.py), like the
+# shared-memory opt-in: `Device.launch` has no attribute to set.
+MAX_PORTABLE_CLUSTER_CTAS = 8
 
 
 @dataclass(slots=True)

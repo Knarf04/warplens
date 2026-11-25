@@ -95,7 +95,11 @@ and O = 101376 (`sharedMemPerBlockOptin`) on this GPU:
   dynamic bytes need the opt-in although neither is above 48 KB.
 - **Static shared memory above the default needs no opt-in.** Such a kernel
   launches as it is, and without any call it may also use all the dynamic
-  shared memory up to the opt-in maximum.
+  shared memory up to the opt-in maximum. A B200 (driver 610.57.04) launches
+  the same way but *reports* 0 as that kernel's maximum, where this GPU
+  reports O - static: `validation/blackwell/measured/b200/e2e/smem_static.txt`.
+  The simulator reports what the B200 does (`reported_max_dynamic` in
+  `warplens/units/smem.py`).
 - `cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, n)`
   replaces the maximum by n. It is accepted for 0 <= n <= O - static and
   refused above, leaving the maximum as it was. It also *lowers* the maximum:

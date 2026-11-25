@@ -1,0 +1,80 @@
+status: ok
+warplens: 9 kernel launch(es) simulated on B200, 23 finding(s)
+  mbar_expect_tx: 1 CTA(s), 223972 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 466: ld.shared.b32 %r58, [_ZZ14mbar_expect_txE6buffer];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 468: ld.shared.b32 %r59, [_ZZ14mbar_expect_txE6buffer+252];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-tx-mismatch] the kernel returned with 252 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 1024; expect_tx is missing or too small
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbar_expect_tx: 1 CTA(s), 223972 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 466: ld.shared.b32 %r58, [_ZZ14mbar_expect_txE6buffer];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 468: ld.shared.b32 %r59, [_ZZ14mbar_expect_txE6buffer+252];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-tx-mismatch] the kernel returned with 248 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 1024; expect_tx is missing or too small
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbar_expect_tx: 1 CTA(s), 223972 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 466: ld.shared.b32 %r58, [_ZZ14mbar_expect_txE6buffer];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 468: ld.shared.b32 %r59, [_ZZ14mbar_expect_txE6buffer+252];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-tx-mismatch] the kernel returned with 240 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 1024; expect_tx is missing or too small
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbar_expect_tx: 1 CTA(s), 223972 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 466: ld.shared.b32 %r58, [_ZZ14mbar_expect_txE6buffer];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 468: ld.shared.b32 %r59, [_ZZ14mbar_expect_txE6buffer+252];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-tx-mismatch] the kernel returned with 224 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 1024; expect_tx is missing or too small
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbar_expect_tx: 1 CTA(s), 223972 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 466: ld.shared.b32 %r58, [_ZZ14mbar_expect_txE6buffer];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 468: ld.shared.b32 %r59, [_ZZ14mbar_expect_txE6buffer+252];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-tx-mismatch] the kernel returned with 208 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 1024; expect_tx is missing or too small
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbar_expect_tx: 1 CTA(s), 43981 warp-instructions
+    [mbarrier-tx-mismatch] a copy of 256 byte(s) landed on the mbarrier at shared offset 1024, which expected only 64 more: the phase completed after 64 byte(s), so a wait on it returns before the other 192 are there; expect_tx is too small (2 times)
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbar_expect_tx: 1 CTA(s), 223972 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 466: ld.shared.b32 %r58, [_ZZ14mbar_expect_txE6buffer];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 468: ld.shared.b32 %r59, [_ZZ14mbar_expect_txE6buffer+252];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-tx-mismatch] the kernel returned with 160 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 1024; expect_tx is missing or too small
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbar_expect_tx: 1 CTA(s), 43981 warp-instructions
+    [mbarrier-tx-mismatch] a copy of 256 byte(s) landed on the mbarrier at shared offset 1024, which expected only 192 more: the phase completed after 192 byte(s), so a wait on it returns before the other 64 are there; expect_tx is too small (2 times)
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+  mbar_expect_tx: 1 CTA(s), 223972 warp-instructions
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 466: ld.shared.b32 %r58, [_ZZ14mbar_expect_txE6buffer];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [tma-load-unsynchronized] read of shared memory that the TMA load at line 421 writes; that load has completed, but this warp never waited on its mbarrier
+      line 468: ld.shared.b32 %r59, [_ZZ14mbar_expect_txE6buffer+252];
+      first in CTA (0, 0, 0), warp 0, lanes 0
+    [mbarrier-tx-mismatch] the kernel returned with 1 completion byte(s) not accounted for by expect_tx on the mbarrier at shared offset 1024; expect_tx is missing or too small
+      line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
+      first in CTA (0, 0, 0), warp 0, lanes 0

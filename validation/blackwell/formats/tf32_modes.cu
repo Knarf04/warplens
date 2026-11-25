@@ -7,7 +7,7 @@
 //
 // Claims tested (docs/numerics.md, "TF32"):
 //   * .rna on Blackwell gives what it gave on the RTX 3080 Ti: the rna column must equal
-//     validation/ampere/tf32_golden.txt (tests/test_blackwell_probes.py checks that the
+//     validation/ampere/tf32_golden.txt (tests/validation/probes/test_blackwell_probes.py checks that the
 //     committed prediction does);
 //   * .rn (ties to even) and .rz (toward zero) act on the same magnitude bits and treat
 //     subnormals, infinities and NaNs as .rna does. They need Hopper or newer and have

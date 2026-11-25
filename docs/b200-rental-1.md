@@ -254,7 +254,7 @@ toward the measurements (45 of 152 benchmark configurations within 10 %, from
 mechanical to repair:
 
 - one property the model is meant to keep fails by a hair:
-  `tests/test_timing.py::test_more_stages_never_make_it_slower` (TIM-18's
+  `tests/timing/test_timing.py::test_more_stages_never_make_it_slower` (TIM-18's
   ordering, 10888 ns against 10905 ns);
 - the worked examples of `docs/guide.md` print other numbers and another
   verdict ("TMA engine-bound, 91 %" was written for the assumed config), so
@@ -304,7 +304,7 @@ The layout of the driver's 128-byte tensor map is read from the TMA-12 sweep
 (`warplens/host/tensor_map.py`, "the driver's own layout"): every one of the
 1087 maps the B200's driver encoded reads back as the parameters that made it,
 and the four maps the CuTe DSL wrote for `fp16_gemm_0.py` read back as the
-tutorial's tensors (`tests/test_tensor_map_driver_layout.py`). The DSL fills
+tutorial's tensors (`tests/validation/golden_replay/test_tensor_map_driver_layout.py`). The DSL fills
 in the first 64 bytes only and sets one flag bit the driver does not.
 
 With that, the kernel captured for RT-11 gets past its TMA loads in the
@@ -333,7 +333,7 @@ Two things it showed besides:
 **Decided by the owner the same day: both forms are in the v1 scope**
 (`docs/history/plan.md`, section 3.5, the amendment). With them implemented the capture
 replays byte for byte with its PTX as compiled, no rewriting
-(`tests/test_rt11_replay.py`, given the capture). The operand order of the
+(`tests/validation/golden_replay/test_rt11_replay.py`, given the capture). The operand order of the
 packed conversion is the GPU's: with the sources the other way round 129,920
 of the 131,072 elements are wrong. Still not done: the tutorial as a script
 under `warplens run` (its arrays are PyTorch's), and the capture as a

@@ -16,7 +16,7 @@ runs the kernel as it was compiled, and compares every byte of every allocation 
 
 The capture of 2026-11-25 (CUTLASS's fp16_gemm_0.py at --mnk 256,512,512 on a B200) replays
 with no byte different from the GPU's (docs/b200-rental-1.md).
-tests/test_rt11_replay.py runs this on a capture named by WARPLENS_RT11_CAPTURE.
+tests/validation/golden_replay/test_rt11_replay.py runs this on a capture named by WARPLENS_RT11_CAPTURE.
 
 Exit status: 0 identical, 1 different, 2 the simulator refused the kernel.
 """

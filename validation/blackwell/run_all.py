@@ -59,7 +59,7 @@ every remaining run is recorded as `not run (GPU unhealthy after <run>)`,
 <out>/GPU-UNHEALTHY.txt names the run, and the exit status is 1. The breaker is armed only
 once the canary has passed in this run: on a machine where it never runs (the development
 machine with bin/: sm_100a programs on an RTX 3080 Ti) its failures are recorded and stop
-nothing. Never tripped by a real GPU so far; tests/test_probe_health.py trips it with
+nothing. Never tripped by a real GPU so far; tests/validation/probes/test_probe_health.py trips it with
 stand-in programs.
 
 Simulator modes need the `warplens` package and its Python environment:
@@ -82,7 +82,7 @@ Options
                       the run (run_rows.py)
     --book PATH       clone of the MLSys book, for e2e (see e2e/run_e2e.py)
     --predicted DIR   predict mode: write the predictions there instead of predicted/ (how
-                      tests/test_predict_path.py runs the whole path without touching the
+                      tests/validation/probes/test_predict_path.py runs the whole path without touching the
                       committed files)
     --binaries WHICH  gpu mode: auto (default), ptx or native; or ampere, for the dry run on an
                       Ampere GPU of the probes `build.sh --ampere` builds (use with --no-build)

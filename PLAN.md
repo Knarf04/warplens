@@ -75,7 +75,7 @@ reserve the PyPI name, and `1.0`, the public release
    decision, not a fix").
 3. **A decision on the RT-11 capture.** The kernel of `fp16_gemm_0.py`
    replays byte for byte against the B200, given the capture
-   (`tests/test_rt11_replay.py` with `WARPLENS_RT11_CAPTURE`). The capture is
+   (`tests/validation/golden_replay/test_rt11_replay.py` with `WARPLENS_RT11_CAPTURE`). The capture is
    not a committed fixture: it is 42 MB, and its PTX is CUTLASS's code
    compiled. The tutorial as a script under `warplens run` is not done: it
    holds its arrays in PyTorch, which needs a GPU.

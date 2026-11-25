@@ -53,7 +53,7 @@ spellings exist.
 
 | Rule | Source |
 | --- | --- |
-| The spellings above, and that the bare `get_first_ctaid` exists only as `.v4` | manual syntax; ptxas assembles the kernels of `tests/test_clc.py` and `examples/09_clc`, and rejects `get_first_ctaid.b32.b128 d, response` |
+| The spellings above, and that the bare `get_first_ctaid` exists only as `.v4` | manual syntax; ptxas assembles the kernels of `tests/memory/test_clc.py` and `examples/09_clc`, and rejects `get_first_ctaid.b32.b128 d, response` |
 | A request cancels a cluster "that has not started running yet", never one that runs | manual |
 | No two successful responses of a grid name the same cluster | manual |
 | The response is written asynchronously, and completion is a `complete_tx` of the bytes stored on `mbar` | manual. 16 bytes: the manual's example expects 16, as do CUTLASS and TIRx |
@@ -124,7 +124,7 @@ That is what the manual calls undefined, so it is reported.
 
 ## Checked against
 
-- `tests/test_clc.py`: every form, the cases above, and each error.
+- `tests/memory/test_clc.py`: every form, the cases above, and each error.
 - `examples/09_clc`: CUDA C++ through nvcc, two-CTA clusters with multicast.
 - A TIRx kernel that uses TIRx's own `query_cancel_first_ctaid_x`, and a CuTe DSL kernel
   that uses `cute.arch.issue_clc_query` and `clc_response`, both under `warplens run`

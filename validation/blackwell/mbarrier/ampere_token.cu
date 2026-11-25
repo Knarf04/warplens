@@ -11,7 +11,7 @@
 // On an RTX 3080 Ti the answer depends on bit 63 of the token alone, the parity of the
 // phase the arrival was made in (validation/ampere/mbarrier_token_golden.txt), and the
 // simulator does the same. So the committed prediction is that file, byte for byte
-// (tests/test_ampere_replay.py).
+// (tests/validation/golden_replay/test_ampere_replay.py).
 //
 // What this run can and cannot say (matrix row MB-03). The answers for the token of the
 // current and of the preceding phase, and all the parity answers, are defined by PTX; a

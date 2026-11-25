@@ -2,7 +2,7 @@
 
 What changed in each release of warplens, newest first. A release is a version on PyPI and
 the `v<version>` tag it was built from; `RELEASING.md` is how one is made. The section for the
-version in `warplens/__init__.py` must exist (`tests/test_packaging.py` checks), so the
+version in `warplens/__init__.py` must exist (`tests/packaging/test_packaging.py` checks), so the
 heading is written when the version is bumped, and the date when the tag is.
 
 ## 0.0.1 (not released)
@@ -70,7 +70,7 @@ Documentation, reorganized before v1:
 Packaging, done ahead of the first upload:
 
 - The wheel and the sdist are built and installed in CI (the `dist` job), and the suite runs
-  against each in place of the checkout. `tests/test_packaging.py` builds both and checks
+  against each in place of the checkout. `tests/packaging/test_packaging.py` builds both and checks
   their file lists.
 - The sdist is the whole checked-in tree (`MANIFEST.in`), so the tests run from it.
 - The version is written once, in `warplens/__init__.py`.

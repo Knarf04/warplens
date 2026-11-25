@@ -45,7 +45,7 @@ Changelog = "https://github.com/Knarf04/warplens/blob/main/CHANGELOG.md"
 warplens = "warplens.cli:main"
 
 [project.optional-dependencies]
-# pytest for the suite; build for tests/test_packaging.py, which builds the wheel and the
+# pytest for the suite; build for tests/packaging/test_packaging.py, which builds the wheel and the
 # sdist and reads their file lists (it is skipped without it).
 dev = ["pytest>=8", "build>=1"]
 # The frontends. Each floor is the version the test suite runs against (env/remote/pins.env);
@@ -56,7 +56,7 @@ triton = ["triton>=3.9"]
 tirx = ["apache-tvm-tirx>=0.1.0", "cuda-bindings>=13.5"]
 cute-dsl = ["nvidia-cutlass-dsl>=4.8.1"]
 # examples/08_book/book_tour.ipynb: Jupyter to open it, nbclient and ipykernel to execute it from a
-# script (as tests/test_guide.py does), and TIRx, which the book's kernels are written in.
+# script (as tests/documentation/test_guide.py does), and TIRx, which the book's kernels are written in.
 # These floors are release lines, not tested minimums: the notebook was executed with
 # notebook 7.6.5, nbclient 0.11.0, nbformat 5.11.1 and ipykernel 7.4.0.
 jupyter = ["notebook>=7", "nbclient>=0.10", "nbformat>=5", "ipykernel>=6", "warplens[tirx]"]
@@ -75,7 +75,7 @@ include-package-data = false
 include = ["warplens*"]
 
 # Files the installed package reads or runs through paths next to its modules. An editable
-# install hides a missing one; tests/test_packaging.py compares the built wheel with the tree.
+# install hides a missing one; tests/packaging/test_packaging.py compares the built wheel with the tree.
 [tool.setuptools.package-data]
 # The machine models (warplens/timing/config.py).
 "warplens.configs" = ["*.yaml"]

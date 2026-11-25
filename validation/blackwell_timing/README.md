@@ -100,7 +100,7 @@ write what was stopped and what was not run to `status.txt`, and exit with 143,
 and no benchmark process left, the 52 lines printed until then in the output
 file. Not tried: a benchmark that hangs inside the driver; whether SIGTERM ends
 it or the SIGKILL after 8 s is needed is unknown, and a process that ignores
-SIGTERM was only a stand-in (`tests/test_timing_run_all.py`).
+SIGTERM was only a stand-in (`tests/validation/probes/test_timing_run_all.py`).
 
 **Counters.** `<out>/ncu/STATUS.txt` exists at the end of every run, and its
 first line starts with exactly one of
@@ -356,14 +356,14 @@ through this script**. What was done instead:
   permission. With the pinned ncu 2026.4: 18 of the 19 names are listed; the one
   that is not, `l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal`, is not listed
   for the 3080 Ti's chip either, where ncu accepted it and reported `n/a`.
-- `tests/test_ncu_scripts.py` runs the script from end to end against a stand-in
+- `tests/validation/probes/test_ncu_scripts.py` runs the script from end to end against a stand-in
   for ncu that replays recorded output (`fixture_ncu/`, whose README says what is
   recorded and what is invented): the permission error, a full run, a rejected
   counter list and its retry, and `compare_ncu.py` on the table recorded from
   the 3080 Ti; and, with a stand-in that hangs, fails or is slow: no second run
   after a timeout, the budget, the four first lines of `STATUS.txt`, the two
   calls of `run_all.sh`, and that SIGTERM or SIGINT to the script leaves neither
-  ncu nor the profiled program. `tests/test_timing_run_all.py` does the same for
+  ncu nor the profiled program. `tests/validation/probes/test_timing_run_all.py` does the same for
   `run_all.sh` with stand-in benchmarks: the order, the three endings of a
   benchmark, stopping, and the exit status with `WARPLENS_NCU=ok`.
 
@@ -486,7 +486,7 @@ The exact numbers of every configuration are in `predicted/predictions.md`
 `predicted/<bench>.out`, and in `predicted/meta.json` under
 `benchmarks.<bench>.active_sms.<id>` with the launch shape, the limit that binds
 and a one-line derivation; `meta.json` `placement` has the rule and the per-SM
-limits. `tests/test_timing_placement.py` holds the table above against the
+limits. `tests/timing/test_timing_placement.py` holds the table above against the
 committed predictions.
 
 Where the hardware build launches a larger grid than the simulator build
@@ -587,7 +587,7 @@ extrapolated to 1000 times the repetitions, a 20 us launch overhead and up to
 unmodified config, returns `TRUTH` (exactly for the latencies, `clc_latency_ns`
 among them, and the clock, within 0.1% for the Tensor Core rates).
 `fixture_synthetic/` is a small committed
-copy used by `tests/test_timing_calibration.py`. Every file in it says SYNTHETIC.
+copy used by `tests/timing/test_timing_calibration.py`. Every file in it says SYNTHETIC.
 
 ### Dry run on the RTX 3080 Ti (Ampere, 2026-11-23)
 
@@ -704,7 +704,7 @@ configurations run there.
 | `*.cu` | one benchmark each: kernel, host program, and a header comment with method and formula |
 | `build.sh` | `hw` (sm_100a), `sim` (PTX for the simulator), `ampere` (local GPU) |
 | `run_all.sh`, `run_ncu.sh` | the unattended run; the counter run |
-| `fixture_ncu/` | recorded ncu output and a stand-in for ncu, for `tests/test_ncu_scripts.py` |
+| `fixture_ncu/` | recorded ncu output and a stand-in for ncu, for `tests/validation/probes/test_ncu_scripts.py` |
 | `ncu_banks_compare.py`, `ncu_banks.ptx` | the simulator's bank counters for `ncu_banks`, next to `ncu`'s; the PTX it simulates |
 | `predict.py`, `predicted/` | simulator predictions, each launch timed with the active SMs of its shape (`warplens/timing/placement.py`) |
 | `fit.py` | results directory to parameters |

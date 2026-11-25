@@ -117,7 +117,7 @@ descriptors here read back as the tutorial's tensors), and a replay of this dire
 
 ```bash
 python validation/blackwell/e2e/replay_launch.py /path/to/rows/e2e/cute_dsl_tma/capture
-WARPLENS_RT11_CAPTURE=/path/to/rows/e2e/cute_dsl_tma/capture python -m pytest -q tests/test_rt11_replay.py
+WARPLENS_RT11_CAPTURE=/path/to/rows/e2e/cute_dsl_tma/capture python -m pytest -q tests/validation/golden_replay/test_rt11_replay.py
 ```
 
 The capture of 2026-11-25 replays with no byte of the allocation different from the

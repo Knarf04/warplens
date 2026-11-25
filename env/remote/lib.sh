@@ -2,7 +2,7 @@
 # Shared by env/remote/{setup,preflight,run}.sh. Source it; it runs nothing.
 # Everything that decides something from text (which GPU this is, which CUDA
 # release the driver supports, which toolkit to install) is a function of its
-# arguments only, so tests/test_remote_env.py can call it without a GPU.
+# arguments only, so tests/validation/remote/test_remote_env.py can call it without a GPU.
 
 REMOTE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC2034  # used by the scripts that source this file

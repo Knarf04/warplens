@@ -32,7 +32,7 @@ Do these at home; none needs the B200.
 - [ ] The commit to test contains `validation/blackwell/`, `validation/blackwell_timing/`
       and `env/remote/`. `env/remote/run.sh --dry-run` must show no stage as `MISSING`.
 - [ ] The predicted outputs are committed (plan step D17).
-- [ ] `python -m pytest -q tests/test_remote_env.py tests/test_remote_regressions.py tests/test_remote_setup_paths.py tests/test_remote_hardening.py` passes.
+- [ ] `python -m pytest -q tests/validation/remote/test_remote_env.py tests/validation/remote/test_remote_regressions.py tests/validation/remote/test_remote_setup_paths.py tests/validation/remote/test_remote_hardening.py` passes.
 - [ ] A dry run of preflight on the development GPU fails for the right reason:
       `WARPLENS_ENV_RUN="conda run -n warplens" env/remote/preflight.sh` must say
       `FAIL gpu-identity ... not a B200`.
@@ -42,7 +42,7 @@ Do these at home; none needs the B200.
       `skipped (needs sm_100 ...)` for `e2e/cute_dsl_tma` (section 3, "The rows without a probe").
       The capture of that row dry-runs there with a stand-in kernel:
       `conda run -n warplens python validation/blackwell/e2e/cute_dsl_tma.py --out /tmp/rt11 --script examples/06_cute_dsl/saxpy.py`
-      must end with `capture: complete`, and `python -m pytest -q tests/test_launch_capture.py`
+      must end with `capture: complete`, and `python -m pytest -q tests/validation/capture/test_launch_capture.py tests/validation/live_gpu`
       must pass with nothing skipped but the PyTorch test.
       `e2e/driver_call_trace.tirx` is `failed` there for as long as that machine's driver
       is older than the toolkit: it refuses NVRTC's PTX, traced or not.
@@ -187,7 +187,7 @@ The fallback on a 13.0 to 13.4 driver, each step done by `run.sh` without being 
    machine's 13.0 driver: nvcc 13.0.88) and says so between rows of `!`;
    `resolved/versions.txt` has `predictions_comparable=not-comparable`.
 2. `selftest` runs the whole predict path with that nvcc against the committed
-   predictions (`tests/test_predict_path.py`); its failures name the predictions that
+   predictions (`tests/validation/probes/test_predict_path.py`); its failures name the predictions that
    do not hold for this compiler.
 3. `build-blackwell` and `build-timing` build with that nvcc.
 4. `predict-toolkit` (`env/remote/predict_toolkit.sh`) runs every probe and every timing
@@ -413,8 +413,8 @@ What `setup.sh` does (its section 5d, `ensure_book` in `lib.sh`, `BOOK_COMMIT` i
 - It clones <https://github.com/mlc-ai/modern-gpu-programming-for-mlsys> into
   `$WARPLENS_REMOTE_HOME/book`, that one commit without history (11 MB; measured), and
   checks that what it got is at exactly the pinned commit and has the GEMM chapter. The
-  pin is the commit `tests/test_book.py` names (`COMMIT`) and CI checks out;
-  `tests/test_remote_env.py` holds the three together.
+  pin is the commit `tests/runtime/test_book.py` names (`COMMIT`) and CI checks out;
+  `tests/validation/remote/test_remote_env.py` holds the three together.
 - Every run of `setup.sh` looks again: a clone at the pinned commit is left alone, one at
   another commit is replaced, a missing one is fetched. The fetch goes into a directory
   beside it and takes its place only when it is right, so a failed fetch leaves what was
@@ -961,15 +961,15 @@ Measured on the development machine, into throwaway directories that were remove
   (after a fix to the probes; `validation/blackwell/README.md`, finding 16). So
   for the probes a fallback toolkit is flagged but, as far as the simulator can
   tell, harmless. On the rented machine the self-test repeats this check with
-  whatever nvcc is installed (`tests/test_predict_path.py`): its per-probe
+  whatever nvcc is installed (`tests/validation/probes/test_predict_path.py`): its per-probe
   failures name the predictions that do not hold for that compiler. Instruction
   counts do differ between the two compilers (one or two per kernel in the
   guide's examples), so the timing predictions are compiler-specific.
 - The self-test with that fallback toolkit is not all green, and need not be:
-  expect `tests/test_predict_path.py::test_the_compiler_is_the_one_the_committed_predictions_name`
-  (it says which nvcc is installed), four `tests/test_clc.py::test_the_kernels_assemble`
+  expect `tests/validation/probes/test_predict_path.py::test_the_compiler_is_the_one_the_committed_predictions_name`
+  (it says which nvcc is installed), four `tests/memory/test_clc.py::test_the_kernels_assemble`
   cases (their PTX says `.version 9.5`, which ptxas 13.0 refuses) and three
-  `tests/test_guide.py` examples (the guide prints instruction counts of nvcc
+  `tests/documentation/test_guide.py` examples (the guide prints instruction counts of nvcc
   13.5 code). In the rehearsal there were 26 failures: those 8, the 16 probe
   predictions that finding 16 has since fixed, and 2 caused by the rehearsal's
   own `PREFLIGHT_EXPECT_CAP`. Any other failure on the day is news.
@@ -980,7 +980,7 @@ Measured on the development machine, into throwaway directories that were remove
     committed probe prediction and every timing prediction (`DIFFERENCES.txt` empty).
     That exercises the script, not the fallback: with another nvcc it has not run.
   - The stage `predict-toolkit` of `run.sh`, with stand-in suites only
-    (`tests/test_remote_env.py`): it runs before the GPU stages when
+    (`tests/validation/remote/test_remote_env.py`): it runs before the GPU stages when
     `resolved/versions.txt` says `not-comparable`, its directory and the names that
     differ are in the archive, a failure does not stop the GPU stages, and it is skipped
     with the pinned toolkit. Not run inside a whole `run.sh` with a real fallback env.
@@ -1013,7 +1013,7 @@ Measured on the development machine, into throwaway directories that were remove
     on this GPU the three Blackwell checks fail too), and wrote an archive with
     `NCU-COUNTERS-NOT-READ.txt`, `ncu=unavailable`, `ncu_required=1`, `book=` and
     `book_commit=` in its manifest and no file of the book.
-  - With stand-ins only (`tests/test_remote_regressions.py`): the book over a clone at
+  - With stand-ins only (`tests/validation/remote/test_remote_regressions.py`): the book over a clone at
     another commit, a commit that is not the book, a run that goes on with `--no-ncu` or
     `--keep-going`, and every `PASS ncu` path.
 
@@ -1031,8 +1031,8 @@ exit status 1 as it must be on Ampere:
   13.0 driver on the day costs those lines; nothing else among the probes.
 - The self-test (2926 passed, 14 failed, 4 errors, 17 min) failed only where the compiler
   or the dry run's own variable decides: the installed-compiler test, the two probes above,
-  four `tests/test_clc.py::test_the_kernels_assemble`, four `tests/test_guide.py` blocks
-  (instruction counts), four `tests/test_atomics.py::test_compiled_cuda_atomic_add_runs_without_a_gpu`
+  four `tests/memory/test_clc.py::test_the_kernels_assemble`, four `tests/documentation/test_guide.py` blocks
+  (instruction counts), four `tests/execution/test_atomics.py::test_compiled_cuda_atomic_add_runs_without_a_gpu`
   (nvcc 13.0 spells `atom` otherwise than the test expects), and three preflight tests that
   read `PREFLIGHT_EXPECT_CAP`. With the pinned 13.5 env the same tree passes whole
   (2969 passed, 8 skipped).
@@ -1050,13 +1050,13 @@ exit status 1 as it must be on Ampere:
     that dump is the PTX the frontend capture of the same script saves. The two 1024-byte
     allocations were followed from `cuMemAlloc_v2`, the driver's `cuMemGetAddressRange`
     agrees, and the dumps are the script's inputs before the kernel and its result after,
-    bit for bit (`tests/test_launch_capture.py`).
+    bit for bit (`tests/validation/live_gpu/test_launch_capture_on_gpu.py`).
   - A CUDA C++ kernel that takes three 128-byte, 64-byte-aligned structs by value
-    (`tests/data/launch_capture_descriptors.cu`): the address at offset 0 and the one at
+    (`tests/validation/live_gpu/data/launch_capture_descriptors.cu`): the address at offset 0 and the one at
     offset 3 were found, the one stored shifted by 4 bits was not, and its memory was in
     the capture all the same (every live allocation is read when a parameter is that
     large); the after dump of the output is the expected sum.
-  - A CuTe DSL kernel over PyTorch tensors (`tests/data/cute_dsl_torch_saxpy.py`, torch
+  - A CuTe DSL kernel over PyTorch tensors (`tests/validation/live_gpu/data/cute_dsl_torch_saxpy.py`, torch
     2.15.0+cu132 in a venv made as `install_torch_env` makes one), traced as the tutorial
     is: both tensors inside one 2 MiB allocation of PyTorch's allocator, followed through
     `cudaMalloc`; PyTorch's own four launches listed, their memory not read, their three
@@ -1082,7 +1082,7 @@ exit status 1 as it must be on Ampere:
 Later again on 2026-11-24, the pre-rental hardening, after a review found defects in paths
 no rehearsal had taken. None of it has run on a B200, and the whole `run.sh` was not
 rehearsed again on the 3080 Ti after these changes (its self-test is the whole test suite);
-what ran is the three test files of `env/remote` and `tests/test_remote_hardening.py`, with
+what ran is the three test files of `env/remote` and `tests/validation/remote/test_remote_hardening.py`, with
 stand-in suites, and the pieces named as measured:
 
 - Ctrl-C under `run.sh 2>&1 | tee ~/run.log`: `tee` dies of the same Ctrl-C and `run.sh`'s
@@ -1126,8 +1126,8 @@ stand-in suites, and the pieces named as measured:
   `run-blackwell` that was cut short (`--no-build --resume`), and the line for counters that
   were required and not read: against stand-in suites that write the files the real ones
   write. `run.sh` was not run with the real suites after these changes; the tests of the
-  suites that go through `run.sh` were (`tests/test_rental_harness.py`,
-  `tests/test_v1_validation_runner_regressions.py`, `tests/test_full_capture_harness_regressions.py`).
+  suites that go through `run.sh` were (`tests/validation/probes/test_rental_harness.py`,
+  `tests/validation/probes/test_validation_runner_regressions.py`, `tests/validation/capture/test_full_capture_harness_regressions.py`).
 - A checkout of another owner (`repo_git`, `freeze_source.py`): under `fakeroot` with git
   2.43, where plain git refuses with "dubious ownership" and both now work. Not with a real
   root, and not with Ubuntu 22.04's git 2.34.1, for which the global-config way is there.
@@ -1144,7 +1144,7 @@ Not tried, because there was no way to here:
 - Root, in a container or not: a real `apt-get`, a real root shell, and `ncu`
   succeeding. No container runtime was usable on the development machine
   (docker needs its group, podman is not installed, and Ubuntu 24.04 denies
-  unprivileged user namespaces). What stands in: `tests/test_remote_setup_paths.py`
+  unprivileged user namespaces). What stands in: `tests/validation/remote/test_remote_setup_paths.py`
   runs `setup.sh` up to the download in a bare `PATH`, as a normal user and as
   root under `fakeroot` with a stand-in `apt-get` (the decisions, not the
   privileges), and `shellcheck` 0.11 is clean on every script here.

@@ -68,6 +68,6 @@ print("\n\n".join("".join(c["source"]) for c in cells if c["cell_type"] == "code
 python /tmp/book_tour.py          # from the top of the checkout, or from this directory
 ```
 
-`tests/test_guide.py` executes the notebook when `WARPLENS_BOOK` is set:
+`tests/documentation/test_guide.py` executes the notebook when `WARPLENS_BOOK` is set:
 through `nbclient` when the Jupyter packages are installed, and as that
 script when they are not.

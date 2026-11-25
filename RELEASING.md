@@ -43,7 +43,7 @@ put the files it lists into the sdist again, whatever `MANIFEST.in` says.
 
 1. Bump `__version__` in `warplens/__init__.py` (the one line above).
 2. In `CHANGELOG.md`, give the version its section: `## <version> (<date>)`, with what changed
-   since the last release. `tests/test_packaging.py` fails while the section is missing.
+   since the last release. `tests/packaging/test_packaging.py` fails while the section is missing.
 3. For `1.0.0`: in `pyproject.toml`, change the classifier `Development Status :: 3 - Alpha`
    to the status the owner chooses (`5 - Production/Stable` or `4 - Beta`), and strike
    "Reserve the PyPI name" in `PLAN.md` once the upload is done.
@@ -113,6 +113,6 @@ put the files it lists into the sdist again, whatever `MANIFEST.in` says.
   included (`MANIFEST.in`), so the suite runs from an unpacked sdist. A new top-level
   directory is added to `MANIFEST.in`.
 
-`tests/test_packaging.py` builds both and fails when a file of the package is missing from
+`tests/packaging/test_packaging.py` builds both and fails when a file of the package is missing from
 the wheel, when the sdist is not the tree that git has, or when a build script has lost its
 executable bit. It needs `build`, which the `dev` extra installs, and is skipped without it.

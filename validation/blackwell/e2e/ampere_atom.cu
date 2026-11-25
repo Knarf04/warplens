@@ -10,7 +10,7 @@
 // into the sum of what the exchanges returned), so the output is deterministic on a GPU.
 //
 // The expected output is validation/ampere/atom_golden.txt, what an RTX 3080 Ti printed, and
-// the committed prediction is that file, byte for byte (tests/test_ampere_replay.py).
+// the committed prediction is that file, byte for byte (tests/validation/golden_replay/test_ampere_replay.py).
 //
 // What differs between the builds is the PTX the compiler makes of this source, not the
 // source: each toolkit spells `atom` its own way for its target (scopes, orderings). The

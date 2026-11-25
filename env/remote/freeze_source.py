@@ -7,7 +7,7 @@ It is named both ways there are, as repo_git in lib.sh does: on the command line
 2.38 and later accept, and in a global config file of its own that includes the user's,
 which is the only way the patched older releases accept (Ubuntu 22.04's 2.34.1). Nothing
 is written to the checkout or to the user's config. Tried under fakeroot with a checkout
-of another owner and git 2.43 (tests/test_remote_hardening.py); not with an older git.
+of another owner and git 2.43 (tests/validation/remote/test_remote_hardening.py); not with an older git.
 """
 from __future__ import annotations
 

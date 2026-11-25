@@ -8,7 +8,7 @@ different, known set of parameters (TRUTH below). Each simulated launch becomes 
 line as the hardware build would print it: the kernel time extrapolated linearly to
 1000 times the repetitions, plus a 20 us launch overhead, plus (for every trial but the
 first) up to 0.4% of positive noise. fit.py, given these lines and the committed
-predictions of the unmodified config, must recover TRUTH. tests/test_timing_calibration.py
+predictions of the unmodified config, must recover TRUTH. tests/timing/test_timing_calibration.py
 checks that on the committed copy in fixture_synthetic/ (made with --small).
 
 Every output line and file says it is synthetic: DEVICE has `synthetic=1` and

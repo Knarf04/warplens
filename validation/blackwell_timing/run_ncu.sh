@@ -6,7 +6,7 @@
 #   --dry-run   print every ncu command this script would run, one per line, and whether
 #               its program is built; run nothing and write nothing. Needs no ncu and no
 #               GPU: it is how the command lines are checked where counters cannot be read
-#               (tests/test_ncu_scripts.py also runs the whole script against a stand-in
+#               (tests/validation/probes/test_ncu_scripts.py also runs the whole script against a stand-in
 #               for ncu that replays recorded output; see fixture_ncu/).
 #   --check-metrics CHIP[,CHIP...]
 #               ask ncu which of the counter names below it lists for those chips

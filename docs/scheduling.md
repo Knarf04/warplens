@@ -38,7 +38,7 @@ $ WARPLENS_SCHEDULE=3 python script.py
 `Device.launch(schedule=...)` is for one launch. The environment variable
 `WARPLENS_SCHEDULE` is the schedule of every untimed launch that names none,
 in any process: under the shim, in a Triton driver, in the tests
-(`WARPLENS_SCHEDULE=2 pytest tests/test_hardware_golden.py`). `warplens run
+(`WARPLENS_SCHEDULE=2 pytest tests/validation/golden_replay/test_hardware_golden.py`). `warplens run
 --schedule` sets that variable for the run and for the program it starts.
 
 The same schedule and the same inputs give the same run: the seed feeds one
@@ -67,8 +67,8 @@ per instruction, so a warp that spins on the clock makes progress.
 ## What to expect
 
 - A correct kernel: the same output and no findings under every schedule.
-  `tests/test_scheduling.py` checks this for the examples it runs, and the
-  results recorded from real hardware (`tests/test_hardware_golden.py`) hold
+  `tests/execution/test_scheduling.py` checks this for the examples it runs, and the
+  results recorded from real hardware (`tests/validation/golden_replay/test_hardware_golden.py`) hold
   under seeded and adversarial schedules.
 - A kernel with an unsynchronized read-modify-write: a different result for
   different seeds, and `smem-race` under all of them.

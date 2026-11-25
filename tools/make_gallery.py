@@ -4,7 +4,7 @@
     python tools/make_gallery.py --check    # exit 1 if a file there is not what this would write
 
 Every picture is the output of a public function of `warplens.viz` on a launch of a kernel
-in `examples/`, so a reader can make the same one. tests/test_gallery.py runs the check.
+in `examples/`, so a reader can make the same one. tests/documentation/test_gallery.py runs the check.
 """
 
 from __future__ import annotations

@@ -28,7 +28,7 @@ Two generations of compiler spell the same functions differently, and both run:
 
 The short forms are not a different instruction: PTX defines an omitted ordering
 as `.relaxed` and an omitted scope as `.gpu`, and `red` as the `atom` update
-without a destination. `tests/test_atom.py` runs every spelling in this table for
+without a destination. `tests/execution/test_atom.py` runs every spelling in this table for
 every operation and type.
 
 Every active lane performs a complete read/modify/write before the next lane,
@@ -74,13 +74,13 @@ therefore does not predict atomic contention or serialization. Generic remote
 shared accesses are omitted from these bank counters, as with ordinary remote
 accesses. Atomic throughput has not been calibrated on hardware.
 
-`tests/test_atom.py` covers the operation/type matrix, race diagnostics, remote
+`tests/execution/test_atom.py` covers the operation/type matrix, race diagnostics, remote
 shared addressing, and the assumed timing model. The checked-in RTX 3080 Ti
 atomic capture supplies order-independent integer/bit-operation reference
-results in `tests/test_hardware_golden.py`, which runs the probe twice: as nvcc
+results in `tests/validation/golden_replay/test_hardware_golden.py`, which runs the probe twice: as nvcc
 13.5 compiles it for `sm_100a` (`atom_probe.ptx`) and as nvcc 12.4, the compiler of
 the GPU binary, compiles it for `sm_86` (`atom_probe_cuda12.ptx`, legacy `atom`
-spellings and `red`). `tests/test_atomics.py` additionally
+spellings and `red`). `tests/execution/test_atomics.py` additionally
 compiles CUDA 13.5 integer, float, double and shared unsigned-long-long
 `atomicAdd` kernels for `sm_100a` and for `sm_86` and executes their PTX without a GPU, and checks flushing,
 masking, validation and proxy-fence regressions. Those compiler and simulator

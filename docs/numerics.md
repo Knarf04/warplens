@@ -48,7 +48,7 @@ says a NaN passes through unchanged; the recorded Ampere results quiet signallin
 NaNs. The table records this model's empirical policy, not a blanket PTX guarantee.
 The simulator returns what an RTX 3080 Ti returned (`validation/ampere/nan_golden.txt`,
 `validation/ampere/ftz_golden.txt`, `validation/ampere/minmax_cvt_golden.txt`,
-`validation/ampere/cvt_ftz_golden.txt`; `tests/test_hardware_golden.py`), implemented in
+`validation/ampere/cvt_ftz_golden.txt`; `tests/validation/golden_replay/test_hardware_golden.py`), implemented in
 `warplens/units/alu.py:_gpu_nans`, `warplens/units/alu.py:_converted_nans` and
 `warplens/units/alu.py:_float_to_float`:
 
@@ -178,7 +178,7 @@ half-precision output.
 
 What this rests on. `validation/blackwell/measured/b200/mma/accumulation_order.txt`
 (3016 words) and `tf32_low_bits.txt` (256) are reproduced word for word
-(`tests/test_tcgen05.py::test_the_mma_sum_is_the_one_a_b200_computes`). The
+(`tests/memory/test_tcgen05.py::test_the_mma_sum_is_the_one_a_b200_computes`). The
 nine kernels of the book, captured on the same GPU with their inputs, then
 replay bit for bit: 311,296 half-precision elements. With any one rule
 changed some elements are a unit off: products normalized before lining up
@@ -218,7 +218,7 @@ this host API; it does not reproduce every CUDA conversion special case.
 
 What has been compared with a GPU is one layer down: the `cvt` forms for
 these formats that the simulator executes (`warplens/units/small_formats.py`),
-which `tests/test_small_format_cvt.py` holds against this host layer. On a
+which `tests/numerics/test_small_format_cvt.py` holds against this host layer. On a
 B200 the GPU's conversions gave what those forms give for every code of E4M3,
 E5M2 and E2M1, for the E8M0 ties and for the special inputs (the runs
 `formats/fp8_codes`, `fp4_codes`, `e8m0_ties` and `special_inputs`, all

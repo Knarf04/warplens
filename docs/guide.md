@@ -12,7 +12,7 @@ Blackwell GPU (B200 or B300): warps, shared memory, TMA, mbarriers, the
 `tcgen05` tensor core, tensor memory and clusters. No GPU is involved.
 
 Every command and program from section 4 on was run to write this guide, and
-the output shown is what it printed. `tests/test_guide.py` runs them again
+the output shown is what it printed. `tests/documentation/test_guide.py` runs them again
 with the test suite and compares the output, so a block that stops working
 fails a test. The installation commands of section 3 were run by hand.
 
@@ -125,7 +125,7 @@ the B200 printed", which is weaker than "predicted it".
 
 | Area | On the RTX 3080 Ti | On the B200 (2026-11-25) |
 | --- | --- | --- |
-| `shfl.sync`, `vote`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive), `[reg+offset]` on a wrapped register | recorded outputs, replayed in `tests/test_hardware_golden.py`: match exactly | the same programs rerun: every recorded line reproduced. **Changed since:** `elect.sync` executed by a lane outside its member mask ends the kernel |
+| `shfl.sync`, `vote`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive), `[reg+offset]` on a wrapped register | recorded outputs, replayed in `tests/validation/golden_replay/test_hardware_golden.py`: match exactly | the same programs rerun: every recorded line reproduced. **Changed since:** `elect.sync` executed by a lane outside its member mask ends the kernel |
 | `cvt.rna.tf32.f32`, `ldmatrix`, `bfe`, `bfi`, `shf`, `prmt`, `.ftz` arithmetic and `cvt`, `min`/`max`, float-to-integer `cvt`, NaN bit patterns, integer division by zero, `cp.async` zero fill | the same, bit for bit | the same programs rerun: every recorded line reproduced |
 | Atomic updates (`atom`, `red`): every atomic function on 32- and 64-bit integers, `atomicAdd` on `float` and `double`, in global and shared memory, as compiled by nvcc 13.5 and by nvcc 12.4 | match exactly, for results that do not depend on the order of the threads | rerun: reproduced |
 | Shared-memory bank conflicts | Nsight Compute counters on the transpose example: conflict counters match exactly; the total wavefront counter matches once two per warp and one per CTA per barrier, which hardware also counts, are added | the same comparison: conflict counters equal, and the wavefront counter above the model's by the same amount |
@@ -162,7 +162,7 @@ the PTX the GPU ran:
 
 The captures of these programs are in the run's archive and not in this
 repository (they are 79 MB), so the replays against them cannot be repeated
-from a checkout; `tests/test_rt11_replay.py` runs the last one when given
+from a checkout; `tests/validation/golden_replay/test_rt11_replay.py` runs the last one when given
 the capture.
 
 What this evidence does not cover:

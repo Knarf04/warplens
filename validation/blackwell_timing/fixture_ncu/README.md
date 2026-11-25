@@ -2,7 +2,7 @@
 
 `run_ncu.sh` here and `validation/ampere/run_ncu.sh` need permission to read GPU performance
 counters. The development machine does not give it to a normal user (`RmProfilingAdminOnly: 1`),
-so the tests cannot take the profiling path against a real ncu: `tests/test_ncu_scripts.py`
+so the tests cannot take the profiling path against a real ncu: `tests/validation/probes/test_ncu_scripts.py`
 runs the scripts against the files below instead. The path has run for real twice, as root
 on the RTX 3080 Ti on 2026-11-24, with ncu 2024.1.1 and with the pinned 2026.4.0, and read
 counters (`../README.md`); that was the previous version of `run_ncu.sh`, before its time

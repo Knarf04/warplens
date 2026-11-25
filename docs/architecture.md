@@ -263,7 +263,7 @@ A tensor map in the **driver's own layout** is read as well
 (`host/tensor_map.py:decode_driver`). The layout was worked out from a sweep
 of the B200 driver's encoder: every one of the 1087 maps it encoded reads
 back as the parameters that made it, and so do the four the CuTe DSL wrote
-for CUTLASS's `fp16_gemm_0.py` (`tests/test_tensor_map_driver_layout.py`).
+for CUTLASS's `fp16_gemm_0.py` (`tests/validation/golden_replay/test_tensor_map_driver_layout.py`).
 The driver's map carries the bytes of one box as `box // element stride`,
 rounded down, where `TensorMapInfo.counts` rounds up; they agree when the
 strides divide the box, which is all that has run on a GPU.

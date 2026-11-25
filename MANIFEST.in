@@ -3,7 +3,7 @@
 # the test suite runs from an unpacked sdist: the tests read examples/, validation/, docs/,
 # env/, tools/ and .github/.
 #
-# tests/test_packaging.py compares the sdist with `git ls-files`: a tracked file missing from
+# tests/packaging/test_packaging.py compares the sdist with `git ls-files`: a tracked file missing from
 # it, or an untracked file in it, fails there. Add a new top-level directory here.
 include CHANGELOG.md PLAN.md RELEASING.md MANIFEST.in .gitignore
 graft .github

@@ -8,7 +8,7 @@
 // whether the join has a barrier, in whether all lanes or lanes 0 to 15 reach it, and in
 // what follows it. On an RTX 3080 Ti every lane that passes the join reads 7 in all of them
 // (validation/ampere/reconvergence_golden.txt), and the simulator does the same; the
-// committed prediction is that file, byte for byte (tests/test_ampere_replay.py).
+// committed prediction is that file, byte for byte (tests/validation/golden_replay/test_ampere_replay.py).
 //
 // The ten kernels with `bar.sync` test something CUDA defines (matrix row RT-14). The ten
 // without (`_nobar`) have no synchronization between lane 0's store and the other lanes'

@@ -53,7 +53,8 @@ from ..core.cta import Wait
 from ..errors import ExecutionError
 from ..frontend.ir import Mem, Reg, Vec
 from ..host.tensor_map import swizzle_offsets
-from .alu import _address, op, unsupported
+from .addressing import effective_address
+from .dispatch import op, unsupported
 from .smem import CLUSTER_WINDOW, GENERIC_WINDOW, local_shared_offset, resolve_shared
 
 LANES, COLUMNS = 128, 512
@@ -295,7 +296,7 @@ def _mma(w, ins, lane: int, pair: bool = False) -> None:
         raise unsupported(ins, "expected [d], a, b, idesc[, {mask}], enable[, scale-input-d]")
     if isinstance(ops[1], Mem):
         raise unsupported(ins, "operand A in tensor memory")
-    d_lane, d_col = _split(int(_address(w, ins, ops[0])[lane]))
+    d_lane, d_col = _split(int(effective_address(w, ins, ops[0])[lane]))
     desc_a = int(w.read(ops[1], "u64")[lane])
     desc_b = int(w.read(ops[2], "u64")[lane])
     idesc = int(w.read(ops[3], "u32")[lane])
@@ -524,7 +525,7 @@ def _transfer(w, ins, mask, store: bool) -> None:
         return
     _collective(ins, mask)
     tmem = _tmem(cta)
-    address = _address(w, ins, mem)[lanes]
+    address = effective_address(w, ins, mem)[lanes]
     if (address != address[0]).any():
         raise ExecutionError(f"{ins.name} requires the same tensor-memory address in every lane "
                              "of the warp")
@@ -617,7 +618,7 @@ def _tcgen05(w, ins, mask):
             raise unsupported(ins)
         _collective(ins, mask)
         ncols = _uniform(w, ins, ins.operands[1], mask, "column count")
-        offsets = _address(w, ins, ins.operands[0])[mask]
+        offsets = effective_address(w, ins, ins.operands[0])[mask]
         if "shared::cta" not in ins.mods:
             window = np.uint64(GENERIC_WINDOW)
             if not ((offsets >= window) & (offsets < window + np.uint64(CLUSTER_WINDOW))).all():
@@ -679,7 +680,7 @@ def _tcgen05(w, ins, mask):
         if not {"mbarrier::arrive::one", "b64"} <= set(ins.mods) \
                 or set(ins.mods) - allowed or len(ins.operands) != 1 + multicast:
             raise unsupported(ins)
-        addresses = _address(w, ins, ins.operands[0])
+        addresses = effective_address(w, ins, ins.operands[0])
         if "shared::cluster" not in ins.mods:
             shared = (addresses >= GENERIC_WINDOW) & (addresses < GENERIC_WINDOW + CLUSTER_WINDOW)
             if not shared[mask].all():

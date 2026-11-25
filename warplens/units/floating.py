@@ -12,6 +12,13 @@ _FORMATS = {
 }
 
 
+def flush_subnormals(x: np.ndarray, small=None) -> np.ndarray:
+    """Subnormal values (or those marked `small`) become zeros of the same sign."""
+    if small is None:
+        small = np.abs(x) < np.finfo(x.dtype).tiny
+    return np.where(small, np.copysign(x.dtype.type(0), x), x)
+
+
 def _fma_bits(a: int, b: int, c: int, fraction_bits: int, exponent_bits: int) -> int:
     """Compute one round-to-nearest-even FMA from IEEE bit patterns.
 

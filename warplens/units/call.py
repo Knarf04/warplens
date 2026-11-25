@@ -18,7 +18,8 @@ import numpy as np
 
 from ..errors import ExecutionError, UnsupportedError
 from ..frontend.ir import Reg, Sym, Vec
-from .alu import op, unsupported
+from .addressing import LOCAL_WINDOW_BYTES
+from .dispatch import op, unsupported
 
 _SPEC = re.compile(r"%([-+ #0]*)(\d+|\*)?(?:\.(\d+|\*))?(hh|h|ll|l|j|z|t|L)?([diouxXeEfFgGaAcspn%])")
 
@@ -184,10 +185,9 @@ def _callrec(w, ins, mask):
     act.delta = _align_up(top - layout.start, max(layout.align, 16)) if layout.locals else 0
     act.top = layout.end + act.delta if layout.locals else top
     if act.top > w.local.shape[1]:
-        from .alu import _LOCAL_WINDOW_BYTES
-        if act.top > _LOCAL_WINDOW_BYTES:
+        if act.top > LOCAL_WINDOW_BYTES:
             raise ExecutionError(f"call stack overflow: the local variables of `{layout.name}` and its "
-                                 f"callers need more than {_LOCAL_WINDOW_BYTES} bytes per thread")
+                                 f"callers need more than {LOCAL_WINDOW_BYTES} bytes per thread")
         grown = np.zeros((w.local.shape[0], max(act.top, 2 * w.local.shape[1])), dtype=np.uint8)
         grown[:, :w.local.shape[1]] = w.local
         w.local = grown

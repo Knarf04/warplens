@@ -96,7 +96,7 @@ class Warp:
 
     def read_bytes(self, address: int, count: int, lane: int) -> bytes:
         """`count` bytes at a generic address, as seen by one lane."""
-        from ..units.alu import route
+        from ..units.addressing import route
         space, offset = route(address)
         if space == "param":  # a struct passed by value, addressed through `cvta.param`
             blob = self.program.param_blob(self.params)

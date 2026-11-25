@@ -6,14 +6,15 @@ from ..errors import UnsupportedError
 from ..frontend.cfg import block_reachability, build_cfg, reconvergence_points
 from ..frontend.inline import inline_calls
 from ..frontend.ir import Function, Module
-from ..units import atomics as _atomics  # noqa: F401  (register atomic handlers)
-from ..units import barrier as _barrier  # noqa: F401  (these imports register handlers)
+from ..units import alu as _alu  # noqa: F401  (these imports register handlers)
+from ..units import atomics as _atomics  # noqa: F401
+from ..units import barrier as _barrier  # noqa: F401
 from ..units import call as _call  # noqa: F401
 from ..units import clc as _clc  # noqa: F401
 from ..units import mbarrier as _mbarrier  # noqa: F401
 from ..units import tcgen05 as _tcgen05  # noqa: F401
 from ..units import tma as _tma  # noqa: F401
-from ..units.alu import CONTROL_FLOW, HANDLERS
+from ..units.dispatch import CONTROL_FLOW, HANDLERS
 
 
 def _align_up(x: int, align: int) -> int:

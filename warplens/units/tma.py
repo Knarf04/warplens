@@ -20,7 +20,8 @@ from ..core.cta import Wait
 from ..errors import ExecutionError, MemoryFault
 from ..frontend.ir import Imm, TensorRef
 from ..host import tensor_map as tm
-from .alu import _address, _async_check, op, unsupported
+from .addressing import async_check, effective_address
+from .dispatch import op, unsupported
 from .smem import local_shared_offset, resolve_shared
 
 _LOAD_FLAGS = frozenset({"mbarrier::complete_tx::bytes", "L2::cache_hint", "multicast::cluster"})
@@ -270,8 +271,8 @@ def _cp_async(w, ins, mask) -> None:
     if (wanted > size).any():
         raise ExecutionError("cp.async source size is larger than the copy size")
     span = np.arange(size, dtype=np.uint64)
-    source = _address(w, ins, ops[1])[lanes]
-    offsets = local_shared_offset(_address(w, ins, ops[0]))
+    source = effective_address(w, ins, ops[1])[lanes]
+    offsets = local_shared_offset(effective_address(w, ins, ops[0]))
     if (source % size).any() or (offsets[lanes] % size).any():
         raise ExecutionError(f"cp.async needs {size}-byte aligned source and destination addresses")
     data = np.zeros((len(lanes), size), dtype=np.uint8)
@@ -295,7 +296,7 @@ def _cp_async(w, ins, mask) -> None:
                          "threads issue cp.async writes to overlapping shared-memory destinations",
                          w, ins, hit)
     if cta.smem.async_active:
-        _async_check(w, ins, mask, offsets, size, "cp.async overwrites", writing=True)
+        async_check(w, ins, mask, offsets, size, "cp.async overwrites", writing=True)
     # Keep separate operation IDs and group membership for each thread. Knowledge
     # elsewhere in the checker is still warp-scoped, as it is for TMA waits.
     operations = [cta.new_async("copy", w, ins, int(lane)) for lane in lanes]
@@ -398,9 +399,9 @@ def _cp(w, ins, mask):
             multicast = "multicast::cluster" in flags
             if len(ops) != 3 + hint + multicast:
                 raise unsupported(ins, "expected [dst], [tensor_map, {coords}], [mbarrier][, mask]")
-            dst_address = int(_address(w, ins, ops[0])[lane])
+            dst_address = int(effective_address(w, ins, ops[0])[lane])
             info, coords = _tensor_map(w, ins, ops[1], lane, nd)
-            bar_address = int(_address(w, ins, ops[2])[lane])
+            bar_address = int(effective_address(w, ins, ops[2])[lane])
             # With multicast, the same box lands at the same offset in every CTA of the
             # cluster whose rank is set in the mask, and reports to each one's mbarrier.
             ranks = _scalar(w, ins, ops[3], lane, "u16") if multicast else None
@@ -424,9 +425,9 @@ def _cp(w, ins, mask):
             multicast = "multicast::cluster" in flags
             if len(ops) != 4 + hint + multicast:
                 raise unsupported(ins, "expected [dst], [src], size, [mbarrier][, mask]")
-            dst_address = int(_address(w, ins, ops[0])[lane])
-            source = int(_address(w, ins, ops[1])[lane])
-            bar_address = int(_address(w, ins, ops[3])[lane])
+            dst_address = int(effective_address(w, ins, ops[0])[lane])
+            source = int(effective_address(w, ins, ops[1])[lane])
+            bar_address = int(effective_address(w, ins, ops[3])[lane])
             ranks = _scalar(w, ins, ops[4], lane, "u16") if multicast else None
             start, targets = _load_targets(w, ins, lane, dst_address, bar_address, dst, None, ranks)
             nbytes = _raw_size(w, ins, ops[2], lane, start, source)
@@ -439,7 +440,7 @@ def _cp(w, ins, mask):
             if len(ops) != 2 + hint:
                 raise unsupported(ins, "expected [tensor_map, {coords}], [src]")
             info, coords = _tensor_map(w, ins, ops[0], lane, nd)
-            start = local_shared_offset(int(_address(w, ins, ops[1])[lane]))
+            start = local_shared_offset(int(effective_address(w, ins, ops[1])[lane]))
             _check_alignment(w, ins, info, start, lane)
             if min(coords) < 0:
                 # Measured on a B200 (validation/blackwell/measured/b200/tma/
@@ -465,8 +466,8 @@ def _cp(w, ins, mask):
         else:  # [global], [smem], size
             if len(ops) != 3 + hint:
                 raise unsupported(ins, "expected [dst], [src], size")
-            target = int(_address(w, ins, ops[0])[lane])
-            start = local_shared_offset(int(_address(w, ins, ops[1])[lane]))
+            target = int(effective_address(w, ins, ops[0])[lane])
+            start = local_shared_offset(int(effective_address(w, ins, ops[1])[lane]))
             nbytes = _raw_size(w, ins, ops[2], lane, start, target)
             idx = _smem_bytes(w, ins, start, nbytes, 0, "store")
 

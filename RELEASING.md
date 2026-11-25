@@ -29,9 +29,9 @@ placeholder to reserve the PyPI name, and `1.0`, the public release. The tree is
    supported Python), `dist` (the wheel and the sdist, installed in place of the checkout),
    `triton`, and `full` (everything, with no test allowed to skip).
 3. `README.md` reads correctly as the PyPI project page. It is the long description, and PyPI
-   does not resolve links that are relative to the repository: the README has such links
-   (`docs/guide.md`, `env/README.md`, `examples/08_book/book_tour.ipynb`), which lead nowhere there
-   until they are written as full URLs.
+   does not resolve links that are relative to the repository, so the README links to the
+   repository's files by full URL (`https://github.com/Knarf04/warplens/blob/main/...`);
+   `tests/documentation/test_guide.py` fails on a relative one and checks that each file is there.
 4. The first upload of a name to PyPI is permanent, and a version cannot be uploaded twice:
    a mistake in an uploaded file is fixed by a new version, not by a new file.
 

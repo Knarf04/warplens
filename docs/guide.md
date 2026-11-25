@@ -1333,7 +1333,8 @@ a decision, not a fix"): the fit itself shows where one number per mechanism
 cannot follow the GPU (the latency of cluster launch control differs by form
 of request, an mbarrier arrive and wait costs 33 ns where the model charges
 about 3), and the examples in this guide were written for the assumed values.
-The fit is of one day's measurements on one machine.
+The fit is of one day's measurements on one machine. Version 1 ships the
+assumed values (the decision is recorded in [PLAN.md](../PLAN.md)).
 
 What the model leaves out is in section 8. What it is good for is the question the example asks:
 with these parameters, is this pipeline limited by the copies, the memory

@@ -24,8 +24,9 @@ file's.
   identical to the simulator's prediction; the differences were taken into
   the simulator, which now reproduces the recorded outputs. Those changes
   have not been run on hardware again.
-- The timing model's shipped configs still hold the values assumed before
-  that run. A fit of the run is recorded and not applied.
+- The timing model's shipped configs hold the values assumed before that
+  run, and v1 ships them: a fit of the run is recorded and can be chosen,
+  and is not the default (decided below).
 
 The guide's section 2 has the evidence area by area.
 
@@ -64,23 +65,27 @@ reserve the PyPI name, and `1.0`, the public release
    of the MMA sum. What to look for is in
    [docs/b200-rental-1.md](docs/b200-rental-1.md), "What the second rental
    has to confirm".
-2. **A decision on the timing config.** Take the fit of the first run
-   (`validation/blackwell_timing/measured/b200/calibrated.yaml`) as it is and
-   rewrite what depends on the assumed values (about twenty tests, the
-   guide's worked examples, one ordering property, TIM-18, that then fails by
-   a hair), or first give the model what the fit says it lacks (a
-   cluster-launch-control latency per form of the request, the cost of an
-   mbarrier wake-up) and fit again
-   ([docs/b200-rental-1.md](docs/b200-rental-1.md), "The timing config is a
-   decision, not a fix").
-3. **A decision on the RT-11 capture.** The kernel of `fp16_gemm_0.py`
-   replays byte for byte against the B200, given the capture
-   (`tests/validation/golden_replay/test_rt11_replay.py` with `WARPLENS_RT11_CAPTURE`). The capture is
-   not a committed fixture: it is 42 MB, and its PTX is CUTLASS's code
-   compiled. The tutorial as a script under `warplens run` is not done: it
-   holds its arrays in PyTorch, which needs a GPU.
-4. **Reserve the PyPI name** with the `0.0.1` placeholder.
-5. What [RELEASING.md](RELEASING.md) lists under "Before the release".
+2. **Reserve the PyPI name** with the `0.0.1` placeholder.
+3. What [RELEASING.md](RELEASING.md) lists under "Before the release".
+
+Decided by the owner on 2026-11-25:
+
+- **The timing config stays as it is for v1.** `b200.yaml` and `b300.yaml`
+  ship the assumed values and say so; the fit of the first run
+  (`validation/blackwell_timing/measured/b200/calibrated.yaml`) is recorded
+  and usable with `--timing-config`, and is not the default. No prediction
+  changes, so the second rental's timing run is compared with the same
+  predictions as the first. Giving the model what the fit says it lacks is
+  after v1 (below; [docs/b200-rental-1.md](docs/b200-rental-1.md), "The
+  timing config is a decision, not a fix").
+- **The RT-11 capture stays out of the repository.** The kernel of
+  `fp16_gemm_0.py` replays byte for byte against the B200, given the capture
+  (`tests/validation/golden_replay/test_rt11_replay.py` with
+  `WARPLENS_RT11_CAPTURE` naming it in an unpacked rental archive); without
+  the variable the test is left out of the run. The capture is 42 MB, most of
+  it the modules of other kernels in the process. The tutorial as a script
+  under `warplens run` is not done: it holds its arrays in PyTorch, which
+  needs a GPU.
 
 Open and recorded, not blocking:
 
@@ -114,6 +119,11 @@ Open and recorded, not blocking:
   built).
 - Hopper (`sm_90a`) mode: `wgmma` on the same TMA and mbarrier engine.
 - Optional SASS-level input via `nvdisasm` for timing studies.
+- The timing model given what the fit of the first B200 run says it lacks (a
+  cluster-launch-control latency per form of the request, the cost of an
+  mbarrier wake-up, an issue rate that is not called a clock), fitted again,
+  and the fit made the default: about twenty tests and the guide's worked
+  examples state the assumed values and are rewritten with it.
 - A calibration run on a B300: nothing in `b300.yaml` was measured on one.
 - If profiling shows the interpreter is the bottleneck, the core (PTX IR
   execution) in Rust behind the same Python API.

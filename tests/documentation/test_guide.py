@@ -56,6 +56,7 @@ from tests.support import REPO as ROOT
 
 GUIDE = ROOT / "docs" / "guide.md"
 README = ROOT / "README.md"
+REPOSITORY_FILE = "https://github.com/Knarf04/warplens/blob/main/"  # how the README links to a file
 NOTEBOOK = ROOT / "examples" / "08_book" / "book_tour.ipynb"
 BOOK = os.environ.get("WARPLENS_BOOK", "")
 MARK = re.compile(r"<!--\s*test:\s*(file|run|output)\b(.*?)-->\s*$")
@@ -221,15 +222,25 @@ if pytest is not None:
         text = re.sub(r"^```.*?^```", "", document.read_text(), flags=re.S | re.M)
         broken = []
         for target in re.findall(r"\]\(([^)\s]+)\)", text):
-            if re.match(r"[a-z][a-z0-9+.-]*:", target):  # http:, https:, mailto:
+            # The README is also the project page on PyPI, which does not resolve a link
+            # relative to the repository: its links to the repository's files are full URLs,
+            # and are checked against the checkout like the relative ones of the guide.
+            in_repository = target.startswith(REPOSITORY_FILE)
+            if re.match(r"[a-z][a-z0-9+.-]*:", target) and not in_repository:  # http:, https:, mailto:
                 continue
-            path, _, anchor = target.partition("#")
-            file = (document.parent / path).resolve() if path else document
+            path, _, anchor = target.removeprefix(REPOSITORY_FILE).partition("#")
+            file = ((ROOT if in_repository else document.parent) / path).resolve() if path else document
             if not file.exists():
                 broken.append(target)
             elif anchor and file.suffix == ".md" and anchor not in anchors(file):
                 broken.append(target)
         assert not broken, f"{document.name} links to things that do not exist: {broken}"
+
+    def test_the_readme_has_no_link_that_pypi_cannot_resolve():
+        text = re.sub(r"^```.*?^```", "", README.read_text(), flags=re.S | re.M)
+        targets = re.findall(r"\]\(([^)\s]+)\)", text)
+        assert sum(t.startswith(REPOSITORY_FILE) for t in targets) > 10
+        assert not [t for t in targets if not re.match(r"[a-z][a-z0-9+.-]*:", t)]
 
     def test_every_finding_kind_is_explained_in_the_guide():
         kinds = set()

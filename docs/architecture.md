@@ -275,10 +275,10 @@ load reads global memory when issued and writes shared memory when it
 completes, then performs `complete_tx` on its mbarrier. A store reads shared
 memory when it completes. Copy bounds are checked before allocating
 transfer-sized temporary arrays. A tensor copy at a shared address that is
-not a multiple of 32 bytes is an error: a B200 ends the kernel at 16
-(`cudaErrorMisalignedAddress`), and 32 is the weakest alignment that
-measurement allows (`TENSOR_COPY_ALIGNMENT`, an assumption a probe run asks a
-GPU about).
+not a multiple of 128 bytes is an error (`TENSOR_COPY_ALIGNMENT`): a B200
+ends the kernel with `cudaErrorMisalignedAddress` at every other offset that
+was tried, from 16 to 192, and runs at 128 and 256
+([b200-rental-2.md](b200-rental-2.md)).
 
 **Swizzle is a function of the shared-memory address**, not of the offset
 into the buffer: CuTe's `Swizzle<B,4,3>` with B = 1, 2, 3 for 32B, 64B, 128B,
@@ -335,10 +335,15 @@ through zero. `Mbarrier.deliver` models this: a copy larger than the bytes
 still expected completes the phase, charges the rest to the next phase, and
 reports `mbarrier-tx-mismatch`. The copy's data is still written whole, so a
 kernel with this bug computes the right result in the simulator where a GPU
-may read a half-written tile; the finding is what says so. The piece size, 64
-bytes (`TX_PIECE_BYTES`), is an assumption: the largest the measurements
-allow. A count that is not a whole number of pieces is passed over, as it is
-by the instruction.
+may read a half-written tile; the finding is what says so. On a B200 the
+pieces vary from run to run and are multiples of 32 bytes: the same kernel
+completes such a phase early in one run and never in the next
+([b200-rental-2.md](b200-rental-2.md)). The simulator keeps two things apart.
+The diagnosis is the accounting, which no schedule changes: the phase
+accounts for fewer bytes than the copy delivers. The outcome it shows is the
+early completion, at every multiple of 32 (`TX_PIECE_BYTES`), because that is
+the dangerous one of those a GPU has. A count that is not a multiple of 32 is
+passed over, as on the GPU and as by the instruction.
 
 **Bulk groups belong to each issuing thread.** A commit includes that
 thread's uncommitted stores, including an empty group if there were none. A

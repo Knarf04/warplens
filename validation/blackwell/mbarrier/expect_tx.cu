@@ -27,17 +27,22 @@
 //   expect_tx wait-large    expect_tx 512 for a 256-byte load, same loop. Expected to hang.
 //   expect_tx pieces        how large the pieces are: one 256-byte load against expect_tx
 //                                of 4, 8, 16, 32, 48, 64, 96, 192 and 255 bytes, each polled
-//                                and then settled (never hangs). The phase completes where
-//                                the count is a whole number of pieces. The simulator takes
-//                                64 bytes, the largest size the first measurements allow,
-//                                which is an assumption: a difference here is the answer.
+//                                and then settled (never hangs). On a B200 the answer changes
+//                                from run to run (2026-11-25, second rental): the phase
+//                                completes only at a multiple of 32, and there in some runs
+//                                and not in others. No prediction is held against this run.
+//   expect_tx sweep FROM TO STEP   the same for every count in a range. Not in the manifest:
+//                                run by hand, 80 times, to count how often each completes
+//                                (measured/b200/mbarrier/expect_tx_sweep.txt).
 #include "../common.h"
 
 enum Op { ARRIVE_EXPECT = 1, EXPECT = 2, ARRIVE = 3, LOAD = 4, POLL = 5, SETTLE = 6, WAIT = 7 };
 static const char* op_names[] = {"?", "arrive.expect_tx", "expect_tx", "arrive", "load 256 bytes", "poll parity",
                                  "settle", "try_wait loop, parity"};
 
+#ifndef LOAD_BYTES  // the sweep was also built with -DLOAD_BYTES=128 and 512 (measured/b200)
 #define LOAD_BYTES 256
+#endif
 #define MAX_LOADS 4
 
 extern "C" __global__ void mbar_expect_tx(const __grid_constant__ CUtensorMap map, const int* ops, const int* args,
@@ -131,6 +136,12 @@ int main(int argc, char** argv) {
         RUN("expect_tx 512 for a 256-byte load, then wait without a bound",
             {ARRIVE_EXPECT, 512}, {LOAD, 0}, {WAIT, 0});
         printf("the wait returned\n");
+    } else if (!strcmp(which, "sweep") && argc > 4) {  // sweep FROM TO STEP: not in the manifest
+        for (int bytes = atoi(argv[2]); bytes <= atoi(argv[3]); bytes += atoi(argv[4])) {
+            char title[96];
+            snprintf(title, sizeof title, "sweep: expect_tx %d, one load of %d bytes", bytes, LOAD_BYTES);
+            RUN(title, {ARRIVE_EXPECT, bytes}, {LOAD, 0}, {POLL, 0}, {SETTLE, 0});
+        }
     } else if (!strcmp(which, "pieces")) {
         for (int bytes : {4, 8, 16, 32, 48, 64, 96, 192, 255}) {
             char title[96];

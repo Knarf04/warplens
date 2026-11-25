@@ -43,8 +43,10 @@ def test_expect_tx_too_small_is_caught():
 
 
 def test_an_undersized_expect_tx_completes_only_at_a_whole_number_of_pieces():
-    """TX_PIECE_BYTES is an assumption (64, the largest size the B200's results allow): a
-    count that is not a multiple of it is passed over, and the wait deadlocks as before."""
+    """TX_PIECE_BYTES is 32, as a B200 has it (measured/b200/mbarrier/expect_tx_sweep.txt): a
+    count that is not a multiple of it is passed over, and the wait deadlocks as before. At
+    a multiple of 32 a GPU completes the phase in some runs and not in others; the simulator
+    always does, and reports it."""
     from warplens.units.mbarrier import Mbarrier, TX_PIECE_BYTES
 
     class Cta:
@@ -64,10 +66,13 @@ def test_an_undersized_expect_tx_completes_only_at_a_whole_number_of_pieces():
         bar.deliver(copy, None, None, [0])
         return cta.completed, bar.tx, cta.kinds
 
-    assert TX_PIECE_BYTES == 64
+    assert TX_PIECE_BYTES == 32
     assert phases(256) == (1, 0, [])
     assert phases(128) == (1, -128, ["mbarrier-tx-mismatch"]) and phases(64) == (1, -192, ["mbarrier-tx-mismatch"])
-    assert phases(96) == (0, -160, []) and phases(32) == (0, -224, [])
+    assert phases(96) == (1, -160, ["mbarrier-tx-mismatch"]) and phases(32) == (1, -224, ["mbarrier-tx-mismatch"])
+    # What a B200 never completed in 80 runs: a count that is not a multiple of 32.
+    assert phases(48) == (0, -208, []) and phases(16) == (0, -240, []) and phases(255) == (0, -1, [])
+    assert phases(64, copy=128) == (1, -64, ["mbarrier-tx-mismatch"]) and phases(80, copy=128) == (0, -48, [])
     assert phases(512) == (0, 256, [])
 
 
@@ -213,24 +218,50 @@ def test_swizzled_bytes_land_where_cute_says(sim, swizzle, bits, inner):
 def test_buffer_not_aligned_to_swizzle_period_is_reported(sim):
     data = np.arange(256, dtype=np.uint8).reshape(2, 128)
     src_map = sim.tensor_map_tiled(sim.from_numpy(data), (2, 128), swizzle="128B")
-    mod = kernel(DUMP.format(pad=32), DUMP_PARAMS)  # buf lands at offset 32
-    stats = sim.launch(mod, "k", grid=1, block=256, args=[src_map, sim.empty(256, "u8"), 256])
+    # buf lands at offset 128: aligned as a tensor copy must be (a B200 ends the kernel for
+    # less, and so does the simulator), and not to the swizzle's period.
+    mod = kernel(DUMP.format(pad=128), DUMP_PARAMS)
+    out = sim.empty(256, "u8")
+    stats = sim.launch(mod, "k", grid=1, block=256, args=[src_map, out, 256])
     f = stats.findings[0]
     assert f.kind == "tma-swizzle-misaligned" and "not aligned to 1024 bytes" in f.message
-    # The consequence: bytes are not where offset-based indexing looks for them.
-    assert "smem-uninitialized-read" in {f.kind for f in stats.findings}
+    # The consequence: bytes are not where offset-based indexing looks for them. The rows are
+    # 1 and 2 of the period, not 0 and 1, so the chunks of each are in another order than a
+    # buffer at offset 0 has them.
+    at_zero = sim.empty(256, "u8")
+    assert not sim.launch(kernel(DUMP.format(pad=1024), DUMP_PARAMS), "k", grid=1, block=256,
+                          args=[src_map, at_zero, 256]).findings
+    assert sorted(out.numpy().tolist()) == sorted(at_zero.numpy().tolist())
+    assert not np.array_equal(out.numpy(), at_zero.numpy())
 
 
 def test_a_tensor_copy_16_bytes_into_a_row_ends_the_kernel_as_on_a_b200(sim):
     """validation/blackwell/measured/b200/tma/swizzle_misaligned.sixteen.txt: a destination 16
     bytes into the buffer is cudaErrorMisalignedAddress, with or without a swizzle. The
-    simulator refuses what is not a multiple of 32 (TENSOR_COPY_ALIGNMENT, an assumption)."""
+    simulator refuses what is not a multiple of 128 (TENSOR_COPY_ALIGNMENT)."""
     data = np.arange(256, dtype=np.uint8).reshape(2, 128)
     for swizzle in (None, "128B"):
         src_map = sim.tensor_map_tiled(sim.from_numpy(data), (2, 128), swizzle=swizzle)
-        with pytest.raises(warplens.ExecutionError, match="aligned to 32 bytes, got offset 16.*cudaErrorMisalignedAddress"):
+        with pytest.raises(warplens.ExecutionError, match="aligned to 128 bytes, got offset 16.*cudaErrorMisalignedAddress"):
             sim.launch(kernel(DUMP.format(pad=16), DUMP_PARAMS), "k", grid=1, block=256,
                        args=[src_map, sim.empty(256, "u8"), 256])
+
+
+@pytest.mark.parametrize("pad", [32, 48, 64, 80, 96, 112, 144, 192])
+def test_a_tensor_copy_needs_a_shared_address_aligned_to_128_bytes_as_on_a_b200(sim, pad):
+    """The second rental (validation/blackwell/measured/b200/tma/swizzle_offsets.txt): every
+    offset tried that is not a multiple of 128 ended the kernel, 32 and 64 among them, which
+    the simulator let run before; 128 and 256 ran."""
+    from warplens.units.tma import TENSOR_COPY_ALIGNMENT
+    assert TENSOR_COPY_ALIGNMENT == 128
+    data = np.arange(256, dtype=np.uint8).reshape(2, 128)
+    src_map = sim.tensor_map_tiled(sim.from_numpy(data), (2, 128))
+    with pytest.raises(warplens.ExecutionError, match=f"aligned to 128 bytes, got offset {pad}.*cudaErrorMisalignedAddress"):
+        sim.launch(kernel(DUMP.format(pad=pad), DUMP_PARAMS), "k", grid=1, block=256,
+                   args=[src_map, sim.empty(256, "u8"), 256])
+    out = sim.empty(256, "u8")
+    assert not [f for f in sim.launch(kernel(DUMP.format(pad=128), DUMP_PARAMS), "k", grid=1, block=256,
+                                      args=[src_map, out, 256]).findings if "aligned" in f.message]
 
 
 # -- mbarrier semantics ----------------------------------------------------------------

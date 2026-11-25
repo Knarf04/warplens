@@ -97,12 +97,12 @@ def _tensor_map(w, ins, operand: TensorRef, lane: int, nd: int):
     return info, coords
 
 
-# What the shared address of a tensor copy must be a multiple of. A B200 ends the kernel with
-# cudaErrorMisalignedAddress for a box 16 bytes into its buffer and runs every multiple of 128
-# (validation/blackwell/measured/b200/tma/swizzle_misaligned.sixteen.txt; tma/swizzle
-# misaligned was identical to its prediction). 32 is an ASSUMPTION: the smallest alignment
-# that refuses what was measured to fault. tma/swizzle thirtytwo and sixtyfour ask a GPU.
-TENSOR_COPY_ALIGNMENT = 32
+# What the shared address of a tensor copy must be a multiple of. Measured on a B200: the
+# kernel ends with cudaErrorMisalignedAddress for a box 16, 32, 48, 64, 80, 96, 112, 144 or
+# 192 bytes into its buffer, and runs at 128 and 256 as at every multiple of 128 before
+# (validation/blackwell/measured/b200/tma/swizzle_misaligned.*.txt, swizzle_offsets.txt).
+# Before the second rental this was 32, an assumption: the weakest that refused offset 16.
+TENSOR_COPY_ALIGNMENT = 128
 
 
 def _check_alignment(w, ins, info, start: int, lane: int) -> None:

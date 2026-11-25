@@ -34,8 +34,15 @@ the outputs that differed from a prediction and the timing measurements):
   larger than the bytes expected completes the mbarrier phase; the NaN of the TMA fill and of
   `cvt.rn/.rz.tf32.f32`; clusters of more than 8 CTAs need the non-portable attribute; what
   `maxDynamicSharedSizeBytes` reports above 48 KiB static; four faults that end the kernel,
-  and a tensor-memory leak that fails the launch. These changes have not been run on
-  hardware again.
+  and a tensor-memory leak that fails the launch.
+- A second run the same day (`docs/b200-rental-2.md`) held those changes against the GPU:
+  every probe run whose prediction had changed was identical, and the whole programs were
+  bit-identical. Two answers from it changed the simulator again, and have not been run on
+  hardware since: a TMA tensor copy at a shared address that is not a multiple of 128 bytes
+  ends the kernel (it was 32, an assumption); and a TMA copy larger than the bytes expected
+  completes the phase early wherever those bytes are a multiple of 32 (it was 64), with a
+  finding that states the accounting first and says that a B200 does this in some runs and
+  hangs in others.
 - Tensor maps in the driver's own layout are read, from that run's encoder sweep.
 - `tcgen05.mma` with `.collector::a::discard` and `cvt.rn.f16x2.f32` are implemented, for the
   kernel of CUTLASS's `fp16_gemm_0.py`, which replays byte for byte from its B200 capture.

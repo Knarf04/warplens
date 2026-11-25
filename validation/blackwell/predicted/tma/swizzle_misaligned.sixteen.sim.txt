@@ -1,5 +1,5 @@
 status: exit 3
-warplens: a TMA tensor copy needs a shared-memory address aligned to 32 bytes, got offset 1040: a GPU ends the kernel here with cudaErrorMisalignedAddress
+warplens: a TMA tensor copy needs a shared-memory address aligned to 128 bytes, got offset 1040: a GPU ends the kernel here with cudaErrorMisalignedAddress
   at module0.ptx:136: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r53], [%rd13, {%r16, %r17}], [%r54];
   in kernel `tma_dump`, CTA (0, 0, 0), warp 0
   lane 0 (thread (0, 0, 0))

@@ -107,7 +107,9 @@ Two GPUs have been compared with the simulator:
   probe programs whose output the simulator had predicted beforehand, 17
   whole programs, and 14 timing benchmarks. [b200-rental-1.md](b200-rental-1.md)
   is the record of that run, and the outputs that differed from a prediction
-  are in `validation/blackwell/measured/b200/`.
+  are in `validation/blackwell/measured/b200/`. A second run on the same
+  machine, later that day, held the simulator as changed after the first
+  against the GPU again ([b200-rental-2.md](b200-rental-2.md)).
 
 Of the 126 probe runs, 88 printed exactly what the simulator had predicted
 and 8 did not. The other 30 have no pass or fail: 18 had no prediction to
@@ -115,13 +117,18 @@ hold or ran what the simulator refuses, in 6 the GPU ended a kernel that the
 simulator let return, in 3 it faulted where the simulator has no model, 2
 timed out as predicted, and 1 could not be judged.
 
-**What "changed since" means below.** Every difference was taken into the
-simulator after the run, and for each one the simulator now prints the
-recorded B200 output line for line. That is a model fitted to one recording.
-The changed predictions have not been run on a GPU again; a second run that
-would confirm them is planned and has not happened
-([PLAN.md](../PLAN.md)). So a row marked *changed since* is "reproduces what
-the B200 printed", which is weaker than "predicted it".
+**What "changed since" means below.** Every difference of the first run was
+taken into the simulator after it, and for each one the simulator then
+printed the recorded B200 output line for line. That is a model fitted to one
+recording, which is weaker than a prediction. The second run made them
+predictions: of 130 probe runs, every one whose prediction had changed came
+back identical, in both of its passes, and the whole programs were
+bit-identical. It also answered two questions the first run had left as
+assumptions, and both answers changed the simulator once more: the alignment
+a tensor copy needs (128 bytes, not 32), and what an undersized `expect_tx`
+does (below, under mbarriers). Those two changes have not been run on a GPU
+again; for the first, what the simulator now does is what the second run
+recorded.
 
 | Area | On the RTX 3080 Ti | On the B200 (2026-11-25) |
 | --- | --- | --- |
@@ -130,15 +137,15 @@ the B200 printed", which is weaker than "predicted it".
 | Atomic updates (`atom`, `red`): every atomic function on 32- and 64-bit integers, `atomicAdd` on `float` and `double`, in global and shared memory, as compiled by nvcc 13.5 and by nvcc 12.4 | match exactly, for results that do not depend on the order of the threads | rerun: reproduced |
 | Shared-memory bank conflicts | Nsight Compute counters on the transpose example: conflict counters match exactly; the total wavefront counter matches once two per warp and one per CTA per barrier, which hardware also counts, are added | the same comparison: conflict counters equal, and the wavefront counter above the model's by the same amount |
 | Launch errors and the shared-memory opt-in under `warplens run` | codes and the opt-in rule measured at Ampere's limits | the limit, the opt-in and the device attributes identical to the prediction. **Changed since:** what `maxDynamicSharedSizeBytes` reports for a kernel with more than 48 KiB static (0), and that a cluster of more than 8 CTAs needs the non-portable attribute |
-| mbarriers | arrival tokens and `test_wait` predicates (`try_wait` and byte counts need Hopper or newer) | identical: phases and parity, arrival counts, `expect_tx` with bytes, tokens, `try_wait` on completed phases, completion before `expect_tx`. **Changed since:** a TMA copy larger than the bytes expected completes the phase; over-arrival ends the kernel. `try_wait` on a phase that never completes returned false; the simulator blocks, by decision (section 8) |
-| TMA, tensor maps | not possible | identical: every swizzle mode on aligned and misaligned buffers, ranks 1 to 5, element strides, zero fill, stores and `wait_group`, raw bulk copies, the missing fence. **Changed since:** the NaN of the out-of-bounds fill; two cases the GPU ends the kernel for (a tensor copy at an address aligned to 16 bytes only, a store at a negative coordinate). The driver's own tensor-map layout is read from this run's encoder sweep |
+| mbarriers | arrival tokens and `test_wait` predicates (`try_wait` and byte counts need Hopper or newer) | identical: phases and parity, arrival counts, `expect_tx` with bytes, tokens, `try_wait` on completed phases, completion before `expect_tx`. **Changed since:** a TMA copy larger than the bytes expected completes the phase; over-arrival ends the kernel. The second run showed that the early completion is not the same from run to run: it happens only where the bytes expected are a multiple of 32, and there in some runs and not in others (80 runs counted). The simulator reports the accounting, which does not vary, and shows the early completion `try_wait` on a phase that never completes returned false; the simulator blocks, by decision (section 8) |
+| TMA, tensor maps | not possible | identical: every swizzle mode on aligned and misaligned buffers, ranks 1 to 5, element strides, zero fill, stores and `wait_group`, raw bulk copies, the missing fence. **Changed since:** the NaN of the out-of-bounds fill; two cases the GPU ends the kernel for (a tensor copy at a shared address that is not a multiple of 128 bytes, measured at ten offsets over the two runs; a store at a negative coordinate). The driver's own tensor-map layout is read from this run's encoder sweep |
 | Tensor memory | not possible | identical: allocation addresses and order, the lane window, the layout of MMA results, every transfer shape and repeat count. **Changed since:** a larger allocation after a smaller one is made, as the GPU made it; a leak fails the launch. Still stricter than the GPU, on purpose: 48 columns, and an allocation after the permit was relinquished, are refused. Not modeled: three transfers past a warp's lane window faulted on the GPU and are refused here; tensor memory never written held an earlier launch's values on the GPU |
 | `tcgen05.mma`: where things go | not possible | identical: operand layouts, negation, `scale-input-d`, disabled lanes, `commit` arrivals, the swizzle mismatch, swizzle by absolute address |
-| `tcgen05.mma`: the arithmetic | not possible | **did not match, changed since.** An element is one sum cut toward zero, not a chain of float32 additions, and `kind::tf32` drops the low 13 bits of its operands. The simulator now reproduces both recordings word for word; three rules of the sum were inferred from the book's kernels and have a probe that has not run ([numerics.md](numerics.md)) |
+| `tcgen05.mma`: the arithmetic | not possible | **did not match, changed since.** An element is one sum cut toward zero, not a chain of float32 additions, and `kind::tf32` drops the low 13 bits of its operands. The simulator reproduces both recordings word for word; three rules of the sum were inferred from the book's kernels, and the probe written for them was identical on the second run ([numerics.md](numerics.md)) |
 | Clusters | not possible | identical: the cluster barrier, multicast, remote arrive, the two-CTA MMA in all four forms, the address dump, every cluster-launch-control run |
 | `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | not possible (they need Hopper or newer) | identical for all finite inputs and infinities. **Changed since:** every NaN gives `0x7fffe000` (7 of 715 lines) |
 | FP8 and FP4 `cvt` conversions | not possible | identical: every code of E4M3, E5M2 and E2M1, the E8M0 ties, the special inputs. UE4M3 has no conversion in ptxas 13.3 or 13.5, so nothing to compare |
-| Whole programs (below) | not possible | bit-identical or within tolerance, except the book's `hgemm_v6` to `v9` at the time; all nine replay bit for bit since the MMA change |
+| Whole programs (below) | not possible | bit-identical or within tolerance, except the book's `hgemm_v6` to `v9` at the time; all nine replay bit for bit since the MMA change, and on the second run every program was bit-identical to the simulator |
 | Timing model | seven benchmarks, to show the measuring method is stable | 14 benchmarks measured and fitted. **The shipped config was not changed**: it still holds the assumed values (section 6.7) |
 
 Whole programs, each run on the B200 and then replayed in the simulator from
@@ -171,11 +178,11 @@ What this evidence does not cover:
   written from the simulator's own claims
   ([validation-matrix.md](validation-matrix.md) has one row per claim), and a
   rule nobody thought to state has no probe.
-- **The changes made after the run**, as said above, and three constants in
-  them that are assumptions: the size of the pieces in which a TMA copy
-  reports its bytes, the alignment a tensor copy needs, and three rules of
-  the MMA sum ([b200-rental-1.md](b200-rental-1.md), "What the second rental
-  has to confirm").
+- **The two changes made after the second run**, as said above: the 128-byte
+  alignment of a tensor copy is what that run recorded, and has not been
+  predicted and then measured; for an undersized `expect_tx` the simulator
+  shows one of the outcomes a GPU has, and does not say how often a GPU
+  takes each ([b200-rental-2.md](b200-rental-2.md)).
 - **What only a race could show**: when exactly a copy reads its source,
   which synchronization a program may rely on. The checkers report these
   instead of modeling an outcome (the matrix, "Claims not turned into a

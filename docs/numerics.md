@@ -186,7 +186,9 @@ changed some elements are a unit off: products normalized before lining up
 (495), the old value added without being cut (143), a width of 24, 26 or 27
 bits (204, 123, 146). Those captures are in the rental's archive and not in
 the repository, so parts 4 to 6 of `mma/accumulation_order` ask a GPU for the
-same three rules directly.
+same three rules directly. They were asked on the second run of 2026-11-25
+and the output was identical to the prediction, with both compilers
+([b200-rental-2.md](b200-rental-2.md)).
 
 **Not measured:** operands that are subnormal in half precision (their
 exponent is taken from the value), elements with an infinity or a NaN among

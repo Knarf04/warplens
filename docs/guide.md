@@ -146,7 +146,7 @@ recorded.
 | `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | not possible (they need Hopper or newer) | identical for all finite inputs and infinities. **Changed since:** every NaN gives `0x7fffe000` (7 of 715 lines) |
 | FP8 and FP4 `cvt` conversions | not possible | identical: every code of E4M3, E5M2 and E2M1, the E8M0 ties, the special inputs. UE4M3 has no conversion in ptxas 13.3 or 13.5, so nothing to compare |
 | Whole programs (below) | not possible | bit-identical or within tolerance, except the book's `hgemm_v6` to `v9` at the time; all nine replay bit for bit since the MMA change, and on the second run every program was bit-identical to the simulator |
-| Timing model | seven benchmarks, to show the measuring method is stable | 14 benchmarks measured and fitted. **The shipped config was not changed**: it still holds the assumed values (section 6.7) |
+| Timing model | seven benchmarks, to show the measuring method is stable | 14 benchmarks measured and fitted, and measured again on the second run: 127 of 161 configurations within 1 % of the first, and the first run's fit predicts the second run's measurements as well as its own. **The shipped config was not changed**: it still holds the assumed values (section 6.7) |
 
 Whole programs, each run on the B200 and then replayed in the simulator from
 the PTX the GPU ran:
@@ -1340,7 +1340,10 @@ a decision, not a fix"): the fit itself shows where one number per mechanism
 cannot follow the GPU (the latency of cluster launch control differs by form
 of request, an mbarrier arrive and wait costs 33 ns where the model charges
 about 3), and the examples in this guide were written for the assumed values.
-The fit is of one day's measurements on one machine. Version 1 ships the
+The fit is of one day's measurements on one machine; a second set, taken on
+the same machine after a restart, repeats the first to within 1 % for most
+configurations, and the fit predicts it as well as its own
+([b200-rental-2.md](b200-rental-2.md)). Version 1 ships the
 assumed values (the decision is recorded in [PLAN.md](../PLAN.md)).
 
 What the model leaves out is in section 8. What it is good for is the question the example asks:

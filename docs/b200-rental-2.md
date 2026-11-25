@@ -135,13 +135,87 @@ Matching how often a GPU takes each outcome is not attempted. The probe run
 has no prediction any more (`predict="none"` in the manifest): no single
 output can be held against it.
 
+## The timing measurements
+
+Both runs ran the timing suite again: 14 benchmarks, 161 configurations. The
+tables are in `validation/blackwell_timing/measured/b200/rental-2/`; the first
+rental's are one directory up. Nothing in the simulator or its configs was
+changed by what follows.
+
+**The measurements repeat** (measured; pinned compiler, first rental against
+second). Of 161 configurations 127 are within 1 % and 147 within 5 %; the
+median difference is 0.24 %. By benchmark:
+
+| Benchmark | Configurations | Median difference | Largest |
+| --- | --- | --- | --- |
+| `mma_rate` | 64 | 0.23 % | 0.66 % |
+| `smem_wavefronts` | 20 | 0.22 % | 0.25 % |
+| `alu_chain`, `mbar`, `tmem_access`, `gstream` | 16 | 0.2 to 0.4 % | 0.35 % |
+| `pipelined_gemm` | 6 | 0.74 % | 1.5 % |
+| `cluster_costs` | 10 | 0.55 % | 1.7 % |
+| `tma` | 21 | 1.4 % | 6.1 % |
+| `cp_async` | 2 | 2.4 % | 2.4 % |
+| `clc_latency` | 5 | 1.8 % | 5.2 % |
+| `global_load` | 6 | 0.29 % | 5.9 % |
+
+What moved is one thing: latency on the path through L2. Warm TMA loads,
+`cp.async`, the load chain with an L2-sized footprint and the requests of
+cluster launch control were 2 to 6 % slower in the second run; register
+arithmetic, shared memory, tensor memory, mbarriers and every MMA
+configuration were within 0.7 %. With the fallback compiler the same
+configurations moved further, up to 14 %. **Reading:** the state of the
+machine between two boots, not the programs; nothing here says which state.
+
+**The parameters a fit derives repeat with them.** Ten of the fourteen are
+within 0.4 % of the first rental's (the SM count and memory size, the issue
+rate of one warp, the shared-memory wavefront, tensor-memory access, the MMA
+latency and both tensor-core rates, HBM bandwidth, the latency of a
+cluster-launch-control request). The four that moved are the ones read from
+the L2 path: global access latency +6.0 %, TMA latency +3.6 %, and TMA bytes
+per clock and L2 bandwidth per SM about -3 %.
+
+**What the compiler changes is stable.** A TMA store takes 15 to 35 % longer
+per repetition when built by nvcc 13.5 than by 13.3 (38.8 ns against 25.1 ns
+at 1024 bytes), and each of the four runs gives its compiler's number to
+within 0.3 %. That is code around the instruction, measured twice; it is not
+noise, and a fit made with one compiler's build carries it.
+
+**The first rental's fit, held against the second rental's measurements**
+(`rental-2/first-fit-held-against-it/`). This is the question the first
+write-up left for this run: a fit agrees with the measurements it was made
+from, and that says little. Predicting every benchmark with
+`calibrated.yaml` of the first rental and comparing with what the second
+measured:
+
+| | Within 10 % | Within a factor of two | Of |
+| --- | --- | --- | --- |
+| Shipped config, first rental's measurements | 6 | 53 | 153 |
+| Shipped config, second rental's measurements | 5 | 53 | 153 |
+| First rental's fit, its own measurements | 46 | 104 | 153 |
+| First rental's fit, second rental's measurements | 47 | 105 | 153 |
+
+(The first write-up counted 45 and 104 of 152 for the third line; these were
+counted again for this one, with the simulator as it is now.) The fit is as
+good out of sample as in: no configuration that it had within 10 % left that
+band. And it is no better: where it was wrong it is wrong by the same factor.
+With the fit, all 56 `mma_rate` configurations are within a factor of two
+and 30 within 10 %; `smem_wavefronts` has none of 20 within 10 %, `mbar` is
+off by 3.7 times, a failed cluster-launch-control request on two CTAs by 1.8
+times. Those are the places the first write-up named, where one number per
+mechanism is not enough.
+
+**What this changes: nothing in v1.** The decision recorded in `PLAN.md`
+stands and has more under it: the measurements a fit would be made from are
+repeatable to a fraction of a percent for most mechanisms, so the remaining
+error is the model's shape and not the data. That is the work listed there
+for after v1.
+
+`ncu` profiled all 11 benchmarks in the main run and 10 of 11 in the pinned
+run, where it failed on `transpose` as it had in the first rental (not looked
+into, in either).
+
 ## What was not done
 
-- **The timing measurements were taken and not analysed.** Both runs ran the
-  timing suite (14 benchmarks; `ncu` profiled 10 of 11 in the pinned run and
-  failed on `transpose`, as in the first rental). They are in the archives.
-  Holding the first rental's fit against this second set is still to do; the
-  shipped timing config is unchanged by decision (`PLAN.md`).
 - **The two changes above were not run on hardware again.** For the
   alignment the new predictions are what this rental recorded (the kernel
   ends). Held offline against the pinned run's outputs, the predictions as

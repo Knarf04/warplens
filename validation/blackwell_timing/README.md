@@ -7,7 +7,8 @@ the approximate timing model (`warplens/timing/model.py`,
 **The suite ran on a B200 on 2026-11-25**, twice (once per toolkit;
 `docs/b200-rental-1.md`). `measured/b200/` has the benchmarks' output, the
 measurements and the fit of the run built with the pinned toolkit
-(`report.md`, `calibrated.yaml`), and under `fallback-nvcc-13.3.73/` the fit
+(`report.md`, `calibrated.yaml`), under `rental-2/` the same tables from the second
+run and the first fit held against it (`docs/b200-rental-2.md`), and under `fallback-nvcc-13.3.73/` the fit
 and the `ncu` counter tables of the other. Fourteen benchmarks ran in both.
 `ncu` read counters for all eleven programs it profiled in the run with the
 fallback toolkit, and for ten of eleven in the pinned one (`transpose` failed

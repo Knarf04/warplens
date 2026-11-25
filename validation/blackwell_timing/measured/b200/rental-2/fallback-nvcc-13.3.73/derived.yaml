@@ -1,0 +1,87 @@
+# Timing-model parameters derived by validation/blackwell_timing/fit.py.
+# Results: timing. Device: NVIDIA_B200 (compute capability 10.0).
+# A fragment in the schema of warplens/configs/*.yaml: entries not listed were not measured.
+
+sm_count:
+  value: 148
+  unit: SMs
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "cudaGetDeviceProperties().multiProcessorCount."
+
+hbm_capacity_gb:
+  value: 178.3
+  unit: GB
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "cudaMemGetInfo() total bytes / 2^30. The driver reports usable memory, which is below the nominal size."
+
+clock_ghz:
+  value: 0.51089
+  unit: GHz
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "clock_ghz(config) 1.5 * predicted 2.5 / measured 7.34 ns per repetition of alu_chain/warps=1 (3.75 PTX instructions per repetition). Effective issue clock for one warp of register-only instructions, not the core clock."
+
+smem_wavefront_clk:
+  value: 0.52179
+  unit: clk
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "slope 1.021 ns per extra wavefront (load_chain, conflict 1..32) * clock_ghz. Clocks converted with the fitted clock_ghz = 0.5109."
+
+global_access_latency_clk:
+  value: 96.663
+  unit: clk
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "config 30 + measured 201.4 ns * clock_ghz - predicted 24.17 ns * 1.5 (global_load/load_chain/footprint=l2, one load per repetition). Clocks converted with the fitted clock_ghz = 0.5109."
+
+tmem_access_clk:
+  value: 3.5833
+  unit: clk
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "config 4 + measured 14.84 ns * clock_ghz - predicted 5.333 ns * 1.5 (tmem_access/ld/x1, one tcgen05.ld per repetition). Clocks converted with the fitted clock_ghz = 0.5109."
+
+clc_latency_ns:
+  value: 234.23
+  unit: ns
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "measured 258.7 ns per request - 24.47 ns of instruction time the simulator counts for the same loop (clc_latency/fail/plain/ctas=1, requests that fail in a launch of one cluster). One latency for every form of the request, as the model has. Includes whatever the mbarrier wake-up costs on hardware beyond its instructions. Clocks converted with the fitted clock_ghz = 0.5109. NOT ONE NUMBER on this device: clc_latency/fail/plain/ctas=2 implies 440.8 ns, clc_latency/fail/multicast/ctas=2 implies 443.1 ns, clc_latency/succeed/plain/ctas=1 implies 303.5 ns, clc_latency/succeed/multicast/ctas=2 implies 504.3 ns; the model would need a latency per form."
+
+tma_bytes_per_clk:
+  value: 492.09
+  unit: bytes/clk
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "251.4 bytes/ns (1 / slope of round trip against bytes, load/warm) / clock_ghz. The faster of warm loads and stores is taken as the engine rate: the model charges max(engine, memory) per copy, so each slope is the slower of the two. Clocks converted with the fitted clock_ghz = 0.5109."
+
+l2_bandwidth_per_sm_gb_s:
+  value: 251.41
+  unit: GB/s
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "1 / slope of round trip against bytes, warm loads, in bytes/ns. LOWER BOUND: warm loads run at the engine rate, so L2 is at least this fast; the model reproduces the measurement with any value from here up."
+
+tma_latency_ns:
+  value: 175.05
+  unit: ns
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "intercept 188.3 ns of warm-load round trip against bytes - 13.21 ns of instruction time the simulator counts for the same loop. Includes whatever the mbarrier wake-up costs on hardware beyond its instructions. Clocks converted with the fitted clock_ghz = 0.5109."
+
+hbm_bandwidth_tb_s:
+  value: 6.1814
+  unit: TB/s
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "STREAM Triad: 1 / (0.0001618 ns per byte) / 1000 (gstream/triad, 24 bytes per element). Same definition as the config's published figure. Cold TMA loads on every SM gave 9.069 TB/s."
+
+tensor_core_tflops_f16:
+  value: 2239.6
+  unit: TFLOPS
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "2 * 128 * 256 * 16 FLOP / 69.29 ns per MMA * 148 SMs / 1000 (slope over batch size, ctas=allsm)."
+
+mma_latency_clk:
+  value: 96.517
+  unit: clk
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "config 11.3 + measured batch intercept 216.1 ns * clock_ghz - predicted 16.81 ns * 1.5 (f16 m128 n256). Includes whatever tcgen05.commit and the mbarrier wake-up cost on hardware beyond their instructions. Clocks converted with the fitted clock_ghz = 0.5109."
+
+tensor_core_tflops_tf32:
+  value: 1119.7
+  unit: TFLOPS
+  source: "measured: validation/blackwell_timing on NVIDIA_B200, results timing"
+  note: "2 * 128 * 256 * 8 FLOP / 69.3 ns per MMA * 148 SMs / 1000 (slope over batch size, ctas=allsm)."

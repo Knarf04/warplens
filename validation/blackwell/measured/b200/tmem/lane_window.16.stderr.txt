@@ -1,0 +1,1 @@
+KERNEL FAILED: mma_dump: cudaErrorMisalignedAddress at synchronize (misaligned address)

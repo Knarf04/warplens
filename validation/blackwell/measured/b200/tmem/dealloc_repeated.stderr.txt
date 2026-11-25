@@ -1,0 +1,1 @@
+KERNEL FAILED: release the same allocation twice: cudaErrorLaunchFailure at synchronize (unspecified launch failure)

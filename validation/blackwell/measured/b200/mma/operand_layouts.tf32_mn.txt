@@ -1,0 +1,18 @@
+kind::tf32, M = 128, N = 64, K = 8, swizzle 128B, A MN-major, B K-major
+  descriptors (relative to the operand buffer): A 4000408000400000, B 4000404000010400, instruction 08108910
+  D[0][0] = 00000000, expected 41800000 (16)
+  D[0][1] = 00000000, expected c0800000 (-4)
+  D[0][2] = 00000000, expected 40000000 (2)
+  D[0][3] = 00000000, expected c1b80000 (-23)
+  D[0][4] = 00000000, expected 41700000 (15)
+  D[0][5] = 00000000, expected 41a00000 (20)
+  elements equal to A B^T bit for bit: 179 of 8192
+kind::tf32, M = 128, N = 64, K = 8, swizzle 128B, A K-major, B MN-major
+  descriptors (relative to the operand buffer): A 4000404000010000, B 4000404000400400, instruction 08110910
+  D[0][0] = 00000000, expected 41800000 (16)
+  D[0][1] = 00000000, expected c0800000 (-4)
+  D[0][2] = 00000000, expected 40000000 (2)
+  D[0][3] = 00000000, expected c1b80000 (-23)
+  D[0][4] = 00000000, expected 41700000 (15)
+  D[0][5] = 00000000, expected 41a00000 (20)
+  elements equal to A B^T bit for bit: 179 of 8192

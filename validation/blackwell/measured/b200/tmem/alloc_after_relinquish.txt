@@ -1,0 +1,4 @@
+script: relinquish the permit, then allocate
+  step  0  relinquish_alloc_permit: executed
+  step  1  alloc   32 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  2  dealloc allocation 0: executed

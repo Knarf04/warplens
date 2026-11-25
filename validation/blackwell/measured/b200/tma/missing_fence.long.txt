@@ -1,0 +1,4 @@
+info: 100000 iterations per variant
+no fence                                 rows holding a stale counter: 0; rows holding something else: 0; all rows right: yes
+fence                                    rows holding a stale counter: 0; rows holding something else: 0; all rows right: yes
+fence in another warp, after a barrier   rows holding a stale counter: 0; rows holding something else: 0; all rows right: yes

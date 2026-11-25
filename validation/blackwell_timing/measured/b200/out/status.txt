@@ -1,0 +1,18 @@
+launch: exit=0 seconds=1 lines=402 ok
+alu_chain: exit=0 seconds=4 lines=77 ok
+smem_wavefronts: exit=0 seconds=13 lines=220 ok
+global_load: exit=0 seconds=7 lines=66 ok
+gstream: exit=0 seconds=1 lines=11 ok
+cp_async: exit=0 seconds=1 lines=22 ok
+ncu_banks: exit=0 seconds=1 lines=45 ok
+ncu, first part (the programs valid on Ampere): ncu partial: 5 benchmark(s) profiled, 1 failed, 5 not profiled; no counter table from: transpose (ncu exit 1, no counter table), mbar (not in this run: --group ampere), tma (not in this run: --group ampere), mma_rate (not in this run: --group ampere), tmem_access (not in this run: --group ampere), clc_latency (not in this run: --group ampere); raw CSVs in /home/ubuntu/warplens-pinned/run/out/timing/ncu
+mbar: exit=0 seconds=2 lines=22 ok
+tma: exit=0 seconds=1 lines=231 ok
+mma_rate: exit=0 seconds=17 lines=616 ok
+tmem_access: exit=0 seconds=2 lines=66 ok
+clc_latency: exit=0 seconds=1 lines=55 ok
+cluster_costs: exit=0 seconds=4 lines=110 ok
+pipelined_gemm: exit=0 seconds=0 lines=66 ok
+mma_rate_i8: exit=0 seconds=4 lines=88 ok
+ncu partial: 10 benchmark(s) profiled, 1 failed; no counter table from: transpose (ncu exit 1, no counter table); raw CSVs in /home/ubuntu/warplens-pinned/run/out/timing/ncu
+fit: ok, see /home/ubuntu/warplens-pinned/run/out/timing/fit/report.md

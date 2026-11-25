@@ -1,0 +1,187 @@
+# run started 2026-11-25T02:24:17Z: lines of `dmesg` matching Xid|NVRM, under the run after which each was first seen
+(before the run)	Nov 25 01:50:36 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: loading NVIDIA UNIX Open Kernel Module for x86_64  610.57.04  Release Build  (dvs-builder@U22-I3-AF05-32-1)  Wed Jul 29 02:45:17 UTC 2026
+(before the run)	Nov 25 01:50:37 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 kbifCacheVFInfo_GB100: Unable to read NV_PF0_INITIAL_AND_TOTAL_VFS
+(before the run)	Nov 25 01:51:42 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 01:51:42 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 01:51:44 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 01:51:44 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 01:51:44 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 01:51:44 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:13:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU at PCI:0000:8d:00: GPU-(uuid removed)
+(before the run)	Nov 25 02:13:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU Board Serial Number: (removed)
+(before the run)	Nov 25 02:13:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=87091, name=small_formats, channel 0x00000002
+(before the run)	Nov 25 02:13:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=87107, name=small_formats, channel 0x00000002
+(before the run)	Nov 25 02:16:54 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+(before the run)	Nov 25 02:16:54 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:16:54 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=88775, name=elect, channel 0x00000002
+(before the run)	Nov 25 02:16:56 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+(before the run)	Nov 25 02:16:56 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x1600000f 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:16:56 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=88807, name=swizzle, channel 0x00000002
+(before the run)	Nov 25 02:16:57 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+(before the run)	Nov 25 02:16:57 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:16:57 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=88823, name=ranks, channel 0x00000002
+(before the run)	Nov 25 02:16:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+(before the run)	Nov 25 02:16:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x1000b 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:16:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=88855, name=store, channel 0x00000002
+(before the run)	Nov 25 02:17:00 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=88887, name=init_count, channel 0x00000002
+(before the run)	Nov 25 02:17:01 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=88908, name=init_count, channel 0x00000002
+(before the run)	Nov 25 02:17:03 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Global Exception on (GPC 0, TPC 2, SM 0): Multiple Warp Errors
+(before the run)	Nov 25 02:17:03 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x21 0x507734=0x24 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:17:03 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=88940, name=script, channel 0x00000002
+(before the run)	Nov 25 02:17:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+(before the run)	Nov 25 02:17:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Global Exception on (GPC 0, TPC 2, SM 0): Multiple Warp Errors
+(before the run)	Nov 25 02:17:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xf 0x507734=0x24 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:17:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=88958, name=lane_window, channel 0x00000002
+(before the run)	Nov 25 02:17:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+(before the run)	Nov 25 02:17:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Global Exception on (GPC 0, TPC 2, SM 0): Multiple Warp Errors
+(before the run)	Nov 25 02:17:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xf 0x507734=0x24 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:17:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89003, name=lane_window, channel 0x00000002
+(before the run)	Nov 25 02:17:06 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+(before the run)	Nov 25 02:17:06 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Global Exception on (GPC 0, TPC 2, SM 0): Multiple Warp Errors
+(before the run)	Nov 25 02:17:06 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xf 0x507734=0x24 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:17:06 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89019, name=lane_window, channel 0x00000002
+(before the run)	Nov 25 02:17:07 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+(before the run)	Nov 25 02:17:07 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x1000f 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:17:07 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89035, name=layout_f, channel 0x00000002
+(before the run)	Nov 25 02:17:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+(before the run)	Nov 25 02:17:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:17:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89103, name=alloc, channel 0x00000002
+(before the run)	Nov 25 02:17:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+(before the run)	Nov 25 02:17:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:17:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89119, name=alloc, channel 0x00000002
+(before the run)	Nov 25 02:17:12 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+(before the run)	Nov 25 02:17:12 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+(before the run)	Nov 25 02:17:12 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89135, name=alloc, channel 0x00000002
+(before the run)	Nov 25 02:17:22 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 0, SM 0): CTA Not Present
+(before the run)	Nov 25 02:17:22 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x505730=0x22 0x505734=0x20 0x505728=0x1f81fb60 0x50572c=0x1174
+(before the run)	Nov 25 02:17:22 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89335, name=multicast, channel 0x00000002
+(before the run)	Nov 25 02:18:26 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89472, name=alloc, channel 0x00000002
+(before the run)	Nov 25 02:18:27 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89488, name=alloc, channel 0x00000002
+(before the run)	Nov 25 02:18:28 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=89504, name=alloc, channel 0x00000002
+(before the run)	Nov 25 02:20:32 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:32 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:33 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:33 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:33 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:33 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:33 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:33 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:35 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:35 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:37 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:37 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:37 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:37 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:42 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:42 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:43 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:43 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:43 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:43 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:46 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:46 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:47 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:47 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:47 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:47 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:49 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:49 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:50 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:50 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:50 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:50 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:20:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:20:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:00 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:00 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:00 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:00 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:04 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:04 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:39 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:39 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:40 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:40 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:40 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:40 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:40 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:40 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:42 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:42 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:42 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:42 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:55 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:55 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:56 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:56 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:56 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:56 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:21:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:21:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:22:00 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:22:00 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:22:01 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:22:01 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:22:01 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:22:01 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:22:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:22:58 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:22:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:22:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+(before the run)	Nov 25 02:22:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822ee8
+(before the run)	Nov 25 02:22:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: GPU0 gpuValidateRegOffset_IMPL: User does not have permission to access register offset 0x822eec
+e2e/elect.all	Nov 25 02:24:52 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+e2e/elect.all	Nov 25 02:24:52 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+e2e/elect.all	Nov 25 02:24:52 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106704, name=elect, channel 0x00000002
+tma/swizzle_misaligned.sixteen	Nov 25 02:24:54 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+tma/swizzle_misaligned.sixteen	Nov 25 02:24:54 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x1600000f 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+tma/swizzle_misaligned.sixteen	Nov 25 02:24:54 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106736, name=swizzle, channel 0x00000002
+tma/misaligned_requests	Nov 25 02:24:55 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+tma/misaligned_requests	Nov 25 02:24:55 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+tma/misaligned_requests	Nov 25 02:24:55 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106752, name=ranks, channel 0x00000002
+tma/store_wait_group.edge	Nov 25 02:24:57 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+tma/store_wait_group.edge	Nov 25 02:24:57 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x1000b 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+tma/store_wait_group.edge	Nov 25 02:24:57 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106784, name=store, channel 0x00000002
+mbarrier/init_count.over	Nov 25 02:24:59 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106876, name=init_count, channel 0x00000002
+mbarrier/init_count.zero	Nov 25 02:25:00 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106892, name=init_count, channel 0x00000002
+mbarrier/over_arrival	Nov 25 02:25:02 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Global Exception on (GPC 0, TPC 2, SM 0): Multiple Warp Errors
+mbarrier/over_arrival	Nov 25 02:25:02 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x21 0x507734=0x24 0x507728=0x1f81fb60 0x50772c=0x1174
+mbarrier/over_arrival	Nov 25 02:25:02 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106927, name=script, channel 0x00000002
+tmem/lane_window.16	Nov 25 02:25:03 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+tmem/lane_window.16	Nov 25 02:25:03 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Global Exception on (GPC 0, TPC 2, SM 0): Multiple Warp Errors
+tmem/lane_window.16	Nov 25 02:25:03 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xf 0x507734=0x24 0x507728=0x1f81fb60 0x50772c=0x1174
+tmem/lane_window.16	Nov 25 02:25:03 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106943, name=lane_window, channel 0x00000002
+tmem/lane_window.1	Nov 25 02:25:04 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+tmem/lane_window.1	Nov 25 02:25:04 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Global Exception on (GPC 0, TPC 2, SM 0): Multiple Warp Errors
+tmem/lane_window.1	Nov 25 02:25:04 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xf 0x507734=0x24 0x507728=0x1f81fb60 0x50772c=0x1174
+tmem/lane_window.1	Nov 25 02:25:04 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106959, name=lane_window, channel 0x00000002
+tmem/lane_window.48	Nov 25 02:25:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+tmem/lane_window.48	Nov 25 02:25:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Global Exception on (GPC 0, TPC 2, SM 0): Multiple Warp Errors
+tmem/lane_window.48	Nov 25 02:25:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xf 0x507734=0x24 0x507728=0x1f81fb60 0x50772c=0x1174
+tmem/lane_window.48	Nov 25 02:25:05 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106975, name=lane_window, channel 0x00000002
+tmem/layout_f.64_8	Nov 25 02:25:06 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+tmem/layout_f.64_8	Nov 25 02:25:06 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x1000f 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+tmem/layout_f.64_8	Nov 25 02:25:06 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=106991, name=layout_f, channel 0x00000002
+tmem/alloc_addresses.size_16	Nov 25 02:25:09 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+tmem/alloc_addresses.size_16	Nov 25 02:25:09 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+tmem/alloc_addresses.size_16	Nov 25 02:25:09 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=107061, name=alloc, channel 0x00000002
+tmem/alloc_addresses.size_0	Nov 25 02:25:10 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+tmem/alloc_addresses.size_0	Nov 25 02:25:10 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+tmem/alloc_addresses.size_0	Nov 25 02:25:10 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=107077, name=alloc, channel 0x00000002
+tmem/alloc_addresses.size_1024	Nov 25 02:25:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+tmem/alloc_addresses.size_1024	Nov 25 02:25:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+tmem/alloc_addresses.size_1024	Nov 25 02:25:11 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=107093, name=alloc, channel 0x00000002
+cluster/multicast.outside	Nov 25 02:25:20 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 0, SM 0): CTA Not Present
+cluster/multicast.outside	Nov 25 02:25:20 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x505730=0x22 0x505734=0x20 0x505728=0x1f81fb60 0x50572c=0x1174
+cluster/multicast.outside	Nov 25 02:25:20 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=107293, name=multicast, channel 0x00000002
+tmem/dealloc_repeated	Nov 25 02:26:24 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=107434, name=alloc, channel 0x00000002
+tmem/dealloc_mismatch	Nov 25 02:26:25 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=107450, name=alloc, channel 0x00000002
+tmem/alloc_leak	Nov 25 02:26:26 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=107466, name=alloc, channel 0x00000002

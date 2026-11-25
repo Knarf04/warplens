@@ -1,0 +1,3 @@
+script: release the same allocation twice
+KERNEL FAILED: release the same allocation twice
+info: error cudaErrorLaunchFailure

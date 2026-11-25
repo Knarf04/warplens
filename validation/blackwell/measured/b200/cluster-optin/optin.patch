@@ -1,0 +1,10 @@
+--- cluster/baseline.cu	2026-11-25 01:45:58.000000000 +0000
++++ cluster/optin.cu	2026-11-25 01:45:58.000000000 +0000
+@@ -32,6 +32,7 @@
+     uint32_t most = (uint32_t)prop.sharedMemPerBlockOptin;
+     printf("info: sharedMemPerBlockOptin %u bytes\n", most);
+     HOST_CHECK(cudaFuncSetAttribute(cluster_touch, cudaFuncAttributeMaxDynamicSharedMemorySize, (int)most));
++    HOST_CHECK(cudaFuncSetAttribute(cluster_touch, cudaFuncAttributeNonPortableClusterSizeAllowed, 1));
+     uint32_t* d_ran = dev_alloc<uint32_t>(32);
+     uint32_t ran[32];
+     for (int pass = 0; pass < 2; ++pass)

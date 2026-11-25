@@ -1,0 +1,1 @@
+KERNEL FAILED: allocate 256 columns and return without releasing them: cudaErrorTensorMemoryLeak at synchronize (tensor memory not completely freed)

@@ -1,0 +1,5 @@
+name	row	status	seconds	command
+e2e/cute_dsl_tma	RT-11	ok	21.8	/home/ubuntu/warplens-remote/env/bin/python /home/ubuntu/warplens/validation/blackwell/e2e/cute_dsl_tma.py --out /home/ubuntu/warplens-remote/run/out/blackwell/rows/e2e/cute_dsl_tma
+formats/ue4m3_ptxas	NUM-05	ok	0.2	/home/ubuntu/warplens-remote/env/bin/python /home/ubuntu/warplens/validation/blackwell/formats/ue4m3_ptxas.py
+e2e/driver_call_trace.tirx	RT-10	ok	3.6	/home/ubuntu/warplens-remote/env/bin/python /home/ubuntu/warplens/validation/blackwell/e2e/driver_call_trace.py --timeout 240.0 --out /home/ubuntu/warplens-remote/run/out/blackwell/rows/e2e/driver_call_trace.tirx -- /home/ubuntu/warplens-remote/env/bin/python /home/ubuntu/warplens/examples/07_tirx/run.py
+e2e/driver_call_trace.cute_dsl	RT-10	ok	2.7	/home/ubuntu/warplens-remote/env/bin/python /home/ubuntu/warplens/validation/blackwell/e2e/driver_call_trace.py --timeout 240.0 --out /home/ubuntu/warplens-remote/run/out/blackwell/rows/e2e/driver_call_trace.cute_dsl -- /home/ubuntu/warplens-remote/env/bin/python /home/ubuntu/warplens/examples/06_cute_dsl/saxpy.py

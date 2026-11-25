@@ -1,0 +1,7 @@
+script: expect_tx 128 for a 256-byte load, then wait without a bound
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  try_wait loop, parity    0                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+the wait returned

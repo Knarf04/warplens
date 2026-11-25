@@ -1,0 +1,30 @@
+==PROF== Connected to process 90173 (/home/ubuntu/warplens/validation/blackwell_timing/bin/ncu/transpose_hw)
+transpose_linear: ok
+transpose_padded: ok
+transpose_swizzled: ok
+==PROF== Disconnected from process 90173
+"ID","Process ID","Process Name","Host Name","Kernel Name","Context","Stream","Block Size","Grid Size","Device","CC","Section Name","Metric Name","Metric Unit","Metric Value"
+"0","90173","transpose_hw","127.0.0.1","transpose_linear","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum","","63488"
+"0","90173","transpose_hw","127.0.0.1","transpose_linear","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum","","63488"
+"0","90173","transpose_hw","127.0.0.1","transpose_linear","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum","","0"
+"0","90173","transpose_hw","127.0.0.1","transpose_linear","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_pipe_lsu_wavefronts_mem_shared.sum","","71744"
+"0","90173","transpose_hw","127.0.0.1","transpose_linear","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum","","n/a"
+"0","90173","transpose_hw","127.0.0.1","transpose_linear","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","59392"
+"0","90173","transpose_hw","127.0.0.1","transpose_linear","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed_op_shared_ld.sum","inst","2048"
+"0","90173","transpose_hw","127.0.0.1","transpose_linear","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed_op_shared_st.sum","inst","2048"
+"1","90173","transpose_hw","127.0.0.1","transpose_padded","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum","","0"
+"1","90173","transpose_hw","127.0.0.1","transpose_padded","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum","","0"
+"1","90173","transpose_hw","127.0.0.1","transpose_padded","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum","","0"
+"1","90173","transpose_hw","127.0.0.1","transpose_padded","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_pipe_lsu_wavefronts_mem_shared.sum","","8256"
+"1","90173","transpose_hw","127.0.0.1","transpose_padded","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum","","n/a"
+"1","90173","transpose_hw","127.0.0.1","transpose_padded","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","59392"
+"1","90173","transpose_hw","127.0.0.1","transpose_padded","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed_op_shared_ld.sum","inst","2048"
+"1","90173","transpose_hw","127.0.0.1","transpose_padded","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed_op_shared_st.sum","inst","2048"
+"2","90173","transpose_hw","127.0.0.1","transpose_swizzled","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum","","0"
+"2","90173","transpose_hw","127.0.0.1","transpose_swizzled","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum","","0"
+"2","90173","transpose_hw","127.0.0.1","transpose_swizzled","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum","","0"
+"2","90173","transpose_hw","127.0.0.1","transpose_swizzled","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_pipe_lsu_wavefronts_mem_shared.sum","","8256"
+"2","90173","transpose_hw","127.0.0.1","transpose_swizzled","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum","","n/a"
+"2","90173","transpose_hw","127.0.0.1","transpose_swizzled","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","61440"
+"2","90173","transpose_hw","127.0.0.1","transpose_swizzled","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed_op_shared_ld.sum","inst","2048"
+"2","90173","transpose_hw","127.0.0.1","transpose_swizzled","1","7","(32, 32, 1)","(64, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed_op_shared_st.sum","inst","2048"

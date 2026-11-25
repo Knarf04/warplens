@@ -1,0 +1,19 @@
+toolkit: BUILT WITH FALLBACK TOOLKIT - PREDICTIONS NOT COMPARABLE: programs built by nvcc 13.3.73, predictions made from the code of nvcc 13.5.37
+launch: exit=0 seconds=1 lines=402 ok
+alu_chain: exit=0 seconds=5 lines=77 ok
+smem_wavefronts: exit=0 seconds=12 lines=220 ok
+global_load: exit=0 seconds=7 lines=66 ok
+gstream: exit=0 seconds=1 lines=11 ok
+cp_async: exit=0 seconds=2 lines=22 ok
+ncu_banks: exit=0 seconds=0 lines=45 ok
+ncu, first part (the programs valid on Ampere): ncu partial: 6 benchmark(s) profiled, 0 failed, 5 not profiled; no counter table from: mbar (not in this run: --group ampere), tma (not in this run: --group ampere), mma_rate (not in this run: --group ampere), tmem_access (not in this run: --group ampere), clc_latency (not in this run: --group ampere); raw CSVs in /home/ubuntu/warplens-remote/run/out/timing/ncu
+mbar: exit=0 seconds=1 lines=22 ok
+tma: exit=0 seconds=2 lines=231 ok
+mma_rate: exit=0 seconds=18 lines=616 ok
+tmem_access: exit=0 seconds=2 lines=66 ok
+clc_latency: exit=0 seconds=0 lines=55 ok
+cluster_costs: exit=0 seconds=4 lines=110 ok
+pipelined_gemm: exit=0 seconds=0 lines=66 ok
+mma_rate_i8: exit=0 seconds=3 lines=88 ok
+ncu ok: 11 benchmark(s) profiled, 0 failed; raw CSVs in /home/ubuntu/warplens-remote/run/out/timing/ncu
+fit: ok, see /home/ubuntu/warplens-remote/run/out/timing/fit/report.md

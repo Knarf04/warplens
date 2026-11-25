@@ -1,0 +1,7 @@
+driver_version=610.57.04
+driver_cuda=
+bin=bin/hw
+built_nvcc_version=13.5.37
+predictions_nvcc_version=13.5.37
+predictions_comparable=yes
+reason=nvcc 13.5.37 as for the predictions

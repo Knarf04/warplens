@@ -1,0 +1,3 @@
+script: an allocation of 48 columns
+  step  0  alloc   48 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+  step  1  dealloc allocation 0: executed

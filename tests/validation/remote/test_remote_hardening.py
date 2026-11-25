@@ -635,7 +635,11 @@ def test_a_checkout_of_another_owner_is_still_read_and_frozen(checkout, tmp_path
               f'bash -c \'source "$1/env/remote/lib.sh"; repo_git "$1" rev-parse HEAD; echo "branch=$(repo_git "$1" rev-parse --abbrev-ref HEAD)";'
               f' echo "changed=$(repo_git "$1" status --porcelain | wc -l)"; echo "head=$(git_head "$1")"\' _ "{root}"\n'
               f'python3 "{root}/env/remote/freeze_source.py" --repo "{root}" --out "{tmp_path}/frozen"; echo "freeze=$?"\n')
-    done = subprocess.run([fakeroot, "sh", "-c", script], capture_output=True, text=True, timeout=120)
+    # The machine's own git configuration is left out: GitHub's runner images trust every
+    # directory in the system one (safe.directory = *), and plain git then refuses nothing.
+    (tmp_path / "gitconfig").write_text("")
+    own = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": str(tmp_path / "gitconfig")}
+    done = subprocess.run([fakeroot, "sh", "-c", script], capture_output=True, text=True, timeout=120, env=own)
     lines = done.stdout.splitlines()
     if "plain=0" in lines:
         pytest.skip("git under fakeroot did not see another owner here")

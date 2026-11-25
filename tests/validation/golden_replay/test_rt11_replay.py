@@ -4,7 +4,8 @@ The capture is CUTLASS's fp16_gemm_0.py at --mnk 256,512,512: its PTX, its launc
 parameters (two tensor maps the DSL wrote itself among them) and the device memory before
 the kernel and after it. It is 42 MB and is in the rental's archive, not in the repository:
 set WARPLENS_RT11_CAPTURE to `rows/e2e/cute_dsl_tma/capture` of an unpacked archive
-(docs/hardware-capture.md). Without it the replay is skipped; the two instruction forms the
+(docs/hardware-capture.md). Without it the replay is left out of the run (deselected, as the
+tests that need a GPU are: tests/conftest.py); the two instruction forms the
 kernel needed are tested without it below."""
 
 import importlib.util
@@ -25,7 +26,8 @@ CAPTURE = os.environ.get("WARPLENS_RT11_CAPTURE", "")
 TOOL = BLACKWELL / "e2e/replay_launch.py"
 
 
-@pytest.mark.skipif(not (Path(CAPTURE) / "launches.json").is_file() if CAPTURE else True,
+@pytest.mark.rental_archive("WARPLENS_RT11_CAPTURE")
+@pytest.mark.skipif(not (Path(CAPTURE) / "launches.json").is_file(),
                     reason="WARPLENS_RT11_CAPTURE is not a capture of matrix row RT-11")
 def test_the_captured_kernel_replays_byte_for_byte():
     spec = importlib.util.spec_from_file_location("replay_launch", TOOL)

@@ -622,7 +622,9 @@ which keeping the PTX causes.)
 
 `saxpy.py` holds its arrays as device memory from the CUDA driver, through the
 DSL's own helpers (`cutlass.base_dsl.runtime.cuda`), and passes them as
-pointers. **CuTe DSL kernels that use TMA do not run yet**; see section 9.
+pointers. **CuTe DSL kernels that use TMA do not run yet**: their tensor maps
+are read, and the tutorial's kernel then uses two instruction forms outside
+the supported set; see section 9.
 
 ### 5.6 The kernels of *Modern GPU Programming for MLSys*
 
@@ -1385,9 +1387,11 @@ PTX is [coverage.md](coverage.md); anything not in it raises
   barrier semantics in divergent code are reported, not modeled.
 - TMEM loads and stores complete at once; `tcgen05.wait::ld/st` checks
   participation and models no delay.
-- Tensor maps and cluster-wide addresses use warplens's own encodings. A
-  tensor map written by the real driver, or by code that imitates it, cannot
-  be read (section 9, CuTe DSL).
+- Cluster-wide addresses use warplens's own encoding, and so do the tensor
+  maps warplens makes. A tensor map in the driver's own layout is read as
+  well (the layout was worked out from a B200's encoder; `numerics` aside,
+  it is the one thing here taken from hardware bytes alone): section 9, CuTe
+  DSL.
 - Misaligned loads and stores are allowed.
 - Lanes of one warp whose `atom` names the same bytes are applied in lane
   order, lowest first. A GPU's order is not specified; results that depend
@@ -1413,7 +1417,8 @@ PTX is [coverage.md](coverage.md); anything not in it raises
 - Triton: no torch tensors, no benchmarking interface, no kernels that need a
   global or profile scratch buffer, no host tensor-descriptor arguments. Some
   multi-CTA Triton matmuls emit `tcgen05.st.16x32bx2` and fail on it.
-- CuTe DSL: kernels that use TMA do not run.
+- CuTe DSL: the tutorial kernel that uses TMA does not run: two of its
+  instruction forms are not implemented (section 9).
 
 **Timing model**
 
@@ -1657,15 +1662,19 @@ finally:
 LaunchError: use a warplens tensor for simulated pointer arguments
 ```
 
-**A CuTe DSL kernel that uses TMA stops at its first `cp.async.bulk.tensor`.**
-Not supported yet. The DSL does not ask the driver for its tensor maps; its
-compiled host code writes the 128-byte descriptor itself, in the driver's
-undocumented layout, and the simulator can only read tensor maps it encoded.
-Decoding the driver's layout needs samples from the driver's encoder, which
-only runs on a GPU that has TMA; that is planned for the first Blackwell run
-([PLAN.md](../PLAN.md), section 11). CUTLASS's `fp16_gemm_0.py` gets as far as
-this ([m6.md](m6.md); not rerun for this guide). The error is the one any
-foreign descriptor produces:
+**A CuTe DSL kernel that uses TMA stops at an instruction that is not
+implemented.** The DSL does not ask the driver for its tensor maps; its
+compiled host code writes the descriptor itself, in the driver's undocumented
+layout. warplens reads that layout since the first Blackwell run, from which
+it was worked out ([b200-rental-1.md](b200-rental-1.md)), so the loads of
+CUTLASS's `fp16_gemm_0.py` go through. The kernel then stops at
+`tcgen05.mma` with `.collector::a::discard`, and after that would stop at
+`cvt.rn.f16x2.f32`: neither form is in the supported set
+([coverage.md](coverage.md)). With those two rewritten in the PTX text, the
+kernel as it was captured on a B200 replays with every byte of its output
+equal to the GPU's (`validation/blackwell/e2e/replay_launch.py`).
+
+Bytes that are neither kind of tensor map are still an error:
 
 <!-- test: run -->
 ```python
@@ -1683,7 +1692,7 @@ except warplens.ExecutionError as error:
 
 <!-- test: output -->
 ```text
-the tensor-map operand does not point at a tensor map created by Device.tensor_map_tiled
+the tensor-map operand points at neither a tensor map created by Device.tensor_map_tiled nor one in the driver's layout
   at tma_copy.ptx:73: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r12], [%rd1, {%r21, %r22}], [%r11];
   in kernel `tma_copy`, CTA (0, 0, 0), warp 0
   lane 0 (thread (0, 0, 0))

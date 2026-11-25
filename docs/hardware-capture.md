@@ -111,12 +111,24 @@ checks it, with no GPU.
 | `capture/mem/<sha256>.bin` | the dumps. A dump is a whole driver allocation: PyTorch keeps the three tensors in one allocation of its caching allocator, and where each starts is the pointer's `offset_in_allocation`. Their extents are the tutorial's (`a` is M x K, `b` N x K, `c` M x N, float16, row-major) |
 | `capture/capture.json` | modules, kernel lookups, every allocation and free the tracer followed, and anything it could not do |
 
-What is still to be done, after the rental and without a GPU: the decoder of driver-format
-tensor maps (from the descriptors here and the encoder sweep of TMA-12), and then a
-converter of this directory into a `warplens.capture.v1` case, whose expected output is the
-`after` dump of `c`. Until then nothing compares the simulator with this capture.
+Done since, without a GPU: the decoder of driver-format tensor maps
+(`warplens/host/tensor_map.py:decode_driver`, from the encoder sweep of TMA-12; the
+descriptors here read back as the tutorial's tensors), and a replay of this directory:
 
-The address field of a driver-format tensor map is not established. The tracer therefore
+```bash
+python validation/blackwell/e2e/replay_launch.py /path/to/rows/e2e/cute_dsl_tma/capture
+python validation/blackwell/e2e/replay_launch.py /path/to/rows/e2e/cute_dsl_tma/capture --rewrite-out-of-scope
+```
+
+The first stops where any run of this kernel stops, at an instruction form outside the v1
+scope (`tcgen05.mma` with `.collector::a::discard`; `cvt.rn.f16x2.f32` is the other). The
+second is an experiment that rewrites those two in the PTX text; with it the capture of
+2026-11-25 replays with no byte of the allocation different from the `after` dump, the
+131,072 elements of `c` among them. It is not a `warplens.capture.v1` case yet, and cannot
+be a passing one while the two forms are out of scope.
+
+The address field of a driver-format tensor map is the first eight bytes, as the decoder
+established. When the tracer was written it was not known. The tracer therefore
 looks for addresses at every byte offset of every parameter, and when a launch has a
 parameter of 64 bytes or more it also saves every live allocation, so that an address in a
 form the scan does not see still has its memory in the capture (`summary.txt` then carries

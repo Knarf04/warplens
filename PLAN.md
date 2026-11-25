@@ -598,8 +598,15 @@ Owed before v1.0 because of it:
   bit-exact and tolerance rows have to be confirmed, and three constants in
   the fixes are assumptions that new probe runs measure
   (`docs/b200-rental-1.md`, "What the second rental has to confirm").
-- The decoder of driver-format tensor maps, from the RT-11 capture and the
-  encoder sweep, without a GPU (`docs/hardware-capture.md`).
+- Done since: the decoder of driver-format tensor maps, from the encoder
+  sweep (`warplens/host/tensor_map.py:decode_driver`). The RT-11 capture then
+  replays byte for byte against the B200 once two instruction forms that are
+  outside the frozen v1 scope are rewritten in its PTX
+  (`tcgen05.mma ... .collector::a::discard`, `cvt.rn.f16x2.f32`).
+- **A decision on those two forms**: add them to the v1 surface, so that
+  CUTLASS's `fp16_gemm_0.py` runs and its capture becomes a fixture, or leave
+  CuTe DSL kernels with TMA out of v1 (`docs/b200-rental-1.md`, "The
+  tensor-map decoder").
 - **A decision on the timing config**: take the fit as it is and rewrite what
   depends on the assumed values, or first give the model what the fit says it
   lacks (a CLC latency per form of the request, the cost of an mbarrier

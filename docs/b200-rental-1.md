@@ -298,5 +298,41 @@ Open, and not for a GPU to settle: what separates the repeated dealloc that
 faulted from the ones in the book's kernels that did not (TM-11); `kind::i8`
 arithmetic; half-precision subnormals in an MMA.
 
-Still to do without a GPU: the decoder of driver-format tensor maps, from the
-RT-11 capture and the TMA-12 sweep (`docs/hardware-capture.md`).
+## The tensor-map decoder (done after the rental, without a GPU)
+
+The layout of the driver's 128-byte tensor map is read from the TMA-12 sweep
+(`warplens/host/tensor_map.py`, "the driver's own layout"): every one of the
+1087 maps the B200's driver encoded reads back as the parameters that made it,
+and the four maps the CuTe DSL wrote for `fp16_gemm_0.py` read back as the
+tutorial's tensors (`tests/test_tensor_map_driver_layout.py`). The DSL fills
+in the first 64 bytes only and sets one flag bit the driver does not.
+
+With that, the kernel captured for RT-11 gets past its TMA loads in the
+simulator and stops at two instruction forms **outside the v1 scope**:
+`tcgen05.mma` with `.collector::a::discard` (12 uses) and `cvt.rn.f16x2.f32`
+(32). As an experiment, with both rewritten in the PTX text
+(`validation/blackwell/e2e/replay_launch.py --rewrite-out-of-scope`: the
+modifier dropped, the packed conversion written as two scalar ones), the
+launch replays in 3 seconds and **no byte of the 2 MiB allocation differs
+from the B200's after the kernel**: 255,768 bytes the GPU changed, the 131,072
+half-precision elements of C among them. That is the first kernel compared
+with hardware whose TMA, MMA and epilogue all ran from a frontend's own
+descriptors, and it holds the MMA sum above on a tenth kernel.
+
+Two things it showed besides:
+
+- The kernel's tiles sit 128 bytes off the swizzle period (`tma-swizzle-misaligned`,
+  64 times) and the result is right: TMA and the MMA both swizzle by the
+  absolute address (TMA-02, MMA-12), now on a real kernel. The finding's text
+  warns about code that indexes by offset, which this kernel does not; for
+  such a kernel it is noise.
+- The driver's map carries the bytes of one box as `box // element stride`,
+  rounded down, dimension 0 included; `TensorMapInfo.counts` rounds up and
+  takes dimension 0's stride as 1. They agree when the strides divide the box,
+  which is all that has run on a GPU. Not changed; not measured.
+
+**A decision for the owner:** whether those two forms join the v1 surface.
+`PLAN.md` freezes it ("nothing is added to it before v1.0"), so they were not
+added. Both are small (`discard` is what an MMA without the modifier does; the
+conversion is two existing ones packed), and with them `fp16_gemm_0.py` would
+run under `warplens run` and its capture could be a committed fixture.

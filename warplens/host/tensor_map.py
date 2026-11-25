@@ -2,8 +2,10 @@
 
 On real hardware `cuTensorMapEncodeTiled` fills an opaque 128-byte CUtensorMap.
 warplens emulates the encode call, so it defines its own 128-byte encoding
-here and the TMA unit decodes it. A tensor map made by a real driver cannot
-be used, and vice versa.
+here and the TMA unit decodes it. A tensor map in the driver's own layout is
+read as well (`decode_driver`): a frontend that writes the descriptor itself
+instead of calling the encoder (the CuTe DSL does) hands the kernel one of
+those. The reverse does not hold: a map encoded here means nothing to a GPU.
 
 Dimension order follows TMA: dimension 0 is the innermost (fastest varying).
 """
@@ -70,7 +72,9 @@ def decode(raw: bytes) -> TensorMapInfo:
         raise ExecutionError(f"a tensor map must contain {SIZE} bytes, got {len(raw)}")
     fields = struct.unpack_from(_FORMAT, raw)
     magic, rank, elem_size, is_float, swizzle, nan_fill, address = fields[:7]
-    if magic != MAGIC or not 1 <= rank <= MAX_RANK:
+    if magic != MAGIC:
+        return decode_driver(raw)
+    if not 1 <= rank <= MAX_RANK:
         raise ExecutionError("the tensor-map operand does not point at a tensor map created by "
                              "Device.tensor_map_tiled")
     dims, strides, box, steps = fields[7:12], fields[12:16], fields[16:21], fields[21:26]
@@ -93,6 +97,99 @@ def decode(raw: bytes) -> TensorMapInfo:
     if info.steps != expected.steps:
         raise ExecutionError("invalid tensor-map element strides")
     return info
+
+
+# -- the driver's own layout ---------------------------------------------------------------
+#
+# The 128 bytes cuTensorMapEncodeTiled writes, as sixteen little-endian 64-bit words. Worked
+# out from validation/blackwell/measured/b200/tma/tensormap_encode_sweep.txt: 1087 maps a B200's
+# driver (610.57.04) encoded over a sweep of every parameter, each of which this reading
+# gives back (tests/test_tensor_map_driver_layout.py). It is not documented.
+#
+#   word 0            the tensor's address
+#   word 1, low half  bits 4-6 rank - 1; 7-10 the data type's code (_DRIVER_TYPE_CODES);
+#                     11-12 interleave; 13-14 swizzle; 15 NaN fill; 16 TFLOAT32; 17-18 L2
+#                     promotion; 19-20 the atom of the 128-byte swizzles with a smaller atom
+#                     (CU_TENSOR_MAP_SWIZZLE_128B_ATOM_32B and its two neighbours); 21 set by
+#                     the driver for some maps, by a rule the sweep does not show (not read)
+#   word 1 high, word 2 low, word 2 high, word 3 low
+#                     the byte strides of dimensions 1 to 4, divided by 16: their low 32 bits
+#   word 3, bits 32-47  the next 4 bits of each of the four strides
+#   words 4, 5, word 6 low   the five dimensions, each less one, 32 bits apiece
+#   word 6, bits 32-46  the five element strides, each less one, 3 bits apiece
+#   word 6, bits 56-63  the box's dimension 0, less one
+#   word 7, bytes 0-3   the box's dimensions 1 to 4, each less one
+#   word 8            the bytes one box occupies in shared memory; word 9 the swizzle's
+#                     period (16 without one). Both follow from the rest and are not read.
+#   words 10 to 15    zero
+#
+# Only the first eight words are the descriptor a kernel's TMA instructions need: the CuTe
+# DSL writes those 64 bytes itself and nothing else, and its kernels ran on a B200 (matrix
+# row RT-11; tests/test_tensor_map_driver_layout.py has two of its maps).
+#
+# The codes of the data types are the enumeration's numbers but for three: FLOAT64 (8) is 9,
+# BFLOAT16 (9) is 10, FLOAT32_FTZ (10) is 8. TFLOAT32 and TFLOAT32_FTZ are the codes of
+# FLOAT32 and FLOAT32_FTZ with bit 16.
+_DRIVER_TYPE_CODES = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 10, 9: 8, 10: 9}  # code -> CUtensorMapDataType
+_NOT_A_MAP = ("the tensor-map operand points at neither a tensor map created by Device.tensor_map_tiled "
+              "nor one in the driver's layout")
+
+
+def driver_fields(raw: bytes) -> dict:
+    """The parameters of cuTensorMapEncodeTiled as a driver wrote them into `raw`, in TMA
+    order, without judging them: `data_type` (the enumeration's number), `rank`, `address`,
+    `dims`, `strides`, `box`, `steps`, `interleave`, `swizzle`, `swizzle_atom`, `l2_promotion`,
+    `nan_fill`. Raises ExecutionError if the bytes cannot be such a map."""
+    if len(raw) != SIZE:
+        raise ExecutionError(f"a tensor map must contain {SIZE} bytes, got {len(raw)}")
+    w = struct.unpack("<16Q", raw)
+    flags = w[1] & 0xFFFF_FFFF
+    code = flags >> 7 & 0xF
+    # What a map never has set: the high bits of the flag word, which no parameter reaches,
+    # and the bits above the fields of words 3, 6 and 7. Words 8 to 15 are not looked at:
+    # the driver writes two derived numbers and zeros there, and the CuTe DSL, which fills
+    # in the descriptor itself, writes the first 64 bytes only and leaves the rest as it
+    # found them (the maps captured on a B200 hold host pointers there). The DSL also sets
+    # bit 1 of the flag word, which the driver never did in the sweep; bits 0 to 3 are not
+    # looked at either.
+    if (flags & 0xFFC0_0000 or code not in _DRIVER_TYPE_CODES or w[3] >> 48 or w[6] >> 47 & 0x1FF
+            or w[7] >> 32):
+        raise ExecutionError(_NOT_A_MAP)
+    rank = (flags >> 4 & 7) + 1
+    if rank > MAX_RANK:
+        raise ExecutionError(_NOT_A_MAP)
+    data_type = _DRIVER_TYPE_CODES[code]
+    if flags >> 16 & 1:
+        if data_type not in (7, 10):
+            raise ExecutionError(_NOT_A_MAP)
+        data_type = {7: 11, 10: 12}[data_type]
+    low = (w[1] >> 32, w[2] & 0xFFFF_FFFF, w[2] >> 32, w[3] & 0xFFFF_FFFF)
+    strides = tuple(((w[3] >> (32 + 4 * i) & 0xF) << 32 | low[i]) * 16 for i in range(4))
+    dims = tuple(v + 1 for v in (w[4] & 0xFFFF_FFFF, w[4] >> 32, w[5] & 0xFFFF_FFFF, w[5] >> 32,
+                                 w[6] & 0xFFFF_FFFF))
+    steps = tuple((w[6] >> (32 + 3 * i) & 7) + 1 for i in range(5))
+    box = ((w[6] >> 56) + 1, *((w[7] >> (8 * i) & 0xFF) + 1 for i in range(4)))
+    return {"data_type": data_type, "rank": rank, "address": w[0], "dims": dims[:rank],
+            "strides": strides[:rank - 1], "box": box[:rank], "steps": steps[:rank],
+            "interleave": flags >> 11 & 3, "swizzle": flags >> 13 & 3, "swizzle_atom": flags >> 19 & 3,
+            "l2_promotion": flags >> 17 & 3, "nan_fill": bool(flags >> 15 & 1)}
+
+
+def decode_driver(raw: bytes) -> TensorMapInfo:
+    """A tensor map in the driver's layout, as the map the simulator runs. What the simulator
+    does not model is refused by name: interleaved layouts and the 128-byte swizzles with a
+    smaller atom. The L2 promotion is a hint and is ignored; a TFLOAT32 tensor is read as
+    the float32 it is stored as, as for a map the shim's own encoder made."""
+    f = driver_fields(raw)
+    if f["swizzle_atom"]:
+        raise ExecutionError("a tensor map with a 128-byte swizzle of a smaller atom "
+                             "(CU_TENSOR_MAP_SWIZZLE_128B_ATOM_...) is not supported")
+    try:
+        return from_driver(data_type=f["data_type"], rank=f["rank"], address=f["address"], dims=f["dims"],
+                           strides=f["strides"], box=f["box"], steps=f["steps"], swizzle=f["swizzle"],
+                           nan_fill=f["nan_fill"], interleave=f["interleave"])
+    except LaunchError as e:
+        raise ExecutionError(f"invalid tensor map (in the driver's layout): {e}") from e
 
 
 def _integer_tuple(values, what: str) -> tuple[int, ...]:

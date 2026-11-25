@@ -469,7 +469,8 @@ def test_tma_errors(sim):
     good = sim.tensor_map_tiled(data, (4, 16))
     with pytest.raises(warplens.ExecutionError, match="1d TMA instruction used with a 2-dimensional"):
         sim.launch(box_kernel(1), "k", grid=1, block=1, args=[good, good, 256, 0])
-    with pytest.raises(warplens.ExecutionError, match="does not point at a tensor map"):
+    # Tensor data where a tensor map belongs: not one of ours, and not a driver's either.
+    with pytest.raises(warplens.ExecutionError, match="invalid tensor map|neither a tensor map"):
         sim.launch(box_kernel(2), "k", grid=1, block=1, args=[data, good, 256, 0, 0])
     big = sim.tensor_map_tiled(sim.empty((256, 128), "u8"), (256, 128))
     with pytest.raises(warplens.ExecutionError, match=r"runs past\s+the CTA's 16392 bytes"):

@@ -100,9 +100,10 @@ def test_run_rows_records_skips_and_never_fails(tmp_path):
                env={"WARPLENS_GDB": str(tmp_path / "no-gdb")})
     assert done.returncode == 0, done.stdout + done.stderr
     rows = [line.split("\t") for line in (out / "rows" / "status.tsv").read_text().splitlines()[1:]]
-    assert [(row[0], row[1]) for row in rows] == [("e2e/driver_call_trace.tirx", "RT-10"),
-                                                 ("e2e/driver_call_trace.cute_dsl", "RT-10"),
-                                                 ("e2e/cute_dsl_tma", "RT-11")]
+    # RT-11 first: the one row a rental cannot end without (it used to be last).
+    assert [(row[0], row[1]) for row in rows] == [("e2e/cute_dsl_tma", "RT-11"),
+                                                 ("e2e/driver_call_trace.tirx", "RT-10"),
+                                                 ("e2e/driver_call_trace.cute_dsl", "RT-10")]
     assert all(row[2].startswith("skipped (gdb not found") for row in rows)
     assert (out / "rows" / "e2e" / "cute_dsl_tma.stdout").read_text().startswith("SKIPPED:")
 
@@ -116,9 +117,14 @@ def test_run_all_runs_the_rows_only_on_a_whole_gpu_run():
     fail the run: run_all.py reads no status of a row, only whether run_rows.py exited 0,
     which it does unless the RT-11 capture is required and missing."""
     source = (SUITE / "run_all.py").read_text()
-    block = source[source.index('if args.mode == "gpu" and not args.only:'):source.index('(out / "manifest.py")')]
+    assert "with_rows = gpu and not args.only" in source
+    block = source[source.index("    def run_rows() -> None:"):source.index("    for kind, batch in execution_phases(")]
     assert "run_rows.py" in block and "--no-e2e" in block
-    assert block.count("infrastructure_failures") == 1 and "status.tsv\")" not in block
+    # The run fails for the rows in two ways only: run_rows.py did not exit 0, or (--resume)
+    # the rows are kept from an earlier run that left the RT-11 flag. No status of a row is read.
+    assert block.count("infrastructure_failures += ") == 2 and "split(" not in block
+    assert 'if status != "ok":\n            infrastructure_failures += 1' in block
+    assert "infrastructure_failures += rt11_marker.is_file()" in block
     rows = (SUITE / "run_rows.py").read_text()
     assert rows.count("return 1") == 1 and "return rt11_verdict(" in rows       # the one way to fail
 

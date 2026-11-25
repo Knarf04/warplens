@@ -362,16 +362,17 @@ def test_running_one_step_again_keeps_the_other_lines(tmp_path):
     status.write_text(status.read_text().replace("skipped (gdb not found", "FIRST RUN (gdb not found"))
     assert run_rows("--out", tmp_path, "--only", "e2e/cute_dsl_tma", "--rt11", "optional", env=no_gdb).returncode == 0
     lines = status.read_text().splitlines()
-    assert [line.split("\t")[0] for line in lines[1:]] == ["e2e/driver_call_trace.tirx", "e2e/driver_call_trace.cute_dsl",
-                                                          "e2e/cute_dsl_tma"]
-    assert ["FIRST RUN" in line for line in lines[1:]] == [True, True, False]
+    # RT-11 runs, and is listed, first (it used to be last).
+    assert [line.split("\t")[0] for line in lines[1:]] == ["e2e/cute_dsl_tma", "e2e/driver_call_trace.tirx",
+                                                          "e2e/driver_call_trace.cute_dsl"]
+    assert ["FIRST RUN" in line for line in lines[1:]] == [False, True, True]
 
 
 def test_run_all_fails_without_a_required_capture_and_says_so_at_the_end():
     """run_all.py hands --rt11 on, counts a run_rows.py that did not exit 0 as a failure of
     the run, and repeats the flag file after the summary."""
     source = (SUITE / "run_all.py").read_text()
-    block = source[source.index('if args.mode == "gpu" and not args.only:'):source.index('(out / "manifest.py")')]
+    block = source[source.index("    def run_rows() -> None:"):source.index("    for kind, batch in execution_phases(")]
     assert '"--rt11", args.rt11' in block
     assert 'if status != "ok":\n            infrastructure_failures += 1' in block
     ending = source[source.index('print(f"compare with: '):]

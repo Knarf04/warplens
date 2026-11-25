@@ -114,7 +114,7 @@ def test_ncu_permission_canary_has_a_timeout(tmp_path):
                           env={**os.environ, "PATH": str(bindir) + os.pathsep + os.environ["PATH"],
                                "NCU_BIN": str(ncu)}, timeout=10)
     assert done.returncode == 0
-    assert log.exists() and "--kill-after=10 60" in log.read_text()
+    assert log.exists() and "--kill-after=10 300" in log.read_text()
     assert "exit 124" in (out / "STATUS.txt").read_text()
 
 

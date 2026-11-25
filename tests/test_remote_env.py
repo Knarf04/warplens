@@ -107,7 +107,7 @@ def test_every_pin_is_an_exact_version():
     for key, value in pins.items():
         if "SHA256" in key:
             assert re.fullmatch(r"[0-9a-f]{64}", value), key
-        elif key == "BOOK_COMMIT":      # the one pin that is a commit: whole, not abbreviated
+        elif key in ("BOOK_COMMIT", "CUTLASS_COMMIT"):      # the pins that are commits: whole, not abbreviated
             assert re.fullmatch(r"[0-9a-f]{40}", value), key
         else:
             # digits and dots, optionally a build number: no ranges, wildcards or "latest"
@@ -133,6 +133,22 @@ def test_the_book_is_pinned_to_one_commit_everywhere():
     # The runbook's fetch by hand is for the same commit.
     by_hand = re.findall(r"\b[0-9a-f]{40}\b", (REMOTE / "RUNBOOK.md").read_text())
     assert by_hand and set(by_hand) == {pin}
+
+
+def test_cutlass_is_pinned_to_one_commit_everywhere():
+    """pins.env is where setup.sh and preflight.sh get the CUTLASS commit; build.sh, which a
+    developer runs without them, names the same one in full (a server gives a single commit
+    only by its whole name), and the capture tool requires it by its first characters."""
+    pin = read_pins()["CUTLASS_COMMIT"]
+    build = (REPO / "examples" / "03_cutlass_mma" / "build.sh").read_text()
+    assert re.findall(r"^COMMIT=(\S+)$", build, re.M) == [pin]
+    capture = (REPO / "validation" / "blackwell" / "e2e" / "capture_cutlass.py").read_text()
+    required = re.search(r'^PIN = "([0-9a-f]{7,40})"', capture, re.M)
+    assert required and pin.startswith(required[1])
+    assert 'ensure_cutlass "$PIN_CUTLASS_COMMIT"' in (REMOTE / "setup.sh").read_text()
+    assert "$PIN_CUTLASS_COMMIT" in (REMOTE / "preflight.sh").read_text()
+    # Nothing clones the whole history any more, and nothing fetches without a time limit.
+    assert "git clone" not in build and "--depth 1" in build and "timeout" in build
 
 
 def test_the_shell_reads_the_same_pins():
@@ -344,8 +360,11 @@ def test_capability_bits():
 # run.sh
 # ---------------------------------------------------------------------------------------------
 
-STAGES = ["preflight-quick", "setup", "preflight", "selftest", "build-blackwell", "build-timing",
+# With a fallback toolkit, or before setup.sh has recorded one: the self-test before the GPU stages.
+STAGES = ["preflight-quick", "setup", "build-cutlass", "preflight", "selftest", "build-blackwell", "build-timing",
           "predict-toolkit", "run-blackwell", "run-timing", "collect"]
+# With the predictions' own compiler (predictions_comparable=comparable): after them.
+STAGES_PINNED = [stage for stage in STAGES if stage not in ("selftest", "collect")] + ["selftest", "collect"]
 
 
 def test_dry_run_prints_the_plan_without_a_gpu(tmp_path):
@@ -365,6 +384,20 @@ def test_dry_run_prints_the_plan_without_a_gpu(tmp_path):
     assert not home.exists()                    # a dry run touches nothing
     skipped = bash(REMOTE / "run.sh", "--dry-run", "--skip", "selftest", env=env)
     assert re.search(r"selftest\s+0-0\s+skip", skipped.stdout)
+    assert "The self-test is before the GPU stages" in done.stdout
+    # The numbers of the last whole runs of the suite, not those of half the tests ago.
+    assert "13.6 min" in done.stdout and "3046 tests" in done.stdout and "1513" not in done.stdout
+    # Without the end-to-end programs there is nothing of CUTLASS to build.
+    probes_only = bash(REMOTE / "run.sh", "--dry-run", env={**env, "WARPLENS_BLACKWELL_RUN_ARGS": "--no-e2e"})
+    assert re.search(r"build-cutlass\s+0-0\s+skip", probes_only.stdout)
+
+    # Once setup.sh has recorded the predictions' own compiler, the self-test is planned last.
+    pinned = tmp_path / "pinned-home"
+    (pinned / "resolved").mkdir(parents=True)
+    (pinned / "resolved" / "versions.txt").write_text("predictions_comparable=comparable\n")
+    done = bash(REMOTE / "run.sh", "--dry-run", env={**env, "WARPLENS_REMOTE_HOME": str(pinned)})
+    planned = [line.split()[0] for line in done.stdout.splitlines() if line.split() and line.split()[0] in STAGES]
+    assert planned == STAGES_PINNED and "The self-test is after the GPU stages" in done.stdout
 
 
 def test_run_rejects_bad_arguments():
@@ -379,9 +412,37 @@ def suite(root: Path, name: str, build: str, run: str):
     (directory / "run_all.sh").write_text("#!/usr/bin/env bash\nset -eu\n" + run)
 
 
+def stand_in_cutlass(root: Path, commit: str | None = None, built: bool = False) -> Path:
+    """What the scripts take for the CUTLASS example of a checkout: a clone at `commit` (the
+    pinned one unless given; "" for no clone) and a build.sh that makes the four programs
+    and says what it was given. `built`: the programs are there already."""
+    example = root / "examples" / "03_cutlass_mma"
+    clone = example / ".cutlass"
+    if commit != "":
+        for path in ("examples/cute/tutorial/blackwell/01_mma_sm100.cu", "include/cutlass/cutlass.h",
+                     "examples/python/CuTeDSL/cute/blackwell/tutorial/tutorial_gemm/fp16_gemm_0.py"):
+            (clone / path).parent.mkdir(parents=True, exist_ok=True)
+            (clone / path).write_text("stand-in\n")
+        (clone / ".git").mkdir(exist_ok=True)
+        (clone / ".git" / "HEAD").write_text((commit or read_pins()["CUTLASS_COMMIT"]) + "\n")
+    example.mkdir(parents=True, exist_ok=True)
+    (example / "build.sh").write_text(
+        '#!/usr/bin/env bash\nset -eu\ncd "$(dirname "$0")"\n'
+        'echo "cutlass build: $* nvcc=$NVCC no_fetch=${WARPLENS_CUTLASS_NO_FETCH:-unset}"\n'
+        'echo "$*" >> build-calls\n'
+        '[[ ! -f fail-the-build ]] || { echo "nvcc: the tutorial does not compile" >&2; exit 1; }\n'
+        'mkdir -p bin\nfor n in 1 2 3 4; do echo program > "bin/tutorial_0$n"; done\n')
+    if built:
+        (example / "bin").mkdir(exist_ok=True)
+        for n in range(1, 5):
+            (example / "bin" / f"tutorial_0{n}").write_text("program\n")
+    return example
+
+
 @pytest.fixture
 def checkout(tmp_path):
-    """A copy of env/remote in a directory of its own, with stand-ins for the two probe suites.
+    """A copy of env/remote in a directory of its own, with stand-ins for the two probe suites
+    and for the CUTLASS example (a clone at the pinned commit, as setup.sh leaves one).
     `env` in place of the env runner: the stages run with whatever is on PATH."""
     root = tmp_path / "repo"
     shutil.copytree(REMOTE, root / "env" / "remote")
@@ -391,6 +452,7 @@ def checkout(tmp_path):
     subprocess.run(["git", "-C", str(root), "-c", "user.name=fixture", "-c",
                     "user.email=fixture@example.invalid", "commit", "-m", "fixture"],
                    check=True, capture_output=True)
+    stand_in_cutlass(root)      # after the commit: the clone and its programs are never tracked
     env = {"WARPLENS_REMOTE_HOME": str(tmp_path / "home"), "WARPLENS_ENV_RUN": "env",
            "WARPLENS_RUN_MINUTES": "1"}
     # Skip what needs a GPU or installs things; the stage runner is what is under test.

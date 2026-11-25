@@ -10,6 +10,8 @@
 //   * After a failed launch the program prints "KERNEL FAILED" and exits with status 3:
 //     a real GPU's context is unusable after a fault, the simulator's is not, and the two
 //     must print the same thing.
+//   * Standard output is line-buffered (below, "Host side"), so a program that is killed
+//     keeps the lines it had printed.
 #pragma once
 
 #include <cuda.h>
@@ -229,6 +231,12 @@ __host__ __device__ inline uint64_t mma_smem_desc(uint32_t start, uint32_t lbo, 
 // -------------------------------------------------------------------------------------
 // Host side
 // -------------------------------------------------------------------------------------
+// Standard output is line-buffered in every probe. run_all.py reads it through a pipe, where
+// the C library would otherwise hold up to a block of text back until the program exits: a
+// probe killed at its timeout (a kernel that never returns) or by a signal would lose the
+// lines of the cases it had already finished. The bytes printed are the same either way.
+static const int probe_stdout_line_buffered_ = setvbuf(stdout, NULL, _IOLBF, 0);
+
 #define HOST_CHECK(call)                                                                   \
     do {                                                                                   \
         cudaError_t probe_error_ = (call);                                                 \

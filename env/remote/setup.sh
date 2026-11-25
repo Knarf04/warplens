@@ -7,8 +7,9 @@
 # only re-verified. Needs no root, no conda and no system CUDA toolkit: it
 # downloads one static micromamba binary and builds a private env from
 # conda-forge and PyPI, at the versions in env/remote/pins.env, and clones the
-# book whose kernels the end-to-end step runs, at the commit pinned there. Root
-# is used only if a download tool, git or gdb is missing and apt-get is available.
+# book whose kernels the end-to-end step runs, and CUTLASS, whose tutorials it
+# runs, each at the commit pinned there. Root is used only if a download tool,
+# git or gdb is missing and apt-get is available.
 #
 #   --toolkit auto     (default) the pinned CUDA toolkit, or the release that
 #                      matches the driver when the driver is older (the driver
@@ -31,6 +32,10 @@
 #                          the large disk.
 #   WARPLENS_BOOK_URL      fetch the book from here instead of its repository
 #                          on github.com (a mirror)
+#   WARPLENS_CUTLASS_URL   the same for CUTLASS. It is fetched into the checkout,
+#                          examples/03_cutlass_mma/.cutlass (git-ignored), one
+#                          commit without history; a clone already there at the
+#                          pinned commit is left alone
 #
 # Writes $WARPLENS_REMOTE_HOME/resolved/: the exact conda packages, pip freeze,
 # and versions.txt with what was actually installed next to what was pinned.
@@ -51,7 +56,7 @@ while [[ $# -gt 0 ]]; do
     --no-torch) with_torch=0 ;;
     --no-book) with_book=0 ;;
     --force) force=1 ;;
-    -h|--help) sed -n '2,36p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,41p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -322,6 +327,22 @@ case "$book_state" in
 esac
 
 # ---------------------------------------------------------------------------
+# 5e. CUTLASS, for the end-to-end step (matrix rows RT-06 and RT-11)
+# ---------------------------------------------------------------------------
+# The four Blackwell tutorials and the CuTe DSL's GEMM tutorial are run from a clone of
+# CUTLASS at one commit. examples/03_cutlass_mma/build.sh used to clone it, with its whole
+# history and no time limit, when the end-to-end step first asked for a program: inside the
+# GPU stage of a rental. It is fetched here instead, like the book, and run.sh builds the
+# programs in a stage of its own before the GPU is used (build-cutlass). A failure is a
+# warning and is tried again by every run of this script; a full run then stops at preflight
+# (check cutlass).
+IFS='|' read -r cutlass_state cutlass_why <<<"$(ensure_cutlass "$PIN_CUTLASS_COMMIT")"
+case "$cutlass_state" in
+  present|fetched) say "CUTLASS: $cutlass_state: $cutlass_why" ;;
+  *) warn "CUTLASS: ${cutlass_why:-not fetched}. Rows RT-06 (the CUTLASS tutorials) and RT-11 (the CuTe DSL tutorial) cannot run and a full run stops at preflight (cutlass). Run env/remote/setup.sh again to retry, or copy a clone at that commit to $CUTLASS_DIR (RUNBOOK.md, section 3)" ;;
+esac
+
+# ---------------------------------------------------------------------------
 # 6. Record what was installed, and compare with the pins
 # ---------------------------------------------------------------------------
 resolved="$REMOTE_HOME/resolved"
@@ -359,6 +380,7 @@ package_status=0
   (( with_ncu )) || echo "ncu_requested=no (--no-ncu): this setup was told to do without Nsight Compute, so no performance counters are expected"
   # The clone setup.sh keeps, whatever WARPLENS_BOOK says: what was fetched here.
   if is_book_clone "$BOOK_DIR"; then echo "book_commit=$(book_commit "$BOOK_DIR")"; else echo "book_commit=not-fetched"; fi
+  if is_cutlass_clone "$CUTLASS_DIR"; then echo "cutlass_commit=$(git_head "$CUTLASS_DIR")"; else echo "cutlass_commit=not-fetched"; fi
   echo "gdb=$( { [[ -n "$gdb_bin" ]] && "$gdb_bin" --version 2>/dev/null | head -n 1; } || echo none)"
   env_run python "$REMOTE_DIR/check_env.py" versions || package_status=1
   if [[ -x "$TORCH_ENV/bin/python" ]]; then
@@ -413,7 +435,7 @@ for line in "${drift[@]}"; do
   # without the torch env, so does torch; without the book (said or warned of above), so does it.
   case "$line" in
     cuda_*|nsight_compute*) [[ "$toolkit_status" == fallback || "$line" == nsight_compute*MISSING ]] && { say "differs from pins: $line"; continue; } ;;
-    torch:*not-installed|book_commit:*not-fetched) say "differs from pins: $line"; continue ;;
+    torch:*not-installed|book_commit:*not-fetched|cutlass_commit:*not-fetched) say "differs from pins: $line"; continue ;;
   esac
   warn "differs from pins: $line"
 done

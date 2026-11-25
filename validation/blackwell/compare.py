@@ -3,24 +3,48 @@
 
     validation/blackwell/compare.py RESULTS [--predicted DIR] [--sim-captures DIR] [--lines N]
 
-RESULTS is the archive run_all.py wrote (or its unpacked directory). Each probe gets one
-verdict:
+RESULTS is the archive run_all.py wrote (or its unpacked directory), or the archive of a
+whole rental from env/remote/run.sh (or its unpacked directory): there the probes' results
+are out/blackwell/. A status.tsv under predicted-toolkit/ (a simulator's run on the rented
+machine) or in a rows/ directory (run_rows.py's) is never taken for the GPU's; if more than
+one remains and none is out/blackwell/status.tsv, the candidates are listed and nothing is
+compared. Each probe gets one verdict:
 
-    identical       its output is the committed prediction, line for line
+    identical       its output is the committed prediction, line for line. When that output
+                    is a failed kernel, the detail names the GPU's error and where it was
+                    reported, and the simulator's side is a rule it models (it names the rule)
+                    or a deadlock (the detail then says that a GPU reports no deadlock)
     unverified      only finite float32 words differ; the ULP distance is reported, but
                     no tolerance or hardware-equivalence claim is inferred
     DIFFERS         it is not; the first differing lines are shown below the table
     informational   there is no prediction to hold it against: the probe has none, or the
                     simulator refuses the kernel and the GPU ran it
-    kernel failed   the GPU faulted or rejected the kernel (the program reported it)
+    kernel failed   the GPU faulted or rejected the kernel (the program reported it); the
+                    detail has the CUDA error and whether it came at the launch or at the
+                    synchronize (from the program's standard error; "place not recorded" if
+                    that is not in the results)
+    GPU faulted, not modelled
+                    the same lines on both sides, but the simulator's are "unsupported
+                    instruction": it does not run this kernel at all, so the GPU's fault
+                    confirms no model. A failed kernel prints only its label on the compared
+                    lines, so ANY error of the GPU matches such a prediction
     FAILED TO LAUNCH  the driver could not load the program's kernels (PTX it does not
                     accept, no code for this GPU, ...). Nothing was tested. Never by design,
                     and never counted as "the GPU refused the kernel"
     HOST ERROR      a host-side CUDA call failed before or after the kernel. Nothing was
                     tested, or the GPU was left unusable by an earlier fault
-    timed out       killed by the timeout
+    timed out       killed by the timeout. "(as predicted)": the manifest lets the run hang
+                    and the simulator predicts a deadlock. "(by design)": the manifest lets
+                    it hang and there is no prediction of a kernel that returns
+    TIMED OUT, predicted to finish
+                    the manifest lets the run hang, but the simulator's prediction is a
+                    kernel that returns: a mismatch, counted, with an entry under Details
     crashed         the program itself died, or could not be started
     not run         no result in the archive
+    NOT RUN, GPU unhealthy
+                    run_all.py's canary stopped passing and it launched nothing more
+                    (GPU-UNHEALTHY.txt in the results, repeated at the top). Not a finding
+                    about the probe; the run is incomplete, so the exit status is 1
 
 The end-to-end runs (validation matrix RT-06 to RT-09) are judged on their tensors, not on
 their printed lines: every element of each output the GPU produced is compared with the
@@ -44,9 +68,9 @@ tensors. --require-hardware fails a run whose captures are labelled as a simulat
 
 "(by design)" marks an outcome the manifest allows for that probe. Lines that start with
 "info:" carry machine-dependent values and are never compared. The exit status is 1 if any
-probe DIFFERS, failed to launch, had a host error, crashed, was not run, or failed or timed
-out without that being by design, or if any end-to-end run has a verdict other than
-"bit-identical" or "within tolerance".
+probe DIFFERS, failed to launch, had a host error, crashed, was not run, timed out where it
+is predicted to finish, or failed or timed out without that being by design, or if any
+end-to-end run has a verdict other than "bit-identical" or "within tolerance".
 
 If the programs were not built by the toolkit the predictions were made with
 (env/toolkit.txt in the results, written by run_all.py), a banner says so before and after
@@ -165,11 +189,63 @@ def read(path: Path) -> str:
 
 
 def launch_failed(status: str | None, text: str) -> bool:
-    return status == "launch-failed" or text.startswith("LAUNCH FAILED") or "\nLAUNCH FAILED" in text
+    return (status == "launch-failed" or text.startswith("LAUNCH FAILED") or "\nLAUNCH FAILED" in text
+            or (status == "exit 4" and "LAUNCH FAILED:" in text))     # the words in the middle of a begun line
 
 
 def host_error(status: str | None, text: str) -> bool:
     return status == "host-error" or text.startswith("HOST ERROR") or "\nHOST ERROR" in text
+
+
+FAILED_AT = re.compile(r"^KERNEL FAILED: .*: (cudaError\w+) (at launch|at synchronize|after synchronize) \(", re.M)
+
+
+def gpu_error(stdout: str, stderr: str) -> str:
+    """The CUDA error of a failed kernel and where the program got it: "cudaErrorIllegalAddress
+    at synchronize". The place is on standard error only (common.h, probe_report_failure)."""
+    found = FAILED_AT.search(stderr)
+    if found:
+        return f"{found[1]} {found[2]}"
+    name = re.search(r"^info: error (\w+)", stdout, re.M)
+    return f"{name[1]} (place not recorded)" if name else "error not recorded"
+
+
+def simulator_says(note: list[str]) -> tuple[str, str]:
+    """What predicted/<name>.sim.txt says of the simulator's run: (kind, the simulator's words).
+
+        none         there is no prediction
+        finishes     every kernel returned
+        deadlock     the simulator reports a kernel that can never return
+        unsupported  it does not run the kernel: an instruction or operand it has no model of
+        refuses      it stops the kernel for a rule it models, and names the rule"""
+    if not note or not note[0].startswith("status:"):
+        return "none", ""
+    if note[0] == "status: ok":
+        return "finishes", ""
+    reason = next((line.removeprefix("warplens: ") for line in note[1:] if line.startswith("warplens: ")), "")
+    if reason.startswith("deadlock"):
+        return "deadlock", reason
+    if reason.startswith("unsupported instruction"):
+        return "unsupported", reason
+    return "refuses", reason
+
+
+def find_results(root: Path, given: Path) -> Path:
+    """The directory with the GPU's status.tsv under `root`, or exit saying why there is not one."""
+    if (root / "status.tsv").is_file():
+        return root
+    candidates = sorted(path for path in root.rglob("status.tsv")
+                        if "predicted-toolkit" not in path.relative_to(root).parts and path.parent.name != "rows")
+    if not candidates:
+        sys.exit(f"{given}: no status.tsv of a GPU run inside (one under predicted-toolkit/ is a simulator's, "
+                 "one in rows/ is run_rows.py's)")
+    preferred = [path for path in candidates if path.parts[-3:] == ("out", "blackwell", "status.tsv")]
+    if len(preferred) == 1:
+        return preferred[0].parent
+    if len(candidates) == 1:
+        return candidates[0].parent
+    sys.exit(f"{given}: more than one status.tsv could be the GPU run's; give the directory of one:\n"
+             + "\n".join(f"    {path.parent.relative_to(root)}" for path in (preferred or candidates)))
 
 
 def toolkit_banner(results: Path, predicted: Path) -> str:
@@ -230,10 +306,9 @@ def main() -> int:
         scratch = tempfile.TemporaryDirectory()
         with tarfile.open(results) as tar:
             tar.extractall(scratch.name, filter="data")
-        found = list(Path(scratch.name).rglob("status.tsv"))
-        if not found:
-            sys.exit(f"{results}: no status.tsv inside")
-        results = found[0].parent
+        results = find_results(Path(scratch.name), results)
+    elif results.is_dir():
+        results = find_results(results, results)
     predicted = Path(args.predicted)
 
     statuses = {}
@@ -249,6 +324,11 @@ def main() -> int:
         if args.require_same_toolkit:
             return 3
 
+    unhealthy = read(results / "GPU-UNHEALTHY.txt")
+    if unhealthy:
+        bar = "!" * 100
+        print(f"{bar}\n{unhealthy}{bar}\n")
+
     if (results / "RT-11-NOT-CAPTURED.txt").is_file():
         # No verdict here depends on it; a reader of this report must still not miss it.
         bar = "!" * 100
@@ -262,13 +342,22 @@ def main() -> int:
         got = compared_lines(got_text)
         want = compared_lines(read(predicted / (probe.name + ".txt")))
         note = read(predicted / (probe.name + ".sim.txt")).splitlines()
-        refused = bool(note) and note[0].startswith("status:") and note[0] != "status: ok"
-        reason = next((l.removeprefix("warplens: ") for l in note[1:] if l.startswith("warplens: ")), "")
+        says, reason = simulator_says(note)
+        refused = says in ("deadlock", "unsupported", "refuses")
         design = " (by design)" if probe.risk else ""
         gpu_failed = "KERNEL FAILED" in got_text
         error_line = next((l for l in got_text.splitlines() if l.startswith("info: error")), "")[6:]
+        stderr_text = read(results / (probe.name + ".stderr"))
+        failure = gpu_error(got_text, stderr_text) if gpu_failed else ""
+        # Results that are themselves a simulator's run (run_all.py --mode sim or predict, held
+        # against predictions to see that they are current): its messages are on standard error.
+        simulated = any(line.startswith("warplens: ") for line in stderr_text.splitlines())
 
-        if status is None or status.startswith(("not built", "not run", "skipped")):
+        if status is not None and status.startswith("not run (GPU unhealthy"):
+            # Not a finding about this probe: the runner stopped launching (GPU-UNHEALTHY.txt).
+            verdict, detail = "NOT RUN, GPU unhealthy", status[len("not run ("):].rstrip(")")
+            bad += 1
+        elif status is None or status.startswith(("not built", "not run", "skipped")):
             verdict, detail = "not run", status or "no entry in status.tsv"
             bad += 1
         elif launch_failed(status, got_text):
@@ -280,28 +369,60 @@ def main() -> int:
             verdict = "HOST ERROR"
             detail = next((l for l in got_text.splitlines() if l.startswith("HOST ERROR")), "")[12:110]
             bad += 1
-        elif status == "timeout":
-            verdict, detail = "timed out" + (design if probe.risk == "hang" else ""), ""
-            bad += probe.risk != "hang"
-            if refused:
-                detail = f"simulator: {reason[:90]}"
+        elif status.startswith("timeout"):
+            unreaped = "; " + status[len("timeout ("):].rstrip(")") if status != "timeout" else ""
+            if probe.risk != "hang":
+                verdict, detail = "timed out", (f"simulator: {reason[:90]}" if refused else "") + unreaped
+                bad += 1
+            elif says == "finishes":
+                # The manifest lets it hang; the simulator says it does not. That is a prediction
+                # the GPU did not confirm, whatever the manifest allows.
+                verdict, detail = "TIMED OUT, predicted to finish", "the simulator's kernel returns" + unreaped
+                bad += 1
+                details += [f"{probe.name}: {', '.join(probe.ids) or '-'}: {probe.claim}",
+                            f"    timed out on the GPU ({status}); the simulator predicts that it finishes, with "
+                            f"{len(want)} line(s) of output. The GPU printed {len(got)} before it was killed:"] + \
+                           ["    " + l[:200] for l in got[:12]]
+            elif says == "deadlock":
+                verdict, detail = "timed out (as predicted)", f"simulator: {reason[:90]}{unreaped}"
+            else:
+                verdict = "timed out (by design)"
+                detail = (f"simulator: {reason[:90]}" if refused else "no prediction") + unreaped
         elif status != "ok" and not gpu_failed:
             verdict, detail = "crashed", status + ": " + (read(results / (probe.name + ".stderr")).strip()[-120:])
             bad += 1
+        elif probe.predict == "none" and gpu_failed:
+            verdict = "kernel failed" + design
+            detail = f"no prediction; GPU: {failure}; {len(got_text.splitlines())} line(s) recorded"
+            bad += not probe.risk
         elif probe.predict == "none":
             verdict, detail = "informational", f"no prediction; {len(got_text.splitlines())} line(s) recorded"
         elif refused and not gpu_failed:
             verdict, detail = "informational", f"the GPU ran what the simulator refuses ({reason[:70]})"
             details += [f"{probe.name}: GPU output (the simulator refuses this kernel)"] + \
                        ["    " + l[:200] for l in got[:12]]
+        elif got == want and gpu_failed and says == "unsupported" and not simulated:
+            # The compared lines of a failed kernel are its label and nothing else, so this
+            # "match" holds for any error at all, and the simulator's side is not a model.
+            verdict = "GPU faulted, not modelled"
+            detail = f"GPU: {failure}; the simulator does not model this ({reason[:80]})"
+            bad += not probe.risk
+        elif got == want and gpu_failed and says == "deadlock":
+            # The same lines: the simulator reports its deadlock as a failed kernel. A GPU has
+            # no such report (a kernel that deadlocks is a timeout there), so its error is
+            # something else that ended the kernel; the detail says so and the reader judges.
+            verdict = "identical"
+            detail = f"GPU: {failure}, where the simulator predicts a deadlock, which a GPU does not report ({reason[:50]})"
         elif got == want:
             verdict = "identical"
-            detail = "both refuse the kernel" if gpu_failed else ""
+            detail = f"both refuse the kernel; GPU: {failure}; simulator: {reason[:80]}" if gpu_failed else ""
+            if gpu_failed and simulated:
+                detail = f"a simulator's run, refusing the kernel as predicted ({reason[:80]})"
             if gpu_failed and not refused:
-                verdict, detail = "kernel failed" + design, "as predicted"
+                verdict, detail = "kernel failed" + design, f"as predicted; GPU: {failure}"
         elif gpu_failed:
             verdict = "kernel failed" + design
-            detail = error_line
+            detail = f"GPU: {failure}" + (f"; simulator: {reason[:80]}" if refused else "; the simulator's kernel returns")
             bad += not probe.risk
             details += [f"{probe.name}: the GPU reported a failed kernel; outputs differ"] + \
                 first_differences(got, want, args.lines)
@@ -347,9 +468,11 @@ def main() -> int:
             rows.append((name, "not run", "missing required end-to-end run"))
             continue
         got, want = key_lines(read(results / (name + ".stdout"))), key_lines(read(predicted / (name + ".txt")))
-        if status.startswith("skipped"):
+        if status.startswith("not run (GPU unhealthy"):
+            verdict = "NOT RUN, GPU unhealthy"
+        elif status.startswith(("skipped", "not run")):
             verdict = "not run"
-        elif status == "timeout":
+        elif status.startswith("timeout"):
             verdict = "timed out"
         elif status != "ok":
             verdict = "crashed"
@@ -365,9 +488,9 @@ def main() -> int:
                         "ran the script, and that depends on its BLAS"]
 
     width = max(len(name) for name, _, _ in rows)
-    print(f"{'probe':{width}}  {'verdict':26}  detail")
+    print(f"{'probe':{width}}  {'verdict':30}  detail")
     for name, verdict, detail in rows:
-        print(f"{name:{width}}  {verdict:26}  {detail}")
+        print(f"{name:{width}}  {verdict:30}  {detail}")
     counts: dict[str, int] = {}
     for _, verdict, _ in rows:
         counts[verdict] = counts.get(verdict, 0) + 1
@@ -376,6 +499,25 @@ def main() -> int:
         print(f"\n{counts['FAILED TO LAUNCH']} probe(s) FAILED TO LAUNCH: the driver could not load their kernels, "
               "so they tested nothing.\nIf the error is cudaErrorUnsupportedPtxVersion the driver is older than the "
               "toolkit: rerun with `run_all.py --binaries native` (see README, 'When probes do not launch').")
+    # health.tsv, from run_all.py: every check of the canary. A failure that went away is
+    # not a verdict on any probe, but the runs after it were made on a GPU that had just
+    # failed, and a reader should know.
+    events = [line.split("\t") for line in read(results / "health.tsv").splitlines()[1:]]
+    events = [fields for fields in events if len(fields) >= 6 and fields[5].startswith(("FAILED THEN", "GPU UNHEALTHY"))]
+    if events:
+        print("\nGPU health (health.tsv): the canary failed after")
+        for fields in events:
+            print(f"    {fields[0]}: {fields[5]} ({fields[2]} s, {fields[3]} attempt(s), from {fields[4]})")
+    kernel_lines = [line for line in read(results / "xid.log").splitlines()
+                    if line and not line.startswith(("#", "(before the run)\t"))]
+    if kernel_lines:
+        # NVRM also logs what is no fault (on the development machine: "User does not have
+        # permission to access register offset ..."); an Xid is the driver reporting a GPU
+        # error, so those are the ones shown.
+        xids = [line for line in kernel_lines if "Xid" in line]
+        print(f"\n{len(kernel_lines)} kernel log line(s) naming Xid or NVRM appeared during the run (xid.log, under "
+              f"the run after which each was first seen); {len(xids)} name an Xid" + (", the first:" if xids else ""))
+        print("\n".join("    " + line[:200] for line in xids[:8]), end="\n" if xids else "")
     if banner:
         print(f"\n{banner}")
     if details:

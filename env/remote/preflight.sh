@@ -2,6 +2,7 @@
 # Is this machine worth the rental? Run before anything else.
 #
 #   env/remote/preflight.sh [--quick] [--e2e] [--book PATH] [--no-ncu] [--out FILE] [--status FILE]
+#                           [--ncu-path FILE]
 #
 # Prints one line per check, PASS, WARN, FAIL, INFO or SKIP, then a summary.
 # Exit status 1 if any check FAILed, 0 otherwise.
@@ -16,12 +17,18 @@
 #                  is a FAIL, because the timing suite is held against counters
 #   --no-ncu       counters are not needed: whatever keeps ncu from reading one
 #                  is a WARN. The report still says that none was read
-#   --e2e          also require native Triton (CUDA PyTorch) and a clone of the
-#                  book, and check which commit of the book it is
+#   --e2e          also require native Triton (CUDA PyTorch), a clone of the
+#                  book and one of CUTLASS at its pinned commit with the four
+#                  tutorial programs built from it, and check which commit of
+#                  the book it is. Nothing is then left to fetch or compile
+#                  for the end-to-end programs while the GPU stages run
 #   --book PATH    book clone for --e2e (default: WARPLENS_BOOK, else the clone
 #                  setup.sh made in $WARPLENS_REMOTE_HOME/book)
 #   --out FILE     also write the report to FILE
 #   --status FILE  write "check STATUS" lines to FILE, for run.sh
+#   --ncu-path FILE  write the path of the ncu that was found to FILE (empty
+#                  when none was), for run.sh, which hands it to the timing
+#                  suite as NCU_BIN
 #
 # For tests, and nothing else:
 #   preflight.sh --classify NAME COMPUTE_CAP          the GPU verdict for that card
@@ -51,6 +58,7 @@ require_ncu=1
 book="$(book_path)"
 out_file=""
 status_file=""
+ncu_path_file=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick) quick=1 ;;
@@ -59,7 +67,8 @@ while [[ $# -gt 0 ]]; do
     --book) book="${2:?--book needs a path}"; shift ;;
     --out) out_file="${2:?--out needs a file}"; shift ;;
     --status) status_file="${2:?--status needs a file}"; shift ;;
-    -h|--help) sed -n '2,34p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    --ncu-path) ncu_path_file="${2:?--ncu-path needs a file}"; shift ;;
+    -h|--help) sed -n '2,41p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "error: unknown argument '$1' (see --help)" >&2; exit 2 ;;
   esac
   shift
@@ -72,10 +81,12 @@ load_pins || exit 2
 report="$(mktemp)"
 statuses="$(mktemp)"
 work=""
+ncu_bin=""
 # shellcheck disable=SC2329  # called by the trap
 cleanup() {
   [[ -n "$out_file" ]] && cp "$report" "$out_file"
   [[ -n "$status_file" ]] && cp "$statuses" "$status_file"
+  [[ -n "$ncu_path_file" ]] && echo "$ncu_bin" > "$ncu_path_file"
   rm -rf "$report" "$statuses" ${work:+"$work"}
 }
 trap cleanup EXIT
@@ -221,7 +232,7 @@ fi
 
 # Clock: the manifest's timestamps and every TLS download depend on it.
 now="$(date +%s)"
-commit_time="$(git -C "$REPO_DIR" log -1 --format=%ct 2>/dev/null || true)"
+commit_time="$(repo_git "$REPO_DIR" log -1 --format=%ct 2>/dev/null || true)"
 clock_problem=""
 if [[ "$commit_time" =~ ^[0-9]+$ ]] && (( now < commit_time )); then
   clock_problem="the clock ($(utc_now)) is earlier than the checked-out commit ($(date -u -d "@$commit_time" +%Y-%m-%dT%H:%M:%SZ))"
@@ -288,6 +299,30 @@ else
         warn book "$book is at commit $book_head, not the pinned $PIN_BOOK_COMMIT the predictions were made against: row RT-08 runs other kernels than were predicted"
         note "Unset WARPLENS_BOOK (and drop --book) to use the clone env/remote/setup.sh fetches at the pinned commit."
       fi
+    fi
+    # CUTLASS, for the four tutorials (RT-06) and the CuTe DSL tutorial (RT-11): the clone
+    # setup.sh fetches into the checkout, and the programs run.sh's stage build-cutlass makes
+    # from it. Without them the end-to-end step would clone and compile while the GPU stages
+    # run (examples/03_cutlass_mma/build.sh, called by run_e2e.py), or with
+    # WARPLENS_CUTLASS_NO_FETCH, as run.sh sets it, fail there.
+    if ! is_cutlass_clone "$CUTLASS_DIR"; then
+      fail cutlass "no clone of CUTLASS in $CUTLASS_DIR (or not a whole one): rows RT-06 and RT-11 cannot run"
+      note "env/remote/setup.sh fetches it at the pinned commit (run it again; env/remote/run.sh does that by itself"
+      note "after this failure). Without network: copy a clone at commit ${PIN_CUTLASS_COMMIT:0:12} there (RUNBOOK.md, section 3)."
+      note "For a probe-only run: WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e env/remote/run.sh"
+    elif [[ "$(git_head "$CUTLASS_DIR")" != "$PIN_CUTLASS_COMMIT" ]]; then
+      fail cutlass "$CUTLASS_DIR is at commit $(git_head "$CUTLASS_DIR"), not the pinned $PIN_CUTLASS_COMMIT"
+      note "env/remote/setup.sh checks out or fetches the pinned commit (run it again; env/remote/run.sh does that by itself)."
+    else
+      pass cutlass "$CUTLASS_DIR is at commit ${PIN_CUTLASS_COMMIT:0:12}, the pinned one"
+    fi
+    not_built="$(cutlass_programs_missing)"
+    if [[ -z "$not_built" ]]; then
+      pass cutlass-built "the four tutorial programs are in $(cutlass_bin_dir)"
+    else
+      fail cutlass-built "not built in $(cutlass_bin_dir): $not_built"
+      note "env/remote/run.sh builds them before this check (stage build-cutlass; its log says why it failed)."
+      note "By hand, in the env: examples/03_cutlass_mma/build.sh --programs"
     fi
     # Matrix row RT-11 is captured under gdb, and on a B200 the stage run-blackwell fails
     # without that capture (validation/blackwell/run_rows.py). Better known now than then.
@@ -488,7 +523,10 @@ else
       note "$ncu_detail"
       note "Remedies, from https://developer.nvidia.com/ERR_NVGPUCTRPERM:"
       note "  1. run as root, or with CAP_SYS_ADMIN (CAP_PERFMON also works from driver R565):"
-      note "       sudo env \"PATH=\$PATH\" env/remote/run.sh"
+      note "       sudo env \"PATH=\$PATH\" WARPLENS_REMOTE_HOME=$(printf '%q' "$REMOTE_HOME") env/remote/run.sh"
+      note "     WARPLENS_REMOTE_HOME must be given as here: sudo resets HOME and drops the variable, and"
+      note "     without it root would install a second env in /root/warplens-remote. Other WARPLENS_"
+      note "     variables you set (WARPLENS_BOOK, ...) are dropped the same way: repeat them after 'env'."
       note "  2. on the host, allow it for every user (needs root on the host, and a module reload or reboot):"
       note "       modprobe nvidia NVreg_RestrictProfilingToAdminUsers=0"
       note "       or 'options nvidia NVreg_RestrictProfilingToAdminUsers=0' in a file in /etc/modprobe.d"

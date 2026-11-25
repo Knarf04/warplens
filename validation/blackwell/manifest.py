@@ -196,9 +196,16 @@ def _mma() -> list[Probe]:
         Probe("mma/base_offset", "mma/base_offset", (), ("MMA-12",),
               "with the base-offset field 0 (all CUTLASS emits) an operand that starts off a swizzle period "
               "is read through the swizzle of its absolute shared address"),
-        Probe("mma/base_offset.field", "mma/base_offset", ("field",), ("MMA-12",),
-              "none: a non-zero base-offset field is outside v1 and refused. Records what it selects, "
-              "against three candidate rules", risk="fault", predict="none"),
+    ] + [
+        # One process per case: the program stops at its first failed kernel, and after a fault
+        # the context is gone, so `base_offset field` alone would lose every case after it.
+        Probe(f"mma/base_offset.field.{index}", "mma/base_offset", ("field", str(index)), ("MMA-12",),
+              f"none: a non-zero base-offset field is outside v1 and refused. Records what field {field} "
+              f"selects for a {layout} operand starting at byte {start}, against three candidate rules",
+              risk="fault", predict="none")
+        for index, (layout, start, field) in enumerate((
+            ("128B", 128, 1), ("128B", 384, 3), ("128B", 896, 7), ("64B", 128, 1), ("64B", 384, 3),
+            ("32B", 128, 1), ("128B", 0, 1), ("128B", 128, 7)))   # WITH_FIELD in mma/base_offset.cu
     ]
 
 

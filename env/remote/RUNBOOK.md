@@ -12,9 +12,9 @@ means neither. Nothing here has run on a B200.
 | File | What it does |
 | --- | --- |
 | `pins.env` | Every version, exact. The only place a version is written. |
-| `setup.sh` | Installs the env from the pins and clones the book at its pinned commit. No root, no conda, no system toolkit needed. |
+| `setup.sh` | Installs the env from the pins and clones the book and CUTLASS, each at its pinned commit. No root, no conda, no system toolkit needed. |
 | `preflight.sh` | Is this machine a real B200 and does everything on it work? PASS / WARN / FAIL per check. |
-| `run.sh` | Preflight, setup, build and run both probe suites, pack one archive. Resumable. |
+| `run.sh` | Preflight, setup, build and run both probe suites, pack one archive. Resumable; Ctrl-C packs what exists. |
 | `predict_toolkit.sh` | Makes the predictions again with the installed nvcc, without a GPU. `run.sh` runs it by itself when setup fell back to another toolkit (section 2). |
 | `gpu_probe.py`, `check_env.py`, `kernels/` | What preflight runs on the GPU. |
 
@@ -30,7 +30,7 @@ Do these at home; none needs the B200.
 - [ ] The commit to test contains `validation/blackwell/`, `validation/blackwell_timing/`
       and `env/remote/`. `env/remote/run.sh --dry-run` must show no stage as `MISSING`.
 - [ ] The predicted outputs are committed (plan step D17).
-- [ ] `python -m pytest -q tests/test_remote_env.py` passes.
+- [ ] `python -m pytest -q tests/test_remote_env.py tests/test_remote_regressions.py tests/test_remote_setup_paths.py tests/test_remote_hardening.py` passes.
 - [ ] A dry run of preflight on the development GPU fails for the right reason:
       `WARPLENS_ENV_RUN="conda run -n warplens" env/remote/preflight.sh` must say
       `FAIL gpu-identity ... not a B200`.
@@ -96,14 +96,14 @@ starts.
       depends on the compiler is known in advance. Below 12.8 (`CUDA_VERSION_MIN`) preflight
       fails. A rented driver cannot be changed from inside a container.
 - [ ] **Outbound HTTPS**, to: github.com and the hosts its downloads redirect to (the
-      micromamba binary, the clone of the book, the clone of CUTLASS that
-      `examples/03_cutlass_mma/build.sh` makes for the end-to-end step, and the clock check);
+      micromamba binary, the clone of the book, the clone of CUTLASS for the end-to-end
+      step, both made by `setup.sh`, and the clock check);
       conda.anaconda.org (conda-forge: Python, nvcc, the CUDA headers, NVRTC, Nsight Compute;
       git and gdb too when the image has none); pypi.org and files.pythonhosted.org (Triton,
       the CuTe DSL, TIRx, cuda-bindings, PyTorch). And the image's own package mirror if
       you are root and it lacks `curl`, `git` or `gdb` (`apt-get`). No fetch here can be
-      replaced by an upload except the repository itself (the bundle of section 3) and,
-      with `WARPLENS_BOOK`, the book.
+      replaced by an upload except the repository itself (the bundle of section 3), with
+      `WARPLENS_BOOK` the book, and CUTLASS (section 3, "PyTorch, the book and CUTLASS").
 - [ ] **18 GB free on one filesystem you can write to** (`WARPLENS_REMOTE_HOME`; `setup.sh`
       refuses to start with less, 12 GB with `--no-torch`), and not counting `/tmp`:
       everything, temporary files included, goes under that directory. The archive is small
@@ -315,13 +315,30 @@ export WARPLENS_REMOTE_HOME=$HOME/warplens-remote     # 18 GB; point it at the b
 env/remote/preflight.sh --quick              # 2 seconds. FAIL gpu-identity: release the machine now
 env/remote/run.sh --dry-run                  # the plan; no stage may say MISSING
 tmux new -s run
-env/remote/run.sh 2>&1 | tee ~/run.log       # everything; prints the archive path and checksum at the end
+env/remote/run.sh 2>&1 | tee -i ~/run.log    # everything; prints the archive path and checksum at the end
 ```
 
+`tee -i`, not `tee`: Ctrl-C goes to both programs, and a plain `tee` dies of it while
+`run.sh` is still packing. `run.sh` survives that too (it then writes on to
+`$WARPLENS_REMOTE_HOME/run/logs/run.console.log`, which has its lines in any case), but with
+`-i` the archive path and checksum still reach the terminal and `~/run.log`.
+
 The same command whatever the driver is: the toolkit policy of section 2 is built in.
-Nothing else is fetched by hand: `setup.sh` installs PyTorch and clones the book
-("PyTorch and the book" below). A full run needs `ncu` to read a counter and stops at
-preflight if it cannot (section 7, `ncu` FAIL): become root before the first command.
+Nothing else is fetched by hand: `setup.sh` installs PyTorch and clones the book and
+CUTLASS ("PyTorch, the book and CUTLASS" below). A full run needs `ncu` to read a counter
+and stops at preflight if it cannot (section 7, `ncu` FAIL): become root before the first
+command.
+
+The order of the stages, and what is on the clock before the first measurement:
+`preflight-quick`, `setup`, `build-cutlass` (the four CUTLASS tutorials, from the clone
+`setup.sh` fetched), `preflight`, the two builds, then `run-blackwell` and `run-timing`. The
+self-test (`selftest`, the repository's own tests in the simulator, a quarter of an hour)
+runs **after** the GPU stages when `setup.sh` installed the pinned toolkit: that is the
+compiler the suite passed with at home, so it tells nothing a measurement should wait for.
+The archive is packed once before it starts, so Ctrl-C during it loses nothing measured.
+With a fallback toolkit (section 2) it runs **before** the builds, because its failures
+name the predictions that do not hold for the installed compiler. `--skip selftest`
+leaves it out either way.
 
 - No `git` on the machine: `setup.sh` installs it with `apt-get` when it is root
   (not exercised) or puts conda-forge's git into the env (measured). To get the
@@ -331,8 +348,20 @@ preflight if it cannot (section 7, `ncu` FAIL): become root before the first com
 - If you are not root and `sudo` works, become root first (`sudo -i`) and do
   everything as root, so that `ncu` may read counters; without them the run
   stops at preflight. Decide this before the first command: the env lives under
-  `$HOME` of whoever runs `setup.sh`.
-- Again after any failure or interruption: the same `env/remote/run.sh`.
+  `$HOME` of whoever runs `setup.sh`, and after `sudo -i` that is `/root`, which the
+  login you copy results back with cannot read. So as root set
+  `export WARPLENS_REMOTE_HOME=/home/<user>/warplens-remote` (or a directory on the big
+  disk that this login can read) before the first command; the `scp` lines below then
+  work as written. If the run is already under `/root/warplens-remote`, copy the archive
+  out first: section 6.
+- Started as a normal user and stopped at `ncu`: do not start over in `/root`. The
+  preflight report prints the command, which keeps the install where it is:
+  `sudo env "PATH=$PATH" WARPLENS_REMOTE_HOME=$WARPLENS_REMOTE_HOME env/remote/run.sh`
+  (`sudo` resets `HOME` and drops `WARPLENS_` variables; any other you set, repeat after `env`).
+- Again after any failure or interruption: the same `env/remote/run.sh`. If the
+  preflight failed for want of something `setup.sh` provides (the PyTorch env, the book,
+  the CUTLASS clone, a missing ncu), that run repeats `setup.sh` by itself, which retries
+  those parts and only verifies the rest.
   Finished stages are skipped only for the same commit, pins and run configuration.
   Changing `--toolkit` or suite arguments reruns the stages. `--redo STAGE` repeats
   one and invalidates dependent results: rebuilding a suite reruns that suite;
@@ -342,11 +371,11 @@ preflight if it cannot (section 7, `ncu` FAIL): become root before the first com
 Back on your own machine (section 6):
 
 ```bash
-scp '<user>@<host>:warplens-remote/results/warplens-b200-*' .
+scp '<user>@<host>:warplens-remote/results/warplens-b200-*' .   # the path run.sh printed, if WARPLENS_REMOTE_HOME is elsewhere
 sha256sum -c warplens-b200-*.tar.gz.sha256
 ```
 
-### PyTorch and the book
+### PyTorch, the book and CUTLASS
 
 **PyTorch: `setup.sh` installs it; there is nothing to prepare.** What it does
 (`setup.sh` section 5b, `install_torch_env` in `lib.sh`, the pins at the end of `pins.env`):
@@ -401,8 +430,36 @@ What `setup.sh` does (its section 5d, `ensure_book` in `lib.sh`, `BOOK_COMMIT` i
   what the captures keep of a run: the PTX compiled from its kernels, the commit and a
   checksum of each chapter read.
 
-The fallback, when the rented machine cannot reach github.com but you can upload: clone it
-by hand, at the same commit, and name it. These are the commands CI runs.
+**CUTLASS: `setup.sh` fetches it; there is nothing to prepare.** The four CUTLASS tutorials
+(row RT-06) and the CuTe DSL's GEMM tutorial (row RT-11) are run from a clone of
+<https://github.com/NVIDIA/cutlass> at one commit (`CUTLASS_COMMIT` in `pins.env`; the one
+`examples/03_cutlass_mma/build.sh` builds and `e2e/capture_cutlass.py` requires).
+`examples/03_cutlass_mma/build.sh` used to clone it, whole history and no time limit, when
+the end-to-end step first asked for a program, which on a rented machine was inside the
+stage `run-blackwell`; no rehearsal took that path, because the development checkout has a
+clone. Now (`setup.sh` section 5e, `ensure_cutlass` in `lib.sh`):
+
+- `setup.sh` fetches that one commit, without history, into
+  `examples/03_cutlass_mma/.cutlass` of the checkout (git-ignored), which is where
+  `run_e2e.py` and `cute_dsl_tma.py` look and the only place they take from `run.sh`.
+  5.5 s and 244 MB from github.com on a fast link (measured 2026-11-24; a commit has to be
+  named in full for that, an abbreviated one is refused). Into a directory beside it, moved
+  into place only when it is at the pinned commit and has the tutorials; each git command is
+  given up on after 10 minutes, or 30 s without data. A clone already there at the pinned
+  commit is left alone. `cutlass_commit=` in `resolved/versions.txt` and `manifest.txt`.
+- `run.sh` builds the four programs in a stage of its own, `build-cutlass`
+  (`build.sh --programs`, 40 s on 20 cores; measured), before the preflight.
+- The preflight checks both (`cutlass`, `cutlass-built`; section 7), with the other
+  end-to-end prerequisites, and a full run stops there if either is missing.
+- `run.sh` sets `WARPLENS_CUTLASS_NO_FETCH=1` for every stage: `build.sh`, which
+  `run_e2e.py` still calls when it misses a program, then fails at once instead of using
+  the network. Nothing is fetched while the GPU stages run.
+- Without network to github.com: at home, `examples/03_cutlass_mma/build.sh` (it fetches
+  the same commit), then `rsync -a examples/03_cutlass_mma/.cutlass <user>@<host>:warplens/examples/03_cutlass_mma/`;
+  `setup.sh` finds it `present`. `WARPLENS_CUTLASS_URL` names a mirror instead.
+
+The fallback for the book, when the rented machine cannot reach github.com but you can
+upload: clone it by hand, at the same commit, and name it. These are the commands CI runs.
 
 ```bash
 git init -q ~/book
@@ -411,10 +468,12 @@ git -C ~/book checkout -q FETCH_HEAD        # elsewhere, then: rsync -a ~/book <
 export WARPLENS_BOOK=$HOME/book             # before env/remote/run.sh
 ```
 
-A full run checks both before the suites start: the preflight check `native-e2e` FAILs,
+A full run checks all three before the suites start: the preflight check `native-e2e` FAILs,
 and the run stops, when the PyTorch env does not see the GPU or there is no clone of the
 book; the check `book` says which commit the clone is at (FAIL for `setup.sh`'s own clone
-at another commit than the pinned one, WARN for a clone you named). `run.sh` asks for that check by itself unless the Blackwell suite is
+at another commit than the pinned one, WARN for a clone you named); `cutlass` FAILs without
+a clone of CUTLASS at the pinned commit, and `cutlass-built` without the four programs.
+`run.sh` asks for those checks by itself unless the Blackwell suite is
 skipped or restricted with `--no-e2e` / `--only`; a standalone `preflight.sh` does it
 with `--e2e`. If PyTorch cannot be had (a 12.x driver), run the probes without the
 end-to-end programs, which also leaves out the launches of rows RT-10 and RT-11. That is a
@@ -425,12 +484,50 @@ owed (section 5):
 WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e env/remote/run.sh
 ```
 
+### The order inside `run-blackwell`, and a GPU that stops answering
+
+`validation/blackwell/run_all.py` (its README has the details) runs, in this order: the
+probe runs the manifest gives no risk (80 of the 126), the end-to-end programs
+(`e2e/run_e2e.py`, 900 s per step at most), the rows without a probe (below; RT-11 first,
+3000 s at most), then the 33 runs that may fault by design and the 13 that may hang. What
+is least likely to disturb the GPU is on disk before what may.
+
+After every run with a risk, and every run that did not end as `ok`, it runs a canary, a
+kernel that had worked (`out/blackwell/health.tsv`, `health/`, and the new `Xid`/`NVRM`
+lines of the kernel log in `xid.log`). If the canary fails and does not come back in
+about a minute, the suite launches nothing more: the remaining runs are `not run (GPU
+unhealthy after <run>)` in `status.tsv`, `out/blackwell/GPU-UNHEALTHY.txt` names the run, and
+the stage fails. `run.sh` then:
+
+- does **not** start `run-timing` (`skipped`, with the reason): timings on a GPU that does
+  not answer are worthless, and each benchmark would wait out its limit;
+- prints the text of `GPU-UNHEALTHY.txt` between rows of `!` at its end, records
+  `gpu_unhealthy=` in `manifest.txt`, and exits 1; so does `--collect-only` while the file is there.
+
+What to do: get the GPU back (`nvidia-smi --gpu-reset -i 0` as root where the provider
+allows it, else a reboot; `nvidia-smi` must list it again), then the same command:
+
+```bash
+env/remote/run.sh        # run-blackwell again, with --no-build --resume; then run-timing
+```
+
+`run.sh` adds `--no-build --resume` by itself when the earlier `run-blackwell` left
+`GPU-UNHEALTHY.txt`, hit its limit or was interrupted: runs that have a status are kept,
+the run after which the GPU went away is not repeated, the rest run. (`--redo run-blackwell`
+starts the probes over instead; arguments of your own with `--only` or `--resume` are left
+as they are.) For the timing suite alone, before or without the rest of the probes:
+`env/remote/run.sh --timing-on-unhealthy-gpu --skip run-blackwell`. If the GPU does not come
+back, release the instance: what ran is in the archive, and the rest is a reason for the
+second rental (section 5, trigger 2). Never tripped by a real GPU; with stand-ins only
+(section 9).
+
 ### The rows without a probe: NUM-05, RT-10, RT-11
 
 Three rows of `docs/validation-matrix.md` are not kernels with a predicted output. They
-are scripted all the same: `validation/blackwell/run_all.py` ends a GPU run with
-`validation/blackwell/run_rows.py`, inside the stage `run-blackwell`, so there is nothing
-to type. Outputs go to `out/blackwell/rows/` of the archive, one line per step to
+are scripted all the same: `validation/blackwell/run_all.py` runs
+`validation/blackwell/run_rows.py` inside the stage `run-blackwell`, so there is nothing
+to type: after the probes without a risk and the end-to-end programs, and before the probes
+that may fault or hang, RT-11 first (NUM-05 and RT-10 after it, 300 s each at most). Outputs go to `out/blackwell/rows/` of the archive, one line per step to
 `out/blackwell/rows/status.tsv`. NUM-05 and RT-10 are informational: a step that fails or
 is skipped is a line there and never fails the stage.
 
@@ -441,7 +538,8 @@ PyTorch, failed, incomplete, timed out) makes `run_rows.py`, `run_all.py` and so
 `run-blackwell` fail. It is said in a banner that `run_rows.py`, `run_all.py`, `run.sh`
 (after its line of stage statuses) and `compare.py` each print, and in
 `out/blackwell/RT-11-NOT-CAPTURED.txt`, which is there for exactly as long as the capture is
-missing. On any other GPU the step skips itself and nothing fails. `--no-e2e` and `--only`
+missing: on a B200 it is written when the run starts ("not captured yet"), so that a run
+killed before it reaches the row leaves it too, and removed when the row ends as `ok`. On any other GPU the step skips itself and nothing fails. `--no-e2e` and `--only`
 (through `WARPLENS_BLACKWELL_RUN_ARGS`) leave the rows out and are not failures;
 `--rt11 optional` there runs the row and accepts whatever it ends as.
 
@@ -455,7 +553,7 @@ What they need, and what `setup.sh` does about it: gdb with Python support. `set
 uses the machine's gdb, else installs the system package as root, else puts
 conda-forge's gdb into `$WARPLENS_REMOTE_HOME/gdb-env` (0.3 GB, not pinned: it is a tool,
 not part of what is measured); `gdb=` in `resolved/versions.txt` says which. RT-11 also
-needs the PyTorch env and the CUTLASS clone that the end-to-end step makes.
+needs the PyTorch env and the CUTLASS clone that `setup.sh` fetches.
 
 If a step says `skipped` or `failed` on the B200, run it by hand before releasing the
 instance; each takes under a minute. From the checkout, with `E=$WARPLENS_REMOTE_HOME/envrun`
@@ -533,22 +631,46 @@ What was and was not tried of this is in section 9.
 | --- | --- | --- |
 | log in, upload, clone | 5 to 10 | guess |
 | `preflight-quick` | under 1 | measured: 2 s |
-| `setup` | 3 to 12 | measured: 79 s for the main env and 144 s for the PyTorch env on a fast link (9.7 GB on disk in all); the upper end is a guess for a slow link or disk |
+| `setup` | 3 to 12 | measured: 79 s for the main env, 144 s for the PyTorch env and 6 s for the CUTLASS clone on a fast link (9.7 GB on disk for the two envs, and the clone's 244 MB in the checkout); the upper end is a guess for a slow link or disk |
+| `build-cutlass` | 1 to 5 | measured: 40 s on 20 cores for the four CUTLASS tutorials, compiled at once (each compile peaks at 1.9 GB of memory); one at a time (fewer than 4 CPUs) 2 min 31 s. 0 with `--no-e2e` |
 | `preflight` | 1 to 2 | measured: 5 s, but there the Blackwell kernels fail at load; on a B200 they run, and `ncu` attaches |
-| `selftest` (the repository's tests, in the simulator) | 4 to 20 | measured: 10.5 min on 20 cores (1513 tests). It includes the whole predict path, which is what says whether the committed predictions hold for the installed compiler; worth its time on a first rental with a fallback toolkit, `--skip selftest` otherwise. Limit: 30 min |
+| `selftest` (the repository's tests, in the simulator) | 6 to 30 | measured: 13.6 min on 20 cores (3046 tests) with the pinned toolkit, 17 min with the fallback toolkit 13.0 (2926 passed, 14 failed, 4 errors; section 9). With the pinned toolkit it runs last, after the GPU stages; with a fallback toolkit here, before the builds, because it includes the whole predict path, which is what says whether the committed predictions hold for the installed compiler. Limit: 30 min, which is the upper end |
 | `build-blackwell` | 1 to 6 | measured: 8 s on 20 cores for the 51 programs (13 s with `--native`); the upper end is a guess for a smaller machine |
 | `build-timing` | 1 to 4 | measured: 62 s for the 14 benchmarks |
 | `predict-toolkit` | 0, or 5 to 15 | 0 when the driver takes the pinned toolkit's PTX (the stage is skipped). With a fallback toolkit, measured with nvcc 13.5.37 on 20 cores: 65 s for the 108 probe predictions, 8 at once, and about 7 min for the 14 timing benchmarks, one at a time; the upper end is a guess for a slower CPU. Limit: 30 min |
-| `run-blackwell` | 3 to 20 | guess. Kernels are tiny; the time is process start-up and the probes that wait out a timeout on purpose. The rows without a probe at its end add about 15 s here (measured without the RT-11 tutorial, which needs a B200; that is three runs of a GEMM, two of them under gdb, and a guess of 1 to 3 min; a stand-in over PyTorch tensors took 7 s under the tracer with the capture on) |
-| `run-timing` | 3 to 20 | guess. Under `ncu` every kernel is replayed per counter group |
+| `run-blackwell` | 3 to 20 | guess. 126 probe runs of tiny kernels; the time is process start-up, the canary after each run with a risk, and the probes that wait out a timeout on purpose. Measured on the 3080 Ti, where nothing Blackwell launches: 189 s with the build. The rows without a probe add about 15 s here (measured without the RT-11 tutorial, which needs a B200; that is three runs of a GEMM, two of them under gdb, and a guess of 1 to 3 min; a stand-in over PyTorch tensors took 7 s under the tracer with the capture on) |
+| `run-timing` | 3 to 20 | guess. 14 benchmarks: the 7 that ran on Ampere, `ncu` for them, the 7 Blackwell-only ones, `ncu` for those. Under `ncu` every kernel is replayed per counter group. Bounded by the suite itself: 180 s per benchmark, 300 s per `ncu` profile, 1200 s for all `ncu` work |
 | `collect` | under 1 | measured |
 | copy back, verify, second copy | 5 | guess |
-| **Total** | **28 to 116** | the two run stages are the unknown; 101 at the upper end when the driver takes the pinned toolkit; 20 fewer with `--skip selftest`, which a fallback run on a tight clock can afford, since `predict-toolkit` then says which predictions depend on the compiler |
+| **Total** | **31 to 131** | the two run stages are the unknown; 116 at the upper end when the driver takes the pinned toolkit, and the self-test is then the last 30 of them, which Ctrl-C ends without losing a measurement (86 without it); 30 fewer with `--skip selftest`, which a fallback run on a tight clock can afford, since `predict-toolkit` then says which predictions depend on the compiler |
+
+Before the first probe runs on the GPU, at the upper ends: 40 minutes with the pinned toolkit
+(log in, `preflight-quick`, `setup`, `build-cutlass`, `preflight`, the two builds); 85 with a
+fallback toolkit, where the self-test and `predict-toolkit` come first.
 
 Limits: each build stage is stopped after 30 minutes and each run stage after 60
-(`WARPLENS_BUILD_MINUTES`, `WARPLENS_RUN_MINUTES`). The timing suite gives each
-benchmark 15 minutes of its own, so four hung benchmarks would reach the stage
-limit; raise `WARPLENS_RUN_MINUTES` if the first minutes show benchmarks hanging.
+(`WARPLENS_BUILD_MINUTES`, `WARPLENS_RUN_MINUTES`; `build-cutlass` counts as a build).
+The timing suite has limits of its own for each benchmark
+(`validation/blackwell_timing/README.md`: 180 s per benchmark, 300 s per `ncu` profile,
+1200 s for all `ncu` work). By that arithmetic the worst case fits the 60 minutes: every
+Blackwell-only benchmark hanging is 8 x 190 s, about 25 minutes, plus 20 of `ncu`, 45 in
+all; `WARPLENS_RUN_MINUTES` needs raising for `run-timing` only with `--scale` or longer
+limits of your own.
+
+`run-blackwell` is the other way round: its inner limits add up to far more than the stage's
+(900 s for each of eight end-to-end steps, 3000 s for RT-11, all before the probes that may
+fault or hang), so the 60 minutes are what bounds it, on purpose: half the first rental.
+Nothing there is expected to come near its limit (a guess: the whole suite, build and end-to-end steps
+included, took 189 s on the 3080 Ti, where no Blackwell kernel launches). If the stage limit does hit, what had not run yet is lost for
+that attempt, and by the order that is first the 13 runs that may hang, then the 33 that
+may fault, then the rows, RT-11 among them (`RT-11-NOT-CAPTURED.txt` stays); the suite's
+own `tar.gz` is not written, which costs nothing, since `run.sh` archives the directory.
+`status.tsv` has every run that finished, and the next `env/remote/run.sh` resumes from it
+(`--resume`, section 3) and then goes on to what follows. If one end-to-end step is what
+hangs, raise nothing: rerun with what is known to hang left out. Each stage runs in a session of its own, and when it
+ends, at its limit or at Ctrl-C, `run.sh` stops every process still in that session
+before it goes on: a benchmark that the suite's own `timeout` had put in another process
+group no longer outlives its stage on the GPU.
 
 ## 5. Cost
 
@@ -559,10 +681,16 @@ the providers, and prices move).
 
 | | Hours | At $8/h |
 | --- | --- | --- |
-| Everything works first time | 0.5 to 1.9 | $4 to $16 |
+| Everything works first time | 0.5 to 2.2 | $4 to $17.50 |
 | Budget, with one retry of a stage | 2 | $16 |
 | Provider bills whole hours | 1 or 2 | $8 or $16 |
 | Only an 8-GPU node is on offer | 2 x 8 GPUs | about $130 |
+
+The upper end of the first line is past the 2-hour budget since the self-test was measured
+again (section 4: its row was 4 to 20 minutes, and is 6 to 30). With the pinned toolkit it
+is the last stage, the archive is packed before it starts, and Ctrl-C at the two-hour mark
+costs no measurement. With a fallback toolkit it comes first: on a clock that is already
+tight, `--skip selftest`.
 
 ### A second rental (plan step F24)
 
@@ -572,7 +700,7 @@ first rental, the other 4 held in reserve for what comes after it.**
 | | Hours | At $8/h | From |
 | --- | --- | --- | --- |
 | **First rental** | **2** | **$16** | the budget line of the table above |
-| A second run, everything works | 0.4 to 1.6 | $3 to $13 | section 4 without `selftest`: 24 to 96 minutes (to 81 when the driver takes the pinned toolkit) |
+| A second run, everything works | 0.4 to 1.7 | $3 to $13.50 | section 4 without `selftest`: 25 to 101 minutes (to 86 when the driver takes the pinned toolkit) |
 | **Reserve, for later rentals** | **4** | **$32** | 6 - 2: two more runs at the first rental's budget line, or one with time to look at it |
 | **Ceiling for everything** | **6** | **$48** | the owner's number |
 
@@ -623,25 +751,44 @@ spent with mismatches still open, more is a new decision for the owner, not a de
 `run.sh` ends by printing three lines: the archive path, its size and its
 SHA-256. The archive is `$WARPLENS_REMOTE_HOME/results/warplens-b200-<start>-<commit>.tar.gz`
 with a `.sha256` next to it. It is rebuilt at the end of every `run.sh`, also
-after a failure.
+after a failure or Ctrl-C, and with the pinned toolkit once more before the self-test.
+
+If the run was done as root after `sudo -i` without `WARPLENS_REMOTE_HOME`, the archive is
+under `/root/warplens-remote/results/`, which `scp <user>@<host>:...` cannot read. `run.sh`
+says so and prints the command; on the rented machine, as root:
+
+```bash
+cp /root/warplens-remote/results/warplens-b200-* /tmp/ && chmod a+r /tmp/warplens-b200-*
+```
+
+and at home `scp '<user>@<host>:/tmp/warplens-b200-*' .` (for the raw copy of section 8, step
+5, the same with `cp -r /root/warplens-remote/run /tmp/run-raw && chmod -R a+rX /tmp/run-raw`).
+Or log in as root, if the machine lets you: `scp 'root@<host>:warplens-remote/results/warplens-b200-*' .`
 
 Contents:
 
 | Path | What |
 | --- | --- |
-| `manifest.txt` | commit, branch, start and end times, host, the status of every stage; `ncu=ok` only when preflight read a counter, `ncu_required`, `ncu_counters`; `book` and `book_commit` (the clone used; the book itself is never in the archive) |
+| `manifest.txt` | commit, branch, start and end times, host, the status of every stage; `ncu=ok` only when preflight read a counter, `ncu_required`, `ncu_counters` (below), `ncu_bin` (the ncu handed to the timing suite); `kernel_log`; `book` and `book_commit` (the clone used; the book itself is never in the archive), `cutlass_commit` |
 | `stages.tsv` | every attempt of every stage: status, exit code, start, end, seconds |
-| `preflight-quick.txt`, `preflight.txt` | the two preflight reports |
-| `resolved/` | what `setup.sh` installed: every conda package with its hash, `pip freeze`, `versions.txt`, `drift.txt` (differences from the pins). The archive's `versions.txt` ends with `ncu_counters=read` or `not-read (...)` |
+| `preflight-quick.txt`, `preflight.txt` | the two preflight reports (`preflight.ncu`: the path of the ncu it found) |
+| `resolved/` | what `setup.sh` installed: every conda package with its hash, `pip freeze`, `versions.txt`, `drift.txt` (differences from the pins). The archive's `versions.txt` ends with `ncu_counters=read (...)`, `partial (...)` or `not-read (...)` |
 | `pins.env` | what was asked for |
 | `nvidia-smi.txt`, `nvidia-smi-q.txt` | the GPU as the driver describes it |
 | `logs/<stage>.log` | latest output of each stage; earlier attempts are preserved in `logs/history/` |
+| `logs/run.console.log` | every line `run.sh` itself said, all attempts, up to the moment the archive was packed (the lines after that, the archive's path and checksum among them, are in the copy on the machine). What `~/run.log` has, also when the terminal or `tee` was gone |
+| `kernel/` | the kernel's log when the archive was packed (`dmesg.txt`), its lines with `Xid` (a GPU fault as the driver reports it) or `NVRM` (`dmesg-xid-nvrm.txt`), the log as it was before this run's first full preflight (`dmesg-before-gpu.txt`), and the Xid/NVRM lines that are new since then (`dmesg-xid-nvrm-new.txt`). `summary.txt` says which of these could be made: a file that starts with `not readable` says why (a container; `kernel.dmesg_restrict` for a user who is not root) |
+| `source/`, `source-snapshot.log` | the tracked files of the checkout as they were, with a manifest and the diff against the commit. `SOURCE-SNAPSHOT-FAILED.txt` when that could not be made: the rest of the archive is whole |
 | `out/blackwell/`, `out/timing/` | the suites' raw outputs (`WARPLENS_RESULTS_DIR`) |
 | `out/blackwell/rows/` | the rows without a probe: `status.tsv`, the UE4M3 answer of ptxas (NUM-05), the driver call traces (RT-10), and in `e2e/cute_dsl_tma/` the capture of the CuTe DSL tutorial (RT-11): its output, the kernel parameters of its launch, tensor maps included, its code and PTX, the memory it reads and writes, `summary.txt` and `capture.sha256`. About 5 MB. Section 3 |
-| `out/blackwell/RT-11-NOT-CAPTURED.txt` | only when the capture of row RT-11 was required and is missing: why. Section 3 |
+| `out/blackwell/RT-11-NOT-CAPTURED.txt` | on a B200 from the start of the run until row RT-11 ends as `ok` ("not captured yet", then why not). Section 3 |
+| `out/blackwell/status.tsv` | one line per run: name, status, seconds, command, and the UTC time it started (fifth column) |
+| `out/blackwell/health.tsv`, `health/`, `xid.log` | the canary after each risky or failed run (how it ended, attempts, when), `nvidia-smi` around a failed one, and the kernel-log lines with `Xid` or `NVRM` under the run after which each was first seen |
+| `out/blackwell/GPU-UNHEALTHY.txt` | only when the canary did not come back: after which run. `gpu_unhealthy=` in `manifest.txt` repeats its first line. Section 3 |
+| `out/timing/status.txt`, `out/timing/ncu/STATUS.txt` | the timing suite's line per benchmark (`ok`, `FAILED`, `TIMED OUT after 180s`, `LAUNCH FAILED`, `STOPPED by SIGTERM`), and its verdict on the counters, first line `ncu ok:`, `ncu partial:`, `ncu failed:` or `ncu not run:`; `run_all: COUNTERS REQUIRED AND NOT READ` in `status.txt` when preflight had read one and the profiles read none |
 | `out/predicted-toolkit/` | only with a fallback toolkit: the predictions made with the installed nvcc before the GPU stages, `DIFFERENCES.txt`, `toolkit.txt`. Section 2 |
 | `PREDICTIONS-NOT-COMPARABLE.txt` | only with a fallback toolkit: why, and the two commands that compare with `out/predicted-toolkit/` |
-| `NCU-COUNTERS-NOT-READ.txt` | only when preflight read no counter: whether the run was told to do without (`--no-ncu`), did not need them (no timing suite) or required them and went on with `--keep-going` |
+| `NCU-COUNTERS-NOT-READ.txt` | only when `ncu_counters` is `not-read`: the timing suite's own status line, preflight's check, and whether the run was told to do without (`--no-ncu`), did not need them (no timing suite) or required them |
 | `suite-dirs/` | result directories a suite created inside its own directory |
 | `SHA256SUMS` | a checksum for every file above |
 
@@ -650,6 +797,14 @@ well as text logs. The 17-case CPU-only end-to-end capture occupied 73 MB before
 compression; a full rental adds probe artifacts, timing results and the frozen
 source tree. Check the reported archive size and allow space for two copies.
 Transfer it with `scp` or `rsync` over the existing SSH connection.
+
+**`ncu_counters`** says what came of the counters, and after the timing suite has run it
+is the suite's word, not preflight's: the first line of `out/timing/ncu/STATUS.txt`, which
+the suite starts with `ncu ok:` (every profile read counters), `ncu partial:` (some did),
+`ncu failed:` (attempted, none did) or `ncu not run:`. `run.sh` turns that into `read`,
+`partial` or `not-read`, with the line quoted. Preflight's check (one counter of one
+trivial kernel) stands only for a run in which the timing suite did not run, and the
+value then says so. A suite that ran and left no `ncu/STATUS.txt` is `not-read`.
 
 ## 7. When preflight fails
 
@@ -671,12 +826,14 @@ Transfer it with `scp` or `rsync` over the existing SSH connection.
 | `run-trivial` FAIL | `sm_100a` machine code does not run | With `gpu-identity` PASS this should not happen. Read the error; try `env/remote/setup.sh --toolkit <the driver's CUDA Version> --force`. If it persists the machine is unusable. |
 | `ptx-jit` WARN | the driver refuses the toolkit's PTX | `--native` covers the probes only. Full end-to-end runs also fail `e2e-ptx`; use a driver-compatible toolkit (`--toolkit auto`) or deliberately select `--no-e2e`. |
 | `rt11-tracer` WARN | no gdb, a gdb without Python, or a machine that does not let gdb trace a process | Matrix row RT-11 cannot be captured without it, and on a B200 the stage `run-blackwell` then fails at its end (section 3, "The rows without a probe"). Fix it now: `apt-get install -y gdb` as root, or `env/remote/setup.sh` again, or `WARPLENS_GDB`; in a container, `--cap-add=SYS_PTRACE`. The probes do not need it. |
-| `native-e2e` FAIL | the PyTorch env does not see the GPU, or there is no clone of the book | The message says which. Both: `env/remote/setup.sh` again (it installs the one and fetches the other; section 3, "PyTorch and the book"), or through `run.sh`: `env/remote/run.sh --redo setup`. If the book cannot be fetched from this machine: the fallback there, by hand, and `export WARPLENS_BOOK`. Then `env/remote/run.sh` again. For probes only, set `WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e`. |
+| `native-e2e` FAIL | the PyTorch env does not see the GPU, or there is no clone of the book | The message says which. Both: `env/remote/run.sh` again, which repeats `setup.sh` by itself after this failure (it installs the one and fetches the other; section 3, "PyTorch, the book and CUTLASS"). If the book cannot be fetched from this machine: the fallback there, by hand, and `export WARPLENS_BOOK`. Then `env/remote/run.sh` again. For probes only, set `WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e`. |
+| `cutlass` FAIL | no clone of CUTLASS in `examples/03_cutlass_mma/.cutlass`, or one at another commit than the pinned | `setup.sh` could not fetch it (its log says why; github.com unreachable is the usual cause). `env/remote/run.sh` again repeats `setup.sh` by itself. Without network from this machine: copy a clone there (section 3). For probes only, `WARPLENS_BLACKWELL_RUN_ARGS=--no-e2e`. |
+| `cutlass-built` FAIL | the four tutorial programs are not in `examples/03_cutlass_mma/bin` | The stage `build-cutlass` failed or was skipped for want of the clone; `logs/build-cutlass.log` says which. Fix, then `env/remote/run.sh` again: the stage is repeated. |
 | `book` FAIL | `setup.sh`'s clone in `$WARPLENS_REMOTE_HOME/book` is not at the pinned commit | Something changed it. `env/remote/run.sh --redo setup` fetches the pinned commit again. |
 | `book` WARN | the clone you named (`WARPLENS_BOOK`, `--book`) is at another commit, or at none that can be read | Row RT-08 then runs other kernels than the prediction was made for. Unset `WARPLENS_BOOK` to use `setup.sh`'s clone, or note it next to the archive. |
 | `tcgen05` / `tensor-map` / `tma` FAIL | a Blackwell feature is not exposed | On a real B200 these must pass. Keep the report (it is in the archive) and stop: this is a finding about the machine or a bug in the preflight kernel, not something to debug on the clock. `--keep-going` runs the suites anyway if the failure is confined to one feature. |
 | `nvrtc` WARN | NVRTC cannot compile for `sm_100a` | TIRx kernels will not build. Expected only with a 12.x toolkit. |
-| `ncu` FAIL, `ERR_NVGPUCTRPERM` | no permission to read counters. **The run stops here**: a full run requires a counter read, because the timing model is held against counters | In order: run everything as root (`sudo -i`, then the commands of section 3). On a VM as root, if it still fails: `modprobe nvidia NVreg_RestrictProfilingToAdminUsers=0` needs the module reloaded, which is rarely possible with the GPU in use. In a container: only the provider can grant it (`--cap-add=SYS_ADMIN`). If none works, decide: release the machine and rent one that grants it (section 2, "Before paying"), or take everything but the counters with `env/remote/run.sh --no-ncu`. |
+| `ncu` FAIL, `ERR_NVGPUCTRPERM` | no permission to read counters. **The run stops here**: a full run requires a counter read, because the timing model is held against counters | In order: run as root. The report prints the command that keeps this install: `sudo env "PATH=$PATH" WARPLENS_REMOTE_HOME=<where it is> env/remote/run.sh` (plain `sudo env/remote/run.sh`, or `sudo -i` and starting over, would install a second env under `/root`). On a VM as root, if it still fails: `modprobe nvidia NVreg_RestrictProfilingToAdminUsers=0` needs the module reloaded, which is rarely possible with the GPU in use. In a container: only the provider can grant it (`--cap-add=SYS_ADMIN`). If none works, decide: release the machine and rent one that grants it (section 2, "Before paying"), or take everything but the counters with `env/remote/run.sh --no-ncu`. |
 | `ncu` FAIL, other | no ncu was found, ncu ran but gave no counter, or the trivial kernel did not run so there was nothing to profile | The report shows which, with ncu's last lines. No ncu: `env/remote/run.sh --redo setup` without `--no-ncu`. An ncu too old to know the B200 says so in those lines; `setup.sh` installs one that matches the toolkit. Nothing to profile: fix `run-trivial` first. Otherwise as above: `--no-ncu` to go on without. |
 | `ncu` WARN | the same outcomes, in a run that was told to do without counters (`--no-ncu`) or has no timing suite (`--skip run-timing`) | Nothing: the run goes on. The archive says that no counter was read (`NCU-COUNTERS-NOT-READ.txt`, `ncu=unavailable` and `ncu_counters=` in `manifest.txt`, `ncu_counters=` at the end of `resolved/versions.txt`). |
 
@@ -698,6 +855,11 @@ ran. A check that was skipped, or never reached, is `unavailable`.
 A stage of `run.sh` that fails prints the end of its log and the run goes on.
 Archive or checksum failures return a nonzero status; preserve the raw run directory
 and retry `--collect-only` after fixing the storage problem. Fix, then run `env/remote/run.sh` again.
+Two things at the end are warnings of their own and not a failed archive: `source snapshot:
+FAILED` (the frozen copy of the checkout could not be made; the archive is written and has
+everything else; exit status 1) and `a file ... changed while it was packed` (tar read a
+file that was still being written, twice; the archive is written; pack again with
+`--collect-only` once nothing runs).
 
 `run-blackwell` fails for missing programs or artifacts, launch or host errors,
 unexpected process failures or timeouts, and incomplete or failed E2E captures.
@@ -706,27 +868,49 @@ them. Differences in the output of a completed probe remain results to assess
 with `compare.py`; they do not by themselves fail collection.
 `validation/blackwell/README.md`, "When probes do not launch", says what to do.
 In the timing suite the same thing is `LAUNCH FAILED` in `status.txt`.
+It also fails when the GPU was found unhealthy (`GPU-UNHEALTHY.txt`; section 3, "The order
+inside `run-blackwell`"), and `run-timing` is then not started.
+
+`run-timing` fails for a benchmark that failed or timed out, and, with every benchmark
+fine, when preflight read a counter (`WARPLENS_NCU=ok`) and the suite's own `ncu` profiles
+read none (`ncu failed:` or `ncu not run:`): `run.sh` says so under the stage's line, the
+manifest has `ncu_counters=not-read (the timing suite: "...")`, and
+`NCU-COUNTERS-NOT-READ.txt` is in the archive. `ncu partial:` does not fail the stage; the
+run ends with `performance counters: partial (...)`. `out/timing/ncu.log` and `out/timing/ncu/`
+say which profile failed and why.
+
+`compare.py` at home has verdicts for what the new order and the canary produce: `TIMED
+OUT, predicted to finish` (a mismatch), `timed out (as predicted)`, `GPU faulted, not
+modelled` (nothing confirmed), `kernel failed` (a run without a prediction that printed
+`KERNEL FAILED`), and `NOT RUN, GPU unhealthy` (not a finding about the run; the comparison
+exits 1 because the run is incomplete). `validation/blackwell/README.md` has each.
 
 ## 8. The last minutes before releasing the instance
 
 The machine's disk is gone when it is released. In this order:
 
 1. `run.sh` has printed `archive:`, `size:` and `sha256:`. If a stage is still
-   running and time is up, press Ctrl-C once: `run.sh` stops the stage, packs
-   what exists and prints the same three lines. `env/remote/run.sh --collect-only`
-   packs again without running anything.
-2. `run.sh` did not end with the banner `MATRIX ROW RT-11 WAS NOT CAPTURED`, and
+   running and time is up, press Ctrl-C once: `run.sh` stops the stage and everything
+   it started, packs what exists and prints the same three lines. If the terminal shows
+   nothing after Ctrl-C (a plain `tee` that died of it), the lines are at the end of
+   `$WARPLENS_REMOTE_HOME/run/logs/run.console.log`. If the stage is the self-test at
+   the end of a run with the pinned toolkit, nothing measured is lost by stopping it.
+   `env/remote/run.sh --collect-only` packs again without running anything.
+2. `run.sh` did not end with `THE GPU WAS UNHEALTHY AFTER ...` (if it did: section 3,
+   "The order inside `run-blackwell`": reset, then `env/remote/run.sh` again, if the clock
+   allows), nor with the banner `MATRIX ROW RT-11 WAS NOT CAPTURED`, and
    `head -1 $WARPLENS_REMOTE_HOME/run/out/blackwell/rows/e2e/cute_dsl_tma/summary.txt` says
    `RT-11 capture: COMPLETE`. If not, section 3, "The rows without a probe", has the
    commands; they take a minute, and a missing capture is a reason for a second rental
    (section 5). Then `env/remote/run.sh --collect-only`.
-3. Copy the archive and its `.sha256` to your machine. Run `sha256sum -c` **there**
-   and compare the value with the one `run.sh` printed.
+3. Copy the archive and its `.sha256` to your machine (from under `/root`: section 6).
+   Run `sha256sum -c` **there** and compare the value with the one `run.sh` printed.
 4. Unpack it locally and check `manifest.txt`: the commit is the one you wrote
    down, and every stage has the status you expect. `sha256sum -c SHA256SUMS`
    inside the unpacked directory checks every file.
 5. Copy the raw outputs a second time by a second route, in case the archive
    step missed something: `rsync -a <user>@<host>:warplens-remote/run/ ./run-raw/`
+   (`$WARPLENS_REMOTE_HOME/run/` if you set it; from under `/root`: section 6)
    and, if the suites wrote inside the checkout, `rsync -a <user>@<host>:warplens/validation/ ./validation-raw/`.
 6. Put a second copy of the archive somewhere that is not this laptop.
 7. Save `~/run.log` (the console output) too.
@@ -892,6 +1076,64 @@ exit status 1 as it must be on Ampere:
     as soon as the call has returned.
   - `run_rows.py`: RT-11 `skipped (needs sm_100 ...)` and exit status 0; with
     `--rt11 required`, exit status 1, the banner and `RT-11-NOT-CAPTURED.txt`.
+
+Later again on 2026-11-24, the pre-rental hardening, after a review found defects in paths
+no rehearsal had taken. None of it has run on a B200, and the whole `run.sh` was not
+rehearsed again on the 3080 Ti after these changes (its self-test is the whole test suite);
+what ran is the three test files of `env/remote` and `tests/test_remote_hardening.py`, with
+stand-in suites, and the pieces named as measured:
+
+- Ctrl-C under `run.sh 2>&1 | tee ~/run.log`: `tee` dies of the same Ctrl-C and `run.sh`'s
+  next line was its last (SIGPIPE), before the archive. `run.sh` now ignores SIGPIPE, writes
+  on to `logs/run.console.log` when a write to the terminal fails, and the runbook says
+  `tee -i`. A test runs a stand-in run into a real pipe, interrupts the group as a terminal
+  does and finds the archive; with the committed `run.sh` the same test ends with the script
+  killed by signal 13. A dropped terminal (the same failed write, with another error) was
+  not tried.
+- A stage's leftovers: each stage runs under `setsid`, and at its end, limit or Ctrl-C every
+  process still in that session is stopped (TERM, 10 s, KILL) before the next stage or the
+  archive. Tested with a stand-in suite that leaves `timeout 300 sleep 300` behind, the shape
+  the timing suite's benchmarks have; before the change that `sleep` outlived the run. Not
+  tried: a process holding a GPU, a container without `setsid` (the old behaviour is kept
+  there) or without a readable `/proc`.
+- tar's exit status 1 ("file changed as we read it"): one more attempt after 2 s, then the
+  archive stands with a warning. With a stand-in tar; no real file was changed under tar.
+- CUTLASS: `ensure_cutlass` fetched the pinned commit from github.com into a throwaway
+  checkout (8 s, 244 MB, one commit; an abbreviated commit was refused by github.com, which
+  is why the pin is whole), found it `present` the second time, and the real stage
+  `build-cutlass` then compiled the four tutorials with nvcc 13.5.37 in 36 s (20 cores, four
+  at once; the same sizes as the sequential build's programs), with
+  `WARPLENS_CUTLASS_NO_FETCH=1`. Not run: `setup.sh` as a whole with its new step 5e; the
+  step through a git that `setup.sh` put into the env; `run_e2e.py` and `cute_dsl_tma.py`
+  against a clone without history (they read files and `git rev-parse HEAD`, which a
+  one-commit clone has; `capture_cutlass.py build` was not run against one); a build on fewer
+  than 4 CPUs (one compile at a time took 2 min 31 s here with `WARPLENS_CUTLASS_JOBS=1`;
+  four at once on a machine with less than 8 GB of memory was not tried: preflight's `ram`
+  check warns below that).
+- The preflight checks `cutlass` and `cutlass-built`, the repeat of `setup.sh` after a
+  preflight that failed for what it provides, `ncu_counters` from the timing suite's
+  `ncu/STATUS.txt`, `NCU_BIN`, the self-test after the GPU stages with the pinned toolkit:
+  with stand-ins only. The timing suite that writes `ncu/STATUS.txt` is another change of
+  the same day; the two were not run together.
+- The kernel's log: with a stand-in `dmesg`; for real only the case of this machine, where
+  a normal user may not read `dmesg` (`kernel.dmesg_restrict`) and may read the journal's
+  copy, which `save_dmesg` then takes (3317 lines, 1818 of them `NVRM`). "Not readable" with
+  stand-ins only. A real Xid was never in it.
+- After the probe and timing suites were finished the same day: `GPU-UNHEALTHY.txt` (no
+  `run-timing`, the banner, `gpu_unhealthy=`, `--timing-on-unhealthy-gpu`), the resume of a
+  `run-blackwell` that was cut short (`--no-build --resume`), and the line for counters that
+  were required and not read: against stand-in suites that write the files the real ones
+  write. `run.sh` was not run with the real suites after these changes; the tests of the
+  suites that go through `run.sh` were (`tests/test_rental_harness.py`,
+  `tests/test_v1_validation_runner_regressions.py`, `tests/test_full_capture_harness_regressions.py`).
+- A checkout of another owner (`repo_git`, `freeze_source.py`): under `fakeroot` with git
+  2.43, where plain git refuses with "dubious ownership" and both now work. Not with a real
+  root, and not with Ubuntu 22.04's git 2.34.1, for which the global-config way is there.
+- `sudo env "PATH=$PATH" WARPLENS_REMOTE_HOME=... env/remote/run.sh`, the remedy preflight
+  now prints: not run (no sudo without a password here). `env_run` under it finds
+  micromamba by `WARPLENS_REMOTE_HOME`, which is why the variable is in the command.
+- `shellcheck` 0.11 on `lib.sh`, `setup.sh`, `preflight.sh`, `run.sh` and
+  `examples/03_cutlass_mma/build.sh`: clean.
 
 Not tried, because there was no way to here:
 

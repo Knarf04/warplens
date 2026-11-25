@@ -1,0 +1,1 @@
+KERNEL FAILED: member mask 0xffff0000, executed by the lanes of 0xffffffff: cudaErrorIllegalInstruction at synchronize (an illegal instruction was encountered)

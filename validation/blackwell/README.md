@@ -243,7 +243,7 @@ run is isolated for that reason.
 | `smem_optin` | `smem_optin` | RT-15 | a launch may use 48 KiB less the kernel's static shared memory in dynamic shared memory, or what cudaFuncSetAttribute set for that kernel | runs | - |
 | `smem_static` | `smem_static` | RT-15 | a kernel with more than 48 KiB of static shared memory launches without opt-in and may use the rest of 227 KiB | runs | fault |
 | `elect` | `elect` | RT-05 | elect.sync elects the lowest lane of the member mask; every executing lane gets its id | runs | - |
-| `elect.all` | `elect all` | RT-05 | lanes outside the member mask execute elect.sync too: the lowest lane of the mask is elected | runs | fault |
+| `elect.all` | `elect all` | RT-05 | a lane outside the member mask that executes elect.sync ends the kernel | **refuses**: elect.sync is executed by lane(s) 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 that its member mask 0xffff0000 d | fault |
 | `elect.partial` | `elect partial` | RT-05 | the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected | runs | fault |
 | `ampere_replay.shfl` | `ampere_replay shfl` | RT-01 | as on an RTX 3080 Ti (validation/ampere/shfl_golden.txt): shfl.sync in four modes over widths and distances | runs | - |
 | `ampere_replay.printf` | `ampere_replay printf` | RT-01 | as on an RTX 3080 Ti (validation/ampere/printf_golden.txt, lines in another order): device printf with a by-value struct and a local array | runs | - |
@@ -264,15 +264,17 @@ run is isolated for that reason.
 | --- | --- | --- | --- | --- | --- |
 | `swizzle_aligned` | `swizzle aligned` | TMA-01 | a swizzled load XORs the 16-byte chunk index with the low 1/2/3 bits of the 128-byte row index | runs | - |
 | `swizzle_misaligned` | `swizzle misaligned` | TMA-02 | the swizzle is a function of the shared ADDRESS, not of the offset into the buffer | runs (6 finding(s)) | - |
-| `swizzle_misaligned.sixteen` | `swizzle sixteen` | TMA-02 | the same with a destination 16 bytes into a 128-byte row | runs (3 finding(s)) | fault |
+| `swizzle_misaligned.sixteen` | `swizzle sixteen` | TMA-02 | a destination 16 bytes into a 128-byte row is refused | **refuses**: a TMA tensor copy needs a shared-memory address aligned to 32 bytes, got offset 1040: a GPU ends the kernel here with cu | fault |
+| `swizzle_misaligned.thirtytwo` | `swizzle thirtytwo` | TMA-02 | a destination 32 bytes into a 128-byte row runs (an assumption: the alignment a tensor copy needs is between 32 and 128 bytes) | runs (3 finding(s)) | fault |
+| `swizzle_misaligned.sixtyfour` | `swizzle sixtyfour` | TMA-02 | a destination 64 bytes into a 128-byte row runs (the same assumption) | runs (3 finding(s)) | fault |
 | `ranks` | `ranks` | TMA-03, TMA-15 | rank 1-5 boxes land densely, dimension 0 fastest; complete_tx reports box bytes; the tensor map is a by-value kernel parameter | runs | - |
 | `misaligned_requests` | `ranks unaligned` | TMA-10 | an innermost coordinate that is not a multiple of 16 bytes is refused | **refuses**: TMA innermost coordinate must give a 16-byte aligned bounding box (coordinate 1, element size 4) | fault |
 | `oob_fill` | `oob_fill` | TMA-04, TMA-05, TMA-06 | out-of-bounds elements are zero or the default quiet NaN; complete_tx counts the whole box | runs | - |
-| `oob_complete_tx` | `oob_fill inbounds` | TMA-06 | expect_tx of only the in-bounds bytes does NOT complete the phase | runs (6 finding(s)) | - |
+| `oob_complete_tx` | `oob_fill inbounds` | TMA-06 | expect_tx of only the in-bounds bytes does NOT complete the phase | runs (3 finding(s)) | - |
 | `element_strides` | `element_strides` | TMA-07 | element stride s moves ceil(box / s) elements, packed densely, and reports those bytes | runs | - |
 | `element_strides.inner` | `element_strides inner` | TMA-07 | an element stride in dimension 0 is ignored | runs | fault |
 | `store_wait_group` | `store` | TMA-09, TMA-01, TMA-03 | a store is in global memory after commit_group + wait_group 0; it reads through the load's swizzle | runs | - |
-| `store_wait_group.edge` | `store edge` | TMA-04 | a store writes only the elements of the box that are inside the tensor | runs | fault |
+| `store_wait_group.edge` | `store edge` | TMA-04 | a store that hangs over the last row writes the elements inside; one that starts before the first row ends the kernel | **refuses**: a TMA store at coordinates (0, -2) starts outside the tensor: a store may hang over the far edge but not start before th | fault |
 | `store_wait_group.outside` | `store outside` | TMA-04 | a store wholly outside the tensor writes nothing | runs | fault |
 | `tensormap_encode_sweep` | `tensormap_encode_sweep` | TMA-11, TMA-12 | none: records the driver's 128-byte tensor maps over a parameter sweep | not run (no prediction) | - |
 | `raw_bulk` | `raw_bulk` | TMA-08 | cp.async.bulk without a tensor map copies 16, 64 and 4096 bytes verbatim in both directions and reports the size to the mbarrier | runs | - |
@@ -297,9 +299,10 @@ run is isolated for that reason.
 | `init_count.over` | `init_count over` | MB-10 | an arrival count of 2^20 is refused | **refuses**: mbarrier.init with an arrival count of 1048576; it must be 1 to 2^20-1 | fault |
 | `init_count.zero` | `init_count zero` | MB-10 | an arrival count of 0 is refused | **refuses**: mbarrier.init with an arrival count of 0; it must be 1 to 2^20-1 | fault |
 | `complete_before_expect` | `script negative` | MB-07 | the byte count is signed: complete_tx before expect_tx completes once balanced | runs | fault |
-| `over_arrival` | `script over` | MB-04 | arrivals beyond the pending count complete the phase and carry into the next | runs (2 finding(s)) | fault |
-| `expect_tx_small` | `expect_tx` | MB-05, MB-06, MB-07, MB-08 | undersized, oversized and missing expect_tx against real TMA loads, with bounded polls | runs | - |
-| `expect_tx_small.wait` | `expect_tx wait-small` | MB-05, MB-11 | an undersized expect_tx with one load never completes: the usual wait loop deadlocks | **refuses**: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them | hang |
+| `over_arrival` | `script over` | MB-04 | arrivals beyond the pending count end the kernel | **refuses**: 3 arrival(s) on the mbarrier at shared offset 0, which needed only 2 more in this phase: a GPU ends the kernel here with | fault |
+| `expect_tx_small` | `expect_tx` | MB-05, MB-06, MB-07, MB-08 | undersized, oversized and missing expect_tx against real TMA loads, with bounded polls | runs (1 finding(s)) | - |
+| `expect_tx_small.wait` | `expect_tx wait-small` | MB-05, MB-11 | an undersized expect_tx with one load completes part of the way through it: the usual wait loop returns | runs (1 finding(s)) | hang |
+| `expect_tx_small.pieces` | `expect_tx pieces` | MB-05 | a load reports its bytes in pieces of 64 (an assumption): an undersized expect_tx completes the phase only when it is a whole number of pieces | runs (23 finding(s)) | - |
 | `expect_tx_large` | `expect_tx wait-large` | MB-08, MB-11 | an oversized expect_tx never completes: the usual wait loop deadlocks | **refuses**: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them | hang |
 
 ### `tmem/`
@@ -314,19 +317,19 @@ run is isolated for that reason.
 | `layout_f.64_8` | `layout_f 64 8` | TM-04 | M = 64 with lane offset 8, neither of Layout F's two positions: refused | **refuses**: tcgen05.mma result with M=64 at lane 8; the lane of the destination must be 0 or 16 | fault |
 | `transfer_shapes` | `transfer_shapes` | TM-05 | thread and register to (lane, column) for 32x32b, 16x64b, 16x128b, 16x256b, load and store | runs | - |
 | `repeat_counts` | `repeat_counts` | TM-06, TM-05 | every power-of-two repeat count up to 128 registers per thread exists (the build assembles them) and loads the cells the mapping names | runs | - |
-| `fresh_contents` | `fresh_contents` | TM-13 | tensor memory that was never written reads as zero, in a first launch and after a launch that wrote it | runs (64 finding(s)) | - |
+| `fresh_contents` | `fresh_contents` | TM-13 | tensor memory a launch wrote reads back; what a launch that only reads finds is recorded and not compared (a B200 kept the last launch's values) | runs (64 finding(s)) | - |
 | `cp_record` | `cp` | - | none: tcgen05.cp is outside v1 and refused. Records which shared bytes the four one-CTA shapes CUTLASS uses put in which (lane, column) | not run (no prediction) | fault |
 | `alloc_addresses` | `alloc` | TM-07 | alloc returns the lowest free block aligned to its size, as (lane 0, column) | runs | - |
-| `alloc_increasing` | `alloc increasing` | TM-08 | a later allocation may not be larger than an earlier one | **refuses**: tcgen05.alloc of 64 columns increases the previous allocation size of 32 columns | fault |
+| `alloc_increasing` | `alloc increasing` | TM-08 | a later allocation may not be larger than an earlier one | runs (1 finding(s)) | fault |
 | `alloc_addresses.size_48` | `alloc size-48` | TM-07 | an allocation of 48 columns is refused | **refuses**: tcgen05.alloc of 48 columns; the count must be a power of two from 32 to 512 | fault |
 | `alloc_addresses.size_16` | `alloc size-16` | TM-07 | an allocation of 16 columns is refused | **refuses**: tcgen05.alloc of 16 columns; the count must be a power of two from 32 to 512 | fault |
 | `alloc_addresses.size_0` | `alloc size-0` | TM-07 | an allocation of 0 columns is refused | **refuses**: tcgen05.alloc of 0 columns; the count must be a power of two from 32 to 512 | fault |
 | `alloc_addresses.size_1024` | `alloc size-1024` | TM-07 | an allocation of 1024 columns is refused | **refuses**: tcgen05.alloc of 1024 columns; the count must be a power of two from 32 to 512 | fault |
 | `alloc_after_relinquish` | `alloc after-relinquish` | TM-09 | no allocation after relinquish_alloc_permit | **refuses**: tcgen05.alloc after this CTA relinquished its allocation permit | fault |
 | `alloc_blocks` | `alloc exhaust` | TM-10 | an allocation that does not fit waits (here: forever) | **refuses**: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them | hang |
-| `dealloc_repeated` | `alloc dealloc-twice` | TM-11 | a second dealloc of the same columns is ignored | runs (1 finding(s)) | hang |
+| `dealloc_repeated` | `alloc dealloc-twice` | TM-11 | a second dealloc of the same columns is ignored (a B200 ended this kernel, and ran the book's, which repeat it from other warps: open) | runs (1 finding(s)) | hang |
 | `dealloc_mismatch` | `alloc dealloc-wrong-size` | TM-12 | a dealloc with another size than the allocation's is refused | **refuses**: tcgen05.dealloc of 32 columns at column 0 does not match an allocation | hang |
-| `alloc_leak` | `alloc leak` | - | columns never released are reported and do not affect the next launch | runs (1 finding(s)) | hang |
+| `alloc_leak` | `alloc leak` | - | columns never released fail the launch (cudaErrorTensorMemoryLeak) | **refuses**: kernel `tmem_alloc_script` returned with tensor memory still allocated: 256 tensor-memory columns allocated here were ne | hang |
 
 ### `mma/`
 
@@ -359,7 +362,8 @@ run is isolated for that reason.
 | `multicast` | `multicast` | CL-07 | a multicast load writes the box in every CTA of the mask and completes each one's mbarrier | runs | - |
 | `multicast.outside` | `multicast outside` | CL-07 | a mask naming a rank outside the cluster is refused | **refuses**: CTA rank 4 does not exist in a cluster of 4 CTA(s) | fault |
 | `pair_accounting` | `pair_accounting` | CL-08 | with .cta_group::2 a pair's completions go to the member with the mbarrier address's parity | runs (3 finding(s)) | - |
-| `max_size` | `max_size` | CL-02 | clusters of 8 and 16 CTAs launch and one of 32 is refused, with 1 KiB and with the most shared memory per CTA | runs | - |
+| `max_size` | `max_size` | CL-02 | without the non-portable attribute a cluster of 8 CTAs launches and those of 16 and 32 are refused, with 1 KiB and with the most shared memory per CTA | runs | - |
+| `max_size.nonportable` | `max_size nonportable` | CL-02 | with cudaFuncAttributeNonPortableClusterSizeAllowed clusters of 8 and 16 CTAs launch and one of 32 is refused | runs | - |
 | `address_dump` | `address_dump` | CL-05 | mapa addresses each rank's copy of a shared symbol; in the simulator's encoding clearing bit 24 names the even member of a pair | runs | - |
 | `remote_arrive` | `remote_arrive` | CL-06 | mbarrier.arrive.shared::cluster on a mapa address counts on the target CTA's mbarrier | runs | - |
 | `pair_mma.m256_issuer0` | `pair_mma 256 0` | CL-10, CL-13, CL-09 | two-CTA MMA, M = 256, issued by rank 0: each CTA holds 128 rows on 128 lanes | runs | hang |

@@ -2,7 +2,7 @@
 
 **Understand a Blackwell GPU by watching it run, on your CPU.**
 
-> Status: M0 to M6 done (2026-11-23), with gaps recorded in docs/m1.md to docs/m6.md. Nothing Blackwell-specific has run on Blackwell hardware. What remains before v1.0 and before a hardware run is in section 11.
+> Status: M0 to M6 done (2026-11-23), with gaps recorded in docs/m1.md to docs/m6.md. The probe suites ran on a rented B200 on 2026-11-25 (docs/b200-rental-1.md): most claims held, about ten did not and are fixed on the branch `work/b200-rental-1`; those fixes still need a second run to confirm them. What remains before v1.0 is in section 11.
 > GitHub description: *Understand a Blackwell GPU by watching it run, on your CPU.*
 > Topics: `cuda` `gpu` `blackwell` `simulator` `ptx` `cutlass` `triton` `tensor-cores` `gpu-programming`
 
@@ -121,7 +121,8 @@ Target users:
 form by form in `docs/coverage.md`, is the v1 surface. Nothing is added to it before v1.0;
 a result from the B200 run can change how an instruction in it behaves, not which
 instructions are in it. Anything outside it is a hard error that names the instruction,
-never something else run in its place. Three points that were open are settled as follows:
+never something else run in its place. Three points that were open are settled as follows
+(and one amendment was made by the owner on 2026-11-25, after the list):
 
 - **Descriptor base offset: 0 only.** The 3-bit matrix base offset of the shared-memory
   descriptor (bits 49-51) must be 0; a non-zero field is refused. CUTLASS and CuTe never set
@@ -140,6 +141,17 @@ never something else run in its place. Three points that were open are settled a
 - **`tcgen05.cp` is v2**, with the block-scaled formats it serves (section 10). It was
   listed here for M5 and never implemented; it is refused by name.
   `validation/blackwell/tmem/cp.cu` records what the one-CTA forms copy, for that later work.
+
+**Amendment (owner, 2026-11-25): two forms added, for CUTLASS's `fp16_gemm_0.py`.** The
+kernel of that CuTe DSL tutorial, the one with TMA that row RT-11 captured on the B200,
+uses `tcgen05.mma` with `.collector::a::discard` and `cvt.rn.f16x2.f32`. A tutorial of
+CUTLASS's own Blackwell set that stops at an unsupported instruction is not a scope worth
+keeping frozen, and both forms are small and now rest on hardware: `discard` is what an MMA
+without the modifier does, and the packed conversion's operand order is the one with which
+the captured launch replays byte for byte against the GPU (the other order leaves 129,920
+of 131,072 elements wrong). The collector forms that keep operand A (`fill`, `use`,
+`lastuse`) stay out, as does every other `x2` conversion that is not already listed. The
+freeze stands for everything else.
 
 Also out of v1, as before (`docs/coverage.md`, `docs/guide.md` "Instructions not
 implemented"): MMA kinds other than `f16` and `tf32`, operand A from tensor memory,
@@ -183,7 +195,7 @@ Each finding is reported with the PTX line, the warp/lane, and a short explanati
   - warp issue slots (4 sub-partitions per SM).
 - **GPU configs** in YAML (`configs/b200.yaml`, `configs/b300.yaml`): SM count, clock, HBM bandwidth and capacity, L2 size, SMEM/TMEM sizes, Tensor Core rates. Values come from public specs and microbenchmark papers (e.g. [arXiv 2512.02189](https://arxiv.org/pdf/2512.02189)), with a `source:` field on every number.
 - **Outputs:**
-  - a Perfetto/Chrome trace with tracks per warp, TMA, Tensor Core, and HBM, plus mbarrier phase flips as instant events and counters for bytes in flight;
+  - a Perfetto/Chrome trace with tracks per warp, TMA, Tensor Core, and HBM (the busy time of one SM's share; L2 likewise), plus mbarrier phase flips as instant events on a track per barrier and counters for bytes in flight;
   - a summary table of utilization per resource and the bottleneck verdict;
   - roofline placement.
 
@@ -563,6 +575,59 @@ Found by this work in the simulator, and fixed since unless marked open:
   on the 3080 Ti. `ncu` also counts two wavefronts per warp and one per CTA
   per `__syncthreads()` (`validation/README.md`, "The wavefront offset"). The
   Blackwell `ncu` run now only has to check that the same rule holds there.
+
+### After the first rental (2026-11-25)
+
+The run of steps E19 to E22 happened: one B200, driver 610.57.04 (CUDA 13.3, so
+the fallback toolkit, and a second pass with the pinned one), about the two
+hours budgeted. `docs/b200-rental-1.md` is the record; the outputs that
+differed from a prediction are in `validation/blackwell/measured/b200/` and
+`validation/blackwell_timing/measured/b200/`.
+
+- Held on hardware: 88 of 126 probe runs identical to the prediction, every
+  Ampere golden file reproduced on the B200, the four CUTLASS tutorials, Triton
+  and the TIRx and CuTe DSL scripts bit-identical or inside their tolerance,
+  the bank-conflict counters equal to `ncu`'s, and the capture of row RT-11.
+- Did not hold, and changed since: the arithmetic of `tcgen05.mma` (one sum,
+  lined up and cut toward zero; `kind::tf32` drops operand bits), when a phase
+  with a byte count completes under a TMA copy, the NaN of the TMA fill and of
+  `cvt.rn/.rz.tf32`, the non-portable cluster attribute above 8 CTAs, the
+  reported maximum of dynamic shared memory, and five cases a GPU ends the
+  kernel for where the simulator went on. With the new arithmetic the book's
+  nine kernels replay bit for bit against the day's captures.
+- The timing model has a fit of that run
+  (`validation/blackwell_timing/measured/b200/calibrated.yaml`), **not yet
+  applied** to `warplens/configs/b200.yaml`. Applied, it moves 45 of 152
+  benchmark configurations to within 10 % of the measurement (from 5) and 104
+  to within a factor of two (from 53), breaks the ordering TIM-18 asks for by
+  a hair, and changes the guide's worked examples; and it shows where one
+  parameter per mechanism cannot follow the GPU (`docs/b200-rental-1.md`,
+  "The timing config is a decision").
+
+Owed before v1.0 because of it:
+
+- **A second rental** (4 GPU-hours are in reserve): the changed predictions of
+  bit-exact and tolerance rows have to be confirmed, and three constants in
+  the fixes are assumptions that new probe runs measure
+  (`docs/b200-rental-1.md`, "What the second rental has to confirm").
+- Done since: the decoder of driver-format tensor maps, from the encoder
+  sweep (`warplens/host/tensor_map.py:decode_driver`), and the two instruction
+  forms the RT-11 kernel needed (section 3.5, the amendment). The capture
+  replays byte for byte against the B200
+  (`validation/blackwell/e2e/replay_launch.py`; `tests/test_rt11_replay.py`
+  with `WARPLENS_RT11_CAPTURE`).
+- Not done: `fp16_gemm_0.py` as a script under `warplens run`. Its kernel
+  runs; the script holds its arrays in PyTorch, which does not work without a
+  GPU, so what was replayed is the launch, not the program. And the capture is
+  not a committed fixture: it is 42 MB, and its PTX is CUTLASS's code compiled,
+  which wants a decision on carrying it.
+- **A decision on the timing config**: take the fit as it is and rewrite what
+  depends on the assumed values, or first give the model what the fit says it
+  lacks (a CLC latency per form of the request, the cost of an mbarrier
+  wake-up) and fit again.
+- Open and recorded, not blocking: the repeated `tcgen05.dealloc` (TM-11),
+  NUM-05 (no UE4M3 conversion in ptxas 13.3 or 13.5), the self-test's 24
+  failures under the fallback toolkit, of which not all were read.
 
 ### Still owed for v1.0 besides the above
 

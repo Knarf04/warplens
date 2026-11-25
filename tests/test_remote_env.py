@@ -29,6 +29,8 @@ SCRIPTS = ["lib.sh", "setup.sh", "preflight.sh", "run.sh", "predict_toolkit.sh"]
 # Recorded: the line of `nvidia-smi` that names the driver, and what ncu printed as a normal user.
 SMI_HEADER_3080TI = ("| NVIDIA-SMI 580.173.02             Driver Version: 580.173.02     "
                      "CUDA Version: 13.0     |")
+SMI_HEADER_B200_R610 = ("| NVIDIA-SMI 610.57.04              KMD Version: 610.57.04     "
+                       "CUDA UMD Version: 13.3     |")
 NCU_PERMISSION = ("==ERROR== ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA GPU "
                   "Performance Counters on the target device 0. For instructions on enabling permissions "
                   "and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM")
@@ -272,10 +274,18 @@ def test_preflight_without_a_driver_fails(tmp_path):
 # Driver and toolkit
 # ---------------------------------------------------------------------------------------------
 
-def test_driver_versions_from_nvidia_smi_text():
-    assert lib("parse_smi_cuda_version", SMI_HEADER_3080TI) == "13.0"
-    assert lib("parse_smi_driver_version", SMI_HEADER_3080TI) == "580.173.02"
+@pytest.mark.parametrize("header,cuda,driver", [
+    (SMI_HEADER_3080TI, "13.0", "580.173.02"),
+    (SMI_HEADER_B200_R610, "13.3", "610.57.04"),
+])
+def test_driver_versions_from_nvidia_smi_text(header, cuda, driver):
+    assert lib("parse_smi_cuda_version", header) == cuda
+    assert lib("parse_smi_driver_version", header) == driver
+
+
+def test_driver_versions_from_failed_nvidia_smi():
     assert lib("parse_smi_cuda_version", "NVIDIA-SMI has failed") == ""
+    assert lib("parse_smi_driver_version", "NVIDIA-SMI has failed") == ""
 
 
 @pytest.mark.parametrize("driver,mode,toolkit,status", [

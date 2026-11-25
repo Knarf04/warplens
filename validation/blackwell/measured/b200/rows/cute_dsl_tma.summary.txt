@@ -1,0 +1,21 @@
+RT-11 capture: COMPLETE
+34 file(s), 43902288 bytes; checksums in capture.sha256
+
+module 0 (cuLibraryLoadData, fatbin): module00.bin, 35664 bytes, sha256 7f0a2bfb44d59647bc405b4486cfd3358a5825f55c350927327f16a4484d7a1c
+module 1 (cuLibraryLoadData, wrapped fatbin): not kept (linked into a library (WARPLENS_TRACE_MODULE_SKIP_WRAPPED)), 1034552 bytes
+module 2 (cuLibraryLoadData, wrapped fatbin): not kept (linked into a library (WARPLENS_TRACE_MODULE_SKIP_WRAPPED)), 6200 bytes
+module 3 (cuLibraryLoadData, wrapped fatbin): not kept (linked into a library (WARPLENS_TRACE_MODULE_SKIP_WRAPPED)), 5056 bytes
+module 4 (cuLibraryLoadData, elf): module04.bin, 2448048 bytes, sha256 8041d89b7182444e1aadd2563df4579d052d31b134b07113811f4893fd363de1
+module 5 (cuLibraryLoadData, elf): module05.bin, 12760128 bytes, sha256 446129e1bf7d281b606685baa7a437ed545bbb0eb6cd2463aea9072409397907
+module 6 (cuLibraryLoadData, elf): module06.bin, 11962168 bytes, sha256 b607a91d0a0069c56357513e88c2fab1e33abda033be231f28ef358153d03957
+module 7 (cuLibraryLoadData, elf): module07.bin, 12295824 bytes, sha256 28db473f4ef43bee6aca6abf44e9df5cee8d513738eed6e9931c1b3e8ba4096b
+module 8 (cuLibraryLoadData, wrapped fatbin): not kept (linked into a library (WARPLENS_TRACE_MODULE_SKIP_WRAPPED)), 5040 bytes
+module 9 (cuModuleLoadFatBinary, fatbin): module09.bin, 73560 bytes, sha256 977d468a73225753264d453c44f7f18d3cd9e5fa1af18a9713a2fe482ae05019
+dsl_dump/cutlass_host_function_Tensorgmemodiv512i64div5121_Tensorgmemodiv512i64div5121_Tensorgmemodiv512i64div5121.sm_100a.cubin: its bytes are inside module00.bin: the DSL's dump is the code the driver was handed
+launch 0: cuLaunchKernelEx kernel=kernel_cutlass_kernel_TiledMMA_ThrLayoutVMNK11110000_PermutationMNK____MMAAtom_ThrID10_ShapeMNK12825616_TVLayoutA1128161281128_TVLayoutB1256162561256_TVLayoutC11282561281128_CopyAtom_ThrI_0 grid=[2, 2, 1] block=[128, 1, 1] parameter sizes=[32, 128, 8, 128, 8, 24]
+  module: looked up in a saved module; name in module00.bin
+  PTX: dsl_dump/cutlass_host_function_Tensorgmemodiv512i64div5121_Tensorgmemodiv512i64div5121_Tensorgmemodiv512i64div5121.sm_100a.ptx
+  parameter 1 offset 0: 0x7ffc5d000000 = allocation 0x7ffc5d000000 + 0 (2097152 bytes, known from: followed); before mem/f5d5144b41eddd9230184c865020d55ac60bfd1d76eb25dbb9be47e461bc9856.bin, after mem/86a0b736e9329687cd667aa0bf538c20dbb4c1d3ddfb23f35e539d923ba97d3b.bin
+  parameter 3 offset 0: 0x7ffc5d040000 = allocation 0x7ffc5d000000 + 262144 (2097152 bytes, known from: followed); before mem/f5d5144b41eddd9230184c865020d55ac60bfd1d76eb25dbb9be47e461bc9856.bin, after mem/86a0b736e9329687cd667aa0bf538c20dbb4c1d3ddfb23f35e539d923ba97d3b.bin
+  parameter 5 offset 0: 0x7ffc5d0c0000 = allocation 0x7ffc5d000000 + 786432 (2097152 bytes, known from: followed); before mem/f5d5144b41eddd9230184c865020d55ac60bfd1d76eb25dbb9be47e461bc9856.bin, after mem/86a0b736e9329687cd667aa0bf538c20dbb4c1d3ddfb23f35e539d923ba97d3b.bin
+  changed by the kernel: 0x7ffc5d000000

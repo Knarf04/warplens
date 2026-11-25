@@ -1,0 +1,1 @@
+KERNEL FAILED: tma_store: cudaErrorIllegalInstruction at synchronize (an illegal instruction was encountered)

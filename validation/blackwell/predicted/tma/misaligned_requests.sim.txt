@@ -1,6 +1,6 @@
 status: exit 3
 warplens: TMA innermost coordinate must give a 16-byte aligned bounding box (coordinate 1, element size 4)
-  at module0.ptx:135: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r51], [%rd13, {%r15, %r16}], [%r52];
+  at module0.ptx:136: cp.async.bulk.tensor.2d.shared::cluster.global.mbarrier::complete_tx::bytes [%r53], [%rd13, {%r16, %r17}], [%r54];
   in kernel `tma_dump`, CTA (0, 0, 0), warp 0
   lane 0 (thread (0, 0, 0))
 KERNEL FAILED: tma_dump: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)

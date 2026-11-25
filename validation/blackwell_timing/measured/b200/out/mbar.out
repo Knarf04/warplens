@@ -1,0 +1,23 @@
+DEVICE bench=mbar name=NVIDIA_B200 cc=10.0 sm_count=148 total_mem_bytes=191490555904 free_mem_bytes=190834475008 bench_clock=1 sim=0 trials=5 scale=1 synthetic=0 smem_per_sm_bytes=233472 max_threads_per_sm=2048 max_blocks_per_sm=32
+BENCH id=mbar/arrive_wait/threads=1 reps=1000000 trial=-1 event_ns=32723583 wall_ns=32734360 clk=64250102 check=1000000
+BENCH id=mbar/arrive_wait/threads=1 reps=1000000 trial=0 event_ns=32707905 wall_ns=32718425 clk=64250103 check=1000000
+BENCH id=mbar/arrive_wait/threads=1 reps=2000000 trial=0 event_ns=65401604 wall_ns=65411693 clk=128500103 check=2000000
+BENCH id=mbar/arrive_wait/threads=1 reps=1000000 trial=1 event_ns=32705631 wall_ns=32715435 clk=64250103 check=1000000
+BENCH id=mbar/arrive_wait/threads=1 reps=2000000 trial=1 event_ns=65402115 wall_ns=65412472 clk=128500095 check=2000000
+BENCH id=mbar/arrive_wait/threads=1 reps=1000000 trial=2 event_ns=32703423 wall_ns=32713468 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=1 reps=2000000 trial=2 event_ns=65402786 wall_ns=65412576 clk=128500095 check=2000000
+BENCH id=mbar/arrive_wait/threads=1 reps=1000000 trial=3 event_ns=32701729 wall_ns=32720617 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=1 reps=2000000 trial=3 event_ns=65410622 wall_ns=65432534 clk=128500095 check=2000000
+BENCH id=mbar/arrive_wait/threads=1 reps=1000000 trial=4 event_ns=32710785 wall_ns=32720977 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=1 reps=2000000 trial=4 event_ns=65401566 wall_ns=65414526 clk=128500095 check=2000000
+BENCH id=mbar/arrive_wait/threads=32 reps=1000000 trial=-1 event_ns=32705921 wall_ns=32716799 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=32 reps=1000000 trial=0 event_ns=32701759 wall_ns=32712398 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=32 reps=2000000 trial=0 event_ns=65400192 wall_ns=65409876 clk=128500095 check=2000000
+BENCH id=mbar/arrive_wait/threads=32 reps=1000000 trial=1 event_ns=32702240 wall_ns=32712298 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=32 reps=2000000 trial=1 event_ns=65400063 wall_ns=65410229 clk=128500095 check=2000000
+BENCH id=mbar/arrive_wait/threads=32 reps=1000000 trial=2 event_ns=32703136 wall_ns=32713670 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=32 reps=2000000 trial=2 event_ns=65399330 wall_ns=65409716 clk=128500095 check=2000000
+BENCH id=mbar/arrive_wait/threads=32 reps=1000000 trial=3 event_ns=32701599 wall_ns=32711686 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=32 reps=2000000 trial=3 event_ns=65400352 wall_ns=65410694 clk=128500095 check=2000000
+BENCH id=mbar/arrive_wait/threads=32 reps=1000000 trial=4 event_ns=32703136 wall_ns=32713142 clk=64250095 check=1000000
+BENCH id=mbar/arrive_wait/threads=32 reps=2000000 trial=4 event_ns=65400543 wall_ns=65410602 clk=128500095 check=2000000

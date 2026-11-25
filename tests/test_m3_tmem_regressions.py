@@ -98,9 +98,13 @@ def test_relinquished_permit_applies_to_later_allocations(sim):
                "tcgen05.relinquish_alloc_permit.cta_group::1.sync.aligned;" + ALLOC)
 
 
-def test_allocation_size_cannot_increase_even_after_free(sim):
-    with pytest.raises(warplens.ExecutionError, match="increases the previous allocation size"):
-        launch(sim, ALLOC + LOAD_BASE + FREE + ALLOC.replace("32;", "64;"))
+def test_an_allocation_larger_than_the_one_before_is_reported_and_made(sim):
+    """The PTX contract asks for sizes that do not increase; a B200 allocates all the same
+    (validation/blackwell/measured/b200/tmem/alloc_increasing.txt), so it is a finding. It
+    was an error while nothing had been measured."""
+    stats = launch(sim, ALLOC + LOAD_BASE + FREE + ALLOC.replace("32;", "64;") + LOAD_BASE + FREE.replace("32;", "64;"))
+    (finding,) = stats.findings
+    assert finding.kind == "tmem-alloc-increasing" and "64 columns after one of 32" in finding.message
 
 
 def test_equal_and_decreasing_allocations_remain_valid(sim):

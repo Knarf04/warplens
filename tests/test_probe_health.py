@@ -121,7 +121,7 @@ def test_rt11_runs_first_and_the_optional_rows_get_minutes(tmp_path, monkeypatch
 # ---------------------------------------------------------------------------------------------
 
 SAFE, FAULT_FIRST, FAULT, HANG, HANG_LATER = ("mbarrier/phase_parity", "mbarrier/complete_before_expect",
-                                              "mbarrier/over_arrival", "mbarrier/expect_tx_large", "tmem/alloc_leak")
+                                              "mbarrier/over_arrival", "mbarrier/expect_tx_large", "tmem/dealloc_repeated")
 
 
 @pytest.fixture
@@ -159,7 +159,7 @@ esac
 ''')
     script(root / "bin" / "mbarrier" / "expect_tx", f'echo "$1" >> {state}/calls\n'
            f'cat {predicted}/mbarrier/expect_tx_large.txt\nexit 3\n')
-    script(root / "bin" / "tmem" / "alloc", f'echo "$1" >> {state}/calls\ncat {predicted}/tmem/alloc_leak.txt\n')
+    script(root / "bin" / "tmem" / "alloc", f'echo "$1" >> {state}/calls\ncat {predicted}/tmem/dealloc_repeated.txt\n')
     nvcc = json.loads((SUITE / "predicted" / "provenance.json").read_text())["nvcc_version"]
     (root / "bin" / "toolkit.txt").write_text(f"nvcc_version={nvcc}\n")
     # The machine: a kernel log that names an Xid once the 'GPU' is dead, and an nvidia-smi.
@@ -223,7 +223,7 @@ def test_a_gpu_that_does_not_come_back_stops_the_run(suite):
     assert [row[0] for row in rows] == [SAFE, FAULT_FIRST, FAULT, HANG, HANG_LATER]      # every run has a line
     assert [row[1] for row in rows] == ["ok", "ok", "exit 3"] + [f"not run (GPU unhealthy after {FAULT})"] * 2
     calls = (state / "calls").read_text().split()
-    assert "wait-large" not in calls and "leak" not in calls                          # nothing was launched after it
+    assert "wait-large" not in calls and "dealloc-twice" not in calls                          # nothing was launched after it
     last = table(out / "health.tsv")[-1]
     assert last[0] == FAULT and last[1] == "host-error" and last[3] == "5" and last[5].startswith("GPU UNHEALTHY")
     flag = (out / "GPU-UNHEALTHY.txt").read_text()
@@ -253,7 +253,7 @@ def test_a_gpu_that_does_not_come_back_stops_the_run(suite):
     assert again.returncode == 0, again.stdout + again.stderr
     assert [row[1] for row in table(out / "status.tsv")] == ["ok", "ok", "exit 3", "exit 3", "ok"]
     calls = (state / "calls").read_text().split()
-    assert "over" not in calls and "negative" not in calls and {"wait-large", "leak"} <= set(calls)
+    assert "over" not in calls and "negative" not in calls and {"wait-large", "dealloc-twice"} <= set(calls)
     assert not (out / "GPU-UNHEALTHY.txt").exists()
 
 
@@ -300,7 +300,7 @@ def test_an_unreadable_kernel_log_is_said_once_and_fails_nothing(suite):
 
 
 def test_a_hang_that_is_predicted_to_finish_is_named_by_the_runner(suite):
-    """tmem/alloc_leak may hang by design, and the simulator predicts that it returns. A
+    """tmem/dealloc_repeated may hang by design, and the simulator predicts that it returns. A
     timeout is not a failed collection, but it is said, and the canary runs after it."""
     script(suite / "bin" / "tmem" / "alloc", "echo 'tmem_alloc_script: first case'\nsleep 60\n")
     done = run_all(suite, "--timeout-scale", "0.05", only=(SAFE, HANG_LATER))
@@ -310,7 +310,7 @@ def test_a_hang_that_is_predicted_to_finish_is_named_by_the_runner(suite):
     assert f"TIMED OUT, PREDICTED TO FINISH: {HANG_LATER}" in done.stdout
     assert "1 run(s) TIMED OUT, PREDICTED TO FINISH" in done.stdout
     assert [row[0] for row in table(out / "health.tsv")] == ["(start)", HANG_LATER]
-    assert (out / "tmem" / "alloc_leak.stdout").read_text() == "tmem_alloc_script: first case\n"
+    assert (out / "tmem" / "dealloc_repeated.stdout").read_text() == "tmem_alloc_script: first case\n"
     compared = compare(suite)
     line = next(l for l in compared.stdout.splitlines() if l.startswith(HANG_LATER + " "))
     assert "TIMED OUT, predicted to finish" in line and compared.returncode == 1
@@ -467,16 +467,19 @@ def test_a_timeout_is_as_predicted_only_where_the_simulator_predicts_a_deadlock(
     by_verdict = {}
     for name, (verdict, _) in verdicts.items():
         by_verdict.setdefault(verdict, set()).add(name)
-    assert by_verdict["timed out (as predicted)"] == {"mbarrier/expect_tx_small.wait", "mbarrier/expect_tx_large",
-                                                      "tmem/alloc_blocks"}
-    # No prediction (try_wait.incomplete), or the simulator predicts a refusal (dealloc_mismatch).
-    assert by_verdict["timed out (by design)"] == {"mbarrier/try_wait.incomplete", "tmem/dealloc_mismatch"}
+    # Not mbarrier/expect_tx_small.wait any more: a B200 returned from that wait, and so
+    # does the simulator since (the phase completes part of the way through the copy).
+    assert by_verdict["timed out (as predicted)"] == {"mbarrier/expect_tx_large", "tmem/alloc_blocks"}
+    # No prediction (try_wait.incomplete), or the simulator predicts a refusal (dealloc_mismatch)
+    # or a failed launch (alloc_leak, as a B200 reports it).
+    assert by_verdict["timed out (by design)"] == {"mbarrier/try_wait.incomplete", "tmem/dealloc_mismatch",
+                                                    "tmem/alloc_leak"}
     assert verdicts["mbarrier/try_wait.incomplete"][1] == "no prediction"
     assert verdicts["tmem/dealloc_mismatch"][1].startswith("simulator: tcgen05.dealloc of 32 columns")
     finish = by_verdict["TIMED OUT, predicted to finish"]
     assert finish == {f"cluster/pair_mma.m{m}_issuer{i}" for m in (256, 128) for i in (0, 1)} | {
-        "tmem/dealloc_repeated", "tmem/alloc_leak", "cluster/clc_failed_response.again",
-        "cluster/clc_failed_response.again_grid"}
+        "tmem/dealloc_repeated", "cluster/clc_failed_response.again",
+        "cluster/clc_failed_response.again_grid", "mbarrier/expect_tx_small.wait"}
     assert len(finish) == 8 and len(hang) == 13 and code == 1
     details = printed[printed.index("\nDetails\n"):]
     for name in finish:
@@ -506,9 +509,9 @@ def failed(label: str, error: str, where: str) -> str:
 
 def test_a_matching_failed_kernel_says_which_error_and_whether_the_simulator_models_it(tmp_path, monkeypatch, capsys):
     code, verdicts, _ = compared(tmp_path, monkeypatch, capsys, {
-        # The simulator names the rule (a larger allocation after a smaller one): a prediction.
-        "tmem/alloc_increasing": ("exit 3", None, failed("32 columns, then 64 (a larger allocation after a smaller one)",
-                                                         "cudaErrorIllegalInstruction", "at synchronize")),
+        # The simulator names the rule (a count that is not a power of two): a prediction.
+        "tmem/alloc_addresses.size_48": ("exit 3", None, failed("an allocation of 48 columns",
+                                                                "cudaErrorIllegalInstruction", "at synchronize")),
         # The simulator says "unsupported instruction": any fault of the GPU prints the same line.
         "tmem/lane_window.16": ("exit 3", None, failed("mma_dump", "cudaErrorIllegalAddress", "at synchronize")),
         "mma/operand_layouts.tf32_mn": ("exit 3", None, failed("mma_dump", "cudaErrorInvalidValue", "at launch")),
@@ -518,9 +521,9 @@ def test_a_matching_failed_kernel_says_which_error_and_whether_the_simulator_mod
         "mbarrier/init_count.zero": ("exit 3", None, ""),
     })
     assert code == 0                                                     # all of these may fault or hang by design
-    verdict, detail = verdicts["tmem/alloc_increasing"]
+    verdict, detail = verdicts["tmem/alloc_addresses.size_48"]
     assert verdict == "identical" and detail.startswith("both refuse the kernel; GPU: cudaErrorIllegalInstruction at "
-                                                        "synchronize; simulator: tcgen05.alloc of 64 columns")
+                                                        "synchronize; simulator: tcgen05.alloc of 48 columns")
     for name, error in (("tmem/lane_window.16", "cudaErrorIllegalAddress at synchronize"),
                         ("mma/operand_layouts.tf32_mn", "cudaErrorInvalidValue at launch")):
         verdict, detail = verdicts[name]
@@ -539,7 +542,7 @@ def test_the_simulators_own_run_is_identical_to_its_predictions(tmp_path, monkey
     """run_all.py --mode sim held against predicted/ (tests/test_predict_path.py does it whole):
     no GPU faulted there, and the refusals are the predictions themselves."""
     runs = {name: ("exit 3", None, (SUITE / "predicted" / (name + ".sim.txt")).read_text().split("\n", 1)[1])
-            for name in ("tmem/lane_window.16", "tmem/alloc_increasing", "tmem/alloc_blocks")}
+            for name in ("tmem/lane_window.16", "tmem/alloc_addresses.size_48", "tmem/alloc_blocks")}
     code, verdicts, _ = compared(tmp_path, monkeypatch, capsys, runs)
     assert code == 0 and {verdict for verdict, _ in verdicts.values()} == {"identical"}
     assert verdicts["tmem/lane_window.16"][1].startswith("a simulator's run, refusing the kernel as predicted (unsupported")
@@ -563,11 +566,13 @@ def test_a_failed_kernel_without_a_prediction_is_not_plain_informational(tmp_pat
 
 
 def test_a_failed_kernel_that_the_simulator_runs_is_a_difference(tmp_path, monkeypatch, capsys):
-    text = "KERNEL FAILED: tma_store\ninfo: error cudaErrorIllegalAddress\n"
+    # A repeated dealloc: the simulator ignores it and goes on, and a B200 ended the kernel.
+    text = "script: release the same allocation twice\nKERNEL FAILED: release the same allocation twice\n"
     code, verdicts, printed = compared(tmp_path, monkeypatch, capsys, {
-        "tma/store_wait_group.edge": ("exit 3", text, failed("tma_store", "cudaErrorIllegalAddress", "at synchronize"))})
-    assert verdicts["tma/store_wait_group.edge"] == (
-        "kernel failed (by design)", "GPU: cudaErrorIllegalAddress at synchronize; the simulator's kernel returns")
+        "tmem/dealloc_repeated": ("exit 3", text, failed("release the same allocation twice",
+                                                         "cudaErrorLaunchFailure", "at synchronize"))})
+    assert verdicts["tmem/dealloc_repeated"] == (
+        "kernel failed (by design)", "GPU: cudaErrorLaunchFailure at synchronize; the simulator's kernel returns")
     assert code == 0 and "the GPU reported a failed kernel; outputs differ" in printed
 
 

@@ -1,6 +1,8 @@
-status: ok
-warplens: 4 kernel launch(es) simulated on B200, 0 finding(s)
-  tma_store: 1 CTA(s), 298 warp-instructions
-  tma_store: 1 CTA(s), 298 warp-instructions
-  tma_store: 1 CTA(s), 298 warp-instructions
+status: exit 3
+warplens: a TMA store at coordinates (0, -2) starts outside the tensor: a store may hang over the far edge but not start before the first element of a dimension. A GPU ends the kernel here with cudaErrorIllegalInstruction
+  at module0.ptx:104: cp.async.bulk.tensor.2d.global.shared::cta.bulk_group [%rd2, {%r30, %r31}], [%r29];
+  in kernel `tma_store`, CTA (0, 0, 0), warp 0
+  lane 0 (thread (0, 0, 0))
+KERNEL FAILED: tma_store: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
+warplens: 1 kernel launch(es) simulated on B200, 0 finding(s)
   tma_store: 1 CTA(s), 298 warp-instructions

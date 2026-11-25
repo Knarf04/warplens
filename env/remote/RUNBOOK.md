@@ -7,7 +7,9 @@ section 11).
 What the statements below rest on is marked: **measured** means on the
 development machine (RTX 3080 Ti Laptop, driver 580.173.02, Ubuntu 24.04, on
 2026-11-23), **documented** means NVIDIA says so at the link given, **guess**
-means neither. Nothing here has run on a B200.
+means neither. This was written before anything had run on a B200; the first
+rental (2026-11-25) is in `docs/b200-rental-1.md`, and section 10 has what it
+showed about this runbook.
 
 | File | What it does |
 | --- | --- |
@@ -1181,3 +1183,43 @@ Not tried, because there was no way to here:
 - `predict_toolkit.sh` with a toolkit between 13.1 and 13.4 (13.0.88 was run, above).
 - A driver newer than the pinned toolkit, and a 12.x driver (only a 12.8
   *toolkit* on a 13.0 driver).
+
+## 10. What the first rental showed about this runbook
+
+2026-11-25, one B200 on a VM, driver 610.57.04 (`docs/b200-rental-1.md`).
+
+Worked as written: the bundle, `preflight.sh`, the toolkit fallback (the driver
+supported CUDA 13.3: nvcc 13.3.73, the predictions made again before the GPU
+stages, in 4 minutes), `ncu` as a normal user (`RmProfilingAdminOnly=0`), the
+order inside `run-blackwell` (33 runs faulted or timed out by design and the
+canary came back every time), `--toolkit pinned` into a second home for "the
+one deviation worth its time" (15 minutes with its setup), and resuming: the
+VM was stopped from outside three times and `run.sh` took up where it was.
+
+Did not, and what to do the next time:
+
+- **R610's `nvidia-smi` header** says `KMD Version` and `CUDA UMD Version`.
+  `lib.sh` reads both forms since; before that preflight saw no driver.
+- **RT-11 failed in the first pass**: the tutorial's reference result is a
+  cuBLAS kernel with an unmangled name, which the capture took for a DSL
+  kernel. Fixed in `cute_dsl_tma.py`.
+- **With a 13.3 toolkit `run-blackwell` fails for a reason that is the
+  toolkit's**: `formats/e8m0_ties` and `formats/special_inputs` stop at a
+  device-side assert in that release's `cuda_fp8.hpp`. The pinned pass is what
+  runs them. On a driver below 13.5, plan for both passes from the start.
+- **An instance that the provider may stop** (a preemptible one, or a stop
+  from its console) costs more clock than the price saves: three stops added
+  about forty minutes here. Section 2's list should have asked for it; ask.
+- **A stop in the middle of an install leaves files that pass for installed.**
+  The second home's PyTorch env crashed with a bus error after one. Remove
+  the home (`rm -rf $WARPLENS_REMOTE_HOME`) and run `setup.sh` again: a
+  re-run over the remains does not repair it.
+- **Copy each archive home as soon as `run.sh` prints it**, not at the end:
+  the machine was unreachable for the last copy and the disk had to be
+  mounted on another VM.
+- **The pinned pass's `ncu`** profiled 10 of 11 benchmarks (`transpose`
+  failed, `ncu` exit 1); the fallback pass had all 11. Not looked into.
+- The self-test under a fallback toolkit: 20 failed, 4 errors. Those read
+  are the compiler's (the two E8M0 predictions, `.version 9.5` fixtures that
+  ptxas 13.3 refuses, timing instruction counts) or tests that assume no
+  `ncu` is installed. `--skip selftest` loses nothing a measurement needs.

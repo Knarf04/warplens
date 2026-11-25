@@ -1,0 +1,12 @@
+DEVICE bench=gstream name=NVIDIA_B200 cc=10.0 sm_count=148 total_mem_bytes=191490555904 free_mem_bytes=190834475008 bench_clock=1 sim=0 trials=5 scale=1 synthetic=0 smem_per_sm_bytes=233472 max_threads_per_sm=2048 max_blocks_per_sm=32
+BENCH id=gstream/triad norm=24 reps=134217728 trial=-1 event_ns=544640 wall_ns=555606 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=0 event_ns=527136 wall_ns=537052 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=0 event_ns=1048544 wall_ns=1058190 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=1 event_ns=525760 wall_ns=535177 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=1 event_ns=1048480 wall_ns=1058756 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=2 event_ns=526272 wall_ns=536169 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=2 event_ns=1047488 wall_ns=1058103 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=3 event_ns=523776 wall_ns=533627 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=3 event_ns=1046912 wall_ns=1057795 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=134217728 trial=4 event_ns=524256 wall_ns=534082 clk=0 check=0
+BENCH id=gstream/triad norm=24 reps=268435456 trial=4 event_ns=1047616 wall_ns=1058174 clk=0 check=0

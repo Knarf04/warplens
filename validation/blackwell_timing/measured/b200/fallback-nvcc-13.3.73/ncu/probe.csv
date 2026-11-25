@@ -1,0 +1,46 @@
+==PROF== Connected to process 89992 (/home/ubuntu/warplens/validation/blackwell_timing/bin/hw/launch)
+DEVICE bench=launch name=NVIDIA_B200 cc=10.0 sm_count=148 total_mem_bytes=191490555904 free_mem_bytes=190691868672 bench_clock=1 sim=0 trials=1 scale=1 synthetic=0 smem_per_sm_bytes=233472 max_threads_per_sm=2048 max_blocks_per_sm=32
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=-1 event_ns=240576 wall_ns=266986 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=0 event_ns=55232 wall_ns=67389 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=1 event_ns=48384 wall_ns=60155 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=2 event_ns=49440 wall_ns=61203 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=3 event_ns=49056 wall_ns=60867 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=4 event_ns=67296 wall_ns=78960 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=5 event_ns=56576 wall_ns=68774 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=6 event_ns=55680 wall_ns=67666 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=7 event_ns=45376 wall_ns=56582 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=8 event_ns=46816 wall_ns=58180 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=9 event_ns=51136 wall_ns=62230 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=10 event_ns=46144 wall_ns=57206 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=11 event_ns=46592 wall_ns=57779 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=12 event_ns=47232 wall_ns=58393 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=13 event_ns=47040 wall_ns=64161 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=14 event_ns=44448 wall_ns=55848 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=15 event_ns=43904 wall_ns=55766 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=16 event_ns=53728 wall_ns=65100 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=17 event_ns=44128 wall_ns=55519 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=18 event_ns=46208 wall_ns=57679 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=19 event_ns=42624 wall_ns=53445 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=20 event_ns=43776 wall_ns=54947 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=21 event_ns=44832 wall_ns=56092 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=22 event_ns=42272 wall_ns=53382 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=23 event_ns=45824 wall_ns=57408 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=24 event_ns=48320 wall_ns=59730 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=25 event_ns=47104 wall_ns=58581 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=26 event_ns=55584 wall_ns=67238 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=27 event_ns=51712 wall_ns=63287 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=28 event_ns=56608 wall_ns=67975 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=29 event_ns=48384 wall_ns=60218 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=30 event_ns=49120 wall_ns=60980 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=31 event_ns=53088 wall_ns=65460 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=32 event_ns=55008 wall_ns=67094 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=33 event_ns=48384 wall_ns=59774 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=34 event_ns=51488 wall_ns=63152 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=35 event_ns=48288 wall_ns=60077 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=36 event_ns=50240 wall_ns=62007 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=37 event_ns=49760 wall_ns=61432 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=38 event_ns=57248 wall_ns=69108 clk=0 check=1
+BENCH id=launch/empty/ctas=1 nctas=1 reps=0 trial=39 event_ns=48384 wall_ns=60543 clk=0 check=1
+==PROF== Disconnected from process 89992
+"ID","Process ID","Process Name","Host Name","Kernel Name","Context","Stream","Block Size","Grid Size","Device","CC","Section Name","Metric Name","Metric Unit","Metric Value"
+"0","89992","launch","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","76960020720"

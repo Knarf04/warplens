@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1016" height="278" font-family="sans-serif" font-size="11" fill="#222222">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<line x1="190.00" y1="8" x2="190.00" y2="182" stroke="#e1e0d9"/>
+<text x="190.00" y="195" text-anchor="middle" fill="#666666">0 ns</text>
+<line x1="388.02" y1="8" x2="388.02" y2="182" stroke="#e1e0d9"/>
+<text x="388.02" y="195" text-anchor="middle" fill="#666666">100</text>
+<line x1="586.03" y1="8" x2="586.03" y2="182" stroke="#e1e0d9"/>
+<text x="586.03" y="195" text-anchor="middle" fill="#666666">200</text>
+<line x1="784.05" y1="8" x2="784.05" y2="182" stroke="#e1e0d9"/>
+<text x="784.05" y="195" text-anchor="middle" fill="#666666">300</text>
+<line x1="982.06" y1="8" x2="982.06" y2="182" stroke="#e1e0d9"/>
+<text x="982.06" y="195" text-anchor="middle" fill="#666666">400</text>
+<text x="182" y="21" text-anchor="end">warp 0</text>
+<rect x="190" y="8" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="43" text-anchor="end">warp 1</text>
+<rect x="190" y="30" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="65" text-anchor="end">warp 2</text>
+<rect x="190" y="52" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="87" text-anchor="end">warp 3</text>
+<rect x="190" y="74" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="109" text-anchor="end">TMA engine</text>
+<rect x="190" y="96" width="810" height="17" fill="#f4f4f2"/>
+<text x="182" y="131" text-anchor="end">HBM</text>
+<rect x="190" y="118" width="810" height="17" fill="#f4f4f2"/>
+<rect x="226.96" y="118" width="144.94" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM fetch: 19 to 92 ns, bytes=2048, line=73</title></rect>
+<text x="299.43" y="130" text-anchor="middle" font-size="10" fill="#0b0b0b" pointer-events="none">fetch</text>
+<rect x="654.40" y="118" width="144.94" height="17" fill="#eda100" stroke="#ffffff" stroke-width="0.5"><title>HBM, HBM write: 235 to 308 ns, bytes=2048, line=117</title></rect>
+<text x="726.87" y="130" text-anchor="middle" font-size="10" fill="#0b0b0b" pointer-events="none">write</text>
+<rect x="226.96" y="96" width="342.96" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA load, reports to mbarrier A (shared offset 8192): 19 to 192 ns, bytes=2048, issued_ns=19, line=73, from_hbm=2048</title></rect>
+<text x="398.44" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">load →A</text>
+<rect x="654.40" y="96" width="342.96" height="17" fill="#1baf7a" stroke="#ffffff" stroke-width="0.5"><title>TMA engine, TMA store: 235 to 408 ns, bytes=2048, issued_ns=235, line=117, to_hbm=2048</title></rect>
+<text x="825.88" y="108" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">store</text>
+<rect x="190.00" y="8" width="26.40" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 0 to 13 ns</title></rect>
+<rect x="216.40" y="8" width="18.48" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 13 to 23 ns</title></rect>
+<rect x="234.88" y="8" width="335.03" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: mbarrier A0 (phase 0 of the mbarrier at shared offset 8192): 23 to 192 ns, line=84, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r13], %r14;</title></rect>
+<text x="402.40" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">A0</text>
+<rect x="569.92" y="8" width="73.93" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 192 to 229 ns</title></rect>
+<rect x="643.84" y="8" width="7.92" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: barrier: 229 to 233 ns, line=113, instruction=bar.sync 0;</title></rect>
+<rect x="651.76" y="8" width="9.24" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 233 to 238 ns</title></rect>
+<rect x="661.01" y="8" width="336.35" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 0, wait: bulk group: 238 to 408 ns, line=127, instruction=cp.async.bulk.wait_group.read 0;</title></rect>
+<text x="829.18" y="20" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">bulk group</text>
+<rect x="997.36" y="8" width="2.64" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 0, run: 408 to 409 ns</title></rect>
+<rect x="190.00" y="30" width="21.12" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 0 to 11 ns</title></rect>
+<rect x="211.12" y="30" width="5.28" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: barrier: 11 to 13 ns, line=56, instruction=bar.sync 0;</title></rect>
+<rect x="216.40" y="30" width="7.92" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 13 to 17 ns</title></rect>
+<rect x="224.32" y="30" width="345.60" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: mbarrier A0 (phase 0 of the mbarrier at shared offset 8192): 17 to 192 ns, line=84, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r13], %r14;</title></rect>
+<text x="397.12" y="42" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">A0</text>
+<rect x="569.92" y="30" width="79.21" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 192 to 232 ns</title></rect>
+<rect x="649.12" y="30" width="2.64" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 1, wait: barrier: 232 to 233 ns, line=113, instruction=bar.sync 0;</title></rect>
+<rect x="651.76" y="30" width="2.64" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 1, run: 233 to 235 ns</title></rect>
+<rect x="190.00" y="52" width="21.12" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 0 to 11 ns</title></rect>
+<rect x="211.12" y="52" width="5.28" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 2, wait: barrier: 11 to 13 ns, line=56, instruction=bar.sync 0;</title></rect>
+<rect x="216.40" y="52" width="7.92" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 13 to 17 ns</title></rect>
+<rect x="224.32" y="52" width="345.60" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 2, wait: mbarrier A0 (phase 0 of the mbarrier at shared offset 8192): 17 to 192 ns, line=84, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r13], %r14;</title></rect>
+<text x="397.12" y="64" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">A0</text>
+<rect x="569.92" y="52" width="80.53" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 192 to 233 ns</title></rect>
+<rect x="650.44" y="52" width="1.32" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 2, wait: barrier: 233 to 233 ns, line=113, instruction=bar.sync 0;</title></rect>
+<rect x="651.76" y="52" width="2.64" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 2, run: 233 to 235 ns</title></rect>
+<rect x="190.00" y="74" width="21.12" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 0 to 11 ns</title></rect>
+<rect x="211.12" y="74" width="5.28" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 3, wait: barrier: 11 to 13 ns, line=56, instruction=bar.sync 0;</title></rect>
+<rect x="216.40" y="74" width="7.92" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 13 to 17 ns</title></rect>
+<rect x="224.32" y="74" width="345.60" height="17" fill="#eb6834" stroke="#ffffff" stroke-width="0.5"><title>warp 3, wait: mbarrier A0 (phase 0 of the mbarrier at shared offset 8192): 17 to 192 ns, line=84, instruction=mbarrier.try_wait.parity.shared::cta.b64 P1, [%r13], %r14;</title></rect>
+<text x="397.12" y="86" text-anchor="middle" font-size="10" fill="#ffffff" pointer-events="none">A0</text>
+<rect x="569.92" y="74" width="81.85" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 192 to 233 ns</title></rect>
+<rect x="651.76" y="74" width="2.64" height="17" fill="#2a78d6" stroke="#ffffff" stroke-width="0.5"><title>warp 3, run: 233 to 235 ns</title></rect>
+<text x="182" y="154" text-anchor="end" fill="#666666" font-size="10">mbarrier, by shared offset</text>
+<text x="182" y="171" text-anchor="end"><tspan font-weight="bold">A</tspan> at 8192</text>
+<line x1="190" y1="166.5" x2="1000" y2="166.5" stroke="#e1e0d9"/>
+<line x1="569.92" y1="25" x2="569.92" y2="161.5" stroke="#222222" stroke-width="0.9" pointer-events="none"/>
+<circle cx="569.92" cy="25" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<circle cx="569.92" cy="47" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<circle cx="569.92" cy="69" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<circle cx="569.92" cy="91" r="2.6" fill="#222222" stroke="#ffffff" stroke-width="0.8" pointer-events="none"/>
+<path d="M569.92 161.0l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222" stroke="#ffffff" stroke-width="0.8"><title>mbarrier A (shared offset 8192): phase 0 completes at 192 ns; ends the wait of warp 0, warp 1, warp 2, warp 3</title></path>
+<text x="577.92" y="170.5" font-size="10" fill="#666666" pointer-events="none">0</text>
+<rect x="190" y="204" width="12" height="12" fill="#2a78d6"/>
+<text x="207" y="214">warp runs</text>
+<rect x="279.9" y="204" width="12" height="12" fill="#eb6834"/>
+<text x="296.9" y="214">warp waits</text>
+<rect x="375.9" y="204" width="12" height="12" fill="#1baf7a"/>
+<text x="392.9" y="214">TMA or cp.async copy, start to landing</text>
+<rect x="642.6999999999999" y="204" width="12" height="12" fill="#eda100"/>
+<text x="659.6999999999999" y="214">HBM busy</text>
+<path d="M196 222l5.5 5.5l-5.5 5.5l-5.5 -5.5z" fill="#222222"/>
+<text x="207" y="232">an mbarrier completes the numbered phase; the line rises to the warps whose wait it ends</text>
+<text x="190" y="248">On a wait, B2: the warp waits for phase 2 of mbarrier B. On a TMA load, →B: it reports its bytes to B.</text>
+<text x="190" y="268" fill="#666666">CTA (0, 0, 0). Simulated time from warplens's approximate model, not a measurement. B200: illustrative parameters, 8 of 13 assumed and none fitted to hardware.</text>
+</svg>

@@ -1,0 +1,111 @@
+DEVICE bench=cluster_costs name=NVIDIA_B200 cc=10.0 sm_count=148 total_mem_bytes=191490555904 free_mem_bytes=190834475008 bench_clock=1 sim=0 trials=5 scale=1 synthetic=0 smem_per_sm_bytes=233472 max_threads_per_sm=2048 max_blocks_per_sm=32
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=20000 trial=-1 event_ns=17010464 wall_ns=17020954 clk=33369667 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=20000 trial=0 event_ns=16996416 wall_ns=17006664 clk=33379432 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=40000 trial=0 event_ns=33982784 wall_ns=33992922 clk=66760614 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=20000 trial=1 event_ns=16995329 wall_ns=17005314 clk=33380972 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=40000 trial=1 event_ns=33982719 wall_ns=33992700 clk=66759033 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=20000 trial=2 event_ns=16994816 wall_ns=17004629 clk=33382272 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=40000 trial=2 event_ns=33978722 wall_ns=33988841 clk=66755833 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=20000 trial=3 event_ns=16993313 wall_ns=17004189 clk=33376573 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=40000 trial=3 event_ns=33983105 wall_ns=33994577 clk=66762274 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=20000 trial=4 event_ns=16995232 wall_ns=17005700 clk=33383292 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=1 bytes=16384 nctas=1 reps=40000 trial=4 event_ns=33979553 wall_ns=33990321 clk=66758028 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=20000 trial=-1 event_ns=16991232 wall_ns=17001762 clk=33374433 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=20000 trial=0 event_ns=16994017 wall_ns=17004051 clk=33377697 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=40000 trial=0 event_ns=33978432 wall_ns=33988132 clk=66751877 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=20000 trial=1 event_ns=16992865 wall_ns=17003724 clk=33376699 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=40000 trial=1 event_ns=33982944 wall_ns=33993555 clk=66762868 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=20000 trial=2 event_ns=16991167 wall_ns=17002435 clk=33374963 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=40000 trial=2 event_ns=33983746 wall_ns=33994743 clk=66765402 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=20000 trial=3 event_ns=16996481 wall_ns=17007019 clk=33383951 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=40000 trial=3 event_ns=33984833 wall_ns=33995981 clk=66765851 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=20000 trial=4 event_ns=16995905 wall_ns=17005797 clk=33382406 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=2 bytes=16384 nctas=2 reps=40000 trial=4 event_ns=33985409 wall_ns=33995736 clk=66767970 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=20000 trial=-1 event_ns=16830912 wall_ns=16840939 clk=33060592 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=20000 trial=0 event_ns=16830976 wall_ns=16841765 clk=33060898 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=40000 trial=0 event_ns=33649345 wall_ns=33660279 clk=66108866 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=20000 trial=1 event_ns=16829344 wall_ns=16840123 clk=33056775 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=40000 trial=1 event_ns=33651745 wall_ns=33661995 clk=66110466 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=20000 trial=2 event_ns=16829023 wall_ns=16839731 clk=33054345 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=40000 trial=2 event_ns=33651264 wall_ns=33661700 clk=66110413 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=20000 trial=3 event_ns=16827999 wall_ns=16838084 clk=33054158 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=40000 trial=3 event_ns=33651329 wall_ns=33661277 clk=66111653 check=16883009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=20000 trial=4 event_ns=16831873 wall_ns=16841935 clk=33058399 check=16863009
+BENCH id=cluster_costs/load/multicast/ctas=4 bytes=16384 nctas=4 reps=40000 trial=4 event_ns=33651295 wall_ns=33662690 clk=66112132 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=20000 trial=-1 event_ns=17735041 wall_ns=17745268 clk=34835952 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=20000 trial=0 event_ns=17734272 wall_ns=17744689 clk=34836060 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=40000 trial=0 event_ns=35463745 wall_ns=35474268 clk=69673282 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=20000 trial=1 event_ns=17733889 wall_ns=17743828 clk=34835959 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=40000 trial=1 event_ns=35464607 wall_ns=35475125 clk=69674173 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=20000 trial=2 event_ns=17737312 wall_ns=17747818 clk=34836982 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=40000 trial=2 event_ns=35463745 wall_ns=35474456 clk=69675036 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=20000 trial=3 event_ns=17736095 wall_ns=17746203 clk=34837170 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=40000 trial=3 event_ns=35466305 wall_ns=35477044 clk=69675231 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=20000 trial=4 event_ns=17736736 wall_ns=17747124 clk=34837958 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=1 bytes=16384 nctas=1 reps=40000 trial=4 event_ns=35466080 wall_ns=35476630 clk=69675258 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=20000 trial=-1 event_ns=17818848 wall_ns=17829660 clk=35001779 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=20000 trial=0 event_ns=17820543 wall_ns=17831354 clk=35003273 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=40000 trial=0 event_ns=35632225 wall_ns=35642715 clk=70005764 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=20000 trial=1 event_ns=17819201 wall_ns=17829225 clk=35002868 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=40000 trial=1 event_ns=35633537 wall_ns=35644344 clk=70007812 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=20000 trial=2 event_ns=17820736 wall_ns=17831514 clk=35003881 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=40000 trial=2 event_ns=35635616 wall_ns=35645868 clk=70011717 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=20000 trial=3 event_ns=17820576 wall_ns=17830908 clk=35003595 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=40000 trial=3 event_ns=35634911 wall_ns=35644676 clk=70007463 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=20000 trial=4 event_ns=17820095 wall_ns=17830424 clk=35003654 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=2 bytes=16384 nctas=2 reps=40000 trial=4 event_ns=35634689 wall_ns=35644594 clk=70007776 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=20000 trial=-1 event_ns=17736799 wall_ns=17747701 clk=34841914 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=20000 trial=0 event_ns=17736353 wall_ns=17747489 clk=34838724 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=40000 trial=0 event_ns=35472706 wall_ns=35483366 clk=69691161 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=20000 trial=1 event_ns=17738337 wall_ns=17749220 clk=34841713 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=40000 trial=1 event_ns=35469440 wall_ns=35479548 clk=69684320 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=20000 trial=2 event_ns=17734177 wall_ns=17744830 clk=34834203 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=40000 trial=2 event_ns=35469952 wall_ns=35480761 clk=69686575 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=20000 trial=3 event_ns=17734016 wall_ns=17744499 clk=34833339 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=40000 trial=3 event_ns=35461857 wall_ns=35472650 clk=69670847 check=16883009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=20000 trial=4 event_ns=17738304 wall_ns=17749426 clk=34841395 check=16863009
+BENCH id=cluster_costs/load/separate/ctas=4 bytes=16384 nctas=4 reps=40000 trial=4 event_ns=35460735 wall_ns=35470360 clk=69665940 check=16883009
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=50000 trial=-1 event_ns=14831040 wall_ns=14843245 clk=27300226 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=50000 trial=0 event_ns=14804096 wall_ns=14814131 clk=27300170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=100000 trial=0 event_ns=29603041 wall_ns=29612506 clk=54600170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=50000 trial=1 event_ns=14804352 wall_ns=14814349 clk=27300170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=100000 trial=1 event_ns=29602688 wall_ns=29613301 clk=54600170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=50000 trial=2 event_ns=14804864 wall_ns=14815339 clk=27300170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=100000 trial=2 event_ns=29602720 wall_ns=29613653 clk=54600170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=50000 trial=3 event_ns=14804512 wall_ns=14815219 clk=27300170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=100000 trial=3 event_ns=29603359 wall_ns=29613577 clk=54600170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=50000 trial=4 event_ns=14804832 wall_ns=14814719 clk=27300170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=1 kind=f16 m=256 n=256 k=16 batch=1 nctas=2 reps=100000 trial=4 event_ns=29601152 wall_ns=29611623 clk=54600170 check=16
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=50000 trial=-1 event_ns=23909472 wall_ns=23919480 clk=44100159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=50000 trial=0 event_ns=23910336 wall_ns=23921204 clk=44100159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=100000 trial=0 event_ns=47812702 wall_ns=47822528 clk=88200159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=50000 trial=1 event_ns=23910463 wall_ns=23921644 clk=44100159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=100000 trial=1 event_ns=47813152 wall_ns=47823025 clk=88200159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=50000 trial=2 event_ns=23910015 wall_ns=23920754 clk=44100159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=100000 trial=2 event_ns=47813759 wall_ns=47823978 clk=88200159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=50000 trial=3 event_ns=23908928 wall_ns=23919062 clk=44100159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=100000 trial=3 event_ns=47813377 wall_ns=47824138 clk=88200159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=50000 trial=4 event_ns=23910145 wall_ns=23920116 clk=44100159 check=64
+BENCH id=cluster_costs/mma/pair/m=256/n=256/batch=4 kind=f16 m=256 n=256 k=16 batch=4 nctas=2 reps=100000 trial=4 event_ns=47813698 wall_ns=47824575 clk=88200159 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=50000 trial=-1 event_ns=13634464 wall_ns=13643647 clk=25100286 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=50000 trial=0 event_ns=13614528 wall_ns=13624702 clk=25100174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=100000 trial=0 event_ns=27216160 wall_ns=27226183 clk=50200174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=50000 trial=1 event_ns=13612608 wall_ns=13622647 clk=25100174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=100000 trial=1 event_ns=27216896 wall_ns=27227291 clk=50200174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=50000 trial=2 event_ns=13610752 wall_ns=13620542 clk=25100174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=100000 trial=2 event_ns=27215008 wall_ns=27225316 clk=50200174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=50000 trial=3 event_ns=13611584 wall_ns=13622037 clk=25100174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=100000 trial=3 event_ns=27216225 wall_ns=27227957 clk=50200174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=50000 trial=4 event_ns=13612000 wall_ns=13622093 clk=25100174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=1/ctas=2 kind=f16 m=128 n=256 k=16 batch=1 nctas=2 reps=100000 trial=4 event_ns=27217793 wall_ns=27227599 clk=50200174 check=16
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=50000 trial=-1 event_ns=22716736 wall_ns=22727677 clk=41900163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=50000 trial=0 event_ns=22717472 wall_ns=22727421 clk=41900163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=100000 trial=0 event_ns=45428223 wall_ns=45438836 clk=83800163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=50000 trial=1 event_ns=22716543 wall_ns=22726295 clk=41900163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=100000 trial=1 event_ns=45428577 wall_ns=45438972 clk=83800163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=50000 trial=2 event_ns=22717760 wall_ns=22728039 clk=41900163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=100000 trial=2 event_ns=45428097 wall_ns=45438138 clk=83800163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=50000 trial=3 event_ns=22717344 wall_ns=22728040 clk=41900163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=100000 trial=3 event_ns=45429375 wall_ns=45439325 clk=83800163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=50000 trial=4 event_ns=22717537 wall_ns=22728280 clk=41900163 check=64
+BENCH id=cluster_costs/mma/single/m=128/n=256/batch=4/ctas=2 kind=f16 m=128 n=256 k=16 batch=4 nctas=2 reps=100000 trial=4 event_ns=45426815 wall_ns=45437775 clk=83800163 check=64

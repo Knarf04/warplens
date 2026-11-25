@@ -5,6 +5,8 @@ canonical K-major layouts (cute/arch/mma_sm100_desc.hpp), builds the two
 descriptors, and compares the accumulators read back from TMEM with NumPy.
 """
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -104,7 +106,7 @@ def place(matrix, layout, start, image):
 
 
 def run(sim, m=128, n=32, layout="128B", dtype=np.float16, twice=0, wait=1, shift=0, free=1,
-        negate_a=False, ncols=None, seed=0, block=128, dlane=0, to_tf32=True):
+        negate_a=False, ncols=None, seed=0, block=128, dlane=0, to_tf32=True, mods=""):
     rng = np.random.default_rng(seed)
     k = 32 // np.dtype(dtype).itemsize
     a = rng.uniform(-2, 2, (m, k)).astype(dtype)
@@ -118,7 +120,7 @@ def run(sim, m=128, n=32, layout="128B", dtype=np.float16, twice=0, wait=1, shif
     fmt = 0 if dtype == np.float16 else 2
     idesc = (1 << 4) | (fmt << 7) | (fmt << 10) | (int(negate_a) << 13) | ((n >> 3) << 17) | ((m >> 4) << 24)
     out = sim.from_numpy(np.full((128, n), np.nan, dtype=np.float32))
-    stats = sim.launch(mma_kernel("f16" if dtype == np.float16 else "tf32"), "k", grid=1, block=block,
+    stats = sim.launch(mma_kernel(("f16" if dtype == np.float16 else "tf32") + mods), "k", grid=1, block=block,
                        args=[sim.from_numpy(image), out, desc_a, desc_b, idesc, len(image),
                              ncols or max(32, 1 << (n - 1).bit_length()), n, twice, wait, shift, free, dlane, 0])
     expect = a.astype(np.float32) @ b.astype(np.float32).T * (-1 if negate_a else 1) * (2 if twice else 1)
@@ -175,7 +177,10 @@ def test_tf32_mma_with_unconverted_float32_operands_is_reported(sim):
     (f,) = stats.findings
     assert f.kind == "mma-tf32-operand-not-converted" and f.count == 2  # operands A and B
     assert "low 13 fraction bits" in f.message and "cvt.rna.tf32.f32" in f.message
-    np.testing.assert_allclose(got, expect, rtol=1e-5, atol=1e-5)  # multiplied as plain float32
+    # The low 13 bits of every operand element are dropped, as a B200 drops them: the result
+    # is the product of the truncated operands, a part in 2^10 from the float32 product.
+    assert not np.allclose(got, expect, rtol=1e-5, atol=1e-5)
+    np.testing.assert_allclose(got, expect, rtol=4e-3, atol=4e-2)
 
 
 def test_reading_accumulators_without_waiting_for_the_commit_is_caught(sim):
@@ -411,3 +416,86 @@ def test_descriptor_that_disagrees_with_the_tma_swizzle_is_caught(sim):
     assert "descriptor says 64B swizzle" in f.message and "with 128B swizzle" in f.message
     assert f.text.startswith("@%one tcgen05.mma") and "TMA load at line" in f.message
     assert not np.allclose(got, expect, atol=1e-3)  # and the result really is wrong
+
+
+# -- the arithmetic of one MMA, against what a B200 recorded --------------------------------
+
+MEASURED_MMA = Path(__file__).parents[1] / "validation/blackwell/measured/b200/mma"
+
+
+def _words(lines):
+    return np.array([[int(w, 16) for w in line.split(":")[1].split()] for line in lines], dtype=np.uint32)
+
+
+def test_the_mma_sum_is_the_one_a_b200_computes():
+    """validation/blackwell/mma/accumulation_order as a B200 ran it on 2026-11-25, parts 1 to
+    3: 3016 accumulator words, from operands rebuilt here as the probe builds them. Part 1
+    fixes the width (a term 2^-24 of the largest survives in part, one bit lower is lost);
+    part 2 that the sum is exact and cut off toward zero; part 3 that the old accumulator is
+    inside the sum."""
+    from warplens.units.tcgen05 import mma_sum
+    lines = (MEASURED_MMA / "accumulation_order.txt").read_text().splitlines()
+    part1, part2, part3 = _words(lines[1:121]), _words(lines[123:251]), _words(lines[252:380])
+
+    positions = (0, 1, 2, 7, 8, 15)
+    triples = [(i, j, l) for i in positions for j in positions for l in positions if len({i, j, l}) == 3]
+    a = np.zeros((len(triples), 16), dtype=np.float32)
+    for m, (i, j, l) in enumerate(triples):
+        a[m, i], a[m, j], a[m, l] = 16384.0, 1.0 / 1024.0, -16384.0
+    b = np.repeat(1024.0 * np.arange(1, 9, dtype=np.float32)[:, None], 16, axis=1)
+    got = mma_sum(a, b).view(np.uint32)
+    np.testing.assert_array_equal(got, part1)
+    assert got[0].view(np.float32).tolist() == [1, 2, 3, 4, 4, 6, 6, 8]  # not 5 and 7: cut off, whatever the order
+
+    state = 7
+    def draw(count):
+        nonlocal state
+        values = []
+        for _ in range(count):
+            state = (state * 1664525 + 1013904223) & 0xFFFFFFFF
+            values.append(((state >> 20) - 2048) / 1024.0)
+        return np.array(values, dtype=np.float32)
+    a, b = draw(128 * 16).reshape(128, 16), draw(8 * 16).reshape(8, 16)
+    once = mma_sum(a, b)
+    np.testing.assert_array_equal(once.view(np.uint32), part2)
+    assert (once.view(np.uint32) != (a.astype(np.float64) @ b.astype(np.float64).T).astype(np.float32)
+            .view(np.uint32)).any()  # rounding the exact sum to nearest is not it
+    three = mma_sum(a, b, mma_sum(a, b, once))
+    np.testing.assert_array_equal(three.view(np.uint32), part3)
+
+
+def test_a_product_is_lined_up_by_its_operands_exponents_and_cut_toward_zero():
+    """What the recorded probe could not show and the book's nine kernels, captured on the
+    B200 with their inputs, did (they replay bit for bit with these rules and not with the
+    alternatives; the captures are in the rental's archive, docs/b200-rental-1.md). Parts 4
+    to 6 of the probe ask a GPU directly."""
+    from warplens.units.tcgen05 import mma_sum
+    b = np.repeat(1024.0 * np.arange(1, 9, dtype=np.float32)[:, None], 16, axis=1)
+    a = np.zeros((1, 16), dtype=np.float32)
+    a[0, :3] = 16384.0, -1.0 / 1024.0, -16384.0
+    assert mma_sum(a, b)[0].tolist() == [-1, -2, -3, -4, -4, -6, -6, -8]  # toward zero, not down
+    a[0, :3] = 12288.0, 1.0 / 1024.0, -12288.0  # 1.5 * 1.5: the large products carry
+    assert mma_sum(a, b * np.float32(1.5))[0].tolist() == [1.5, 3, 4, 6, 7, 8, 10, 12]
+    a[0, :3] = 16384.0, 0.0, -16384.0  # the old accumulator is cut like a product
+    assert mma_sum(a, b, np.full((1, 8), 7.0, dtype=np.float32))[0].tolist() == [7, 7, 7, 6, 6, 6, 6, 4]
+    # An exact zero, an overflow, and terms that are not finite.
+    assert mma_sum(np.zeros((1, 16), np.float32), b)[0].tolist() == [0.0] * 8
+    big = np.full((1, 16), 65504.0, dtype=np.float32)
+    assert np.isinf(mma_sum(big * np.float32(2.0 ** 100), np.full((1, 16), 65504.0, dtype=np.float32))).all()
+    assert np.isnan(mma_sum(np.full((1, 16), np.nan, dtype=np.float32), b)).all()
+
+
+def test_a_tf32_mma_drops_the_low_bits_of_its_operands_as_a_b200_does():
+    """validation/blackwell/mma/tf32_low_bits as a B200 ran it: 256 single products, each the
+    float32 product of the two operands with their low 13 bits cleared (its `rz` column)."""
+    from warplens.units.tcgen05 import _TF32_KEPT, mma_sum
+    rows = [line.split() for line in (MEASURED_MMA / "tf32_low_bits.txt").read_text().splitlines()
+            if len(line.split()) == 7 and len(line.split()[0]) == 8]
+    assert len(rows) == 256
+    table = np.array([[int(w, 16) for w in row[:5]] for row in rows], dtype=np.uint32)
+    assert (table[:, 2] == table[:, 4]).all() and (table[:, 2] != table[:, 3]).any()  # result == rz, != full
+    a = (table[:, 0] & _TF32_KEPT).view(np.float32)[:, None]
+    b = (table[:, 1] & _TF32_KEPT).view(np.float32)[:, None]
+    for row in range(len(rows)):
+        got = mma_sum(a[row:row + 1], b[row:row + 1]).view(np.uint32)[0, 0]
+        assert got == table[row, 2], rows[row]

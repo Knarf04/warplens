@@ -41,15 +41,46 @@ def test_round_trip_does_not_depend_on_async_timing(delay):
 
 
 def test_expect_tx_too_small_is_caught():
-    with pytest.raises(warplens.DeadlockError) as info:
-        tma_copy("128B", (16, 32), EXPECT_TOO_FEW)
-    msg = str(info.value)
-    assert "1024 completion byte(s) have not been accounted for" in msg
-    assert "expect_tx too small or missing" in msg
-    # The accounting problem is also available as a structured finding, not only as text.
-    (f,) = [f for f in info.value.findings if f.kind == "mbarrier-tx-mismatch"]
-    assert "the kernel deadlocked with 1024 completion byte(s) not accounted for" in f.message
+    """A copy reports its bytes in pieces, so a count of half the copy reaches zero part of
+    the way through and the phase completes: the wait returns early, as on a B200
+    (validation/blackwell/measured/b200/mbarrier/expect_tx_small.txt), and that is reported.
+    The other half is charged to a phase that never comes."""
+    ok, stats = tma_copy("128B", (16, 32), EXPECT_TOO_FEW)
+    (f,) = stats.findings
+    assert f.kind == "mbarrier-tx-mismatch"
+    assert "a copy of 2048 byte(s) landed" in f.message and "expected only 1024 more" in f.message
+    assert "a wait on it returns before the other 1024 are there" in f.message
     assert "cp.async.bulk.tensor.2d.shared" in f.text and f.cta == (0, 0, 0)
+    assert ok  # the simulator delivers a copy whole; on a GPU the tile may be read half written
+
+
+def test_an_undersized_expect_tx_completes_only_at_a_whole_number_of_pieces():
+    """TX_PIECE_BYTES is an assumption (64, the largest size the B200's results allow): a
+    count that is not a multiple of it is passed over, and the wait deadlocks as before."""
+    from warplens.units.mbarrier import Mbarrier, TX_PIECE_BYTES
+
+    class Cta:
+        def __init__(self):
+            self.completed, self.findings = 0, self
+            self.kinds = []
+        def phase_completed(self, offset=None, phase=None):
+            self.completed += 1
+        def add(self, kind, *rest):
+            self.kinds.append(kind)
+
+    def phases(expect, copy=256):
+        cta = Cta()
+        bar = Mbarrier(cta, 0, 1, 0)
+        bar.expect_tx(expect)
+        bar.pending = 0  # the arrival that came with expect_tx
+        bar.deliver(copy, None, None, [0])
+        return cta.completed, bar.tx, cta.kinds
+
+    assert TX_PIECE_BYTES == 64
+    assert phases(256) == (1, 0, [])
+    assert phases(128) == (1, -128, ["mbarrier-tx-mismatch"]) and phases(64) == (1, -192, ["mbarrier-tx-mismatch"])
+    assert phases(96) == (0, -160, []) and phases(32) == (0, -224, [])
+    assert phases(512) == (0, 256, [])
 
 
 def test_expect_tx_too_large_is_a_deadlock_that_names_the_mbarrier():
@@ -157,6 +188,9 @@ def test_element_strides_and_nan_fill(sim):
                        args=[src_map, sim.tensor_map_tiled(dst, expect.shape), 128, *origin[::-1]])
     np.testing.assert_array_equal(dst.numpy(), expect)
     assert np.isnan(expect).any() and not stats.findings
+    # The bits of the fill are the B200's (validation/blackwell/measured/b200/tma/oob_fill.txt):
+    # 0x7FF7 in every 16 bits of the element, not NumPy's default NaN.
+    assert set(dst.numpy().view(np.uint32)[np.isnan(expect)].tolist()) == {0x7FF77FF7}
 
 
 # -- swizzle ---------------------------------------------------------------------------
@@ -216,12 +250,24 @@ def test_swizzled_bytes_land_where_cute_says(sim, swizzle, bits, inner):
 def test_buffer_not_aligned_to_swizzle_period_is_reported(sim):
     data = np.arange(256, dtype=np.uint8).reshape(2, 128)
     src_map = sim.tensor_map_tiled(sim.from_numpy(data), (2, 128), swizzle="128B")
-    mod = kernel(DUMP.format(pad=16), DUMP_PARAMS)  # buf lands at offset 16
+    mod = kernel(DUMP.format(pad=32), DUMP_PARAMS)  # buf lands at offset 32
     stats = sim.launch(mod, "k", grid=1, block=256, args=[src_map, sim.empty(256, "u8"), 256])
     f = stats.findings[0]
     assert f.kind == "tma-swizzle-misaligned" and "not aligned to 1024 bytes" in f.message
     # The consequence: bytes are not where offset-based indexing looks for them.
     assert "smem-uninitialized-read" in {f.kind for f in stats.findings}
+
+
+def test_a_tensor_copy_16_bytes_into_a_row_ends_the_kernel_as_on_a_b200(sim):
+    """validation/blackwell/measured/b200/tma/swizzle_misaligned.sixteen.txt: a destination 16
+    bytes into the buffer is cudaErrorMisalignedAddress, with or without a swizzle. The
+    simulator refuses what is not a multiple of 32 (TENSOR_COPY_ALIGNMENT, an assumption)."""
+    data = np.arange(256, dtype=np.uint8).reshape(2, 128)
+    for swizzle in (None, "128B"):
+        src_map = sim.tensor_map_tiled(sim.from_numpy(data), (2, 128), swizzle=swizzle)
+        with pytest.raises(warplens.ExecutionError, match="aligned to 32 bytes, got offset 16.*cudaErrorMisalignedAddress"):
+            sim.launch(kernel(DUMP.format(pad=16), DUMP_PARAMS), "k", grid=1, block=256,
+                       args=[src_map, sim.empty(256, "u8"), 256])
 
 
 # -- mbarrier semantics ----------------------------------------------------------------
@@ -286,20 +332,26 @@ def test_phase_needs_both_arrivals_and_bytes(sim):
     assert out.numpy().tolist() == [0, 0, 1]
 
 
-def test_over_arrival_carries_into_next_phase_and_is_reported(sim):
+def test_over_arrival_ends_the_kernel_as_on_a_b200(sim):
+    """Three arrivals at once on an mbarrier that expected two: a B200 ends the kernel with
+    cudaErrorLaunchFailure (validation/blackwell/measured/b200/mbarrier/over_arrival.txt).
+    The first model carried the surplus into the next phase and reported a finding."""
     mod = mb_kernel(f"""
         mbarrier.init.shared::cta.b64 [%bar], 2;
         mbarrier.arrive.shared::cta.b64 _, [%bar], 3;
         mbarrier.test_wait.parity.shared::cta.b64 %p, [%bar], 0;
         {record(0)}
-        mbarrier.arrive.shared::cta.b64 _, [%bar];
-        mbarrier.test_wait.parity.shared::cta.b64 %p, [%bar], 1;
-        {record(1)}
+    """)
+    with pytest.raises(warplens.ExecutionError, match=r"3 arrival\(s\).*needed only 2 more.*mbarrier-over-arrival"):
+        sim.launch(mod, "k", grid=1, block=1, args=[sim.empty(2, "u32")])
+    exact = mb_kernel(f"""
+        mbarrier.init.shared::cta.b64 [%bar], 2;
+        mbarrier.arrive.shared::cta.b64 _, [%bar], 2;
+        mbarrier.test_wait.parity.shared::cta.b64 %p, [%bar], 0;
+        {record(0)}
     """)
     out = sim.empty(2, "u32")
-    stats = sim.launch(mod, "k", grid=1, block=1, args=[out])
-    assert out.numpy().tolist() == [1, 1]
-    assert [f.kind for f in stats.findings] == ["mbarrier-over-arrival"]
+    assert not sim.launch(exact, "k", grid=1, block=1, args=[out]).findings and out.numpy()[0] == 1
 
 
 def test_mbarrier_errors(sim):
@@ -417,7 +469,8 @@ def test_tma_errors(sim):
     good = sim.tensor_map_tiled(data, (4, 16))
     with pytest.raises(warplens.ExecutionError, match="1d TMA instruction used with a 2-dimensional"):
         sim.launch(box_kernel(1), "k", grid=1, block=1, args=[good, good, 256, 0])
-    with pytest.raises(warplens.ExecutionError, match="does not point at a tensor map"):
+    # Tensor data where a tensor map belongs: not one of ours, and not a driver's either.
+    with pytest.raises(warplens.ExecutionError, match="invalid tensor map|neither a tensor map"):
         sim.launch(box_kernel(2), "k", grid=1, block=1, args=[data, good, 256, 0, 0])
     big = sim.tensor_map_tiled(sim.empty((256, 128), "u8"), (256, 128))
     with pytest.raises(warplens.ExecutionError, match=r"runs past\s+the CTA's 16392 bytes"):

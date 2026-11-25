@@ -1,7 +1,8 @@
-status: ok
-warplens: 2 kernel launch(es) simulated on B200, 1 finding(s)
+status: exit 3
+warplens: kernel `tmem_alloc_script` returned with tensor memory still allocated: 256 tensor-memory columns allocated here were never released with tcgen05.dealloc. A GPU reports cudaErrorTensorMemoryLeak for this launch
+KERNEL FAILED: allocate 256 columns and return without releasing them: cudaErrorUnknown at launch (error 721 from the warplens CUDA runtime shim; see any warplens message above)
+warplens: 1 kernel launch(es) simulated on B200, 1 finding(s)
   tmem_alloc_script: 1 CTA(s), 52 warp-instructions
     [tmem-leak] 256 tensor-memory columns allocated here were never released with tcgen05.dealloc
       line 387: tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%r12], %r11;
       first in CTA (0, 0, 0), warp 0, lanes 0
-  tmem_alloc_script: 1 CTA(s), 81 warp-instructions

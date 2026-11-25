@@ -4,6 +4,7 @@ logical tile sit physically.
     python -m warplens.viz.smem 32 128 --swizzle 128B            # a TMA tile, as text
     python -m warplens.viz.smem 32 128 --swizzle 128B --svg t.svg
     python -m warplens.viz.smem 32 128 --pitch 132               # a padded tile[32][33] of 4-byte words
+    python -m warplens.viz.smem 32 128 --pitch 132 --mark 5 7 --svg t.svg   # and where tile[5][7] is
 
     from warplens.viz import smem
     svg = smem.bank_heatmap_svg(stats.smem)                      # of a launch
@@ -28,7 +29,7 @@ LINE_BYTES = BANKS * BANK_BYTES  # 128: one word in every bank
 _SWIZZLE_BITS = {name.lower(): bits for bits, (name, _) in SWIZZLE_MODES.items()}
 # One hue, light to dark, for both views: a count of words, or the bank number.
 _RAMP = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
-_EMPTY, _INK, _MUTED = "#f1f1f1", "#222222", "#666666"
+_EMPTY, _INK, _MUTED, _MARK = "#f1f1f1", "#222222", "#666666", "#eb6834"
 
 
 def _shade(t: float) -> str:
@@ -51,25 +52,43 @@ def _clip(text: str, width: int) -> str:
 
 # -- which banks each instruction loaded -------------------------------------------------
 
+def _conflict_shade(ratio: float) -> float:
+    """Where on the ramp a bank asked for `ratio` times the ideal is: the lightest step for no
+    conflict, and a visibly darker one from the first conflict on."""
+    return 0.0 if ratio <= 1 else 0.25 + 0.75 * min((ratio - 1) / (BANKS - 1), 1.0)
+
+
 def bank_heatmap_svg(report, title: str = "Shared-memory banks per instruction") -> str:
     """One row per shared-memory instruction of a launch (`LaunchStats.smem`), one column per
-    bank. A cell shows the most distinct words a single execution of the instruction put in
-    that bank, which is the number of wavefronts the bank alone demanded: 1 everywhere is a
-    conflict-free access, N is an N-way conflict. Empty cells were never touched. Returns an
-    empty string for a launch without shared-memory accesses."""
+    bank.
+
+    A cell is coloured by conflict, not by load: by the most distinct words one execution put
+    in the bank, relative to the wavefronts a conflict-free layout needs for that execution
+    (its ideal). A warp that loads 16 bytes per lane puts four words in every bank and needs
+    four wavefronts however the data is laid out; its cells are the lightest shade, like those
+    of a conflict-free scalar load. A darker cell holds more words than the ideal, and shows
+    how many. Beside the grid: the wavefronts the worst execution needed and its ideal, the
+    conflict that makes, and the extra wavefronts over all executions. Empty cells were never
+    touched. Returns an empty string for a launch without shared-memory accesses."""
     entries = sorted(report.instructions.values(), key=lambda e: (e.kernel, e.line))
     if not entries:
         return ""
     several = len({e.kernel for e in entries}) > 1
     cell, row, left, top = 20, 22, 330, 58
-    width = left + BANKS * cell + 190
-    height = top + len(entries) * row + 46
+    right = left + BANKS * cell
+    columns = (right + 12, right + 150, right + 222)
+    width = right + 400
+    height = top + len(entries) * row + 64
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
            'font-family="sans-serif" font-size="11">',
+           '<rect width="100%" height="100%" fill="#ffffff"/>',
            f'<text x="10" y="18" font-size="14">{escape(title)}</text>',
            f'<text x="{left + BANKS * cell / 2}" y="36" text-anchor="middle" fill="{_MUTED}">bank</text>',
-           f'<text x="{left + BANKS * cell + 10}" y="{top - 8}" fill="{_MUTED}">worst</text>',
-           f'<text x="{left + BANKS * cell + 70}" y="{top - 8}" fill="{_MUTED}">extra wavefronts</text>']
+           f'<text x="{columns[0]}" y="{top - 22}" fill="{_MUTED}">wavefronts of the</text>',
+           f'<text x="{columns[0]}" y="{top - 8}" fill="{_MUTED}">worst execution</text>',
+           f'<text x="{columns[1]}" y="{top - 8}" fill="{_MUTED}">conflict</text>',
+           f'<text x="{columns[2]}" y="{top - 22}" fill="{_MUTED}">extra wavefronts,</text>',
+           f'<text x="{columns[2]}" y="{top - 8}" fill="{_MUTED}">all executions</text>']
     for bank in range(BANKS):
         if bank % 4 == 0 or bank == BANKS - 1:
             out.append(f'<text x="{left + bank * cell + cell / 2}" y="{top - 8}" text-anchor="middle">{bank}</text>')
@@ -82,30 +101,40 @@ def bank_heatmap_svg(report, title: str = "Shared-memory banks per instruction")
                    f'{escape(label)}<title>{escape(e.kernel)}: {escape(text)}</title></text>')
         for bank in range(BANKS):
             peak, total = int(e.bank_peak[bank]), int(e.bank_words[bank])
-            t = (peak - 1) / (BANKS - 1)
+            ratio = float(e.bank_ratio[bank])
+            t = _conflict_shade(ratio)
             fill = _shade(t) if peak else _EMPTY
             tip = (f"{where}, bank {bank}: at most {peak} distinct word(s) in one execution, "
-                   f"{total / e.executions:.2f} on average over {e.executions}") if peak else \
+                   f"{total / e.executions:.2f} on average over {e.executions}; "
+                   + ("no more than a conflict-free layout needs" if ratio <= 1 else
+                      f"up to {ratio:g} times what a conflict-free layout needs")) if peak else \
                 f"{where}, bank {bank}: not touched"
             x = left + bank * cell
             out.append(f'<rect x="{x}" y="{y}" width="{cell - 1}" height="{row - 3}" fill="{fill}">'
                        f'<title>{escape(tip)}</title></rect>')
-            if peak > 1:
+            if ratio > 1:
                 out.append(f'<text x="{x + (cell - 1) / 2}" y="{y + 13}" text-anchor="middle" font-size="10" '
                            f'fill="{_on(t)}" pointer-events="none">{peak}</text>')
         way = "none" if e.worst_way <= 1 else f"{e.worst_way}-way"
-        out.append(f'<text x="{left + BANKS * cell + 10}" y="{y + 14}">{way}</text>')
-        out.append(f'<text x="{left + BANKS * cell + 70}" y="{y + 14}">{e.conflicts:,} in {e.executions:,} '
+        out.append(f'<text x="{columns[0]}" y="{y + 14}">{e.worst} needed, ideal {e.worst_ideal}</text>')
+        out.append(f'<text x="{columns[1]}" y="{y + 14}">{way}</text>')
+        out.append(f'<text x="{columns[2]}" y="{y + 14}">{e.conflicts:,} in {e.executions:,} '
                    f'execution(s)</text>')
     y = top + len(entries) * row + 10
     out.append(f'<rect x="{left}" y="{y}" width="{cell - 1}" height="12" fill="{_EMPTY}"/>')
     out.append(f'<text x="{left + cell + 4}" y="{y + 10}" fill="{_MUTED}">not touched</text>')
-    steps, x0 = 16, left + 110
+    x0 = left + 100
+    out.append(f'<rect x="{x0}" y="{y}" width="{cell - 1}" height="12" fill="{_shade(0)}"/>')
+    out.append(f'<text x="{x0 + cell + 4}" y="{y + 10}" fill="{_MUTED}">no conflict: the bank holds no more '
+               'words than the ideal number of wavefronts</text>')
+    y += 18
+    steps = 16
     for k in range(steps):
-        out.append(f'<rect x="{x0 + k * 8}" y="{y}" width="8" height="12" fill="{_shade(k / (steps - 1))}"/>')
-    out.append(f'<text x="{x0 - 5}" y="{y + 10}" text-anchor="end" fill="{_MUTED}">1</text>')
-    out.append(f'<text x="{x0 + steps * 8 + 5}" y="{y + 10}" fill="{_MUTED}">{BANKS} or more distinct words '
-               'in the bank in one execution (each needs a wavefront of its own)</text>')
+        ratio = 2 + k * (BANKS - 2) / (steps - 1)
+        out.append(f'<rect x="{left + 24 + k * 8}" y="{y}" width="8" height="12" fill="{_shade(_conflict_shade(ratio))}"/>')
+    out.append(f'<text x="{left + 19}" y="{y + 10}" text-anchor="end" fill="{_MUTED}">2x</text>')
+    out.append(f'<text x="{left + 24 + steps * 8 + 5}" y="{y + 10}" fill="{_MUTED}">{BANKS}x the ideal: a conflict. '
+               'The number in the cell is the distinct words in the bank, each needing a wavefront</text>')
     out.append("</svg>")
     return "\n".join(out)
 
@@ -191,7 +220,8 @@ def layout_text(words, title: str = "Shared-memory layout of a tile", max_rows: 
     return "\n".join(lines)
 
 
-def layout_svg(words, title: str = "Shared-memory layout of a tile", max_rows: int = 32) -> str:
+def layout_svg(words, title: str = "Shared-memory layout of a tile", max_rows: int = 32,
+               mark: tuple[int, int] | None = None) -> str:
     """Two pictures of a logical tile (`tile_words`), per 4-byte word and coloured by bank.
 
     Left, the tile as the program indexes it: a column that is one shade puts every row's
@@ -199,6 +229,9 @@ def layout_svg(words, title: str = "Shared-memory layout of a tile", max_rows: i
     memory itself, 128 bytes (one word per bank) per line, with the tile's words where they
     physically are. The first word of each row is outlined in both, and each cell's tooltip
     names the other side. At most `max_rows` rows are drawn.
+
+    `mark` is the (row, word within the row) of one element to follow from the left picture
+    to the right: it is ringed in both, and a line under the pictures says where it is.
     """
     words = _check_words(words)
     rows, columns = words.shape
@@ -213,9 +246,10 @@ def layout_svg(words, title: str = "Shared-memory layout of a tile", max_rows: i
     logical_w = columns * cell
     px = left + max(logical_w, 220) + gap  # x of the physical panel
     width = px + BANKS * 14 + 20
-    height = top + max(len(shown), lines) * h + 44
+    height = top + max(len(shown), lines) * h + 44 + (14 if mark is not None else 0)
     out = [f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" '
            'font-family="sans-serif" font-size="11">',
+           '<rect width="100%" height="100%" fill="#ffffff"/>',
            f'<text x="10" y="18" font-size="14">{escape(title)}</text>',
            f'<text x="10" y="36" fill="{_MUTED}">{rows} rows of {columns} words of 4 bytes; '
            f'{escape(_conflict_text(words))}</text>',
@@ -256,9 +290,24 @@ def layout_svg(words, title: str = "Shared-memory layout of a tile", max_rows: i
     for x, y, w in outlined:  # last, so that no neighbour paints over them
         out.append(f'<rect x="{x + .75}" y="{y + .75}" width="{w - 1.5}" height="{h - 2.5}" fill="none" '
                    f'stroke="{_INK}" stroke-width="1.5" pointer-events="none"/>')
-    y = top + max(len(shown), lines) * h + 14
     notes = ["Colour is the bank, light (0) to dark (31). Outlined: the first word of each row. "
              "Grey: not part of the tile."]
+    if mark is not None:
+        r, c = mark
+        if not (0 <= r < rows and 0 <= c < columns):
+            raise ValueError(f"mark {mark} is outside a tile of {rows} rows of {columns} words")
+        offset = int(words[r, c])
+        bank, line = offset // BANK_BYTES % BANKS, offset // LINE_BYTES - first_line
+        spots = [(left + c * cell, top + r * h, max(cell - 1, 1))] if r < len(shown) else []
+        if r < len(shown) and line < lines:
+            spots.append((px + bank * 14, top + line * h, 13))
+        for x, y, w in spots:  # a ring that shows on the lightest and on the darkest bank
+            for colour, stroke in (("#ffffff", 5), (_MARK, 2.5)):
+                out.append(f'<rect x="{x - 2}" y="{y - 2}" width="{w + 4}" height="{h + 3}" fill="none" '
+                           f'stroke="{colour}" stroke-width="{stroke}" pointer-events="none"/>')
+        notes.append(f"Ringed: row {r}, bytes {c * BANK_BYTES}-{c * BANK_BYTES + 3} of the tile is at shared "
+                     f"offset {offset}: the line at {offset // LINE_BYTES * LINE_BYTES}, bank {bank}.")
+    y = top + max(len(shown), lines) * h + 14
     if rows > len(shown) or cut:
         notes.append(f"The first {len(shown)} of {rows} rows are drawn"
                      + ("; lines beyond the picture are left out." if cut else "."))
@@ -284,6 +333,9 @@ def main(argv=None) -> int:
     parser.add_argument("--start", type=int, default=0, help="shared-memory offset of the tile")
     parser.add_argument("--pitch", type=int, help="bytes from one row to the next when the rows are "
                                                   "padded (unswizzled only). Default: the row size")
+    parser.add_argument("--mark", type=int, nargs=2, metavar=("ROW", "WORD"),
+                        help="ring one element in the SVG and say where it is: its row, and its 4-byte "
+                             "word within the row")
     parser.add_argument("--svg", metavar="FILE", help="write the picture as SVG")
     args = parser.parse_args(argv)
     try:
@@ -292,10 +344,17 @@ def main(argv=None) -> int:
     except ValueError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
+    mark = None if args.mark is None else tuple(args.mark)
+    if mark is not None and not (0 <= mark[0] < words.shape[0] and 0 <= mark[1] < words.shape[1]):
+        print(f"error: --mark {mark[0]} {mark[1]} is outside the tile", file=sys.stderr)
+        return 2
     print(layout_text(words, title))
+    if mark is not None:
+        offset = int(words[mark])
+        print(f"  row {mark[0]}, word {mark[1]} is at shared offset {offset}, bank {offset // BANK_BYTES % BANKS}")
     if args.svg:
         with open(args.svg, "w") as f:
-            f.write(layout_svg(words, title))
+            f.write(layout_svg(words, title, mark=mark))
         print(f"wrote {args.svg}")
     return 0
 

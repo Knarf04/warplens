@@ -1,17 +1,17 @@
 float32, fill zero, box at column 0, row 4: 16 of 32 elements inside
-  expect_tx 64 of 128 box bytes: phase completed 0; buffer bytes changed in [0, 128)
+  expect_tx 64 of 128 box bytes: phase completed 1; buffer bytes changed in [0, 128)
   box row 0 (tensor row  4): 43c88000 43c90000 43c98000 43ca0000 43ca8000 43cb0000 43cb8000 43cc0000
   box row 1 (tensor row  5): 43fa8000 43fb0000 43fb8000 43fc0000 43fc8000 43fd0000 43fd8000 43fe0000
   box row 2 (tensor row  6): 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
   box row 3 (tensor row  7): 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
 float32, fill NaN, box at column 0, row 4: 16 of 32 elements inside
-  expect_tx 64 of 128 box bytes: phase completed 0; buffer bytes changed in [0, 128)
+  expect_tx 64 of 128 box bytes: phase completed 1; buffer bytes changed in [0, 128)
   box row 0 (tensor row  4): 43c88000 43c90000 43c98000 43ca0000 43ca8000 43cb0000 43cb8000 43cc0000
   box row 1 (tensor row  5): 43fa8000 43fb0000 43fb8000 43fc0000 43fc8000 43fd0000 43fd8000 43fe0000
-  box row 2 (tensor row  6): 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000
-  box row 3 (tensor row  7): 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000 7fc00000
+  box row 2 (tensor row  6): 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7
+  box row 3 (tensor row  7): 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7 7ff77ff7
 uint32, fill zero, box at column 0, row 4: 16 of 32 elements inside
-  expect_tx 64 of 128 box bytes: phase completed 0; buffer bytes changed in [0, 128)
+  expect_tx 64 of 128 box bytes: phase completed 1; buffer bytes changed in [0, 128)
   box row 0 (tensor row  4): 00000191 00000192 00000193 00000194 00000195 00000196 00000197 00000198
   box row 1 (tensor row  5): 000001f5 000001f6 000001f7 000001f8 000001f9 000001fa 000001fb 000001fc
   box row 2 (tensor row  6): 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000

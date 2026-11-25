@@ -11,9 +11,13 @@
 // Claim tested (docs/m3.md; warplens/units/tcgen05.py, finding `tmem-uninitialized-read`):
 // the simulator gives zeros for never-written tensor memory, in launch 1 and in launch 3
 // (a launch starts with fresh tensor memory), and reports the read. Hardware promises
-// nothing: anything other than zeros only confirms that the finding is worth reporting, and
-// the pattern showing up in launch 3 would say that tensor memory survives a launch. The
-// first four words of each warp go on info: lines.
+// nothing, and a B200 showed as much on 2026-11-25 (validation/blackwell/measured/b200/tmem/
+// fresh_contents.txt): zeros in launch 1, and in launch 3 the values launch 2 had stored,
+// each warp reading what another warp's lanes had written (no cell held its own pattern, and
+// none was zero). Tensor memory survives a launch and is not cleared. So only launch 2 is
+// compared with a prediction; the two read-only launches go on info: lines, with the count
+// of cells that hold any value of launch 2's pattern (0xA5 in the top byte). The first four
+// words of each warp go on info: lines too.
 //
 //   fresh_contents
 #include "../common.h"
@@ -49,15 +53,19 @@ int main() {
         fresh_contents<<<1, 128>>>(launch == 1, d_out);
         probe_sync(names[launch]);
         dev_read(out, d_out, 128 * COLS);
-        int zero = 0, pattern = 0;
+        int zero = 0, pattern = 0, residue = 0;
         for (uint32_t t = 0; t < 128; ++t)
             for (uint32_t c = 0; c < COLS; ++c) {
                 uint32_t v = out[t * COLS + c];
                 zero += v == 0;
                 pattern += v == (0xA5000000u | (t << 8) | c);
+                residue += (v >> 24) == 0xA5u;
             }
-        printf("%-26s cells reading zero: %4d of 4096; cells holding launch 2's pattern: %4d\n", names[launch], zero,
-               pattern);
+        // What a read-only launch finds is whatever was left there: not compared.
+        printf("%s%-26s cells reading zero: %4d of 4096; cells holding launch 2's pattern: %4d\n",
+               launch == 1 ? "" : "info: ", names[launch], zero, pattern);
+        if (launch != 1)
+            printf("info: %s: cells holding a value some lane stored in launch 2: %4d\n", names[launch], residue);
         for (int w = 0; w < 4; ++w)
             printf("info: %s, warp %d, lane 0, columns 0-3: %08x %08x %08x %08x\n", names[launch], w,
                    out[w * 32 * COLS], out[w * 32 * COLS + 1], out[w * 32 * COLS + 2], out[w * 32 * COLS + 3]);

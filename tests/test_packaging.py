@@ -13,6 +13,7 @@ Building takes setuptools: the one already installed when it is new enough for
 pyproject.toml, and otherwise one that `build` downloads into an environment of its own.
 """
 
+import importlib.util
 import email
 import re
 import shutil
@@ -143,7 +144,11 @@ def built(tmp_path_factory):
     files copied. setuptools writes warplens.egg-info next to pyproject.toml and, when one is
     already there, takes the files its SOURCES.txt lists into the sdist again: an egg-info left
     in the checkout by an earlier build would hide a file that MANIFEST.in no longer names."""
-    pytest.importorskip("build", reason="needs `build` (pip install build, or the dev extra)")
+    # Not importorskip: pytest runs from the checkout, where an ignored directory `build/`
+    # (a build output, or anything else kept there) imports as an empty namespace package.
+    spec = importlib.util.find_spec("build")
+    if spec is None or spec.origin is None:
+        pytest.skip("needs `build` (pip install build, or the dev extra)")
     out = tmp_path_factory.mktemp("dist")
     tree = tmp_path_factory.mktemp("tree")
     for entry in ROOT.iterdir():

@@ -1,5 +1,5 @@
 status: exit 3
 warplens: unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer spanning the local 32-row tensor-memory window)
-  line 384: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r68}, [%r131];
+  line 393: tcgen05.ld.sync.aligned.32x32b.x1.b32 {%r73}, [%r135];
 KERNEL FAILED: mma_dump: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
 warplens: the program launched no kernels

@@ -3,10 +3,10 @@ warplens: 4 kernel launch(es) simulated on B200, 2 finding(s)
   mma_mismatch: 1 CTA(s), 1436 warp-instructions
   mma_mismatch: 1 CTA(s), 1436 warp-instructions
   mma_mismatch: 1 CTA(s), 1436 warp-instructions
-    [mma-swizzle-mismatch] operand A's descriptor says 64B swizzle, but the TMA load at line 725 wrote this buffer with 128B swizzle; the MMA will read the elements in the wrong order
-      line 746: tcgen05.mma.cta_group::1.kind::f16 [%r78], %rd18, %rd19, %r38, p;
+    [mma-swizzle-mismatch] operand A's descriptor says 64B swizzle, but the TMA load at line 734 wrote this buffer with 128B swizzle; the MMA will read the elements in the wrong order
+      line 755: tcgen05.mma.cta_group::1.kind::f16 [%r78], %rd18, %rd19, %r38, p;
       first in CTA (0, 0, 0), warp 0, lanes 0
   mma_mismatch: 1 CTA(s), 1436 warp-instructions
-    [mma-swizzle-mismatch] operand A's descriptor says 64B swizzle, but the TMA load at line 725 wrote this buffer with 128B swizzle; the MMA will read the elements in the wrong order
-      line 746: tcgen05.mma.cta_group::1.kind::f16 [%r78], %rd18, %rd19, %r38, p;
+    [mma-swizzle-mismatch] operand A's descriptor says 64B swizzle, but the TMA load at line 734 wrote this buffer with 128B swizzle; the MMA will read the elements in the wrong order
+      line 755: tcgen05.mma.cta_group::1.kind::f16 [%r78], %rd18, %rd19, %r38, p;
       first in CTA (0, 0, 0), warp 0, lanes 0

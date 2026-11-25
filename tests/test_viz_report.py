@@ -71,7 +71,7 @@ def test_report_of_a_timed_gemm_has_every_view_inline_and_as_a_file(tmp_path):
     assert "TMA load of 64 rows x 128 bytes" in html and "TMEM layout of a 128 x 64 tcgen05.mma result" in html
     assert "64 tcgen05.mma of this shape" in html and "The checkers reported nothing." in html
     assert stats.timing.verdict in html and "not a prediction" in html
-    assert "mbarrier completing a phase" in html
+    assert "Each mbarrier has a row" in html and "illustrative parameters, 8 of 13 assumed" in html
 
 
 def test_report_shows_findings_with_their_ptx_line_and_says_what_is_absent(tmp_path):

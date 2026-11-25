@@ -1,0 +1,104 @@
+
+banks_linear_32x32  (grid 64, block 32x32)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                            2048      2048               =
+  smsp__inst_executed_op_shared_st.sum                            2048      2048               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                 71744     67584           +4160
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      4096                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum             63488     63488               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum       63488     63488               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum           0         0               =
+
+banks_padded_32x32  (grid 64, block 32x32)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                            2048      2048               =
+  smsp__inst_executed_op_shared_st.sum                            2048      2048               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                  8256      4096           +4160
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      4096                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum                 0         0               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum           0         0               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum           0         0               =
+
+banks_swizzled_32x32  (grid 64, block 32x32)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                            2048      2048               =
+  smsp__inst_executed_op_shared_st.sum                            2048      2048               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                  8256      4096           +4160
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      4096                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum                 0         0               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum           0         0               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum           0         0               =
+
+banks_linear_32x8  (grid 64, block 32x8)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                             512       512               =
+  smsp__inst_executed_op_shared_st.sum                             512       512               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                  5696      4608           +1088
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      1024                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum              3584      3584               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum        3584      3584               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum           0         0               =
+
+banks_padded_32x8  (grid 64, block 32x8)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                             512       512               =
+  smsp__inst_executed_op_shared_st.sum                             512       512               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                  3648      2560           +1088
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      1024                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum              1536      1536               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum        1536      1536               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum           0         0               =
+
+banks_swizzled_32x8  (grid 64, block 32x8)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                             512       512               =
+  smsp__inst_executed_op_shared_st.sum                             512       512               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                  3648      2560           +1088
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      1024                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum              1536      1536               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum        1536      1536               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum           0         0               =
+
+banks_linear_16x16  (grid 64, block 16x16)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                             512       512               =
+  smsp__inst_executed_op_shared_st.sum                             512       512               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                  5696      4608           +1088
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      1024                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum              3584      3584               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum        3584      3584               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum           0         0               =
+
+banks_padded_16x16  (grid 64, block 16x16)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                             512       512               =
+  smsp__inst_executed_op_shared_st.sum                             512       512               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                  3136      2048           +1088
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      1024                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum              1024      1024               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum         512       512               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum         512       512               =
+
+banks_swizzled_16x16  (grid 64, block 16x16)
+  metric                                                           ncu  warplens  ncu - warplens
+  smsp__inst_executed_op_shared_ld.sum                             512       512               =
+  smsp__inst_executed_op_shared_st.sum                             512       512               =
+  l1tex__data_pipe_lsu_wavefronts_mem_shared.sum                  2112      1024           +1088
+  l1tex__data_pipe_lsu_wavefronts_mem_shared_ideal.sum             n/a      1024                
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared.sum                 0         0               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_ld.sum           0         0               =
+  l1tex__data_bank_conflicts_pipe_lsu_mem_shared_op_st.sum           0         0               =
+
+wavefront surplus (ncu - warplens), TIM-17
+  kernel                    surplus  CTAs  warps  ld+st executed  per CTA  per warp
+  banks_linear_32x32          +4160    64   2048            4096    65.00     2.031
+  banks_padded_32x32          +4160    64   2048            4096    65.00     2.031
+  banks_swizzled_32x32        +4160    64   2048            4096    65.00     2.031
+  banks_linear_32x8           +1088    64    512            1024    17.00     2.125
+  banks_padded_32x8           +1088    64    512            1024    17.00     2.125
+  banks_swizzled_32x8         +1088    64    512            1024    17.00     2.125
+  banks_linear_16x16          +1088    64    512            1024    17.00     2.125
+  banks_padded_16x16          +1088    64    512            1024    17.00     2.125
+  banks_swizzled_16x16        +1088    64    512            1024    17.00     2.125
+
+instruction and conflict counters match

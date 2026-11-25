@@ -1,0 +1,45 @@
+==PROF== Connected to process 90879 (/home/ubuntu/warplens/validation/blackwell_timing/bin/hw/mbar)
+DEVICE bench=mbar name=NVIDIA_B200 cc=10.0 sm_count=148 total_mem_bytes=191490555904 free_mem_bytes=190691868672 bench_clock=1 sim=0 trials=1 scale=0.01 synthetic=0 smem_per_sm_bytes=233472 max_threads_per_sm=2048 max_blocks_per_sm=32
+BENCH id=mbar/arrive_wait/threads=1 reps=10000 trial=-1 event_ns=25977633 wall_ns=26003383 clk=642594 check=10000
+BENCH id=mbar/arrive_wait/threads=1 reps=10000 trial=0 event_ns=22461697 wall_ns=22479011 clk=642594 check=10000
+BENCH id=mbar/arrive_wait/threads=1 reps=20000 trial=0 event_ns=21339745 wall_ns=21357333 clk=1285094 check=20000
+BENCH id=mbar/arrive_wait/threads=32 reps=10000 trial=-1 event_ns=22899296 wall_ns=22917705 clk=642594 check=10000
+BENCH id=mbar/arrive_wait/threads=32 reps=10000 trial=0 event_ns=23015232 wall_ns=23032575 clk=642594 check=10000
+BENCH id=mbar/arrive_wait/threads=32 reps=20000 trial=0 event_ns=23092735 wall_ns=23110196 clk=1285094 check=20000
+==PROF== Disconnected from process 90879
+"ID","Process ID","Process Name","Host Name","Kernel Name","Context","Stream","Block Size","Grid Size","Device","CC","Section Name","Metric Name","Metric Unit","Metric Value"
+"0","90879","mbar","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","575940190"
+"0","90879","mbar","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","575001533.67"
+"0","90879","mbar","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","575940190"
+"0","90879","mbar","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","76960020720"
+"0","90879","mbar","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","130000035"
+"1","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","650466"
+"1","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","1087.30"
+"1","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","650466"
+"1","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","60046"
+"1","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","101.43"
+"2","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","649598"
+"2","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","1087.29"
+"2","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","649598"
+"2","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","60046"
+"2","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","101.43"
+"3","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","1293997"
+"3","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","2172.71"
+"3","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","1293997"
+"3","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","120046"
+"3","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","202.78"
+"4","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","650680"
+"4","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","1087.69"
+"4","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","650680"
+"4","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","60046"
+"4","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","101.43"
+"5","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","649202"
+"5","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","1087.25"
+"5","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","649202"
+"5","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","60046"
+"5","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","101.43"
+"6","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","1292399"
+"6","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","2172.59"
+"6","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","1292399"
+"6","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","120046"
+"6","90879","mbar","127.0.0.1","mbar_kernel(unsigned long *, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","202.78"

@@ -1,9 +1,11 @@
 info: sharedMemPerBlockOptin 232448 bytes
 cluster of  8 CTAs, 1024 bytes of dynamic shared memory per CTA: launched; 8 of 8 CTAs ran and read back their last shared byte
-cluster of 16 CTAs, 1024 bytes of dynamic shared memory per CTA: launched; 16 of 16 CTAs ran and read back their last shared byte
+cluster of 16 CTAs, 1024 bytes of dynamic shared memory per CTA: refused at the launch
+info: cluster of 16 CTAs, 1024 bytes: cudaErrorInvalidClusterSize
 cluster of 32 CTAs, 1024 bytes of dynamic shared memory per CTA: refused at the launch
 info: cluster of 32 CTAs, 1024 bytes: cudaErrorInvalidClusterSize
 cluster of  8 CTAs, the opt-in maximum of dynamic shared memory per CTA: launched; 8 of 8 CTAs ran and read back their last shared byte
-cluster of 16 CTAs, the opt-in maximum of dynamic shared memory per CTA: launched; 16 of 16 CTAs ran and read back their last shared byte
+cluster of 16 CTAs, the opt-in maximum of dynamic shared memory per CTA: refused at the launch
+info: cluster of 16 CTAs, 232448 bytes: cudaErrorInvalidClusterSize
 cluster of 32 CTAs, the opt-in maximum of dynamic shared memory per CTA: refused at the launch
 info: cluster of 32 CTAs, 232448 bytes: cudaErrorInvalidClusterSize

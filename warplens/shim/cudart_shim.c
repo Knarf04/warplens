@@ -257,7 +257,7 @@ int warplens_set_function_attribute(const void *key, int attribute, int value) {
   struct function *f = find_function(key);
   if (!f) return cudaErrorInvalidDeviceFunction;
   if (!wl_function_attribute_is_valid(attribute, value)) return cudaErrorInvalidValue;
-  if (attribute != WL_ATTRIBUTE_MAX_DYNAMIC_SMEM) return cudaSuccess;
+  if (attribute != WL_ATTRIBUTE_MAX_DYNAMIC_SMEM && attribute != WL_ATTRIBUTE_NONPORTABLE_CLUSTER) return cudaSuccess;
   int32_t body[3] = {(int32_t)f->id, attribute, value};
   struct wl_part part = {body, sizeof body};
   return warplens_call(WL_SET_ATTRIBUTE, &part, 1, NULL, 0, NULL);

@@ -85,6 +85,8 @@ details.
 
 - **[docs/guide.md](docs/guide.md)**: the user guide. Installation, every way
   to get code in, how to read the results, limits, troubleshooting.
+- [docs/gallery.md](docs/gallery.md): three annotated pictures and how to
+  read them: a bank conflict, a TMA copy that reads too early, a pipelined GEMM.
 - [notebooks/book_tour.ipynb](notebooks/book_tour.ipynb): the nine GEMM kernels
   of the book *Modern GPU Programming for MLSys*, chapter by chapter, in the
   simulator. It runs them from your own clone of the book.

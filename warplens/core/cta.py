@@ -14,11 +14,12 @@ WARP_SIZE = 32
 
 class Wait:
     """Why a warp is blocked. With `retry`, the warp re-executes the blocking
-    instruction when woken instead of continuing after it."""
-    __slots__ = ("kind", "ins", "retry", "detail")
+    instruction when woken instead of continuing after it. `on` names what it waits for,
+    for the timeline: the (shared offset, phase) of each mbarrier whose phase must complete."""
+    __slots__ = ("kind", "ins", "retry", "detail", "on")
 
-    def __init__(self, kind: str, ins, retry: bool = False, detail=None):
-        self.kind, self.ins, self.retry, self.detail = kind, ins, retry, detail
+    def __init__(self, kind: str, ins, retry: bool = False, detail=None, on=()):
+        self.kind, self.ins, self.retry, self.detail, self.on = kind, ins, retry, detail, tuple(on)
 
 
 class AsyncOp:
@@ -148,11 +149,12 @@ class Cta:
             raise ExecutionError(f"CTA rank {rank} does not exist in a cluster of {len(ctas)} CTA(s)")
         return ctas[rank]
 
-    def phase_completed(self) -> None:
-        """An mbarrier phase completed: wake its waiters. What it orders is between the warps
-        that arrived and the warps whose wait succeeds (`units/mbarrier.py`)."""
+    def phase_completed(self, offset: int, phase: int) -> None:
+        """Phase `phase` of the mbarrier at shared offset `offset` completed: wake the waiters.
+        What it orders is between the warps that arrived and the warps whose wait succeeds
+        (`units/mbarrier.py`)."""
         if self.timeline is not None:
-            self.timeline.timing.instants.append(("mbarrier phase completes", self.timeline.now, self.id))
+            self.timeline.phase_completed(offset, phase)
         self._wake("mbarrier")
 
     def _wake(self, kind: str) -> None:

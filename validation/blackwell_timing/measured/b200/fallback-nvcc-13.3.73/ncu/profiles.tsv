@@ -1,0 +1,11 @@
+ncu_banks	ok	counter table in ncu_banks.csv
+transpose	ok	counter table in transpose.csv
+alu_chain	ok	counter table in alu_chain.csv
+smem_wavefronts	ok	counter table in smem_wavefronts.csv
+global_load	ok	counter table in global_load.csv
+cp_async	ok	counter table in cp_async.csv
+mbar	ok	counter table in mbar.csv
+tma	ok	counter table in tma.csv
+mma_rate	ok	counter table in mma_rate.csv
+tmem_access	ok	counter table in tmem_access.csv
+clc_latency	ok	counter table in clc_latency.csv

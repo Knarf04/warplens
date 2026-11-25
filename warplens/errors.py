@@ -21,6 +21,9 @@ CUDA_INVALID_VALUE = 1  # cudaErrorInvalidValue: too much shared memory, a bad a
 CUDA_INVALID_CONFIGURATION = 9  # cudaErrorInvalidConfiguration: block or grid dimensions
 CUDA_INVALID_CLUSTER_SIZE = 912  # cudaErrorInvalidClusterSize: a cluster shape the device refuses
 CUDA_LAUNCH_FAILURE = 719  # cudaErrorLaunchFailure: the kernel faulted while running
+# cudaErrorTensorMemoryLeak: the kernel returned with tensor memory still allocated. Measured
+# on a B200 (validation/blackwell/measured/b200/tmem/alloc_leak.txt).
+CUDA_TENSOR_MEMORY_LEAK = 721
 
 
 class LaunchError(WarplensError):

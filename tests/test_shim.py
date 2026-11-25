@@ -257,11 +257,14 @@ def test_a_launch_is_held_to_the_shared_memory_the_kernel_was_opted_in_to():
     another = kernel(49152)  # each kernel has its own maximum: this one is not opted in
     assert attributes(another) == (default, 0) and launch(another, 0) == 0 and launch(another, 16) == 1
 
-    over = kernel(49168)  # static shared memory over the default: no opt-in is needed at all
-    assert attributes(over) == (49168, most - 49168)
+    # Static shared memory over the default: no opt-in is needed at all. What such a kernel
+    # reports as its maximum is 0 all the same, as a B200 does (the 3080 Ti reported the
+    # rest of the opt-in maximum): validation/blackwell/measured/b200/e2e/smem_static.txt.
+    over = kernel(49168)
+    assert attributes(over) == (49168, 0)
     assert launch(over, 0) == 0 and launch(over, most - 49168) == 0 and launch(over, most - 49168 + 16) == 1
     large = kernel(61440)
-    assert attributes(large) == (61440, most - 61440) and launch(large, 16) == 0
+    assert attributes(large) == (61440, 0) and launch(large, 16) == 0
     assert opt_in(large, most - 61440 + 1) == 1 and opt_in(large, 0) == 0
     assert launch(large, 0) == 0 and launch(large, 16) == 1
     full = kernel(most)
@@ -269,6 +272,40 @@ def test_a_launch_is_held_to_the_shared_memory_the_kernel_was_opted_in_to():
     assert [name for name, _ in c.server.launches] == (
         ["static_16"] * 4 + ["static_40960"] * 2 + ["static_49152"] + ["static_49168"] * 2 + ["static_61440"] * 2
         + [f"static_{most}"])  # no refused launch ran
+
+
+def test_a_cluster_of_more_than_eight_ctas_needs_the_non_portable_attribute(sim):
+    """As a B200 does (validation/blackwell/measured/b200/cluster/max_size.txt and
+    cluster-optin/optin.txt): 8 CTAs launch, 16 are refused with cudaErrorInvalidClusterSize
+    until the program sets cudaFuncAttributeNonPortableClusterSizeAllowed for the kernel, and
+    32 are refused either way. Each kernel has its own setting, and it can be taken back."""
+    c = Client()
+    (module,) = struct.unpack("<I", c.ok(shim.REGISTER_FATBIN, fatbin(STATIC_KERNELS)))
+    (out,) = struct.unpack("<Q", c.ok(shim.MALLOC, struct.pack("<Q", 64)))
+    one, other = (struct.unpack_from("<I", c.ok(shim.REGISTER_FUNCTION,
+                                                 struct.pack("<I", module) + name.encode()))[0]
+                  for name in ("static_16", "static_40960"))
+
+    def refusal(function, ctas):
+        return c.call(shim.LAUNCH, struct.pack("<10IQ", function, ctas, 1, 1, 32, 1, 1, ctas, 1, 1, 0)
+                      + struct.pack("<Q", out))
+
+    def launch(function, ctas):
+        return refusal(function, ctas)[0]
+
+    def allow(function, value):
+        return c.call(shim.SET_ATTRIBUTE, struct.pack("<Iii", function, shim.NONPORTABLE_CLUSTER, value))[0]
+
+    invalid_cluster_size = 912
+    assert launch(one, 8) == 0 and launch(one, 16) == invalid_cluster_size and launch(one, 32) == invalid_cluster_size
+    assert "cudaFuncAttributeNonPortableClusterSizeAllowed, 1)" in refusal(one, 16)[1].decode()
+    assert allow(one, 1) == 0
+    assert launch(one, 16) == 0 and launch(one, 32) == invalid_cluster_size
+    assert launch(other, 16) == invalid_cluster_size  # another kernel was not allowed them
+    assert allow(one, 0) == 0 and launch(one, 16) == invalid_cluster_size and launch(one, 8) == 0
+    # The Python API has no attribute to set and takes any cluster up to the device's 16.
+    module = warplens.parse_ptx(STATIC_KERNELS)
+    sim.launch(module, "static_16", grid=16, block=32, cluster=(16, 1, 1), args=[sim.empty(16, "u32")])
 
 
 def test_the_python_api_has_no_opt_in_step(sim):

@@ -1,8 +1,8 @@
 status: ok
+warplens: kernel `cluster_touch` was launched with a cluster of 16 CTAs (16, 1, 1). A GPU launches clusters of more than 8 CTAs only for a kernel that was allowed them and refuses this launch with cudaErrorInvalidClusterSize. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeNonPortableClusterSizeAllowed, 1), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_NON_PORTABLE_CLUSTER_SIZE_ALLOWED, 1)
 warplens: cluster (32, 1, 1) has more than 16 CTAs
+warplens: kernel `cluster_touch` was launched with a cluster of 16 CTAs (16, 1, 1). A GPU launches clusters of more than 8 CTAs only for a kernel that was allowed them and refuses this launch with cudaErrorInvalidClusterSize. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeNonPortableClusterSizeAllowed, 1), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_NON_PORTABLE_CLUSTER_SIZE_ALLOWED, 1)
 warplens: cluster (32, 1, 1) has more than 16 CTAs
-warplens: 4 kernel launch(es) simulated on B200, 0 finding(s)
+warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
   cluster_touch: 8 CTA(s), 128 warp-instructions
-  cluster_touch: 16 CTA(s), 256 warp-instructions
   cluster_touch: 8 CTA(s), 128 warp-instructions
-  cluster_touch: 16 CTA(s), 256 warp-instructions

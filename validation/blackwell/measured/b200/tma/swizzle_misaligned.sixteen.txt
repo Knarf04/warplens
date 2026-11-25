@@ -1,0 +1,2 @@
+KERNEL FAILED: tma_dump
+info: error cudaErrorMisalignedAddress

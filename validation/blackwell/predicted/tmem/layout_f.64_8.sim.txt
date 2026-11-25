@@ -1,6 +1,6 @@
 status: exit 3
 warplens: tcgen05.mma result with M=64 at lane 8; the lane of the destination must be 0 or 16
-  at module0.ptx:336: tcgen05.mma.cta_group::1.kind::f16 [%r60], %rd18, %rd19, %r61, p;
+  at module0.ptx:345: tcgen05.mma.cta_group::1.kind::f16 [%r65], %rd18, %rd19, %r66, p;
   in kernel `mma_dump`, CTA (0, 0, 0), warp 0
   lane 0 (thread (0, 0, 0))
 KERNEL FAILED: mma_dump: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)

@@ -1,0 +1,1 @@
+KERNEL FAILED: two arrivals expected, three arrive at once, then one at a time: cudaErrorLaunchFailure at synchronize (unspecified launch failure)

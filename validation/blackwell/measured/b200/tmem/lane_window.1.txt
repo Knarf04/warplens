@@ -1,0 +1,4 @@
+MMA: M = 128, N = 8, D[m][n] = 256 m + n; row m is expected on lane m
+lane field 1 in all four warps:
+KERNEL FAILED: mma_dump
+info: error cudaErrorMisalignedAddress

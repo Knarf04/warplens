@@ -48,6 +48,16 @@ class Slice:
     args: dict = field(default_factory=dict)
 
 
+@dataclass(slots=True)
+class Instant:
+    """Something that happened at one time. For an mbarrier phase completion, `args` has the
+    barrier's shared offset (`mbarrier`) and the number of the phase that completed (`phase`)."""
+    name: str
+    when: float
+    cta: tuple = (0, 0, 0)
+    args: dict = field(default_factory=dict)
+
+
 class Server:
     __slots__ = ("name", "free", "busy", "work", "first", "last")
 
@@ -151,9 +161,18 @@ class Timeline:
         warp.time = max(warp.time, when)
         if wait is not None:
             text = " ".join(wait.ins.text.split())
-            self.slice(f"warp {warp.warp_id}", f"wait: {wait.kind}", start, warp.time,
-                       line=wait.ins.line, instruction=text)
+            args = dict(line=wait.ins.line, instruction=text)
+            if wait.kind == "mbarrier" and wait.on:
+                # Which phase of which barrier: what the timeline joins to its completion.
+                args["on"] = "; ".join(f"mbarrier at shared offset {o}, phase {p}" for o, p in wait.on)
+                args["mbarriers"] = [[o, p] for o, p in wait.on]
+            self.slice(f"warp {warp.warp_id}", f"wait: {wait.kind}", start, warp.time, **args)
         self.run_start[warp.warp_id] = warp.time
+
+    def phase_completed(self, offset: int, phase: int) -> None:
+        self.timing.instants.append(Instant(
+            f"mbarrier at shared offset {offset}: phase {phase} completes", self.now, self.cta_id,
+            {"mbarrier": offset, "phase": phase}))
 
     def finished(self, warp) -> None:
         self.slice(f"warp {warp.warp_id}", "run", self.run_start.get(warp.warp_id, 0.0), warp.time)
@@ -182,13 +201,19 @@ class Timeline:
                 seen.update(new)
                 fresh = global_bytes * len(new) / len(lines)
             start, end = self.tma.reserve(issued, nbytes / self.tma_rate, nbytes)
+            verb = "write" if operation.kind == "store" else "fetch"
             if fresh:
-                _, hbm_end = self.hbm.reserve(issued, fresh / self.hbm_rate, fresh)
+                hbm_start, hbm_end = self.hbm.reserve(issued, fresh / self.hbm_rate, fresh)
                 end = max(end, hbm_end)
+                # This SM's share of HBM at work for the copy: the busy time, not the lifetime.
+                self.slice("HBM", f"HBM {verb}", hbm_start, hbm_end, bytes=int(fresh),
+                           line=operation.ins.line)
             if global_bytes - fresh:
-                _, l2_end = self.l2.reserve(issued, (global_bytes - fresh) / self.l2_rate,
-                                          global_bytes - fresh)
+                l2_start, l2_end = self.l2.reserve(issued, (global_bytes - fresh) / self.l2_rate,
+                                                   global_bytes - fresh)
                 end = max(end, l2_end)
+                self.slice("L2", f"L2 {verb}", l2_start, l2_end, bytes=int(global_bytes - fresh),
+                           line=operation.ins.line)
             done = end + cfg["tma_latency_ns"]
             for address in new:
                 self.l2_ready[address] = min(self.l2_ready.get(address, done), done)
@@ -196,8 +221,9 @@ class Timeline:
             label = "cp.async copy" if operation.kind == "copy" else f"TMA {operation.kind}"
             # Bytes charged to HBM: fetched from it, or for a store, written to it.
             hbm_key = "to_hbm" if operation.kind == "store" else "from_hbm"
+            reports = {} if work.get("mbarrier") is None else {"mbarrier": int(work["mbarrier"])}
             self.slice("TMA engine", label, start, done, bytes=nbytes,
-                       issued_ns=issued, line=operation.ins.line, **{hbm_key: int(fresh)})
+                       issued_ns=issued, line=operation.ins.line, **{hbm_key: int(fresh)}, **reports)
         elif operation.kind == "clc":
             # A clusterlaunchcontrol.try_cancel response lands a fixed time after the request.
             # How long a launch takes to answer is not known: `clc_latency_ns` is a placeholder.
@@ -261,7 +287,7 @@ class Timing:
         self.l2_lines: set[int] = set()  # global-memory lines some CTA has already fetched
         self.timelines: list[Timeline] = []
         self.slices: list[Slice] = []
-        self.instants: list[tuple[str, float, tuple]] = []
+        self.instants: list[Instant] = []
 
     def timeline(self, cta_id) -> Timeline:
         self.timelines.append(Timeline(self, cta_id))
@@ -340,9 +366,12 @@ class TimingReport:
     def summary(self) -> str:
         cfg = self.config
         lines = [f"Approximate timing on {cfg.name} (model, not a measurement)",
+                 f"  parameters: {cfg.basis}",
                  f"  {self.ctas} CTA(s), each alone on one SM; {self.active_sms} SMs assumed to share HBM",
                  f"  kernel time {self.time_ns:,.0f} ns ({self.clocks:,.0f} clocks at "
-                 f"{cfg['clock_ghz']:g} GHz, an assumed clock)",
+                 f"{cfg['clock_ghz']:g} GHz, "
+                 + ("an assumed clock)" if cfg.params["clock_ghz"].is_assumption else
+                    "a fitted issue rate, not a clock)" if cfg.params["clock_ghz"].is_fitted else "as given)"),
                  f"  verdict: {self.verdict}"]
         if self.working_ctas < self.ctas:
             lines.append(f"  busy is averaged over the {self.working_ctas} CTA(s) that did work; "

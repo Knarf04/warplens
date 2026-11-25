@@ -106,3 +106,26 @@ def test_bit_explanation():
     assert "result is infinity" in explain_tf32(3.4028235e38)
     assert "without rounding" in explain_tf32(float("nan"))
     assert "cvt.rz.tf32.f32" in explain_tf32(0.1, "rz")
+
+
+def test_rn_and_rz_give_one_nan_for_every_nan_as_a_b200_does():
+    """Measured on a B200 (validation/blackwell/measured/b200/formats/tf32_modes.txt): unlike
+    .rna, which clears the low bits and so can turn a NaN into infinity, .rn and .rz give
+    0x7FFFE000 for every NaN. Infinities stay as they are."""
+    nans = np.array([0x7FC00000, 0xFFC00000, 0x7F800001, 0x7FA12345, 0xFFFFFFFF], dtype=np.uint32)
+    for mode in ("rn", "rz"):
+        assert to_tf32(nans, mode).tolist() == [0x7FFFE000] * 5
+        assert to_tf32(np.array([0x7F800000, 0xFF800000], dtype=np.uint32), mode).tolist() == [0x7F800000, 0xFF800000]
+    assert to_tf32(nans, "rna").tolist() == [0x7FC00000, 0xFFC00000, 0x7F800000, 0x7FA12000, 0xFFFFE000]
+
+
+def test_the_three_modes_are_what_a_b200_printed():
+    """Every line of the B200's run of formats/tf32_modes: input, .rna, .rn, .rz."""
+    from pathlib import Path
+    measured = Path(__file__).parents[1] / "validation/blackwell/measured/b200/formats/tf32_modes.txt"
+    rows = [line.split() for line in measured.read_text().splitlines()
+            if len(line.split()) == 4 and all(len(w) == 8 for w in line.split())]
+    assert len(rows) == 715
+    table = np.array([[int(w, 16) for w in row] for row in rows], dtype=np.uint32)
+    for column, mode in enumerate(("rna", "rn", "rz"), start=1):
+        np.testing.assert_array_equal(to_tf32(table[:, 0], mode), table[:, column])

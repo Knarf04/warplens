@@ -1,0 +1,8 @@
+status: ok
+warplens: cluster (32, 1, 1) has more than 16 CTAs
+warplens: cluster (32, 1, 1) has more than 16 CTAs
+warplens: 4 kernel launch(es) simulated on B200, 0 finding(s)
+  cluster_touch: 8 CTA(s), 128 warp-instructions
+  cluster_touch: 16 CTA(s), 256 warp-instructions
+  cluster_touch: 8 CTA(s), 128 warp-instructions
+  cluster_touch: 16 CTA(s), 256 warp-instructions

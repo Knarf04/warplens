@@ -7,13 +7,16 @@
 // Claims tested (docs/m2.md, "Assumptions"):
 //   * elements outside the tensor are filled, with zero or with a NaN, and elements inside
 //     are loaded; coordinates may be negative;
-//   * the NaN is the default quiet NaN of the type (0x7e00, 0x7fc00000, 0x7ff8000000000000).
-//     The hardware constant is not documented; the simulator uses NumPy's;
+//   * the NaN is 0x7ff7 in every 16 bits of the element (0x7ff7, 0x7ff77ff7,
+//     0x7ff77ff77ff77ff7): measured on a B200, 2026-11-25. It is not documented;
 //   * complete_tx counts the WHOLE box, filled bytes included: every load here expects the
 //     full box and reports whether the mbarrier phase completed.
-// Case `inbounds` (may differ, and polls for a while): the same loads with expect_tx equal
-// to the bytes actually inside the tensor. If hardware counted only those, these phases
-// would complete; the simulator predicts they do not.
+// Case `inbounds`: the same loads with expect_tx equal to the bytes actually inside the
+// tensor. On a B200 these phases complete, and that alone does not say the fill is not
+// counted: a copy reports its bytes in pieces, so a count smaller than the copy reaches zero
+// part of the way through (mbarrier/expect_tx, "too small", shows the same with no fill at
+// all). The buffer is therefore copied only after a settle (tma_dump.h): read at once, one
+// filled row still held the sentinel.
 //
 //   oob_fill [inbounds]
 #include "tma_dump.h"
@@ -68,7 +71,7 @@ static void run(const Type& t, bool nan_fill, int c0, int c1, bool inbounds_only
     uint32_t box_bytes = COLS * BOX_ROWS * t.bytes;
     uint32_t expect = inbounds_only ? (uint32_t)(inside * t.bytes) : box_bytes;
     const int coords[2] = {c0, c1};
-    Dump dump = load_and_dump(map, 2, coords, 0, expect, "tma_dump");
+    Dump dump = load_and_dump(map, 2, coords, 0, expect, "tma_dump", inbounds_only);
     int first, last;
     dump.extent(&first, &last);
     printf("%s, fill %s, box at column %d, row %d: %d of %d elements inside\n", t.name, nan_fill ? "NaN" : "zero",

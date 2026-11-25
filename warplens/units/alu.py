@@ -682,6 +682,21 @@ def _cvt(w, ins, mask):
         d, a = _operands(ins, 2)
         w.write(d, to_tf32(w.read(a, "b32"), ins.mods[0]), mask)
         return
+    if ins.mods[-2:] == ("f16x2", "f32"):
+        # cvt.rn.f16x2.f32 d, a, b: two float32 to half precision, packed into one 32-bit
+        # register with the FIRST source in the high half. The order is from a B200: the
+        # epilogue of CUTLASS's fp16_gemm_0.py (CuTe DSL) uses it for every pair of outputs,
+        # and the launch captured there replays byte for byte this way and with 129,920 of
+        # 131,072 elements wrong the other way (docs/b200-rental-1.md). Round to nearest
+        # even only, which is the form that kernel has; overflow gives an infinity.
+        if ins.mods[:-2] != ("rn",):
+            raise unsupported(ins, "cvt to .f16x2 from .f32 needs .rn and nothing else")
+        d, a, b = _operands(ins, 3)
+        with np.errstate(over="ignore"):
+            high = w.read(a, "f32").astype(np.float16).view(np.uint16).astype(np.uint32)
+            low = w.read(b, "f32").astype(np.float16).view(np.uint16).astype(np.uint32)
+        w.write(d, high << np.uint32(16) | low, mask)
+        return
     from . import small_formats
     if small_formats.is_small_format_cvt(ins.mods):  # FP8, FP4 and E8M0, two values at a time
         small_formats.convert(w, ins, mask, unsupported)
@@ -1190,6 +1205,16 @@ def _elect(w, ins, mask):
         raise unsupported(ins)
     d, member = _operands(ins, 2)
     members = ((w.read(member, "u32")[:, None] >> _LANES.astype(np.uint32)) & 1).astype(bool)
+    outside = np.flatnonzero(mask & ~members[_LANES, _LANES])
+    if len(outside):
+        # Measured on a B200 (validation/blackwell/measured/b200/e2e/elect.all.txt): a mask
+        # of 0xffff0000 executed by all 32 lanes ends the kernel with
+        # cudaErrorIllegalInstruction (Xid 13, "Illegal Instruction Parameter"). A mask that
+        # names lanes which do not execute it is fine (e2e/elect.partial, as predicted).
+        raise ExecutionError(
+            f"elect.sync is executed by lane(s) {', '.join(map(str, outside.tolist()))} that its member mask "
+            f"{int(w.read(member, 'u32')[outside[0]]):#010x} does not name. Every lane that executes it must be in "
+            "the mask: a GPU ends the kernel here with cudaErrorIllegalInstruction")
     leader = np.zeros(len(mask), dtype=np.uint32)
     for lane in np.flatnonzero(mask):
         candidates = np.flatnonzero(members[lane] & mask)

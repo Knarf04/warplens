@@ -1,0 +1,63 @@
+==PROF== Connected to process 91283 (/home/ubuntu/warplens/validation/blackwell_timing/bin/hw/clc_latency)
+DEVICE bench=clc_latency name=NVIDIA_B200 cc=10.0 sm_count=148 total_mem_bytes=191490555904 free_mem_bytes=190691868672 bench_clock=1 sim=0 trials=1 scale=0.01 synthetic=0 smem_per_sm_bytes=233472 max_threads_per_sm=2048 max_blocks_per_sm=32
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=100 trial=-1 event_ns=24843231 wall_ns=24867436 clk=41072 check=100
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=100 trial=0 event_ns=21145023 wall_ns=21162538 clk=41081 check=100
+BENCH id=clc_latency/fail/plain/ctas=1 nctas=1 reps=200 trial=0 event_ns=21638144 wall_ns=21667266 clk=81839 check=200
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=100 trial=-1 event_ns=22809984 wall_ns=22829392 clk=78923 check=100
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=100 trial=0 event_ns=21855040 wall_ns=21872868 clk=78909 check=100
+BENCH id=clc_latency/fail/plain/ctas=2 nctas=2 reps=200 trial=0 event_ns=22349089 wall_ns=22367417 clk=157568 check=200
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=100 trial=-1 event_ns=21888128 wall_ns=21905934 clk=80791 check=100
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=100 trial=0 event_ns=20553505 wall_ns=20573283 clk=80791 check=100
+BENCH id=clc_latency/fail/multicast/ctas=2 nctas=2 reps=200 trial=0 event_ns=23477728 wall_ns=23509292 clk=161266 check=200
+==PROF== Disconnected from process 91283
+"ID","Process ID","Process Name","Host Name","Kernel Name","Context","Stream","Block Size","Grid Size","Device","CC","Section Name","Metric Name","Metric Unit","Metric Value"
+"0","91283","clc_latency","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","576005667"
+"0","91283","clc_latency","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","575001534.02"
+"0","91283","clc_latency","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","576005667"
+"0","91283","clc_latency","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","76960020720"
+"0","91283","clc_latency","127.0.0.1","bench_spin_kernel(int, unsigned long *)","1","7","(128, 1, 1)","(148, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","130000035"
+"1","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","47965"
+"1","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","71.65"
+"1","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","47965"
+"1","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","4009"
+"1","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","7.11"
+"2","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","47454"
+"2","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","71.98"
+"2","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","47454"
+"2","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","4009"
+"2","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","7.11"
+"3","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","88870"
+"3","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","140.74"
+"3","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","88870"
+"3","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","7934"
+"3","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(1, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","14.08"
+"4","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","85724"
+"4","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","271.52"
+"4","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","85724"
+"4","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","8107"
+"4","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","14.03"
+"5","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","85059"
+"5","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","271.57"
+"5","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","85059"
+"5","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","8107"
+"5","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","14.03"
+"6","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","163656"
+"6","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","536.85"
+"6","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","163656"
+"6","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","16057"
+"6","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","27.80"
+"7","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","86484"
+"7","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","277.50"
+"7","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","86484"
+"7","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","9706"
+"7","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","17.41"
+"8","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","86683"
+"8","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","277.33"
+"8","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","86683"
+"8","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","9706"
+"8","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","17.41"
+"9","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","sm__cycles_elapsed.max","cycle","167582"
+"9","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_active.avg","cycle","549.25"
+"9","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__cycles_elapsed.max","cycle","167582"
+"9","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","19256"
+"9","91283","clc_latency","127.0.0.1","clc_fail_kernel(unsigned long *, int, int, int)","1","7","(32, 1, 1)","(2, 1, 1)","0","10.0","Command line profiler metrics","smsp__issue_active.avg","cycle","34.55"

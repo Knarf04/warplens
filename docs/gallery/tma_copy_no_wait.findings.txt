@@ -1,0 +1,9 @@
+[tma-load-unsynchronized] read of shared memory that the TMA load at line 73 writes; that load is still in flight (96 times)
+  line 99: ld.shared.b32 %r18, [%r17];
+  first in CTA (0, 0, 0), warp 1, lanes 0-31
+[smem-uninitialized-read] read of shared memory that this CTA never wrote (96 times)
+  line 99: ld.shared.b32 %r18, [%r17];
+  first in CTA (0, 0, 0), warp 1, lanes 0-31
+[tma-load-unsynchronized] write to shared memory that the TMA load at line 73 writes; that load is still in flight (96 times)
+  line 101: st.shared.b32 [%r17], %r19;
+  first in CTA (0, 0, 0), warp 1, lanes 0-31

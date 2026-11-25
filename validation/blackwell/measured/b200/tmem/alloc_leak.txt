@@ -1,0 +1,3 @@
+script: allocate 256 columns and return without releasing them
+KERNEL FAILED: allocate 256 columns and return without releasing them
+info: error cudaErrorTensorMemoryLeak

@@ -1,7 +1,6 @@
-status: exit 3
-warplens: tcgen05.alloc of 64 columns increases the previous allocation size of 32 columns
-  at module0.ptx:169: tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%r6], %r5;
-  in kernel `tmem_alloc_script`, CTA (0, 0, 0), warp 0
-  lane 0 (thread (0, 0, 0)) and 31 more lane(s)
-KERNEL FAILED: 32 columns, then 64 (a larger allocation after a smaller one): cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
-warplens: the program launched no kernels
+status: ok
+warplens: 1 kernel launch(es) simulated on B200, 1 finding(s)
+  tmem_alloc_script: 1 CTA(s), 128 warp-instructions
+    [tmem-alloc-increasing] tcgen05.alloc of 64 columns after one of 32: the PTX allocation contract asks for sizes that do not increase. A B200 allocates it; whether every GPU and every state of tensor memory does is not promised
+      line 169: tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%r6], %r5;
+      first in CTA (0, 0, 0), warp 0, lanes 0

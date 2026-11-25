@@ -116,10 +116,11 @@ static inline float bits_float(uint32_t x) {
 // 128 threads = 4 warps. Steps:
 //   1. every thread copies part of `image` (OPERAND_BYTES) into shared memory; fence; barrier
 //   2. warp 0 allocates `alloc_cols` columns of tensor memory
-//   3. if `prefill`: every warp stores MMA_TMEM_SENTINEL to its own 32 lanes of the first
-//      `ncols` columns (32x32b at lane 32 * warp, the addressing CUTLASS uses)
+//   3. if `prefill`: every warp stores `prefill_bits` (MMA_TMEM_SENTINEL unless a probe says
+//      otherwise) to its own 32 lanes of the first `ncols` columns (32x32b at lane 32 * warp,
+//      the addressing CUTLASS uses)
 //   4. thread 0 issues `repeat` MMAs to [base + (d_lane << 16)]: the first overwrites, the
-//      rest accumulate. `kind` is 0 for kind::f16 and 1 for kind::tf32. Then tcgen05.commit
+//      rest accumulate; with `prefill` == 2 the first accumulates too, onto what step 3 stored. `kind` is 0 for kind::f16 and 1 for kind::tf32. Then tcgen05.commit
 //      to an mbarrier, on which every thread waits.
 //   5. every warp reads `ncols` columns with tcgen05.ld.32x32b at lane field 32 * warp
 //      (READ_CANONICAL) or at the lane field `read_lane`, the same for all warps, and writes
@@ -127,7 +128,8 @@ static inline float bits_float(uint32_t x) {
 //   6. warp 0 deallocates.
 extern "C" __global__ void mma_dump(const uint32_t* image, uint64_t desc_a, uint64_t desc_b, uint32_t idesc,
                                     uint32_t kind, uint32_t d_lane, uint32_t repeat, uint32_t prefill,
-                                    uint32_t read_lane, uint32_t ncols, uint32_t alloc_cols, uint32_t* out) {
+                                    uint32_t read_lane, uint32_t ncols, uint32_t alloc_cols, uint32_t* out,
+                                    uint32_t prefill_bits) {
     __shared__ alignas(1024) uint32_t operands[OPERAND_BYTES / 4];
     __shared__ uint64_t bar;
     __shared__ uint32_t tmem_base;
@@ -152,7 +154,7 @@ extern "C" __global__ void mma_dump(const uint32_t* image, uint64_t desc_a, uint
     uint32_t own = base + ((warp * 32) << 16);
 
     if (prefill) {
-        for (uint32_t c = 0; c < ncols; ++c) tmem_st_32x32b(own + c, MMA_TMEM_SENTINEL);
+        for (uint32_t c = 0; c < ncols; ++c) tmem_st_32x32b(own + c, prefill_bits);
         tmem_wait_st();
         __syncthreads();
     }
@@ -161,8 +163,9 @@ extern "C" __global__ void mma_dump(const uint32_t* image, uint64_t desc_a, uint
         uint64_t where = (uint64_t)((smem_addr(operands) >> 4) & 0x3fff);
         uint32_t d = base + (d_lane << 16);
         for (uint32_t i = 0; i < repeat; ++i) {
-            if (kind == 0) mma_f16(d, desc_a + where, desc_b + where, idesc, i);
-            else mma_tf32(d, desc_a + where, desc_b + where, idesc, i);
+            uint32_t accumulate = prefill == 2 ? 1 : i;
+            if (kind == 0) mma_f16(d, desc_a + where, desc_b + where, idesc, accumulate);
+            else mma_tf32(d, desc_a + where, desc_b + where, idesc, accumulate);
         }
         mma_commit(&bar);
     }
@@ -186,6 +189,7 @@ struct MmaJob {
     int a_mn_major = 0, b_mn_major = 0;
     uint32_t d_lane = 0, repeat = 1, prefill = 0, read_lane = READ_CANONICAL;
     uint32_t idesc_extra = 0;  // further instruction-descriptor bits, e.g. negate A (bit 13) or B (bit 14)
+    uint32_t prefill_bits = MMA_TMEM_SENTINEL;  // what `prefill` stores; with prefill == 2 every MMA accumulates
 };
 
 // Runs the kernel; out[thread][column] for 128 threads and job.n columns.
@@ -198,7 +202,7 @@ static void run_mma(const uint8_t* image, const MmaJob& job, uint32_t* out, cons
     while (alloc < (uint32_t)job.n) alloc *= 2;
     uint32_t idesc = mma_idesc(job.m, job.n, job.fmt, job.a_mn_major, job.b_mn_major) | job.idesc_extra;
     mma_dump<<<1, 128>>>(d_image, job.desc_a, job.desc_b, idesc, job.fmt == 0 ? 0u : 1u, job.d_lane, job.repeat,
-                         job.prefill, job.read_lane, (uint32_t)job.n, alloc, d_out);
+                         job.prefill, job.read_lane, (uint32_t)job.n, alloc, d_out, job.prefill_bits);
     probe_sync(what);
     dev_read(out, d_out, 128 * (size_t)job.n);
 }

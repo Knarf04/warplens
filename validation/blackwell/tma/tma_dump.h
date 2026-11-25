@@ -11,7 +11,12 @@
 // need not agree on; probes print it on an "info:" line only.
 //
 // If the phase did not complete in time the buffer is copied anyway: the copy has had far
-// longer than any load needs.
+// longer than any load needs. The other way round is not safe: a phase that completes says
+// the bytes expected have landed, not the bytes of the copy. With an expect_tx smaller than
+// the box a B200 completed the phase with part of the box still on its way, and the copy
+// made at once showed the sentinel in one of its rows (validation/blackwell/measured/b200/
+// tma/oob_complete_tx.txt). A probe that expects less than the copy passes `settle`: the
+// kernel then polls the whole budget once more before it copies the buffer.
 #pragma once
 #include "../common.h"
 
@@ -21,7 +26,7 @@
 
 extern "C" __global__ void tma_dump(const __grid_constant__ CUtensorMap map, int rank, int c0, int c1, int c2,
                                     int c3, int c4, int offset, uint32_t expect, uint32_t* out,
-                                    uint32_t* completed) {
+                                    uint32_t* completed, int settle) {
     __shared__ alignas(1024) uint32_t buffer[DUMP_WORDS];
     __shared__ uint64_t bar;
     int t = threadIdx.x;
@@ -42,6 +47,8 @@ extern "C" __global__ void tma_dump(const __grid_constant__ CUtensorMap map, int
             case 5: tma_load_5d(dst, &map, &bar, c0, c1, c2, c3, c4); break;
         }
         completed[0] = mbar_poll(&bar, 0);
+        if (settle)
+            for (int j = 0; j < POLL_BUDGET; ++j) (void)mbar_test(&bar, 0);
         completed[1] = smem_addr(buffer);
     }
     __syncthreads();
@@ -73,14 +80,15 @@ struct Dump {
 
 // Run the kernel. `coords` has `rank` entries, dimension 0 (innermost) first.
 static Dump load_and_dump(const CUtensorMap& map, int rank, const int* coords, int offset, uint32_t expect,
-                          const char* what) {
+                          const char* what, bool settle = false) {
     static uint32_t* d_out = dev_alloc<uint32_t>(DUMP_WORDS);
     static uint32_t* d_completed = dev_alloc<uint32_t>(2);
     int c[5] = {0, 0, 0, 0, 0};
     for (int i = 0; i < rank; ++i) c[i] = coords[i];
     dev_fill(d_out, DUMP_WORDS, 0);
     dev_fill(d_completed, 2, 0);
-    tma_dump<<<1, 128>>>(map, rank, c[0], c[1], c[2], c[3], c[4], offset, expect, d_out, d_completed);
+    tma_dump<<<1, 128>>>(map, rank, c[0], c[1], c[2], c[3], c[4], offset, expect, d_out, d_completed,
+                         settle ? 1 : 0);
     probe_sync(what);
     Dump dump;
     dev_read(dump.words, d_out, DUMP_WORDS);

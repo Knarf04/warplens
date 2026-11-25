@@ -44,7 +44,12 @@ def _tma() -> list[Probe]:
         Probe("tma/swizzle_misaligned", "tma/swizzle", ("misaligned",), ("TMA-02",),
               "the swizzle is a function of the shared ADDRESS, not of the offset into the buffer"),
         Probe("tma/swizzle_misaligned.sixteen", "tma/swizzle", ("sixteen",), ("TMA-02",),
-              "the same with a destination 16 bytes into a 128-byte row", risk="fault"),
+              "a destination 16 bytes into a 128-byte row is refused", risk="fault"),
+        Probe("tma/swizzle_misaligned.thirtytwo", "tma/swizzle", ("thirtytwo",), ("TMA-02",),
+              "a destination 32 bytes into a 128-byte row runs (an assumption: the alignment a tensor copy "
+              "needs is between 32 and 128 bytes)", risk="fault"),
+        Probe("tma/swizzle_misaligned.sixtyfour", "tma/swizzle", ("sixtyfour",), ("TMA-02",),
+              "a destination 64 bytes into a 128-byte row runs (the same assumption)", risk="fault"),
         Probe("tma/ranks", "tma/ranks", (), ("TMA-03", "TMA-15"),
               "rank 1-5 boxes land densely, dimension 0 fastest; complete_tx reports box bytes; "
               "the tensor map is a by-value kernel parameter"),
@@ -61,7 +66,8 @@ def _tma() -> list[Probe]:
         Probe("tma/store_wait_group", "tma/store", (), ("TMA-09", "TMA-01", "TMA-03"),
               "a store is in global memory after commit_group + wait_group 0; it reads through the load's swizzle"),
         Probe("tma/store_wait_group.edge", "tma/store", ("edge",), ("TMA-04",),
-              "a store writes only the elements of the box that are inside the tensor", risk="fault"),
+              "a store that hangs over the last row writes the elements inside; one that starts before the first "
+              "row ends the kernel", risk="fault"),
         Probe("tma/store_wait_group.outside", "tma/store", ("outside",), ("TMA-04",),
               "a store wholly outside the tensor writes nothing", risk="fault"),
         Probe("tma/tensormap_encode_sweep", "tma/tensormap_encode_sweep", (), ("TMA-11", "TMA-12"),
@@ -114,12 +120,15 @@ def _mbarrier() -> list[Probe]:
         Probe("mbarrier/complete_before_expect", "mbarrier/script", ("negative",), ("MB-07",),
               "the byte count is signed: complete_tx before expect_tx completes once balanced", risk="fault"),
         Probe("mbarrier/over_arrival", "mbarrier/script", ("over",), ("MB-04",),
-              "arrivals beyond the pending count complete the phase and carry into the next", risk="fault"),
+              "arrivals beyond the pending count end the kernel", risk="fault"),
         Probe("mbarrier/expect_tx_small", "mbarrier/expect_tx", (), ("MB-05", "MB-06", "MB-07", "MB-08"),
               "undersized, oversized and missing expect_tx against real TMA loads, with bounded polls"),
         Probe("mbarrier/expect_tx_small.wait", "mbarrier/expect_tx", ("wait-small",), ("MB-05", "MB-11"),
-              "an undersized expect_tx with one load never completes: the usual wait loop deadlocks",
-              risk="hang", timeout=30),
+              "an undersized expect_tx with one load completes part of the way through it: the usual wait "
+              "loop returns", risk="hang", timeout=30),
+        Probe("mbarrier/expect_tx_small.pieces", "mbarrier/expect_tx", ("pieces",), ("MB-05",),
+              "a load reports its bytes in pieces of 64 (an assumption): an undersized expect_tx completes "
+              "the phase only when it is a whole number of pieces"),
         Probe("mbarrier/expect_tx_large", "mbarrier/expect_tx", ("wait-large",), ("MB-08", "MB-11"),
               "an oversized expect_tx never completes: the usual wait loop deadlocks", risk="hang", timeout=30),
     ]
@@ -144,8 +153,8 @@ def _tmem() -> list[Probe]:
               "every power-of-two repeat count up to 128 registers per thread exists (the build assembles "
               "them) and loads the cells the mapping names"),
         Probe("tmem/fresh_contents", "tmem/fresh_contents", (), ("TM-13",),
-              "tensor memory that was never written reads as zero, in a first launch and after a launch "
-              "that wrote it"),
+              "tensor memory a launch wrote reads back; what a launch that only reads finds is recorded and "
+              "not compared (a B200 kept the last launch's values)"),
         Probe("tmem/cp_record", "tmem/cp", (), (),
               "none: tcgen05.cp is outside v1 and refused. Records which shared bytes the four one-CTA "
               "shapes CUTLASS uses put in which (lane, column)", risk="fault", predict="none"),
@@ -162,11 +171,12 @@ def _tmem() -> list[Probe]:
         Probe("tmem/alloc_blocks", "tmem/alloc", ("exhaust",), ("TM-10",),
               "an allocation that does not fit waits (here: forever)", risk="hang", timeout=30),
         Probe("tmem/dealloc_repeated", "tmem/alloc", ("dealloc-twice",), ("TM-11",),
-              "a second dealloc of the same columns is ignored", risk="hang", timeout=30),
+              "a second dealloc of the same columns is ignored (a B200 ended this kernel, and ran the book's, which "
+              "repeat it from other warps: open)", risk="hang", timeout=30),
         Probe("tmem/dealloc_mismatch", "tmem/alloc", ("dealloc-wrong-size",), ("TM-12",),
               "a dealloc with another size than the allocation's is refused", risk="hang", timeout=30),
         Probe("tmem/alloc_leak", "tmem/alloc", ("leak",), (),
-              "columns never released are reported and do not affect the next launch", risk="hang", timeout=30),
+              "columns never released fail the launch (cudaErrorTensorMemoryLeak)", risk="hang", timeout=30),
     ]
     return probes
 
@@ -220,8 +230,11 @@ def _cluster() -> list[Probe]:
         Probe("cluster/pair_accounting", "cluster/pair_accounting", (), ("CL-08",),
               "with .cta_group::2 a pair's completions go to the member with the mbarrier address's parity"),
         Probe("cluster/max_size", "cluster/max_size", (), ("CL-02",),
-              "clusters of 8 and 16 CTAs launch and one of 32 is refused, with 1 KiB and with the most "
-              "shared memory per CTA"),
+              "without the non-portable attribute a cluster of 8 CTAs launches and those of 16 and 32 are "
+              "refused, with 1 KiB and with the most shared memory per CTA"),
+        Probe("cluster/max_size.nonportable", "cluster/max_size", ("nonportable",), ("CL-02",),
+              "with cudaFuncAttributeNonPortableClusterSizeAllowed clusters of 8 and 16 CTAs launch and one "
+              "of 32 is refused"),
         Probe("cluster/address_dump", "cluster/address_dump", (), ("CL-05",),
               "mapa addresses each rank's copy of a shared symbol; in the simulator's encoding clearing "
               "bit 24 names the even member of a pair"),
@@ -333,7 +346,7 @@ def _device() -> list[Probe]:
         Probe("e2e/elect", "e2e/elect", (), ("RT-05",),
               "elect.sync elects the lowest lane of the member mask; every executing lane gets its id"),
         Probe("e2e/elect.all", "e2e/elect", ("all",), ("RT-05",),
-              "lanes outside the member mask execute elect.sync too: the lowest lane of the mask is elected",
+              "a lane outside the member mask that executes elect.sync ends the kernel",
               risk="fault"),
         Probe("e2e/elect.partial", "e2e/elect", ("partial",), ("RT-05",),
               "the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected",

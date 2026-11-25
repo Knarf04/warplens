@@ -1,0 +1,2 @@
+KERNEL FAILED: member mask 0xffff0000, executed by the lanes of 0xffffffff
+info: error cudaErrorIllegalInstruction

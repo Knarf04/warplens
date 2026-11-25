@@ -1,0 +1,1 @@
+script: 512 columns, then 32 more with nothing free (expected to wait forever)

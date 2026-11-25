@@ -29,7 +29,7 @@ def test_every_area_has_rows_and_ids_are_unique():
 def test_claims_the_plan_names_are_present():
     """Plan step 6 names four claims taken from review; later work added the others."""
     claims = " ".join(row.cells["claim"] for row in ROWS)
-    for phrase in ("Undersized `expect_tx`", "may not be larger than the previous one", "UE8M0",
+    for phrase in ("Undersized `expect_tx`", "larger than the previous one", "UE8M0",
                    "Either CTA of a pair may issue", "tmem-dealloc-repeated", "`.ftz`",
                    "Calls to device functions", "cuTensorMapEncodeTiled"):
         assert phrase in claims, phrase

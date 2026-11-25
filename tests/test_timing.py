@@ -107,7 +107,10 @@ def test_a_waiting_warp_resumes_when_the_copy_completes(sim):
     assert copy.end - copy.start >= latency and copy.args["bytes"] == 64
     assert wait.end == pytest.approx(copy.end) and wait.start < copy.end
     assert t.time_ns > copy.end and not stats.findings
-    assert [name for name, _, _ in t.instants] == ["mbarrier phase completes"]
+    (phase,) = t.instants  # which barrier, and which of its phases
+    assert phase.name == f"mbarrier at shared offset {phase.args['mbarrier']}: phase 0 completes"
+    assert phase.args["phase"] == 0 and phase.when == pytest.approx(copy.end)
+    assert wait.args["mbarriers"] == [[phase.args["mbarrier"], 0]] and copy.args["mbarrier"] == phase.args["mbarrier"]
 
 
 def test_deadlock_is_still_reported_in_a_timed_run(sim):

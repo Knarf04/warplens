@@ -103,6 +103,8 @@ TF32_DISCARDED_BITS = 13
 _TF32_LOW = np.uint32((1 << TF32_DISCARDED_BITS) - 1)
 _TF32_HALF = np.uint32(1 << (TF32_DISCARDED_BITS - 1))
 TF32_MODES = ("rna", "rn", "rz")
+# What cvt.rn.tf32.f32 and cvt.rz.tf32.f32 give for any NaN (measured on a B200).
+TF32_NAN = np.uint32(0x7FFF_E000)
 
 
 def to_tf32(bits: np.ndarray, mode: str = "rna") -> np.ndarray:
@@ -114,8 +116,11 @@ def to_tf32(bits: np.ndarray, mode: str = "rna") -> np.ndarray:
          and the largest finite values round up to infinity; and for an exponent
          of all ones the low bits are simply cleared, which leaves infinity as
          it is and can turn a NaN whose payload was only in those bits into infinity.
-    rn   nearest, ties to even.   } Need Hopper or newer, so NOT checked on hardware.
-    rz   toward zero.             } Modeled like rna with a different tie rule.
+    rn   nearest, ties to even.   } Need Hopper or newer. Checked bit for bit against a
+    rz   toward zero.             } B200 (validation/blackwell/measured/b200/formats/
+         tf32_modes.txt): finite values and infinities round on the magnitude bits like
+         rna with their own tie rule; every NaN, whatever its sign and payload, gives
+         0x7FFFE000. So unlike rna these two never turn a NaN into infinity.
     """
     if mode not in TF32_MODES:
         raise ValueError(f"unknown TF32 rounding mode {mode!r}")
@@ -133,7 +138,10 @@ def to_tf32(bits: np.ndarray, mode: str = "rna") -> np.ndarray:
         up = (low > _TF32_HALF) | ((low == _TF32_HALF) & (odd == 1))
     special = magnitude >= np.uint32(0x7F80_0000)  # infinity or NaN: no rounding
     rounded = kept + np.where(up & ~special, np.uint32(1 << TF32_DISCARDED_BITS), np.uint32(0))
-    return (sign | rounded).astype(np.uint32)
+    result = (sign | rounded).astype(np.uint32)
+    if mode != "rna":
+        result = np.where(magnitude > np.uint32(0x7F80_0000), TF32_NAN, result).astype(np.uint32)
+    return result
 
 
 def explain_tf32(value, mode: str = "rna") -> str:

@@ -1170,7 +1170,7 @@ recover the layout a kernel computes with its own index arithmetic.
 
 <!-- test: run -->
 ```python
-from warplens.units.floating import explain_tf32
+from warplens.numerics import explain_tf32
 
 print(explain_tf32(0.1))
 ```

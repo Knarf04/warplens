@@ -142,7 +142,7 @@ is. A NaN is different: every NaN input, whatever its sign and payload, gives
 newer; all of this is **measured on a B200** (2026-11-25,
 `validation/blackwell/measured/b200/formats/tf32_modes.txt`, 715 inputs).
 
-`warplens.units.floating.explain_tf32(0.1)` shows one conversion bit by bit:
+`warplens.numerics.explain_tf32(0.1)` shows one conversion bit by bit:
 
 ```
 float32 -> TF32 with cvt.rna.tf32.f32

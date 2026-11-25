@@ -65,10 +65,6 @@ reserve the PyPI name, and `1.0`, the public release
 
 1. **Reserve the PyPI name** with the `0.0.1` placeholder.
 2. What [RELEASING.md](RELEASING.md) lists under "Before the release".
-3. **The timing measurements of the second rental, read.** Both of its passes ran
-   the timing suite; the numbers are in the archives and have not been held
-   against the fit of the first run. The shipped config does not depend on
-   it (decided below).
 
 Decided by the owner on 2026-11-25:
 
@@ -76,8 +72,11 @@ Decided by the owner on 2026-11-25:
   ship the assumed values and say so; the fit of the first run
   (`validation/blackwell_timing/measured/b200/calibrated.yaml`) is recorded
   and usable with `--timing-config`, and is not the default. No prediction
-  changes, so the second rental's timing run is compared with the same
-  predictions as the first (item 3 above). Giving the model what the fit says it lacks is
+  changes, so the second rental's timing run was compared with the same
+  predictions as the first: the measurements repeat (127 of 161 configurations
+  within 1 %), and the first run's fit predicts the second run as well as its
+  own, 47 of 153 within 10 % ([docs/b200-rental-2.md](docs/b200-rental-2.md),
+  "The timing measurements"). What is left is the model's shape. Giving the model what the fit says it lacks is
   after v1 (below; [docs/b200-rental-1.md](docs/b200-rental-1.md), "The
   timing config is a decision, not a fix").
 - **The RT-11 capture stays out of the repository.** The kernel of

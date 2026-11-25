@@ -104,7 +104,7 @@ def decode(raw: bytes) -> TensorMapInfo:
 # The 128 bytes cuTensorMapEncodeTiled writes, as sixteen little-endian 64-bit words. Worked
 # out from validation/blackwell/measured/b200/tma/tensormap_encode_sweep.txt: 1087 maps a B200's
 # driver (610.57.04) encoded over a sweep of every parameter, each of which this reading
-# gives back (tests/test_tensor_map_driver_layout.py). It is not documented.
+# gives back (tests/validation/golden_replay/test_tensor_map_driver_layout.py). It is not documented.
 #
 #   word 0            the tensor's address
 #   word 1, low half  bits 4-6 rank - 1; 7-10 the data type's code (_DRIVER_TYPE_CODES);
@@ -125,7 +125,7 @@ def decode(raw: bytes) -> TensorMapInfo:
 #
 # Only the first eight words are the descriptor a kernel's TMA instructions need: the CuTe
 # DSL writes those 64 bytes itself and nothing else, and its kernels ran on a B200 (matrix
-# row RT-11; tests/test_tensor_map_driver_layout.py has two of its maps).
+# row RT-11; tests/validation/golden_replay/test_tensor_map_driver_layout.py has two of its maps).
 #
 # The codes of the data types are the enumeration's numbers but for three: FLOAT64 (8) is 9,
 # BFLOAT16 (9) is 10, FLOAT32_FTZ (10) is 8. TFLOAT32 and TFLOAT32_FTZ are the codes of

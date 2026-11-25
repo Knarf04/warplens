@@ -32,7 +32,7 @@ def effective_address(w, ins, mem) -> np.ndarray:
     # [reg+offset] is summed in the register's width. nvcc 13.5 relies on it for shared
     # memory: `fixed[N - 1 - tid]` becomes `sub.s32 %r, fixed, 4 * tid` and `[%r+4*(N-1)]`,
     # where %r has wrapped below zero. An RTX 3080 Ti reads the wrapped address
-    # (tests/test_sim_bug_regressions.py).
+    # (tests/execution/test_sim_bug_regressions.py).
     if type(mem.base) is Reg and w.regs[mem.base.name].itemsize == 4:
         address &= np.uint64(0xFFFFFFFF)
     return address

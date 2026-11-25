@@ -82,7 +82,7 @@ LANES, COLUMNS = 128, 512
 # elements, K up to 256), where each of these alternatives leaves elements one unit off:
 # products normalized before lining up; negative terms cut toward minus infinity; the old
 # accumulator added without being cut; a width of 24, 26 or 27 bits
-# (tests/test_tcgen05.py::test_the_mma_sum_is_the_one_a_b200_computes).
+# (tests/memory/test_tcgen05.py::test_the_mma_sum_is_the_one_a_b200_computes).
 # Not measured: operands that are subnormal in half precision (their exponent is taken
 # from the value), and elements with an infinity or a NaN among their terms.
 MMA_ALIGN_BITS = 25

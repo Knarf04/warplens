@@ -19,7 +19,7 @@ from types import SimpleNamespace
 import pytest
 
 from warplens import cli
-from warplens.host import shim_server
+from warplens.host import runtime, shim_server
 from warplens.timing.config import GpuConfig
 
 from conftest import EXAMPLES
@@ -113,7 +113,7 @@ def empty_shims(tmp_path, monkeypatch):
     lib = tmp_path / "lib"
     lib.mkdir()
     monkeypatch.setattr(cli, "shim_libraries", lambda: lib)
-    monkeypatch.setattr(cli, "cute_dsl_runtime", lambda shims: None)
+    monkeypatch.setattr(runtime, "cute_dsl_runtime", lambda shims: None)
     return lib
 
 

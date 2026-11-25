@@ -5,7 +5,7 @@
 #   warplens/shim/build.sh [include directory of the CUDA toolkit] [output directory]
 #
 # Next to the libraries goes warplens-shim.stamp, which records what they were built from.
-# `warplens run` compares it with the sources it finds (`shim_stamp` in warplens/cli.py) and
+# `warplens run` compares it with the sources it finds (`shim_stamp` in warplens/host/runtime.py) and
 # rebuilds or refuses libraries of other sources, so the two must compute the same numbers.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

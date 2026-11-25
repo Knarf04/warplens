@@ -9,13 +9,14 @@ from pathlib import Path
 import pytest
 
 from warplens import cli
+from warplens.host import runtime
 
 HOOK = Path(cli.__file__).resolve().parent / "shim" / "python"
 
 
 @pytest.fixture
 def no_cute_dsl(monkeypatch):
-    monkeypatch.setattr(cli, "cute_dsl_runtime", lambda shims: None)
+    monkeypatch.setattr(runtime, "cute_dsl_runtime", lambda shims: None)
 
 
 def test_frontend_settings_default_to_the_simulated_model(no_cute_dsl, tmp_path):

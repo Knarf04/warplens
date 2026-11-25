@@ -42,11 +42,11 @@ PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 RUNTIME_FILES = [
     "configs/b200.yaml",                # warplens/timing/config.py
     "configs/b300.yaml",
-    "shim/build.sh",                    # warplens/cli.py, shim_libraries: run on first use
+    "shim/build.sh",                    # warplens/host/runtime.py, shim_libraries: run on first use
     "shim/cudart_shim.c",
     "shim/cuda_shim.c",
     "shim/protocol.h",
-    "shim/build_cute_dsl.sh",           # warplens/cli.py, cute_dsl_runtime
+    "shim/build_cute_dsl.sh",           # warplens/host/runtime.py, cute_dsl_runtime
     "shim/python/sitecustomize.py",     # put on the PYTHONPATH of the programs `warplens run` starts
 ]
 SCRIPTS = [name for name in RUNTIME_FILES if name.endswith(".sh")]

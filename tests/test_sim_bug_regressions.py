@@ -17,9 +17,9 @@ import warplens
 from warplens.frontend.ptx_parser import parse_ptx
 from warplens.units.smem import DEFAULT_SMEM_BYTES, MAX_SMEM_BYTES
 
-from conftest import HEADER
-from test_tcgen05 import run as run_mma
-from test_tma import mb_kernel, record
+from tests.support import HEADER
+from tests.support.tcgen05 import run as run_mma
+from tests.support.tma import mb_kernel, record
 
 SHIM = Path(warplens.__file__).resolve().parent / "shim"
 

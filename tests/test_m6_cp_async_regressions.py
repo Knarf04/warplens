@@ -5,7 +5,8 @@ import pytest
 
 import warplens
 from warplens.frontend.ptx_parser import parse_ptx
-from conftest import kernel, HEADER
+
+from tests.support import HEADER, kernel
 
 
 def copy_kernel(body, *, cluster=False):

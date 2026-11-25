@@ -3,9 +3,9 @@
 import numpy as np
 import pytest
 
-from conftest import kernel
-from test_cluster import pair_kernel
-from test_tcgen05 import place
+from tests.support import kernel
+from tests.support.cluster import pair_kernel
+from tests.support.tcgen05 import place
 from warplens.frontend.ir import Imm, Reg
 from warplens.viz import tmem as tmem_view
 

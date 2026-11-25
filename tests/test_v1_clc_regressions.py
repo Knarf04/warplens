@@ -2,8 +2,8 @@
 
 import pytest
 
-from conftest import kernel
-from test_m2_tma_regressions import launch
+from tests.support import kernel
+from tests.support.tma import launch_one_buffer as launch
 
 
 @pytest.mark.parametrize("delay", [0, 1000])
@@ -59,7 +59,7 @@ def test_multicast_checks_async_readers_in_the_receiving_cta(sim, wait):
 
 @pytest.mark.parametrize("wait", [False, True])
 def test_clc_response_reuse_of_mma_operand_requires_commit_wait(sim, monkeypatch, wait):
-    import test_tcgen05 as helpers
+    from tests.support import tcgen05 as helpers
 
     def with_clc_response(body, params):
         body = body.replace(".shared .align 8 .u64 bar;",

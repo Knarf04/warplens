@@ -18,7 +18,8 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 TIMING = ROOT / "validation" / "blackwell_timing"
 FIXTURE = TIMING / "fixture_ncu"
 AMPERE_VALID = ["launch", "alu_chain", "smem_wavefronts", "global_load", "gstream", "cp_async", "ncu_banks"]

@@ -13,7 +13,8 @@ from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parent.parent
+from tests.support import REPO
+
 SUITE = REPO / "validation" / "blackwell"
 
 

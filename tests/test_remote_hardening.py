@@ -18,9 +18,9 @@ from pathlib import Path
 
 import pytest
 
-from test_remote_env import REMOTE, REPO, archive_of, bash, checkout, members, read_pins, stand_in_cutlass, suite
-from test_remote_regressions import (clean, fake_book, fake_tool, git, machine, manifest_of, ready_suites, rental,
-                                     setups_record)
+from tests.support.remote import (REMOTE, REPO, archive_of, bash, checkout, clean, fake_book, fake_tool, git,
+                                  machine, manifest_of, members, read_pins, ready_suites, rental,
+                                  setups_record, stand_in_cutlass, suite)
 
 
 def wait_for(path: Path, seconds: float = 20) -> None:

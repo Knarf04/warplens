@@ -13,7 +13,7 @@ from warplens import cli
 from warplens.viz import report as viz_report
 from warplens.viz import write_report
 
-from conftest import EXAMPLES
+from tests.support import EXAMPLES
 
 SVG = "{http://www.w3.org/2000/svg}"
 

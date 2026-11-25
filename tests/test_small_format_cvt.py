@@ -17,8 +17,7 @@ import warplens
 from warplens.numerics import E2M1, E4M3, E5M2
 from warplens.units import small_formats
 
-from conftest import cuda_include, kernel
-from conftest import run_lanes as run_block
+from tests.support import cuda_include, kernel, run_lanes as run_block
 
 NAN32, INF32 = 0x7FC00000, 0x7F800000
 

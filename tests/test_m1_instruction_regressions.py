@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from conftest import kernel
+from tests.support import kernel
 
 
 def _shuffle(sim, *, block=32, setup="", member="-1", source=0, mode="idx"):

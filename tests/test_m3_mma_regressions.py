@@ -10,7 +10,8 @@ import pytest
 
 import warplens
 from warplens.frontend.ir import Imm, Vec
-from test_tcgen05 import mma_kernel, place
+
+from tests.support.tcgen05 import mma_kernel, place
 
 
 def _run(sim, *, scale=None, kind="f16", first=True, mask=None, modifier=None,

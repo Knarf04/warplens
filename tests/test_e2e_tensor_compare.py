@@ -16,7 +16,8 @@ import pytest
 from validation.blackwell import capture
 from validation.blackwell.e2e_checks import EXPECTED_CASES
 
-ROOT = Path(__file__).resolve().parents[1]
+from tests.support import REPO as ROOT
+
 SUITE = ROOT / "validation" / "blackwell"
 
 HEADER = ".version 9.5\n.target sm_100a\n.address_size 64\n"

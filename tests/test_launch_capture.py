@@ -28,7 +28,8 @@ from types import SimpleNamespace
 
 import pytest
 
-REPO = Path(__file__).resolve().parent.parent
+from tests.support import REPO
+
 SUITE = REPO / "validation" / "blackwell"
 E2E = SUITE / "e2e"
 KERNEL = "kernel_cutlass_kernel_0"

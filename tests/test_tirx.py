@@ -4,14 +4,15 @@
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
+
+from tests.support import EXAMPLES
 
 pytest.importorskip("tvm_tirx")
 pytest.importorskip("cuda.bindings")  # TIRx compiles through NVRTC
 
-EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "07_tirx" / "run.py"
+EXAMPLE = EXAMPLES / "07_tirx" / "run.py"
 
 
 def run(*arguments, **env):

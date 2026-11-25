@@ -11,7 +11,8 @@ import time
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+from tests.support import REPO as ROOT
+
 PROBES = ROOT / "validation" / "blackwell"
 TIMING = ROOT / "validation" / "blackwell_timing"
 

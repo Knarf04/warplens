@@ -5,13 +5,14 @@ installed."""
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
+from tests.support import paths
+
 pytest.importorskip("cutlass")
 
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "06_cute_dsl"
+EXAMPLES = paths.EXAMPLES / "06_cute_dsl"
 
 
 def run(*arguments, script="run.py"):

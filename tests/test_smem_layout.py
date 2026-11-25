@@ -5,7 +5,7 @@ import pytest
 import warplens
 from warplens.units.smem import MAX_SMEM_BYTES
 
-from conftest import HEADER, kernel
+from tests.support import HEADER, kernel
 
 
 def layout_kernel(alignment, body=""):

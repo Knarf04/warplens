@@ -16,10 +16,10 @@ import pytest
 
 import warplens
 
-from conftest import kernel
+from tests.support import BLACKWELL, kernel
 
 CAPTURE = os.environ.get("WARPLENS_RT11_CAPTURE", "")
-TOOL = Path(__file__).parents[1] / "validation/blackwell/e2e/replay_launch.py"
+TOOL = BLACKWELL / "e2e/replay_launch.py"
 
 
 @pytest.mark.skipif(not (Path(CAPTURE) / "launches.json").is_file() if CAPTURE else True,
@@ -59,7 +59,7 @@ def test_cvt_rn_f16x2_f32_packs_its_first_source_into_the_high_half(sim):
 
 
 def test_an_mma_with_collector_a_discard_is_the_mma_without_it(sim):
-    from test_tcgen05 import run
+    from tests.support.tcgen05 import run
     plain = run(sim)
     discard = run(warplens.Device(), mods=".collector::a::discard")
     np.testing.assert_array_equal(plain[0], discard[0])

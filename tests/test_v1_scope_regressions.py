@@ -11,7 +11,7 @@ from warplens.frontend.ir import Instr
 from warplens.host.tensor_map import swizzle_offsets
 from warplens.units.tcgen05 import _operand_bytes
 
-from conftest import kernel
+from tests.support import kernel
 
 MMA = Instr("tcgen05", ("mma", "cta_group::1", "kind::f16"), (), None, False, 7,
             "tcgen05.mma.cta_group::1.kind::f16 [%d], %a, %b, %i;")

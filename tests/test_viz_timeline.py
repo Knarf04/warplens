@@ -14,7 +14,7 @@ from warplens.viz import render_html, smem, timeline_svg
 from warplens.viz.html_report import barrier_names, merged_waits
 from warplens.viz.trace_perfetto import trace_events
 
-from conftest import EXAMPLES, kernel
+from tests.support import EXAMPLES, kernel
 
 SVG = "{http://www.w3.org/2000/svg}"
 FIT = EXAMPLES.parent / "validation" / "blackwell_timing" / "measured" / "b200" / "calibrated.yaml"

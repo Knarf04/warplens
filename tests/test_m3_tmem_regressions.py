@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 import warplens
-from conftest import kernel
+
+from tests.support import kernel
 from warplens.units.tcgen05 import transfer_cells
 
 

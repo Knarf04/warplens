@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from conftest import kernel
+from tests.support import kernel
 
 PARAMS = ".param .u64 out"
 PROLOGUE = """
@@ -210,9 +210,6 @@ def _executions(sim, body, opcode):
             seen.append(int(active.sum()))
     out, stats = launch(sim, body, trace=trace)
     return seen, out, stats
-
-
-
 
 
 @pytest.mark.parametrize("layout", LAYOUTS)

@@ -3,7 +3,8 @@
 import pytest
 
 import warplens
-from conftest import kernel
+
+from tests.support import kernel
 
 
 @pytest.mark.parametrize("generic", [False, True])

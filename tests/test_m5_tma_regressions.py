@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 import warplens
-from conftest import kernel
+
+from tests.support import kernel
 
 
 def copy_kernel(*, multicast=False, group=2, destination=0, barrier=1, raw=False,

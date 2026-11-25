@@ -7,7 +7,7 @@ import pytest
 import warplens
 from warplens.frontend.ir import Imm, Mem, Reg, Special, Sym
 
-from conftest import EXAMPLES, HEADER, kernel
+from tests.support import EXAMPLES, HEADER, kernel
 
 
 def test_parses_nvcc_vecadd():

@@ -2,10 +2,11 @@
 
 import importlib.util
 import warnings
-from pathlib import Path
 
 import numpy as np
 import pytest
+
+from tests.support import EXAMPLES
 
 triton = pytest.importorskip("triton")
 warnings.filterwarnings("ignore", module="triton")
@@ -13,7 +14,7 @@ warnings.filterwarnings("ignore", module="triton")
 import warplens  # noqa: E402
 import warplens.triton_driver as wt  # noqa: E402
 
-EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "05_triton" / "run.py"
+EXAMPLE = EXAMPLES / "05_triton" / "run.py"
 spec = importlib.util.spec_from_file_location("triton_example", EXAMPLE)
 example = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(example)

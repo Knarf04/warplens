@@ -3,9 +3,9 @@
 import importlib.util
 import re
 import sys
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 spec = importlib.util.spec_from_file_location("check_validation_matrix",
                                               ROOT / "tools" / "check_validation_matrix.py")
 checker = importlib.util.module_from_spec(spec)

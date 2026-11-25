@@ -6,7 +6,7 @@ import pytest
 
 import warplens
 
-from conftest import HEADER, kernel
+from tests.support import HEADER, kernel
 
 
 # -- bar.warp.sync -----------------------------------------------------------------------------

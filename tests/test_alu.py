@@ -5,7 +5,7 @@ import pytest
 
 import warplens
 
-from conftest import kernel, run_lanes
+from tests.support import kernel, run_lanes
 
 I32_MIN, I32_MAX = -2**31, 2**31 - 1
 

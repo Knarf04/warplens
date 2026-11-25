@@ -19,7 +19,8 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 TIMING = ROOT / "validation" / "blackwell_timing"
 AMPERE = ROOT / "validation" / "ampere"
 FIXTURE = TIMING / "fixture_ncu"

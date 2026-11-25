@@ -4,8 +4,9 @@ import numpy as np
 import pytest
 
 import warplens
-from conftest import kernel
-from test_rental_harness import reconvergence
+
+from tests.support import kernel
+from tests.support.probes import reconvergence
 
 
 @pytest.mark.parametrize("shape", ["C", "D"])

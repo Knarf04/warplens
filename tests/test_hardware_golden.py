@@ -5,13 +5,14 @@ RTX 3080 Ti (see validation/README.md). Each line is "mode b width r0..r31".
 """
 
 import re
-from pathlib import Path
 
 import numpy as np
 import pytest
 
-AMPERE = Path(__file__).resolve().parent.parent / "validation" / "ampere"
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
+from warplens.core.engine import SCHEDULE_VARIABLE
+
+from tests.support import AMPERE, EXAMPLES
+
 MODES = ["__shfl_sync", "__shfl_up_sync", "__shfl_down_sync", "__shfl_xor_sync"]
 
 
@@ -299,7 +300,7 @@ def test_cp_async_with_a_source_size_matches_real_gpu(sim):
 
 def test_prmt_matches_real_gpu(sim):
     """prmt_golden.txt is bin/prmt_golden on an RTX 3080 Ti: 304 (a, b, control) triples."""
-    from conftest import kernel
+    from tests.support import kernel
     rows = np.array([[int(x, 16) for x in l.split()] for l in (AMPERE / "prmt_golden.txt").read_text().splitlines()],
                     dtype=np.uint32)
     n = len(rows)
@@ -325,7 +326,7 @@ def test_prmt_matches_real_gpu(sim):
 def test_flush_to_zero_arithmetic_matches_real_gpu(sim):
     """ftz_golden.txt is bin/ftz_golden on an RTX 3080 Ti: add, sub, mul, div, fma and sqrt with
     `.ftz` on operands around the subnormal range. Compared bit for bit, NaN results included."""
-    from conftest import kernel
+    from tests.support import kernel
     rows = np.array([[int(x, 16) for x in l.split()] for l in (AMPERE / "ftz_golden.txt").read_text().splitlines()],
                     dtype=np.uint32)
     assert len(rows) == 7075
@@ -389,7 +390,7 @@ def test_min_max_and_float_to_integer_match_real_gpu(sim):
     halves and the values around every integer limit. Each line is "instruction a b result"
     with 64-bit hex patterns. Compared bit for bit, NaN results included."""
     from collections import defaultdict
-    from conftest import kernel
+    from tests.support import kernel
     cases = defaultdict(list)
     for line in (AMPERE / "minmax_cvt_golden.txt").read_text().splitlines():
         name, *values = line.split()
@@ -558,7 +559,7 @@ def _golden_instruction_mismatches(sim, path, operands, skip=(), expected_findin
     narrower value in the low bits) through the simulator, one instruction per thread, and
     describe the lines whose result differs. Returns (problems, lines per instruction)."""
     from collections import defaultdict
-    from conftest import kernel
+    from tests.support import kernel
     cases = defaultdict(list)
     for line in path.read_text().splitlines():
         name, *values = line.split()
@@ -654,3 +655,20 @@ def test_integer_division_matches_real_gpu(sim):
         expected_findings=("integer-divide-by-zero",))
     assert len(counts) == 12 and sum(counts.values()) == 5808
     assert not problems, "\n".join(problems)
+
+
+@pytest.mark.parametrize("schedule", ["1", "2", "adversarial", "adversarial:3"])
+@pytest.mark.parametrize("check", [
+    test_shfl_matches_real_gpu,
+    test_printf_struct_param_and_local_array_match_real_gpu,
+    test_cp_async_with_a_source_size_matches_real_gpu,
+    test_device_function_calls_match_real_gpu,
+    test_lanes_rejoin_where_they_do_on_a_real_gpu,
+    test_mbarrier_tokens_match_real_gpu,
+], ids=lambda check: check.__name__.removeprefix("test_"))
+def test_hardware_golden_results_hold_under_other_schedules(sim, monkeypatch, check, schedule):
+    """All of this file passes with WARPLENS_SCHEDULE set (the order in which runnable warps are
+    stepped: docs/scheduling.md); these are the quick ones, run again here under other schedules
+    so that the suite keeps saying so."""
+    monkeypatch.setenv(SCHEDULE_VARIABLE, schedule)
+    check(sim)

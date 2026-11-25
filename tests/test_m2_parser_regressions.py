@@ -3,7 +3,8 @@
 import pytest
 
 import warplens
-from conftest import HEADER, kernel
+
+from tests.support import HEADER, kernel
 
 
 def test_nested_shared_declaration_does_not_alias_the_outer_variable(sim):

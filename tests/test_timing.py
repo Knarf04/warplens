@@ -3,7 +3,6 @@
 import importlib.util
 import json
 import re
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -14,7 +13,7 @@ from warplens.timing.model import RESOURCE_SOURCES, Server
 from warplens.viz.html_report import render_html
 from warplens.viz.trace_perfetto import trace_events
 
-from conftest import EXAMPLES, kernel
+from tests.support import EXAMPLES, kernel
 
 spec = importlib.util.spec_from_file_location("gemm_run", EXAMPLES / "04_pipelined_gemm" / "run.py")
 gemm = importlib.util.module_from_spec(spec)

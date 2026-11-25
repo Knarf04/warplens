@@ -15,15 +15,14 @@ import re
 import shutil
 import signal
 import subprocess
-import tarfile
 import time
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-REPO = Path(__file__).resolve().parent.parent
-REMOTE = REPO / "env" / "remote"
+from tests.support import REPO
+from tests.support.remote import REMOTE, archive_of, bash, checkout, fake_smi, members, read_pins, suite
 SCRIPTS = ["lib.sh", "setup.sh", "preflight.sh", "run.sh", "predict_toolkit.sh"]
 
 # Recorded: the line of `nvidia-smi` that names the driver, and what ncu printed as a normal user.
@@ -36,28 +35,12 @@ NCU_PERMISSION = ("==ERROR== ERR_NVGPUCTRPERM - The user does not have permissio
                   "and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM")
 
 
-def bash(script: str, *args: str, env: dict | None = None, cwd: Path | None = None):
-    """Run one of the scripts; returns the completed process with text output."""
-    full_env = {**os.environ, "PREFLIGHT_OFFLINE": "1", **(env or {})}
-    return subprocess.run(["bash", str(script), *args], capture_output=True, text=True,
-                          env=full_env, cwd=cwd, timeout=120)
-
-
 def lib(function: str, *args: str) -> str:
     """Call one function of lib.sh and return what it printed."""
     done = subprocess.run(["bash", "-c", 'source "$1"; shift; "$@"', "_", str(REMOTE / "lib.sh"),
                            function, *args], capture_output=True, text=True, timeout=30)
     assert done.returncode == 0, done.stderr
     return done.stdout.strip()
-
-
-def read_pins() -> dict[str, str]:
-    pins = {}
-    for line in (REMOTE / "pins.env").read_text().splitlines():
-        if line.strip() and not line.lstrip().startswith("#"):
-            key, _, value = line.partition("=")
-            pins[key] = value
-    return pins
 
 
 # ---------------------------------------------------------------------------------------------
@@ -206,21 +189,6 @@ def test_arch_names():
     assert lib("arch_for_cap", "10.0") == "sm_100a"
     assert lib("arch_for_cap", "10.3") == "sm_103a"
     assert lib("arch_for_cap", "8.6") == "sm_86"
-
-
-def fake_smi(tmp_path: Path, name: str, cap: str, cuda: str = "13.5", used: int = 3, apps: str = "") -> Path:
-    """A stand-in for nvidia-smi that answers the three ways preflight.sh calls it."""
-    script = tmp_path / "fake-nvidia-smi"
-    script.write_text(f"""#!/usr/bin/env bash
-case "$*" in
-  *--query-gpu=*compute_cap*) echo "0, {name}, {cap}, 183359, {used}, 0" ;;
-  *--query-gpu=*) echo "0, {name}, 183359, {used}, 0" ;;
-  *--query-compute-apps=*) printf '%b' "{apps}" ;;
-  *) echo "| NVIDIA-SMI 590.44.01             Driver Version: 590.44.01     CUDA Version: {cuda}     |" ;;
-esac
-""")
-    script.chmod(0o755)
-    return script
 
 
 def quick_preflight(tmp_path, **gpu):
@@ -413,74 +381,6 @@ def test_dry_run_prints_the_plan_without_a_gpu(tmp_path):
 def test_run_rejects_bad_arguments():
     assert bash(REMOTE / "run.sh", "--redo", "no-such-stage").returncode == 2
     assert bash(REMOTE / "run.sh", "--price", "cheap", "--dry-run").returncode == 2
-
-
-def suite(root: Path, name: str, build: str, run: str):
-    directory = root / "validation" / name
-    directory.mkdir(parents=True)
-    (directory / "build.sh").write_text("#!/usr/bin/env bash\nset -eu\n" + build)
-    (directory / "run_all.sh").write_text("#!/usr/bin/env bash\nset -eu\n" + run)
-
-
-def stand_in_cutlass(root: Path, commit: str | None = None, built: bool = False) -> Path:
-    """What the scripts take for the CUTLASS example of a checkout: a clone at `commit` (the
-    pinned one unless given; "" for no clone) and a build.sh that makes the four programs
-    and says what it was given. `built`: the programs are there already."""
-    example = root / "examples" / "03_cutlass_mma"
-    clone = example / ".cutlass"
-    if commit != "":
-        for path in ("examples/cute/tutorial/blackwell/01_mma_sm100.cu", "include/cutlass/cutlass.h",
-                     "examples/python/CuTeDSL/cute/blackwell/tutorial/tutorial_gemm/fp16_gemm_0.py"):
-            (clone / path).parent.mkdir(parents=True, exist_ok=True)
-            (clone / path).write_text("stand-in\n")
-        (clone / ".git").mkdir(exist_ok=True)
-        (clone / ".git" / "HEAD").write_text((commit or read_pins()["CUTLASS_COMMIT"]) + "\n")
-    example.mkdir(parents=True, exist_ok=True)
-    (example / "build.sh").write_text(
-        '#!/usr/bin/env bash\nset -eu\ncd "$(dirname "$0")"\n'
-        'echo "cutlass build: $* nvcc=$NVCC no_fetch=${WARPLENS_CUTLASS_NO_FETCH:-unset}"\n'
-        'echo "$*" >> build-calls\n'
-        '[[ ! -f fail-the-build ]] || { echo "nvcc: the tutorial does not compile" >&2; exit 1; }\n'
-        'mkdir -p bin\nfor n in 1 2 3 4; do echo program > "bin/tutorial_0$n"; done\n')
-    if built:
-        (example / "bin").mkdir(exist_ok=True)
-        for n in range(1, 5):
-            (example / "bin" / f"tutorial_0{n}").write_text("program\n")
-    return example
-
-
-@pytest.fixture
-def checkout(tmp_path):
-    """A copy of env/remote in a directory of its own, with stand-ins for the two probe suites
-    and for the CUTLASS example (a clone at the pinned commit, as setup.sh leaves one).
-    `env` in place of the env runner: the stages run with whatever is on PATH."""
-    root = tmp_path / "repo"
-    shutil.copytree(REMOTE, root / "env" / "remote")
-    # Collection now freezes the actual tracked source used by the rental.
-    subprocess.run(["git", "init", str(root)], check=True, capture_output=True)
-    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
-    subprocess.run(["git", "-C", str(root), "-c", "user.name=fixture", "-c",
-                    "user.email=fixture@example.invalid", "commit", "-m", "fixture"],
-                   check=True, capture_output=True)
-    stand_in_cutlass(root)      # after the commit: the clone and its programs are never tracked
-    env = {"WARPLENS_REMOTE_HOME": str(tmp_path / "home"), "WARPLENS_ENV_RUN": "env",
-           "WARPLENS_RUN_MINUTES": "1"}
-    # Skip what needs a GPU or installs things; the stage runner is what is under test.
-    args = ["--skip", "preflight-quick", "--skip", "setup", "--skip", "preflight", "--skip", "selftest"]
-    return root, env, args
-
-
-def archive_of(home: Path) -> Path:
-    (archive,) = (home / "results").glob("*.tar.gz")
-    recorded = Path(str(archive) + ".sha256").read_text().split()[0]
-    assert hashlib.sha256(archive.read_bytes()).hexdigest() == recorded
-    return archive
-
-
-def members(archive: Path) -> dict[str, bytes]:
-    with tarfile.open(archive) as tar:
-        return {m.name.split("/", 1)[1]: tar.extractfile(m).read()
-                for m in tar.getmembers() if m.isfile()}
 
 
 def test_run_builds_runs_collects_and_resumes(checkout, tmp_path):

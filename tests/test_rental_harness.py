@@ -29,7 +29,9 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+from tests.support.probes import reconvergence
+
 SUITE = ROOT / "validation" / "blackwell"
 TIMING = ROOT / "validation" / "blackwell_timing"
 REMOTE = ROOT / "env" / "remote"
@@ -420,14 +422,6 @@ def test_no_thread_test_runs_into_a_warp_wide_allocation():
                 assert any(barrier.search(text) for text in before[tests[-1]:]), \
                     f"{source.relative_to(ROOT)}: no __syncthreads() between a `tid == 0` test and the allocation: {line.strip()}"
     assert checked >= 5
-
-
-def reconvergence():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("reconvergence", SUITE / "findings" / "reconvergence.py")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
 
 
 @pytest.mark.parametrize("shape", ["A", "B", "C", "D"])

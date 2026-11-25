@@ -1,27 +1,12 @@
 """Remote orchestration checks using throwaway checkouts; no installs or GPU access."""
-import os
 import re
-import subprocess
 from pathlib import Path
 
 import pytest
 
-from test_remote_env import REMOTE, archive_of, bash, checkout, fake_smi, members, read_pins, stand_in_cutlass, suite
-
-
-def ready_suites(root, tmp_path):
-    for name in ("blackwell", "blackwell_timing"):
-        suite(root, name, f'echo build >> "{tmp_path}/{name}-builds"\n',
-              f'echo run >> "{tmp_path}/{name}-runs"\n')
-
-
-def fake_tool(tmp_path, name, body):
-    tools = tmp_path / "tools"
-    tools.mkdir(exist_ok=True)
-    tool = tools / name
-    tool.write_text("#!/usr/bin/env bash\n" + body)
-    tool.chmod(0o755)
-    return str(tools) + os.pathsep + os.environ["PATH"]
+from tests.support.remote import (BOOK_MARKER, REMOTE, archive_of, bash, checkout, clean, fake_book,
+                                  fake_smi, fake_tool, git, machine, manifest_of, members, read_pins,
+                                  ready_suites, rental, setups_record, stand_in_cutlass)
 
 
 def test_archive_failure_is_not_a_success(checkout, tmp_path):
@@ -76,7 +61,7 @@ def test_collect_only_preserves_recorded_gpu_capabilities(checkout, tmp_path):
 
 def check_module():
     import importlib.util
-    from test_remote_env import REMOTE
+    from tests.support.remote import REMOTE
     spec = importlib.util.spec_from_file_location("remote_check_env", REMOTE / "check_env.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -142,7 +127,7 @@ def test_archive_checksum_failure_is_not_a_success(checkout, tmp_path):
 
 
 def test_refused_ptx_blocks_full_e2e_but_allows_native_probes(tmp_path):
-    from test_remote_env import REMOTE, fake_smi
+    from tests.support.remote import REMOTE, fake_smi
     runner = tmp_path / "fake-env"
     runner.write_text('''#!/usr/bin/env python3
 import pathlib
@@ -204,30 +189,11 @@ def test_failed_source_snapshot_still_preserves_raw_results(checkout, tmp_path):
 # The book: fetched by setup.sh at the pinned commit, the default WARPLENS_BOOK, never archived
 # ---------------------------------------------------------------------------------------------
 
-BOOK_MARKER = "TEXT-OF-THE-BOOK-THAT-MUST-NOT-BE-COPIED"
-BOOK_VARIABLES = ("WARPLENS_BOOK", "WARPLENS_BOOK_URL", "WARPLENS_BLACKWELL_RUN_ARGS")
-
-
-def clean(script, *args, env=None, cwd=None):
-    """bash(), but without the book the machine running the tests may have exported (CI does)
-    and without the ncu it may have installed outside PATH."""
-    full = {k: v for k, v in os.environ.items() if k not in BOOK_VARIABLES}
-    full.update({"PREFLIGHT_OFFLINE": "1", "PREFLIGHT_NCU_CANDIDATES": "/no/such/ncu", **(env or {})})
-    return subprocess.run(["bash", str(script), *args], capture_output=True, text=True, env=full, cwd=cwd,
-                          timeout=120)
-
-
 def lib_call(home: Path, code: str, **env: str):
     """Run shell code with lib.sh sourced; returns (exit status, stdout, stderr)."""
     done = clean("-c", 'source "$1"; eval "$2"', "_", str(REMOTE / "lib.sh"), code,
                  env={"WARPLENS_REMOTE_HOME": str(home), **env})
     return done.returncode, done.stdout.strip(), done.stderr
-
-
-def git(directory: Path, *args: str) -> str:
-    done = subprocess.run(["git", "-C", str(directory), "-c", "user.name=fixture", "-c",
-                           "user.email=fixture@example.invalid", *args], check=True, capture_output=True, text=True)
-    return done.stdout.strip()
 
 
 @pytest.fixture
@@ -319,16 +285,6 @@ def test_the_book_is_not_fetched_when_told_not_to_or_given(tmp_path, upstream):
     assert "--no-book" in help_text and "WARPLENS_BOOK_URL" in help_text
 
 
-def fake_book(directory: Path, commit: str | None) -> Path:
-    """A directory the scripts take for a clone of the book; `commit` is what its .git says."""
-    (directory / "chapter_gemm_basics").mkdir(parents=True)
-    (directory / "chapter_gemm_basics" / "index.md").write_text(BOOK_MARKER + "\n")
-    if commit:
-        (directory / ".git").mkdir()
-        (directory / ".git" / "HEAD").write_text(commit + "\n")
-    return directory
-
-
 def test_the_default_book_is_setups_clone_and_a_named_one_wins(tmp_path):
     home = tmp_path / "home"
     assert lib_call(home, "book_path")[1] == ""                              # nothing fetched, nothing named
@@ -346,76 +302,6 @@ def test_the_default_book_is_setups_clone_and_a_named_one_wins(tmp_path):
 # ---------------------------------------------------------------------------------------------
 # Counters: a full run must read one for real
 # ---------------------------------------------------------------------------------------------
-
-FAKE_ENV = r'''#!/usr/bin/env python3
-"""Stands in for the env runner: a B200 on which everything works, with the outcome of the
-trivial kernel taken from FAKE_TRIVIAL. Anything it does not know is run as it is."""
-import os
-import pathlib
-import sys
-args = sys.argv[1:]
-real = list(args)
-if args[0] == "timeout":
-    args = args[1:]
-    if args[0].startswith("--kill-after="):
-        args = args[1:]
-    args = args[1:]
-if args[0] == "nvcc":
-    if "--version" in args:
-        print("Cuda compilation tools, release 13.5, V13.5.37")
-    else:
-        pathlib.Path(args[args.index("-o") + 1]).write_text(".version 9.5\n")
-elif args[0] == "python" and args[1].endswith("check_env.py"):
-    if args[2] == "e2e":
-        if not (pathlib.Path(args[3] or "/nonexistent") / "chapter_gemm_basics" / "index.md").is_file():
-            print("error=book GEMMs: set WARPLENS_BOOK to a clone of modern-gpu-programming-for-mlsys")
-            sys.exit(1)
-    else:
-        print("nvrtc=13.5\nnvrtc_ptx_version=9.5")
-elif args[0] == "python" and args[1].endswith("gpu_probe.py"):
-    if args[2] == "info":
-        print("compute_cap=10.0\nname=NVIDIA B200\ndriver_api=13.5\ntotal_mem_mib=192000")
-    elif args[2] == "vecadd" and args[3].endswith(".cubin") and os.environ.get("FAKE_TRIVIAL") == "fails":
-        print("error=the launch failed")
-        sys.exit(1)
-    else:
-        print("elements=1000\ntmem_address=0\nok=1")
-else:
-    os.execvp(real[0], real)
-'''
-
-FAKE_NCU = r'''#!/usr/bin/env bash
-# Stands in for ncu: FAKE_NCU is ok, permission or silent.
-if [[ "$1" == --version ]]; then echo "NVIDIA (R) Nsight Compute Command Line Profiler"; echo "Version 2026.4.0.10 (build 1)"; exit 0; fi
-echo "==PROF== Connected to process 4242"
-case "${FAKE_NCU:-ok}" in
-  ok) echo '"0","4242","python3.12","127.0.0.1","pf_vecadd","1","7","(256, 1, 1)","(4, 1, 1)","0","10.0","Command line profiler metrics","smsp__inst_executed.sum","inst","1,234"' ;;
-  permission) echo "==ERROR== ERR_NVGPUCTRPERM - The user does not have permission to access NVIDIA GPU Performance Counters on the target device 0. For instructions on enabling permissions and to get more information see https://developer.nvidia.com/ERR_NVGPUCTRPERM" ;;
-  silent) echo "==WARNING== No kernels were profiled." ;;
-esac
-'''
-
-
-@pytest.fixture
-def machine(tmp_path):
-    """The environment of a B200 on which preflight.sh passes every check that is not under
-    test: stand-ins for nvidia-smi, the env runner and ncu. `machine(False)` has no ncu."""
-    runner = tmp_path / "fake-env"
-    runner.write_text(FAKE_ENV)
-    runner.chmod(0o755)
-    tools = tmp_path / "ncu-tools"
-    tools.mkdir()
-    (tools / "ncu").write_text(FAKE_NCU)
-    (tools / "ncu").chmod(0o755)
-    # A PATH on which the only ncu is the stand-in, whatever the machine has installed.
-    rest = [d for d in os.environ["PATH"].split(os.pathsep) if d and not (Path(d) / "ncu").exists()]
-    env = {"WARPLENS_REMOTE_HOME": str(tmp_path / "home"), "WARPLENS_ENV_RUN": str(runner),
-           "NVIDIA_SMI": str(fake_smi(tmp_path, name="NVIDIA B200", cap="10.0"))}
-
-    def with_ncu(present: bool, **more: str) -> dict:
-        return {**env, **more, "PATH": os.pathsep.join(([str(tools)] if present else []) + rest)}
-    return with_ncu
-
 
 def preflight(tmp_path, env, *args, script=REMOTE / "preflight.sh"):
     status = tmp_path / "status"
@@ -468,36 +354,6 @@ def test_ncu_that_had_nothing_to_profile_does_not_count_as_a_counter(tmp_path, m
     done, checks, _ = preflight(tmp_path, env, "--no-ncu")
     assert checks["run-trivial"] == "FAIL" and checks["ncu"] == "SKIP", done.stdout
     assert done.returncode == 1                                     # the kernel itself still fails it
-
-
-def rental(root, tmp_path, machine_env):
-    """run.sh on the stand-in machine: the real preflight.sh, a setup.sh that records its
-    arguments, suites that record what they were given."""
-    (root / "env/remote/setup.sh").write_text(
-        f'#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "{tmp_path}/setup-args"\n')
-    for name in ("blackwell", "blackwell_timing"):
-        suite(root, name, "echo built\n",
-              f'echo "ncu=$WARPLENS_NCU book=${{WARPLENS_BOOK-unset}}" >> "{tmp_path}/{name}-runs"\n'
-              # The timing suite says itself what came of its ncu profiles (its ncu/STATUS.txt);
-              # this stand-in profiles when preflight read a counter, as the suite does.
-              + ('mkdir -p "$WARPLENS_RESULTS_DIR/ncu"\n'
-                 'if [[ "$WARPLENS_NCU" == ok ]]; then echo "ncu ok: 7 of 7 profiles read counters"\n'
-                 'else echo "ncu not run: WARPLENS_NCU=$WARPLENS_NCU"; fi > "$WARPLENS_RESULTS_DIR/ncu/STATUS.txt"\n'
-                 if name == "blackwell_timing" else ""))
-    return {**machine_env, "WARPLENS_RUN_MINUTES": "1"}, ["--skip", "selftest"]
-
-
-def manifest_of(files) -> dict:
-    return dict(line.split("=", 1) for line in files["manifest.txt"].decode().splitlines()
-                if "=" in line and not line.startswith("#"))
-
-
-def setups_record(home: Path, ncu: str) -> Path:
-    versions = home / "resolved" / "versions.txt"
-    versions.parent.mkdir(parents=True)
-    versions.write_text(f"nsight_compute={ncu}\npredictions_comparable=comparable\n"
-                        "predictions_comparable_why=nvcc 13.5.37 as for the predictions\n")
-    return versions
 
 
 def test_a_full_run_stops_before_the_gpu_stages_without_counters(checkout, tmp_path, machine):

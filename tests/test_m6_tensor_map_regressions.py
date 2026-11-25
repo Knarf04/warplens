@@ -4,7 +4,6 @@ import ctypes
 import shutil
 import struct
 import subprocess
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -13,7 +12,7 @@ import warplens
 from warplens.host import tensor_map as tm
 from warplens.host.shim_server import ShimServer, TENSOR_MAP
 
-from conftest import cuda_include, kernel
+from tests.support import REPO, cuda_include, kernel
 
 
 def driver_map(**changes):
@@ -96,7 +95,7 @@ def test_tensor_map_request_preserves_pitch_and_upper_dimension_bound():
 @pytest.fixture(scope="module")
 def driver_shim(tmp_path_factory):
     """Test the real C entry point with a bounded protocol stub, without a GPU/server."""
-    root = Path(__file__).resolve().parents[1]
+    root = REPO
     include = cuda_include("cuda.h")
     cc = shutil.which("cc")
     if not cc or include is None:

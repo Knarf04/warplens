@@ -14,7 +14,7 @@ import pytest
 
 import warplens
 
-from conftest import EXAMPLES, HEADER
+from tests.support import EXAMPLES, HEADER
 from warplens.timing.config import GpuConfig
 
 TRY_CANCEL = "clusterlaunchcontrol.try_cancel.async.shared::cta.mbarrier::complete_tx::bytes.b128"

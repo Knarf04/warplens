@@ -9,7 +9,7 @@ import warplens
 from warplens.timing.config import ASSUMED_EQUAL_TO_B200, GpuConfig
 from warplens.timing.model import RESOURCE_SOURCES
 
-from conftest import kernel
+from tests.support import kernel
 
 LOAD = """
         mbarrier.init.shared::cta.b64 [%bar], 1;

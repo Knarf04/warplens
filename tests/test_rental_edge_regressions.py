@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from conftest import kernel, run_lanes
+from tests.support import kernel, run_lanes
 
 
 @pytest.mark.parametrize("phase", [2, 3])

@@ -1,7 +1,6 @@
 """Timing inputs and exported reports must preserve the model's meaning."""
 
 import importlib.util
-from pathlib import Path
 import re
 from types import SimpleNamespace
 
@@ -13,6 +12,8 @@ from warplens.timing.config import GpuConfig, Param
 from warplens.timing.model import RESOURCE_SOURCES, Slice
 from warplens.viz.html_report import render_html
 from warplens.viz.trace_perfetto import trace_events
+
+from tests.support import EXAMPLES
 
 
 POSITIVE_PARAMS = (
@@ -151,7 +152,7 @@ def test_overlapping_async_lifetimes_have_separate_display_lanes():
 
 @pytest.mark.parametrize("stages", [0, -1, 5, 1.5, True])
 def test_example_rejects_stage_counts_outside_its_kernel_storage(stages):
-    path = Path(__file__).parents[1] / "examples/04_pipelined_gemm/run.py"
+    path = EXAMPLES / "04_pipelined_gemm/run.py"
     spec = importlib.util.spec_from_file_location("gemm_run_validation", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

@@ -32,7 +32,8 @@ import warplens
 from warplens import cli
 from warplens.timing import config
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 PACKAGE = Path(warplens.__file__).resolve().parent
 PYPROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text())
 

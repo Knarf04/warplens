@@ -1,16 +1,14 @@
 """M6 matrix-load address spaces, bank accounting, and MMA layout validation."""
 
-from pathlib import Path
 import re
 
 import numpy as np
 import pytest
 
 import warplens
-from conftest import kernel
-from test_tcgen05 import mma_kernel, place
 
-AMPERE = Path(__file__).resolve().parents[1] / "validation" / "ampere"
+from tests.support import AMPERE, kernel
+from tests.support.tcgen05 import mma_kernel, place
 
 
 @pytest.mark.parametrize("space", ["shared", "shared::cta", "generic"])

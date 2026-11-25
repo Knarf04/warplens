@@ -6,7 +6,8 @@ import numpy as np
 import pytest
 
 import warplens
-from conftest import EXAMPLES, HEADER
+
+from tests.support import EXAMPLES, HEADER
 from warplens.errors import ExecutionError, UnsupportedError
 from warplens.units import call as call_unit
 

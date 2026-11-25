@@ -10,11 +10,13 @@ from pathlib import Path
 
 import pytest
 
+from tests.support import EXAMPLES
+
 pytest.importorskip("tvm_tirx")
 pytest.importorskip("cuda.bindings")
 
 COMMIT = "3a24144defa6da03d4ab8a1dfcf513b18007d15f"  # what these expectations were recorded against
-RUNNER = Path(__file__).resolve().parent.parent / "examples" / "08_book" / "run.py"
+RUNNER = EXAMPLES / "08_book" / "run.py"
 BOOK = os.environ.get("WARPLENS_BOOK", "")
 
 pytestmark = pytest.mark.skipif(not (Path(BOOK) / "chapter_gemm_basics" / "index.md").is_file() or not BOOK,

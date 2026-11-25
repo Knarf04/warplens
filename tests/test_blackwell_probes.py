@@ -16,11 +16,11 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 SUITE = ROOT / "validation" / "blackwell"
 PREDICTED = SUITE / "predicted"
 sys.path.insert(0, str(SUITE))

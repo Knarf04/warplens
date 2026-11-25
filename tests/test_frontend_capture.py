@@ -12,7 +12,8 @@ import pytest
 
 from validation.blackwell import capture, frontend_capture as adapters
 
-ROOT = Path(__file__).resolve().parents[1]
+from tests.support import REPO as ROOT
+
 PTX = """.version 8.8
 .target sm_100a
 .address_size 64

@@ -1,6 +1,6 @@
 from warplens.frontend.cfg import block_reachability, build_cfg, reconvergence_points
 
-from conftest import kernel
+from tests.support import kernel
 
 REGS = ".reg .pred %p; .reg .b32 %r;"
 

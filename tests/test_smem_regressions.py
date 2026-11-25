@@ -1,6 +1,6 @@
 """Regressions for M1 shared-memory reporting."""
 
-from conftest import kernel
+from tests.support import kernel
 
 
 def test_same_line_load_and_store_have_separate_bank_counters(sim):

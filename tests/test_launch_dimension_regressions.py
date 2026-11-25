@@ -2,7 +2,7 @@
 
 import pytest
 
-from conftest import kernel
+from tests.support import kernel
 from warplens.errors import CUDA_INVALID_CONFIGURATION, LaunchError
 from warplens.host.launch import MAX_BLOCK_DIM, MAX_GRID_DIM, _check_dimensions
 

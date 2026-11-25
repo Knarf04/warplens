@@ -6,7 +6,7 @@ import pytest
 
 import warplens
 
-from conftest import kernel
+from tests.support import kernel
 
 PARAMS = ".param .u64 o, .param .u32 m"
 

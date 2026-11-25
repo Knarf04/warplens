@@ -1,7 +1,6 @@
 """TF32 conversion: against a recording from a real GPU, and against exact rational rounding."""
 
 from fractions import Fraction
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -9,9 +8,7 @@ import pytest
 import warplens
 from warplens.units.floating import explain_tf32, to_tf32
 
-from conftest import kernel
-
-AMPERE = Path(__file__).resolve().parent.parent / "validation" / "ampere"
+from tests.support import AMPERE, BLACKWELL, kernel
 
 
 def golden():
@@ -122,7 +119,7 @@ def test_rn_and_rz_give_one_nan_for_every_nan_as_a_b200_does():
 def test_the_three_modes_are_what_a_b200_printed():
     """Every line of the B200's run of formats/tf32_modes: input, .rna, .rn, .rz."""
     from pathlib import Path
-    measured = Path(__file__).parents[1] / "validation/blackwell/measured/b200/formats/tf32_modes.txt"
+    measured = BLACKWELL / "measured/b200/formats/tf32_modes.txt"
     rows = [line.split() for line in measured.read_text().splitlines()
             if len(line.split()) == 4 and all(len(w) == 8 for w in line.split())]
     assert len(rows) == 715

@@ -30,7 +30,8 @@ from types import SimpleNamespace
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 SUITE = ROOT / "validation" / "blackwell"
 sys.path.insert(0, str(SUITE))
 import manifest  # noqa: E402

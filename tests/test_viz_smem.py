@@ -8,7 +8,7 @@ import pytest
 from warplens.host.tensor_map import swizzle_offsets
 from warplens.viz import smem
 
-from conftest import EXAMPLES
+from tests.support import EXAMPLES
 
 SVG = "{http://www.w3.org/2000/svg}"
 
@@ -57,7 +57,7 @@ def test_heatmap_of_a_launch_without_shared_accesses_is_empty(sim):
 
 
 def test_untouched_banks_are_marked(sim):
-    from conftest import kernel
+    from tests.support import kernel
     mod = kernel(".shared .b32 cell[4]; .reg .b32 %v; st.shared.u32 [cell+8], 7; ret;")
     stats = sim.launch(mod, "k", grid=1, block=32)
     tips = [tip for tip, _ in cells(smem.bank_heatmap_svg(stats.smem))]

@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 import warplens
-from conftest import kernel
+
+from tests.support import kernel
 
 
 SHAPES = [("32x32b", 128, 128), ("16x64b", 128, 128),

@@ -87,7 +87,7 @@ def test_read_only_commit_is_not_silently_treated_as_full_mma_completion():
 
 
 def test_another_lane_cannot_make_mma_result_synchronized(sim, monkeypatch):
-    import test_tcgen05 as helpers
+    from tests.support import tcgen05 as helpers
 
     original = helpers.mma_kernel
 
@@ -106,7 +106,7 @@ def test_another_lane_cannot_make_mma_result_synchronized(sim, monkeypatch):
 
 
 def test_store_cannot_erase_unwaited_mma_dependency(sim, monkeypatch):
-    import test_tcgen05 as helpers
+    from tests.support import tcgen05 as helpers
 
     original = helpers.mma_kernel
 
@@ -124,7 +124,7 @@ def test_store_cannot_erase_unwaited_mma_dependency(sim, monkeypatch):
 
 
 def test_freeing_unwaited_mma_destination_is_reported(sim):
-    from test_tcgen05 import run
+    from tests.support.tcgen05 import run
 
     _, _, stats = run(sim, n=8, wait=0)
     assert "tmem-dealloc-before-commit" in {f.kind for f in stats.findings}
@@ -145,7 +145,7 @@ def test_tma_overwriting_mma_operand_names_the_actual_reader():
 @pytest.mark.parametrize("fence", [False, True])
 @pytest.mark.parametrize("phase", [0, 1])
 def test_relaxed_wait_fence_acquires_only_tcgen_completion(sim, monkeypatch, fence, phase):
-    import test_tcgen05 as helpers
+    from tests.support import tcgen05 as helpers
 
     original = helpers.mma_kernel
 

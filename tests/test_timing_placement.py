@@ -17,9 +17,9 @@ import warplens
 from warplens.host import device as host_device
 from warplens.timing.placement import LIMITS, place
 
-from conftest import kernel
+from tests.support import BLACKWELL_TIMING, kernel
 
-SUITE = Path(__file__).resolve().parent.parent / "validation" / "blackwell_timing"
+SUITE = BLACKWELL_TIMING
 PREDICTED = SUITE / "predicted"
 
 

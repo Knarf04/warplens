@@ -5,7 +5,7 @@ import pytest
 
 import warplens
 
-from conftest import kernel
+from tests.support import kernel
 
 
 def _barrier_kernel(body):

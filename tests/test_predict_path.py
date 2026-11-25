@@ -25,7 +25,8 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 SUITE = ROOT / "validation" / "blackwell"
 COMMITTED = SUITE / "predicted"
 CUTLASS_BIN = ROOT / "examples" / "03_cutlass_mma" / "bin"

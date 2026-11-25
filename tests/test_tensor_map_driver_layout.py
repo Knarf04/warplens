@@ -7,7 +7,6 @@ file, and every accepted line must come back as the parameters that made it."""
 
 import re
 import struct
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -15,7 +14,9 @@ import pytest
 import warplens
 from warplens.host import tensor_map as tm
 
-SWEEP = Path(__file__).parents[1] / "validation/blackwell/measured/b200/tma/tensormap_encode_sweep.txt"
+from tests.support import BLACKWELL
+
+SWEEP = BLACKWELL / "measured/b200/tma/tensormap_encode_sweep.txt"
 LINE = re.compile(r"(\S+) type=(\d+) rank=(\d+) address=(\S+) base\+\S+ dims=(\S+) strides=(\S*) box=(\S+) "
                   r"estrides=(\S+) interleave=(\d+) swizzle=(\d+) l2=(\d+) fill=(\d+) -> (\d+)(.*)")
 

@@ -12,7 +12,7 @@ import pytest
 from warplens.core.clocks import Clocks
 from warplens.units.smem import SharedMemory
 
-from conftest import kernel
+from tests.support import kernel
 
 WARPS = """
     .reg .u32 %t, %w, %v; .reg .b32 %bar; .reg .pred %w0, %w1, %w2, %w12, %first, %p;

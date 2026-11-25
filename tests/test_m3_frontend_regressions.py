@@ -7,7 +7,8 @@ import pytest
 
 import warplens
 from warplens.core.program import Program
-from conftest import HEADER, kernel
+
+from tests.support import HEADER, kernel
 
 
 def test_nested_local_declarations_keep_distinct_storage(sim):

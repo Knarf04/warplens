@@ -2,9 +2,9 @@
 
 import importlib.util
 import re
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 spec = importlib.util.spec_from_file_location("make_gallery", ROOT / "tools" / "make_gallery.py")
 make_gallery = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(make_gallery)

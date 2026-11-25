@@ -7,15 +7,13 @@ import shutil
 import socket
 import subprocess
 import threading
-from pathlib import Path
 
 import pytest
 
-from conftest import HEADER, cuda_include
+from tests.support import HEADER, REPO as ROOT, cuda_include
 
 from warplens.host.shim_server import REGISTER_FUNCTION, REGISTER_MODULE, ShimServer
 
-ROOT = Path(__file__).resolve().parent.parent
 PTX = HEADER + """
 .visible .entry scale(.param .u64 src, .param .u64 dst, .param .u32 factor)
 {

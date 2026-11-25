@@ -22,9 +22,8 @@ from warplens import cli
 from warplens.host import runtime, shim_server
 from warplens.timing.config import GpuConfig
 
-from conftest import EXAMPLES
+from tests.support import EXAMPLES, REPO as ROOT
 
-ROOT = Path(__file__).resolve().parent.parent
 B200 = ROOT / "warplens" / "configs" / "b200.yaml"
 
 # A host program without a compiler: the CUDA driver API through ctypes. It launches the
@@ -213,7 +212,7 @@ def test_without_the_options_a_launch_is_what_it_was(empty_shims, servers):
 def test_the_server_passes_its_options_to_every_launch():
     """From a launch request to the kernel of examples/09_clc, without a program or the shim."""
     import struct
-    from test_shim import Client, fatbin
+    from tests.support.shim import Client, fatbin
     stats = {}
     for limit in (None, 0):
         c = Client(clc_limit=limit, timing=True, active_sms=4)

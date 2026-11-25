@@ -4,33 +4,9 @@ import numpy as np
 import pytest
 
 import warplens
-from conftest import kernel
 
-
-SETUP = """
-    .reg .b64 %s, %d;
-    .reg .b32 %t;
-    .reg .pred %p, %one;
-    .shared .align 16 .b8 buf[16];
-    .shared .align 8 .u64 bar;
-    ld.param.u64 %s, [src]; ld.param.u64 %d, [dst];
-    mov.u32 %t, %tid.x;
-    setp.eq.u32 %one, %t, 0;
-    @%one st.shared.u32 [buf], 7;
-    @%one st.shared.u32 [buf+4], 7;
-    @%one st.shared.u32 [buf+8], 7;
-    @%one st.shared.u32 [buf+12], 7;
-    fence.proxy.async.shared::cta;
-"""
-
-
-def launch(sim, body, *, block=1, delay=1000):
-    src = sim.from_numpy(np.arange(8, dtype=np.uint32))
-    dst = sim.empty(4, "u32")
-    stats = sim.launch(kernel(SETUP + body + "\nret;",
-                              ".param .u64 src, .param .u64 dst"),
-                       "k", grid=1, block=block, args=[src, dst], async_delay=delay)
-    return dst.numpy(), stats
+from tests.support import kernel
+from tests.support.tma import ONE_BUFFER as SETUP, launch_one_buffer as launch
 
 
 @pytest.mark.parametrize("wait", ["wait_group", "wait_group.read"])
@@ -125,7 +101,7 @@ def test_tensor_coordinate_must_preserve_bounding_box_alignment(sim, direction, 
 
 
 def test_explicit_tile_mode_matches_the_default(sim):
-    from test_tma import box_kernel
+    from tests.support.tma import box_kernel
 
     data = np.arange(8, dtype=np.uint32)
     src, dst = sim.from_numpy(data), sim.empty(4, "u32")

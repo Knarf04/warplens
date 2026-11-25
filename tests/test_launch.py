@@ -5,7 +5,7 @@ import pytest
 
 import warplens
 
-from conftest import EXAMPLES, kernel
+from tests.support import EXAMPLES, kernel
 
 VECADD = EXAMPLES / "00_vecadd" / "vecadd.ptx"
 

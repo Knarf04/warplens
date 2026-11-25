@@ -7,7 +7,7 @@ import pytest
 
 import warplens
 
-from conftest import kernel
+from tests.support import kernel
 
 # What `nvcc -arch=sm_100a -ptx` (13.5) emits before the operation: atomicX(), and the
 # _block and _system variants, on pointers it knows to be global or shared and on others.

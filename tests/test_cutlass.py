@@ -2,12 +2,13 @@
 to have been run (it fetches CUTLASS and compiles the tutorials); skipped otherwise."""
 
 import importlib.util
-from pathlib import Path
 
 import numpy as np
 import pytest
 
-EXAMPLE = Path(__file__).resolve().parent.parent / "examples" / "03_cutlass_mma"
+from tests.support import EXAMPLES
+
+EXAMPLE = EXAMPLES / "03_cutlass_mma"
 
 
 def load_runner():

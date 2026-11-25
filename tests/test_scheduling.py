@@ -11,8 +11,7 @@ import warplens
 from warplens import cli
 from warplens.core.engine import ADVERSARIAL_QUANTUM, SCHEDULE_VARIABLE, Engine, Schedule
 
-import test_hardware_golden as golden
-from conftest import EXAMPLES, kernel
+from tests.support import EXAMPLES, kernel
 
 SCHEDULES = [None, 0, 1, 2, 12345, "adversarial", "adversarial:1", "adversarial:2"]
 
@@ -157,22 +156,6 @@ def test_examples_compute_the_same_under_every_schedule(sim, schedule):
     assert not stats.findings
 
 
-@pytest.mark.parametrize("schedule", ["1", "2", "adversarial", "adversarial:3"])
-@pytest.mark.parametrize("check", [
-    golden.test_shfl_matches_real_gpu,
-    golden.test_printf_struct_param_and_local_array_match_real_gpu,
-    golden.test_cp_async_with_a_source_size_matches_real_gpu,
-    golden.test_device_function_calls_match_real_gpu,
-    golden.test_lanes_rejoin_where_they_do_on_a_real_gpu,
-    golden.test_mbarrier_tokens_match_real_gpu,
-], ids=lambda check: check.__name__.removeprefix("test_"))
-def test_hardware_golden_results_hold_under_other_schedules(sim, monkeypatch, check, schedule):
-    """The whole of tests/test_hardware_golden.py passes with WARPLENS_SCHEDULE set; these are
-    the quick ones, run here so that the suite keeps saying so."""
-    monkeypatch.setenv(SCHEDULE_VARIABLE, schedule)
-    check(sim)
-
-
 # -- the engine under an adversarial schedule --------------------------------------------------
 
 def test_adversarial_turn_ends_at_the_quantum_and_counts_every_instruction(sim):
@@ -213,7 +196,7 @@ def test_deadlock_is_still_found(sim):
 def test_tma_round_trip_is_schedule_invariant(schedule):
     """Asynchronous copies complete later under an adversarial schedule, which a kernel that
     waits for them does not notice."""
-    from test_tma import NO_WAIT, tma_copy
+    from tests.support.tma import NO_WAIT, tma_copy
     ok, stats = tma_copy("128B", (16, 32), schedule=schedule)
     assert ok and not stats.findings
     ok, stats = tma_copy("128B", (16, 32), NO_WAIT, schedule=schedule)  # and one that does not

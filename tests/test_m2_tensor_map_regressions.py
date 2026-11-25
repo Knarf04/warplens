@@ -8,7 +8,7 @@ import pytest
 import warplens
 from warplens.host import tensor_map as tm
 
-from conftest import kernel
+from tests.support import kernel
 
 
 @pytest.mark.parametrize("kwargs", [

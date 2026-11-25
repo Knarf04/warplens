@@ -5,16 +5,14 @@ import shutil
 import socket
 import subprocess
 import threading
-from pathlib import Path
 
 import pytest
 
-from conftest import cuda_include
+from tests.support import REPO as ROOT, cuda_include
 
 from warplens.errors import WarplensError
 from warplens.host.shim_server import FREE, MALLOC, ShimServer
 
-ROOT = Path(__file__).resolve().parent.parent
 CLIENT = r'''
 #include <cuda_runtime_api.h>
 #include <pthread.h>

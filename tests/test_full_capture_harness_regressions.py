@@ -8,7 +8,8 @@ import sys
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+from tests.support import REPO as ROOT
+
 SUITE = ROOT / "validation" / "blackwell"
 sys.path.insert(0, str(SUITE))
 from validation.blackwell.e2e_checks import EXPECTED_CASES, completion_errors

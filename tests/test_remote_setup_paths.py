@@ -19,7 +19,8 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 REMOTE = ROOT / "env" / "remote"
 # What setup.sh and lib.sh call before the download, besides shell builtins.
 TOOLS = ["bash", "sh", "env", "dirname", "basename", "sed", "awk", "grep", "cut", "tr", "sort", "head", "tail",

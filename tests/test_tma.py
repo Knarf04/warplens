@@ -6,21 +6,9 @@ import pytest
 import warplens
 from warplens.frontend.ir import Reg, Sym, TensorRef
 
-from conftest import EXAMPLES, kernel
-
-TMA_COPY = EXAMPLES / "02_tma_copy" / "tma_copy.ptx"
-NONE, EXPECT_TOO_FEW, EXPECT_TOO_MANY, NO_WAIT, NO_FENCE, EARLY_REUSE = range(6)
-
-
-def tma_copy(swizzle, box, bug=NONE, shape=(48, 64), **launch):
-    sim = warplens.Device()
-    data = np.random.default_rng(0).standard_normal(shape).astype(np.float32)
-    src, dst = sim.from_numpy(data), sim.from_numpy(np.full(shape, np.nan, dtype=np.float32))
-    maps = [sim.tensor_map_tiled(a, box, swizzle=swizzle) for a in (src, dst)]
-    grid = (-(-shape[1] // box[1]), -(-shape[0] // box[0]))
-    stats = sim.launch(TMA_COPY, "tma_copy", grid=grid, block=128,
-                       args=[*maps, box[1], box[0], bug], **launch)
-    return np.array_equal(dst.numpy(), 2 * data), stats
+from tests.support import kernel
+from tests.support.tma import (EARLY_REUSE, EXPECT_TOO_FEW, EXPECT_TOO_MANY, NO_FENCE, NO_WAIT, box_kernel,
+                               mb_kernel, record, tma_copy)
 
 
 # -- M2 acceptance -------------------------------------------------------------------
@@ -116,31 +104,6 @@ def test_early_reuse_of_store_source_is_caught():
 
 
 # -- loads and stores of every rank ----------------------------------------------------
-
-def box_kernel(rank: int, raw_wait: str = "cp.async.bulk.wait_group 0;"):
-    """One thread: TMA-load the box at (c0..), then TMA-store it at the origin of `dst`."""
-    coords = ", ".join(f"%c{d}" for d in range(rank))
-    zeros = ", ".join("0" for _ in range(rank))
-    loads = "\n".join(f"ld.param.s32 %c{d}, [c{d}];" for d in range(rank))
-    params = ".param .u64 src, .param .u64 dst, .param .u32 bytes, " + \
-        ", ".join(f".param .s32 c{d}" for d in range(rank))
-    return kernel(f"""
-        .reg .b64 %s, %d; .reg .b32 %n, %c<5>, %buf, %bar; .reg .pred %p;
-        .shared .align 1024 .b8 buf[16384];
-        .shared .align 8 .u64 bar;
-        ld.param.u64 %s, [src]; ld.param.u64 %d, [dst]; ld.param.u32 %n, [bytes];
-        {loads}
-        mov.b32 %buf, buf; mov.b32 %bar, bar;
-        mbarrier.init.shared::cta.b64 [%bar], 1;
-        mbarrier.arrive.expect_tx.shared::cta.b64 _, [%bar], %n;
-        cp.async.bulk.tensor.{rank}d.shared::cluster.global.mbarrier::complete_tx::bytes [%buf], [%s, {{{coords}}}], [%bar];
-        mbarrier.try_wait.parity.shared::cta.b64 %p, [%bar], 0;
-        cp.async.bulk.tensor.{rank}d.global.shared::cta.bulk_group [%d, {{{zeros}}}], [%buf];
-        cp.async.bulk.commit_group;
-        {raw_wait}
-        ret;
-    """, params)
-
 
 def extract_box(data, origin, box, steps, fill=0):
     """What TMA should load: NumPy-order origin/box/steps, out-of-bounds filled."""
@@ -271,22 +234,6 @@ def test_a_tensor_copy_16_bytes_into_a_row_ends_the_kernel_as_on_a_b200(sim):
 
 
 # -- mbarrier semantics ----------------------------------------------------------------
-
-MB = """
-    .reg .b32 %bar, %v; .reg .b64 %o, %tok; .reg .pred %p;
-    .shared .align 8 .u64 bar;
-    mov.b32 %bar, bar;
-    ld.param.u64 %o, [out];
-"""
-
-
-def mb_kernel(body):
-    return kernel(MB + body + "\nret;", ".param .u64 out")
-
-
-def record(k):
-    return f"selp.u32 %v, 1, 0, %p;\nst.global.u32 [%o+{4 * k}], %v;"
-
 
 def test_phases_flip_parity(sim):
     mod = mb_kernel(f"""

@@ -6,7 +6,8 @@ import pytest
 
 from warplens.errors import MemoryFault, WarplensError
 from warplens.host import shim_server as shim
-from test_shim import VECADD, fatbin
+
+from tests.support.shim import VECADD, fatbin
 
 
 class FragmentedSocket:

@@ -13,11 +13,11 @@ probe carries is what validation/ampere/reconvergence_golden.py generates.
 
 import importlib.util
 import sys
-from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 AMPERE = ROOT / "validation" / "ampere"
 SUITE = ROOT / "validation" / "blackwell"
 PREDICTED = SUITE / "predicted"

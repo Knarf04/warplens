@@ -1,6 +1,5 @@
 """Shared memory, bank conflicts, named barriers, shuffles, deadlock."""
 
-from pathlib import Path
 
 import numpy as np
 import pytest
@@ -8,11 +7,10 @@ import pytest
 import warplens
 from warplens.units.smem_banks import analyze
 
-from conftest import EXAMPLES, HEADER, kernel
+from tests.support import AMPERE, EXAMPLES, HEADER, kernel
 
 TRANSPOSE = EXAMPLES / "01_smem_transpose" / "transpose.ptx"
 REDUCE = EXAMPLES / "01_warp_reduce" / "reduce.ptx"
-AMPERE = Path(__file__).resolve().parent.parent / "validation" / "ampere"
 
 
 # -- M1 acceptance -------------------------------------------------------------------

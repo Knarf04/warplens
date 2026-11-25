@@ -52,7 +52,8 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from tests.support import REPO as ROOT
+
 GUIDE = ROOT / "docs" / "guide.md"
 README = ROOT / "README.md"
 NOTEBOOK = ROOT / "examples" / "08_book" / "book_tour.ipynb"

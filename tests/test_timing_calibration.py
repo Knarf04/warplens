@@ -19,7 +19,9 @@ import pytest
 
 from warplens.timing.config import GpuConfig
 
-SUITE = Path(__file__).resolve().parent.parent / "validation" / "blackwell_timing"
+from tests.support import BLACKWELL_TIMING
+
+SUITE = BLACKWELL_TIMING
 FIXTURE = SUITE / "fixture_synthetic"
 PREDICTED = SUITE / "predicted"
 # The benchmarks cheap enough to re-simulate in a test (mma_rate takes minutes).

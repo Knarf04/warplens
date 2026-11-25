@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from conftest import EXAMPLES
+from tests.support import EXAMPLES
 
 VECADD = EXAMPLES / "00_vecadd" / "vecadd.ptx"
 DIVERGENT = EXAMPLES / "00_divergent" / "divergent.ptx"

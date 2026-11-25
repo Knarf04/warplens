@@ -17,7 +17,6 @@ shim libraries are compiled on first use, which needs a C compiler and the CUDA 
 
 from __future__ import annotations
 
-import os
 import socket
 import subprocess
 import tempfile
@@ -28,6 +27,7 @@ from pathlib import Path
 from ..errors import WarplensError
 from ..frontend.ir import Module
 from .launch import LaunchStats
+from .runtime import program_environment, serve_program, shim_libraries, start_program
 
 __all__ = ["ProgramLaunch", "ProgramRun", "run_program"]
 
@@ -84,17 +84,15 @@ def run_program(command, *, model: str = "B200", timing=False, active_sms: int |
     `returncode` and `stderr`, not by an exception; `WarplensError` is raised only when the
     shim libraries cannot be built.
     """
-    from .. import cli  # here, not at the top: cli is the command and imports nothing from host
     from .shim_server import ShimServer
 
     try:
-        shims = cli.shim_libraries()
+        shims = shim_libraries()
     except SystemExit as stop:
         raise WarplensError(str(stop.code)) from None
     ours, theirs = socket.socketpair()
-    child_env = dict(os.environ, **(env or {}), WARPLENS_SHIM_FD=str(theirs.fileno()), WARPLENS_MODEL=model)
     with tempfile.TemporaryDirectory(prefix="warplens_program_") as scratch:
-        kept = cli.frontend_environment(child_env, model, shims, Path(scratch))
+        child_env, kept = program_environment(model, shims, theirs, Path(scratch), env)
         server = ShimServer(model, kept_ptx=kept)
         launches: list[ProgramLaunch] = []
         device_launch = server.device.launch
@@ -108,28 +106,12 @@ def run_program(command, *, model: str = "B200", timing=False, active_sms: int |
             return stats
 
         server.device.launch = launch
-        child_env["LD_LIBRARY_PATH"] = f"{shims}:{child_env.get('LD_LIBRARY_PATH', '')}".rstrip(":")
-        # Preload as well: a program built with an RPATH would otherwise find the real runtime first.
-        preload = [str(p) for p in sorted(shims.glob("libcudart.so.*")) + [shims / "libcuda.so.1"]]
-        child_env["LD_PRELOAD"] = " ".join(preload + child_env.get("LD_PRELOAD", "").split())
         start = time.perf_counter()
         # Output goes to files, not pipes: this process is busy serving the child and would
         # not drain a pipe.
         with open(Path(scratch, "stdout"), "w+") as out, open(Path(scratch, "stderr"), "w+") as err:
-            try:
-                child = subprocess.Popen([str(c) for c in command], env=child_env, pass_fds=[theirs.fileno()],
-                                         stdout=out, stderr=err, stdin=subprocess.DEVNULL)
-            except BaseException:
-                ours.close(), theirs.close()
-                raise
-            try:
-                theirs.close()
-                server.serve(ours)  # returns when the child closes its end
-                code = child.wait()
-            finally:
-                ours.close()
-                if child.poll() is None:
-                    child.kill()
-                    child.wait()
+            child = start_program([str(c) for c in command], child_env, ours, theirs,
+                                  stdout=out, stderr=err, stdin=subprocess.DEVNULL)
+            code = serve_program(server, child, ours, theirs)  # killed, if the server fails
             out.seek(0), err.seek(0)
             return ProgramRun(code, out.read(), err.read(), time.perf_counter() - start, launches)

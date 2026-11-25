@@ -27,7 +27,8 @@ import numpy as np
 
 from ..errors import ExecutionError
 from ..frontend.ir import B128, Sym, Vec
-from .alu import _address, op, unsupported
+from .addressing import effective_address
+from .dispatch import op, unsupported
 from .smem import CLUSTER_WINDOW, GENERIC_WINDOW, local_shared_offset, resolve_shared
 
 RESPONSE_BYTES = 16
@@ -59,7 +60,7 @@ def _decode(response: np.ndarray):
 
 def _local_offsets(w, ins, operand, mask, what: str) -> np.ndarray:
     """Offsets in this CTA's shared memory that an address operand names."""
-    addr = _address(w, ins, operand)
+    addr = effective_address(w, ins, operand)
     if "shared::cta" in ins.mods:
         return local_shared_offset(addr)
     window = np.uint64(GENERIC_WINDOW)  # no state space: generic addresses

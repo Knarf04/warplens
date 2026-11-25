@@ -6,7 +6,8 @@ import numpy as np
 
 from ..core.cta import NUM_BARRIERS, WARP_SIZE
 from ..errors import ExecutionError
-from .alu import membermask_check, op, unsupported
+from .alu import membermask_check
+from .dispatch import op, unsupported
 
 
 def _uniform(w, ins, operand, mask, what: str) -> int:

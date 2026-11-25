@@ -21,8 +21,9 @@ import numpy as np
 
 from ..errors import ExecutionError, MemoryFault
 from ..frontend.ir import Imm, NP_TYPES, Reg, Sym
-from .alu import (_address, _async_check, _fault_lanes, _flush, _operands,
-                  _record_memory_banks, op, route, unsupported)
+from .addressing import async_check, effective_address, fault_lanes, record_memory_banks, route
+from .dispatch import expect_operands, op, unsupported
+from .floating import flush_subnormals
 from .smem import CLUSTER_STRIDE, local_shared_offset
 
 _TYPES = {
@@ -81,11 +82,11 @@ def _result(operation, old, value, replacement):
 def _atomic(w, ins, mask):
     operation, ty, space, noftz = _form(ins)
     if ins.opcode == "atom":
-        dest, address, *sources = _operands(ins, 4 if operation == "cas" else 3)
+        dest, address, *sources = expect_operands(ins, 4 if operation == "cas" else 3)
         if not isinstance(dest, Reg) and not (isinstance(dest, Sym) and dest.name == "_"):
             raise unsupported(ins, "atom requires a scalar register or _ destination")
     else:
-        address, source = _operands(ins, 2)
+        address, source = expect_operands(ins, 2)
         dest, sources = None, [source]
     if any(not isinstance(source, (Reg, Imm)) for source in sources):
         raise unsupported(ins, "atomics require scalar register or immediate operands")
@@ -93,7 +94,7 @@ def _atomic(w, ins, mask):
     replacement = w.read(sources[1], ty) if operation == "cas" else None
     if isinstance(dest, Reg):
         w.read(dest, ty)  # validate destination width/type before changing memory
-    addrs = _address(w, ins, address)
+    addrs = effective_address(w, ins, address)
     dt = NP_TYPES[ty]
     lanes = np.flatnonzero(mask)
     if np.any(addrs[mask] % dt.itemsize):
@@ -121,17 +122,17 @@ def _atomic(w, ins, mask):
         if global_lanes.any():
             w.mem.read(addrs[global_lanes], dt)
     except MemoryFault as error:
-        _fault_lanes(error, global_lanes)
+        fault_lanes(error, global_lanes)
         raise
     for target in {target for target in targets if target is not None}:
         selected = mask & np.asarray([item is target for item in targets])
         try:
             target.smem.index(offsets[selected], dt.itemsize, "atomic access")
         except MemoryFault as error:
-            _fault_lanes(error, selected)
+            fault_lanes(error, selected)
             raise
         if target is w.cta and target.smem.async_active:
-            _async_check(w, ins, selected, offsets, dt.itemsize, "atomic access to", writing=True)
+            async_check(w, ins, selected, offsets, dt.itemsize, "atomic access to", writing=True)
     old_values = np.zeros(len(mask), dtype=dt)
     uninitialized, races = [], []
     for lane in lanes:
@@ -142,9 +143,9 @@ def _atomic(w, ins, mask):
         ftz = ty == "f32" and target is None and not noftz
 
         def update(old):
-            before, operand = (_flush(old), _flush(value)) if ftz else (old, value)
+            before, operand = (flush_subnormals(old), flush_subnormals(value)) if ftz else (old, value)
             updated = _result(operation, before, operand, change)
-            return _flush(updated) if ftz else updated
+            return flush_subnormals(updated) if ftz else updated
 
         if target is not None:
             old, unwritten, racy = target.smem.atomic(at, dt, w.sync_id, update)
@@ -169,5 +170,5 @@ def _atomic(w, ins, mask):
     # Preserve the assumed load+store timing model and ordinary-bank accounting.
     # It does not predict atomic throughput or contention; see docs/atomics.md.
     waves = w.smem_waves
-    _record_memory_banks(w, ins, space, addrs, mask, dt.itemsize)
+    record_memory_banks(w, ins, space, addrs, mask, dt.itemsize)
     w.smem_waves += w.smem_waves - waves

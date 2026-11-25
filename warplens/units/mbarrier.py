@@ -40,7 +40,8 @@ from ..core.clocks import join
 from ..core.cta import Wait
 from ..errors import ExecutionError
 from ..frontend.ir import Sym
-from .alu import _address, op, unsupported
+from .addressing import effective_address
+from .dispatch import op, unsupported
 from .smem import CLUSTER_WINDOW, GENERIC_WINDOW, local_shared_offset, resolve_shared
 
 _NOISE = frozenset({"shared", "shared::cta", "shared::cluster", "b64",
@@ -59,7 +60,7 @@ def _mbarrier(w, ins, mask):
     local = any(m in ins.mods for m in ("shared", "shared::cta"))
 
     def offsets(operand):
-        addr = _address(w, ins, operand)
+        addr = effective_address(w, ins, operand)
         if not any(m in ins.mods for m in ("shared", "shared::cta", "shared::cluster")):
             window = np.uint64(GENERIC_WINDOW)
             shared = (addr >= window) & (addr < window + np.uint64(CLUSTER_WINDOW))

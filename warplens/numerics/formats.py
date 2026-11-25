@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+__all__ = ["E2M1", "E4M3", "E5M2", "FloatFormat", "UE4M3", "UE8M0"]
+
 
 @dataclass(frozen=True)
 class FloatFormat:

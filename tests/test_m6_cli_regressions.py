@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from warplens import cli
-from warplens.host import shim_server
+from warplens.host import runtime, shim_server
 
 
 def args(program, *arguments):
@@ -58,7 +58,7 @@ def test_cli_reaps_child_and_closes_both_sockets_on_server_failure(monkeypatch, 
     def fail(*_):
         raise failure
 
-    monkeypatch.setattr(cli.subprocess, "Popen", popen)
+    monkeypatch.setattr(subprocess, "Popen", popen)
     monkeypatch.setattr(cli.socket, "socketpair", pair)
     monkeypatch.setattr(shim_server.ShimServer, "serve", fail)
     try:
@@ -168,7 +168,7 @@ def build_tree(tmp_path, monkeypatch):
     monkeypatch.setenv("CC", str(compiler))
     monkeypatch.setenv("PATH", str(nvcc.parent) + os.pathsep + os.environ["PATH"])
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    monkeypatch.setattr(cli, "SHIM_DIR", source)
+    monkeypatch.setattr(runtime, "SHIM_DIR", source)
     return source, include
 
 
@@ -341,7 +341,7 @@ def test_a_run_checks_the_libraries_once_and_a_launch_never(build_tree, monkeypa
     manual_build(source, include)
     calls = []
     stamp = cli.shim_stamp
-    monkeypatch.setattr(cli, "shim_stamp", lambda *a: calls.append(a) or stamp(*a))
+    monkeypatch.setattr(runtime, "shim_stamp", lambda *a: calls.append(a) or stamp(*a))
     assert cli.shim_libraries() == source / "lib"
     assert len(calls) == 2  # the sources, and the headers the build recorded
     text = Path(shim_server.__file__).read_text()

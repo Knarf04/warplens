@@ -16,19 +16,21 @@ from __future__ import annotations
 
 import argparse
 import atexit
-import fcntl
-import hashlib
 import json
 import os
 import shutil
 import signal
 import socket
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-SHIM_DIR = Path(__file__).resolve().parent / "shim"
+# What surrounds the program is not the command's own: `run_program` uses it too. The names
+# stay importable from here, where they were before warplens/host/runtime.py.
+from .host.runtime import (SHIM_DIR, SHIM_HEADERS, SHIM_STAMP, cute_dsl_runtime,  # noqa: F401
+                           frontend_environment, program_environment, serve_program, shim_complete,
+                           shim_libraries, shim_staleness, shim_stamp, start_program)
+
 # What `warplens run` tells the Python programs it starts, as JSON: the model, the launch
 # options, and the file to report the launches of a Triton driver in. See `child_options`.
 RUN_OPTIONS = "WARPLENS_RUN_OPTIONS"
@@ -36,191 +38,6 @@ RUN_OPTIONS = "WARPLENS_RUN_OPTIONS"
 BUILD_HINT = """\
 The program must carry PTX and use the shared CUDA runtime. Build it like this:
   nvcc -gencode arch=compute_100a,code=compute_100a --no-compress --cudart shared prog.cu -o prog"""
-
-
-SHIM_STAMP = "warplens-shim.stamp"  # written by warplens/shim/build.sh next to the libraries
-SHIM_HEADERS = ("cuda_runtime_api.h", "cuda.h")
-
-
-def _digest(directory: Path, names) -> str:
-    """A digest of files of one directory: of the lines `sha256sum` prints for them, which
-    is how warplens/shim/build.sh computes the same number."""
-    lines = "".join(f"{hashlib.sha256((directory / name).read_bytes()).hexdigest()}  {name}\n" for name in names)
-    return hashlib.sha256(lines.encode()).hexdigest()
-
-
-def shim_stamp(include: Path | None = None) -> dict:
-    """What build.sh records about a build made now: `sources`, a digest of the shim's C
-    sources, protocol.h and build.sh; and with `include` (a CUDA include directory) a digest
-    of the CUDA headers there that the shim is compiled against."""
-    names = sorted(p.name for p in SHIM_DIR.iterdir() if p.suffix in {".c", ".h"} or p.name == "build.sh")
-    stamp = {"sources": _digest(SHIM_DIR, names)}
-    if include is not None:
-        stamp["headers"] = _digest(include, [name for name in SHIM_HEADERS if (include / name).is_file()])
-    return stamp
-
-
-def shim_complete(lib: Path) -> bool:
-    return (lib / "libcuda.so.1").is_file() and any(p.is_file() for p in lib.glob("libcudart.so.*"))
-
-
-def _recorded_stamp(lib: Path) -> dict | None:
-    """The stamp build.sh left in `lib`: `sources`, `headers` and `include`. None without one."""
-    try:
-        lines = (lib / SHIM_STAMP).read_text().splitlines()
-    except OSError:
-        return None
-    return dict(line.split(" ", 1) for line in lines if " " in line)
-
-
-def shim_staleness(lib: Path, sources: str | None = None) -> str | None:
-    """Why the libraries in `lib` must not be used with the shim sources of this package, or
-    None when they were built from exactly these sources (and from the CUDA headers that are
-    still where they were). Costs a hash of the sources and two headers: called once for
-    every `warplens run`, never for a launch."""
-    if not shim_complete(lib):
-        return "holds no complete pair of shim libraries"
-    recorded = _recorded_stamp(lib)
-    if recorded is None:
-        return (f"has no {SHIM_STAMP}: the libraries were built by an older build.sh, or a build was "
-                "interrupted, and nothing says which sources they are from")
-    if recorded.get("sources") != (sources or shim_stamp()["sources"]):
-        return "was built from other shim sources (cudart_shim.c, cuda_shim.c, protocol.h or build.sh changed since)"
-    # A build made by hand stays usable where the CUDA headers are not installed any more.
-    include = Path(recorded.get("include", ""))
-    if recorded.get("include") and (include / SHIM_HEADERS[0]).is_file() \
-            and shim_stamp(include)["headers"] != recorded.get("headers"):
-        return f"was built against the CUDA headers in {include}, which have changed since"
-    return None
-
-
-def _rebuild_local_shim(lib: Path, sources: str) -> None:
-    """Rebuild a build made by hand (warplens/shim/lib) whose sources changed, or stop: a
-    stale library must never be loaded as if it were current."""
-    try:
-        with (lib / ".lock").open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            why = shim_staleness(lib, sources)
-            if why is None:  # another run rebuilt it meanwhile
-                return
-            print(f"warplens: {lib} {why}; rebuilding it", file=sys.stderr)
-            # Against the headers it was built with, if they are still there; else nvcc's.
-            include = (_recorded_stamp(lib) or {}).get("include", "")
-            if not include or not (Path(include) / SHIM_HEADERS[0]).is_file():
-                include = ""
-            done = subprocess.run([str(SHIM_DIR / "build.sh"), include, str(lib)], capture_output=True, text=True)
-            failure = (f"{done.stdout}{done.stderr}".strip() or f"build.sh exited with status {done.returncode}"
-                       if done.returncode else shim_staleness(lib, sources))
-    except OSError as error:
-        why, failure = shim_staleness(lib, sources), str(error)
-    if failure is not None:
-        sys.exit(f"warplens: {lib} {why}, and it could not be rebuilt:\n{failure}\n"
-                 f"The stale libraries are not used. Run {SHIM_DIR / 'build.sh'} <CUDA include directory> by "
-                 f"hand, or remove {lib} to have them built in the user cache.")
-
-
-def shim_libraries() -> Path:
-    """The directory holding the shim libraries, building them on first use, and again when
-    the sources they were built from are not the ones here (`shim_staleness`)."""
-    sources = shim_stamp()["sources"]
-    # A manual build remains usable without a compiler or installed CUDA headers, as long as
-    # it is a build of these sources.
-    local = SHIM_DIR / "lib"
-    if shim_complete(local):
-        if shim_staleness(local, sources) is not None:
-            _rebuild_local_shim(local, sources)
-        return local
-    digest = hashlib.sha256()
-    for source in sorted(SHIM_DIR.iterdir()):
-        if source.suffix in {".c", ".h"} or source.name == "build.sh":
-            digest.update(source.name.encode() + b"\0" + source.read_bytes())
-    # The toolkit changes the runtime SONAME and exported ABI, even when our
-    # sources have not changed. Never reuse another toolkit's cached build.
-    if nvcc := shutil.which("nvcc"):
-        root = Path(nvcc).resolve().parent.parent
-        digest.update(str(root).encode())
-        for include in (root / "targets/x86_64-linux/include", root / "include"):
-            if (include / "cuda_runtime_api.h").is_file():
-                for name in ("cuda_runtime_api.h", "cuda.h"):
-                    header = include / name
-                    if header.is_file():
-                        digest.update(header.read_bytes())
-                break
-    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    lib = (cache / "warplens" / "shim" / digest.hexdigest()).absolute()
-    try:
-        lib.parent.mkdir(parents=True, exist_ok=True)
-        # Concurrent first runs share the build, rather than loading half of it.
-        with lib.with_suffix(".lock").open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            # The cache directory is named after the sources and the toolkit; the stamp says
-            # that what is in it is a finished build of them.
-            if shim_staleness(lib, sources) is not None:
-                print("warplens: building the shim libraries (first run)", file=sys.stderr)
-                done = subprocess.run([str(SHIM_DIR / "build.sh"), "", str(lib)],
-                                      capture_output=True, text=True)
-                if done.returncode or shim_staleness(lib, sources) is not None:
-                    sys.exit(f"warplens: could not build the shim libraries:\n{done.stdout}{done.stderr}\n"
-                             f"Run {SHIM_DIR / 'build.sh'} <CUDA include directory> by hand.")
-    except OSError as error:
-        sys.exit(f"warplens: could not build the shim libraries: {error}")
-    return lib
-
-
-def cute_dsl_runtime(shims: Path) -> Path | None:
-    """A runtime library for the CuTe DSL that calls the shims, built on first use from the
-    wrapper archive in the installed `nvidia-cutlass-dsl`. None when the DSL is not installed."""
-    import importlib.util
-    try:
-        spec = importlib.util.find_spec("nvidia_cutlass_dsl")
-    except (ImportError, ValueError):
-        spec = None
-    if spec is None or not spec.submodule_search_locations:
-        return None
-    archives = sorted(Path(root).glob("cu*/lib/libcuda_dialect_runtime_static.a")
-                      for root in spec.submodule_search_locations)
-    archives = [a for found in archives for a in found]
-    if not archives:
-        return None
-    archive = archives[-1]
-    digest = hashlib.sha256((SHIM_DIR / "build_cute_dsl.sh").read_bytes())
-    for part in (archive, *sorted(shims.glob("libcudart.so.*"))):
-        stat = part.stat()
-        digest.update(f"{part}\0{stat.st_size}\0{stat.st_mtime_ns}".encode())
-    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    out = (cache / "warplens" / "cute_dsl" / digest.hexdigest()).absolute()
-    library = out / "libcute_dsl_runtime.so"
-    try:
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with out.with_suffix(".lock").open("a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            if not library.is_file():
-                done = subprocess.run([str(SHIM_DIR / "build_cute_dsl.sh"), str(archive), str(shims), str(out)],
-                                      capture_output=True, text=True)
-                if done.returncode or not library.is_file():
-                    print(f"warplens: could not build the CuTe DSL runtime; its launches will not be "
-                          f"simulated:\n{done.stdout}{done.stderr}", file=sys.stderr)
-                    return None
-    except OSError as error:
-        print(f"warplens: could not build the CuTe DSL runtime: {error}", file=sys.stderr)
-        return None
-    return library
-
-
-def frontend_environment(env: dict, model: str, shims: Path, kept: Path) -> Path:
-    """Point the compilers that run inside the program at the simulator: the architecture to
-    compile for, and, for the CuTe DSL, the runtime library to launch through and the request
-    to keep its PTX. Settings the user made win. Returns the directory the PTX is kept in."""
-    env.setdefault("CUTE_DSL_ARCH", "sm_103a" if model == "B300" else "sm_100a")
-    if "CUTE_DSL_LIBS" not in env and (runtime := cute_dsl_runtime(shims)):
-        env["CUTE_DSL_LIBS"] = str(runtime)
-    tokens = [t.strip() for t in env.get("CUTE_DSL_KEEP", "").split(",") if t.strip()]
-    if not {"ptx", "all"} & {t.lower() for t in tokens}:
-        env["CUTE_DSL_KEEP"] = ",".join([*tokens, "ptx"])
-    kept = Path(env.setdefault("CUTE_DSL_DUMP_DIR", str(kept)))
-    # A Python program gets warplens/shim/python/sitecustomize.py.
-    env["PYTHONPATH"] = os.pathsep.join([str(SHIM_DIR / "python"), *filter(None, [env.get("PYTHONPATH")])])
-    return kept
 
 
 def short(name: str, width: int = 64) -> str:
@@ -381,43 +198,22 @@ def run(args, collect=None) -> int:
     options = child_options(args)
     launch = launch_options(**{k: v for k, v in options.items() if k != "model"})
     ours, theirs = socket.socketpair()
-    env = dict(os.environ, WARPLENS_SHIM_FD=str(theirs.fileno()), WARPLENS_MODEL=args.model)
     scratch = tempfile.TemporaryDirectory(prefix="warplens_kept_ptx_")
     handle, report = tempfile.mkstemp(prefix="warplens_triton_launches_")
     os.close(handle)
     if getattr(args, "report_dir", None):  # `warplens report`: see install_triton_driver
         options["report_dir"] = args.report_dir
-    env[RUN_OPTIONS] = json.dumps({**options, "report": report,
-                                   "package": str(Path(__file__).resolve().parent.parent)})
-    server = ShimServer(args.model, kept_ptx=frontend_environment(env, args.model, lib, Path(scratch.name)),
-                        **{"timing": False, **launch})
-    env["LD_LIBRARY_PATH"] = f"{lib}:{env.get('LD_LIBRARY_PATH', '')}".rstrip(":")
-    # Preload as well: a program built with an RPATH would otherwise find the real runtime first.
-    shims = [str(p) for p in sorted(lib.glob("libcudart.so.*")) + [lib / "libcuda.so.1"]]
-    env["LD_PRELOAD"] = " ".join(shims + env.get("LD_PRELOAD", "").split())
-    child = None
+    run_options = json.dumps({**options, "report": report, "package": str(Path(__file__).resolve().parent.parent)})
+    env, kept = program_environment(args.model, lib, theirs, Path(scratch.name), {RUN_OPTIONS: run_options})
+    server = ShimServer(args.model, kept_ptx=kept, **{"timing": False, **launch})
     try:
         try:
-            child = subprocess.Popen([*command, *args.arguments], env=env, pass_fds=[theirs.fileno()])
+            child = start_program([*command, *args.arguments], env, ours, theirs)
         except OSError as error:
             sys.exit(f"warplens: cannot execute {args.program}: {error.strerror}")
-        theirs.close()
-        server.serve(ours)
-        ours.close()
-        code = child.wait()
+        # Asked to terminate first, if the server fails or the run is interrupted: see serve_program.
+        code = serve_program(server, child, ours, theirs, grace=2)
     finally:
-        theirs.close()
-        ours.close()
-        # A server exception or interruption must not orphan the CUDA program,
-        # which may otherwise remain blocked waiting for its next RPC response.
-        if child is not None:
-            if child.poll() is None:
-                child.terminate()
-                try:
-                    child.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    child.kill()
-            child.wait()
         scratch.cleanup()
         reported = []  # by the Triton driver of a Python program: see install_triton_driver
         try:

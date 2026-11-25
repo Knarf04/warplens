@@ -79,7 +79,7 @@ include = ["warplens*"]
 [tool.setuptools.package-data]
 # The machine models (warplens/timing/config.py).
 "warplens.configs" = ["*.yaml"]
-# The shim sources and build scripts `warplens run` compiles on first use (warplens/cli.py).
+# The shim sources and build scripts `warplens run` compiles on first use (warplens/host/runtime.py).
 # shim/python/sitecustomize.py, which it puts on the PYTHONPATH of the programs it starts, is
 # in a directory without an __init__.py: it is packaged because the search above takes
 # namespace packages, and it is named here so that it does not depend on that.

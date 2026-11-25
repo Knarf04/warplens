@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import numpy as np
 
+__all__ = ["TF32_DISCARDED_BITS", "TF32_MODES", "TF32_NAN", "explain_tf32", "flush_subnormals",
+           "fused_multiply_add", "to_tf32"]
+
 
 _FORMATS = {
     np.dtype(np.float16): (np.uint16, 10, 5),

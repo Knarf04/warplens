@@ -269,6 +269,10 @@ a clock, an mbarrier arrive and wait costs 33 ns against 3. Replacing the
 numbers without deciding those would trade assumed values for fitted ones
 that are known to be wrong elsewhere.
 
+Decided on 2026-11-25 (`PLAN.md`): v1 ships the assumed values, the fit stays
+recorded and selectable with `--timing-config`, and the model is given those
+mechanisms after v1.
+
 Three numbers in these fixes are **assumptions**, each the weakest that the
 measurements allow, and each has a new probe run that asks a GPU:
 

@@ -88,7 +88,7 @@ their arbitrary outputs do not become a universal hardware contract.
 Replay can run locally after downloading. It is also useful to replay a small case
 before ending the rental, so missing artifacts are discovered while access remains.
 
-## The CuTe DSL kernel with TMA (RT-11): captured, not yet a fixture
+## The CuTe DSL kernel with TMA (RT-11): captured, and kept in the archive
 
 CUTLASS's `fp16_gemm_0.py` cannot be one of the cases above. A case's tensor maps are
 recipes, the arguments of `cuTensorMapEncodeTiled`, and the CuTe DSL never calls the

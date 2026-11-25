@@ -100,14 +100,15 @@ version_ge() {
 }
 
 # The CUDA release a driver supports, from the text `nvidia-smi` prints
-# ("... Driver Version: 580.173.02     CUDA Version: 13.0 ..."). Prints X.Y,
+# ("... Driver Version: 580.173.02     CUDA Version: 13.0 ...", or R610's
+# "... KMD Version: 610.57.04     CUDA UMD Version: 13.3 ..."). Prints X.Y,
 # or nothing when the text has no such field.
 parse_smi_cuda_version() {
-  sed -n 's/.*CUDA Version: *\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' <<<"$1" | head -n 1
+  sed -nE 's/.*CUDA (UMD )?Version: *([0-9]+\.[0-9]+).*/\2/p' <<<"$1" | head -n 1
 }
 
 parse_smi_driver_version() {
-  sed -n 's/.*Driver Version: *\([0-9][0-9.]*\).*/\1/p' <<<"$1" | head -n 1
+  sed -nE 's/.*(Driver|KMD) Version: *([0-9][0-9.]*).*/\2/p' <<<"$1" | head -n 1
 }
 
 # classify_gpu NAME COMPUTE_CAP -> one line "verdict|explanation".

@@ -191,8 +191,30 @@ def test_triton_is_predicted(run):
     pytest.importorskip("triton")
     _, predicted, _, statuses = run
     assert statuses["e2e/triton"] == "ok"
+    # The matmul's max error is not compared: it is measured against this machine's NumPy
+    # (see compare.TRITON_ERROR). The vector add's is, and so are the simulator's counts.
     now = key_lines((predicted / "e2e" / "triton.txt").read_text())
-    assert len(now) == 2 and now == key_lines((COMMITTED / "e2e" / "triton.txt").read_text())
+    assert len(now) == 2 and all(": max abs error vs NumPy " in line for line in now), now
+    assert compare.claims(now) == compare.claims(key_lines((COMMITTED / "e2e" / "triton.txt").read_text()))
+
+
+def test_the_triton_matmuls_max_error_is_not_part_of_what_is_compared():
+    """CI's runner printed 5.72e-06 where the committed prediction says 5.25e-06, for the same
+    kernel output: on one machine the number moves between the two with OMP_NUM_THREADS."""
+    committed = key_lines((COMMITTED / "e2e" / "triton.txt").read_text())
+    assert "matmul: max abs error vs NumPy 5.25e-06; " in committed[1]
+    elsewhere = [line.replace("5.25e-06", "5.72e-06") for line in committed]
+    assert elsewhere != committed and compare.claims(elsewhere) == compare.claims(committed)
+    assert compare.claims(committed)[1].startswith("matmul: max abs error vs NumPy; 4 CTA(s), ")
+    # The GPU's line has the number and nothing after it.
+    assert compare.claims(["matmul: max abs error vs NumPy 4.77e-06"]) == ["matmul: max abs error vs NumPy"]
+    # What is a claim still counts: the simulator's counts, the vector add's exact result, a
+    # distance that is not a number.
+    assert compare.claims([committed[1].replace("8480", "8481")]) != compare.claims([committed[1]])
+    assert compare.claims([committed[0].replace("NumPy 0;", "NumPy 1e-07;")]) != compare.claims([committed[0]])
+    for bad in ("nan", "inf", "-1e-06"):
+        line = f"matmul: max abs error vs NumPy {bad}"
+        assert compare.claims([line]) == [line]
 
 
 @pytest.mark.parametrize("name,module", [("tirx", "tvm_tirx"), ("cute_dsl", "cutlass")])

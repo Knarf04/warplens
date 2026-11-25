@@ -112,7 +112,14 @@ SECONDS = re.compile(r", \d+\.\d+ s\)")
 # distance. A failed program, another format, NaN or infinity remains visible.
 MAX_ERROR = re.compile(
     r"^(hgemm_v\d+ \d+x\d+x\d+: matches NumPy) "
-    r"\(max error (\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)\)$")
+    r"\(max error (\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)\)()$")
+# The Triton matmul's line is the same distance, printed after the script has asserted its
+# tolerance: "matmul: max abs error vs NumPy 5.25e-06; 4 CTA(s), ..." on one machine and
+# 5.72e-06 on another, or on the same one with another number of BLAS threads. What follows
+# the number (the simulator's counts) stays in the claim. The vector add's distance is to a
+# sum NumPy computes exactly, and is compared as it is.
+TRITON_ERROR = re.compile(
+    r"^(matmul: max abs error vs NumPy) (\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)((?:; .*)?)$")
 
 
 def key_lines(text: str) -> list[str]:
@@ -124,8 +131,8 @@ def claims(lines: list[str]) -> list[str]:
     """`key_lines` without what depends on the machine: "hgemm_v6 128x128x256: matches NumPy"."""
     result = []
     for line in lines:
-        match = MAX_ERROR.fullmatch(line)
-        result.append(match[1] if match and math.isfinite(float(match[2])) else line)
+        match = MAX_ERROR.fullmatch(line) or TRITON_ERROR.fullmatch(line)
+        result.append(match[1] + match[3] if match and math.isfinite(float(match[2])) else line)
     return result
 
 

@@ -274,7 +274,9 @@ recorded and selectable with `--timing-config`, and the model is given those
 mechanisms after v1.
 
 Three numbers in these fixes are **assumptions**, each the weakest that the
-measurements allow, and each has a new probe run that asks a GPU:
+measurements allow, and each has a new probe run that asks a GPU. (The second
+rental asked: the third held, the second is 128 and not 32, and the first has
+no fixed size. [b200-rental-2.md](b200-rental-2.md).)
 
 | Assumption | Where | Asked by |
 | --- | --- | --- |
@@ -283,6 +285,8 @@ measurements allow, and each has a new probe run that asks a GPU:
 | In an MMA a negative term is cut toward zero, a product is lined up by its operands' exponents, and the old accumulator is cut like a product (from the book's kernels, not from a probe) | `mma_sum` | `mma/accumulation_order`, parts 4 to 6 |
 
 ## What the second rental has to confirm
+
+It ran on the same day: [b200-rental-2.md](b200-rental-2.md) is its record.
 
 Fixes 1 to 7 and 9 changed predictions of bit-exact and tolerance rows, which
 is trigger 1 of `env/remote/RUNBOOK.md`, section 5. The run is the same

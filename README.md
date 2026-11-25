@@ -129,9 +129,15 @@ What that rests on:
   within tolerance. Of the book's nine kernels five were within tolerance
   and four outside it; all nine replay bit for bit since the arithmetic of
   `tcgen05.mma` was changed to what the GPU computes.
-- **Changed after that run and not run on hardware again**: everything that
-  differed. The simulator now reproduces the recorded B200 outputs; a second
-  run to confirm the changed predictions has not happened.
+- **Confirmed by a second run the same day**
+  ([docs/b200-rental-2.md](https://github.com/Knarf04/warplens/blob/main/docs/b200-rental-2.md)): everything that
+  had differed and was changed. Every probe run whose prediction had changed
+  was identical, and the eight whole programs were bit-identical. That run
+  also answered two open questions, and both answers changed the simulator
+  again: a tensor copy needs a shared address aligned to 128 bytes, and an
+  undersized `expect_tx` completes its phase early in some runs of the same
+  kernel and not in others. Those two changes have not been run on hardware
+  again.
 - **Not calibrated**: the timing model. The parameters that ship are mostly
   assumptions. The B200 run measured the benchmarks they would be fitted
   from; the fit is recorded and not applied.

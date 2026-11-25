@@ -22,8 +22,15 @@ file's.
 - The probe suites ran once on a rented B200, on 2026-11-25
   ([docs/b200-rental-1.md](docs/b200-rental-1.md)). Of 126 probe runs 88 were
   identical to the simulator's prediction; the differences were taken into
-  the simulator, which now reproduces the recorded outputs. Those changes
-  have not been run on hardware again.
+  the simulator, which now reproduces the recorded outputs.
+- They ran a second time the same day, on the same machine
+  ([docs/b200-rental-2.md](docs/b200-rental-2.md); about 45 minutes of the 4
+  GPU-hours in reserve). Every prediction the first run had changed was
+  identical, and the whole programs were bit-identical. Two assumptions were
+  answered and taken into the simulator: a tensor copy needs a shared address
+  aligned to 128 bytes, and an undersized `expect_tx` completes its phase
+  early only at a multiple of 32 bytes, in some runs and not in others. Those
+  two changes have not been run on hardware again.
 - The timing model's shipped configs hold the values assumed before that
   run, and v1 ships them: a fit of the run is recorded and can be chosen,
   and is not the default (decided below).
@@ -56,17 +63,12 @@ reserve the PyPI name, and `1.0`, the public release
 
 ## Still owed for v1.0
 
-1. **A second rental.** 4 GPU-hours are in reserve (the budget and the
-   triggers are in `env/remote/RUNBOOK.md`, section 5). The fixes made after
-   the first run changed predictions of bit-exact and tolerance rows, which
-   hardware has to confirm, and three constants in those fixes are
-   assumptions that new probe runs measure: the piece size in which a TMA
-   copy reports its bytes, the alignment a tensor copy needs, and three rules
-   of the MMA sum. What to look for is in
-   [docs/b200-rental-1.md](docs/b200-rental-1.md), "What the second rental
-   has to confirm".
-2. **Reserve the PyPI name** with the `0.0.1` placeholder.
-3. What [RELEASING.md](RELEASING.md) lists under "Before the release".
+1. **Reserve the PyPI name** with the `0.0.1` placeholder.
+2. What [RELEASING.md](RELEASING.md) lists under "Before the release".
+3. **The timing measurements of the second rental, read.** Both of its passes ran
+   the timing suite; the numbers are in the archives and have not been held
+   against the fit of the first run. The shipped config does not depend on
+   it (decided below).
 
 Decided by the owner on 2026-11-25:
 
@@ -75,7 +77,7 @@ Decided by the owner on 2026-11-25:
   (`validation/blackwell_timing/measured/b200/calibrated.yaml`) is recorded
   and usable with `--timing-config`, and is not the default. No prediction
   changes, so the second rental's timing run is compared with the same
-  predictions as the first. Giving the model what the fit says it lacks is
+  predictions as the first (item 3 above). Giving the model what the fit says it lacks is
   after v1 (below; [docs/b200-rental-1.md](docs/b200-rental-1.md), "The
   timing config is a decision, not a fix").
 - **The RT-11 capture stays out of the repository.** The kernel of

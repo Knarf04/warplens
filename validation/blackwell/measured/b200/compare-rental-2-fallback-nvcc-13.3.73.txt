@@ -1,0 +1,296 @@
+probe                                   verdict                         detail
+e2e/device_attributes                   identical                       
+e2e/smem_limit                          identical                       
+e2e/smem_optin                          identical                       
+e2e/smem_static                         identical                       
+e2e/elect                               identical                       
+e2e/elect.all                           identical                       both refuse the kernel; GPU: cudaErrorIllegalInstruction at synchronize; simulator: elect.sync is executed by lane(s) 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 
+e2e/elect.partial                       identical                       
+e2e/ampere_replay.shfl                  identical                       
+e2e/ampere_replay.printf                identical                       
+e2e/ampere_replay.ldmatrix              identical                       
+e2e/ampere_replay.prmt                  identical                       
+e2e/ampere_replay.cpasync               identical                       
+e2e/ampere_replay.barrier_exit          identical                       
+e2e/ampere_replay.addrwrap              identical                       
+e2e/ampere_replay.vote                  identical                       
+e2e/ampere_replay.call                  identical                       
+e2e/ampere_replay.callforms             identical                       
+e2e/ampere_atom                         identical                       
+e2e/ampere_reconvergence                identical                       
+tma/swizzle_aligned                     identical                       
+tma/swizzle_misaligned                  identical                       
+tma/swizzle_misaligned.sixteen          identical                       both refuse the kernel; GPU: cudaErrorMisalignedAddress at synchronize; simulator: a TMA tensor copy needs a shared-memory address aligned to 32 bytes, got offset 
+tma/swizzle_misaligned.thirtytwo        kernel failed (by design)       GPU: cudaErrorMisalignedAddress at synchronize; the simulator's kernel returns
+tma/swizzle_misaligned.sixtyfour        kernel failed (by design)       GPU: cudaErrorMisalignedAddress at synchronize; the simulator's kernel returns
+tma/ranks                               identical                       
+tma/misaligned_requests                 identical                       both refuse the kernel; GPU: cudaErrorIllegalInstruction at synchronize; simulator: TMA innermost coordinate must give a 16-byte aligned bounding box (coordinate 1,
+tma/oob_fill                            identical                       
+tma/oob_complete_tx                     identical                       
+tma/element_strides                     identical                       
+tma/element_strides.inner               identical                       
+tma/store_wait_group                    identical                       
+tma/store_wait_group.edge               identical                       both refuse the kernel; GPU: cudaErrorIllegalInstruction at synchronize; simulator: a TMA store at coordinates (0, -2) starts outside the tensor: a store may hang o
+tma/store_wait_group.outside            identical                       
+tma/tensormap_encode_sweep              informational                   no prediction; 1382 line(s) recorded
+tma/raw_bulk                            identical                       
+tma/hints                               identical                       
+tma/missing_fence                       identical                       
+tma/missing_fence.long                  informational                   no prediction; 4 line(s) recorded
+mbarrier/phase_parity                   identical                       
+mbarrier/phase_parity.counts            identical                       
+mbarrier/arrivals_and_bytes             identical                       
+mbarrier/lane_arrivals                  identical                       
+mbarrier/arrive_token                   identical                       
+mbarrier/arrive_token.stale             identical                       
+mbarrier/ampere_token                   identical                       
+mbarrier/try_wait                       identical                       
+mbarrier/try_wait.incomplete            informational                   no prediction; 10 line(s) recorded
+mbarrier/init_count                     identical                       
+mbarrier/init_count.over                identical                       both refuse the kernel; GPU: cudaErrorLaunchFailure at synchronize; simulator: mbarrier.init with an arrival count of 1048576; it must be 1 to 2^20-1
+mbarrier/init_count.zero                identical                       both refuse the kernel; GPU: cudaErrorLaunchFailure at synchronize; simulator: mbarrier.init with an arrival count of 0; it must be 1 to 2^20-1
+mbarrier/complete_before_expect         identical                       
+mbarrier/over_arrival                   identical                       both refuse the kernel; GPU: cudaErrorLaunchFailure at synchronize; simulator: 3 arrival(s) on the mbarrier at shared offset 0, which needed only 2 more in thi
+mbarrier/expect_tx_small                identical                       
+mbarrier/expect_tx_small.wait           identical                       
+mbarrier/expect_tx_small.pieces         DIFFERS                         
+mbarrier/expect_tx_large                timed out (as predicted)        simulator: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them
+tmem/lane_window                        identical                       
+tmem/lane_window.16                     GPU faulted, not modelled       GPU: cudaErrorMisalignedAddress at synchronize; the simulator does not model this (unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer span)
+tmem/lane_window.1                      GPU faulted, not modelled       GPU: cudaErrorMisalignedAddress at synchronize; the simulator does not model this (unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer span)
+tmem/lane_window.48                     GPU faulted, not modelled       GPU: cudaErrorMisalignedAddress at synchronize; the simulator does not model this (unsupported instruction `tcgen05.ld.sync.aligned.32x32b.x1.b32` (a transfer span)
+tmem/layout_f                           identical                       
+tmem/layout_f.64_8                      identical                       both refuse the kernel; GPU: cudaErrorMisalignedAddress at synchronize; simulator: tcgen05.mma result with M=64 at lane 8; the lane of the destination must be 0 or
+tmem/transfer_shapes                    identical                       
+tmem/repeat_counts                      identical                       
+tmem/fresh_contents                     identical                       
+tmem/cp_record                          informational                   no prediction; 48 line(s) recorded
+tmem/alloc_addresses                    identical                       
+tmem/alloc_increasing                   identical                       
+tmem/alloc_addresses.size_48            informational                   the GPU ran what the simulator refuses (tcgen05.alloc of 48 columns; the count must be a power of two from 32 )
+tmem/alloc_addresses.size_16            identical                       both refuse the kernel; GPU: cudaErrorIllegalInstruction at synchronize; simulator: tcgen05.alloc of 16 columns; the count must be a power of two from 32 to 512
+tmem/alloc_addresses.size_0             identical                       both refuse the kernel; GPU: cudaErrorIllegalInstruction at synchronize; simulator: tcgen05.alloc of 0 columns; the count must be a power of two from 32 to 512
+tmem/alloc_addresses.size_1024          identical                       both refuse the kernel; GPU: cudaErrorIllegalInstruction at synchronize; simulator: tcgen05.alloc of 1024 columns; the count must be a power of two from 32 to 512
+tmem/alloc_after_relinquish             informational                   the GPU ran what the simulator refuses (tcgen05.alloc after this CTA relinquished its allocation permit)
+tmem/alloc_blocks                       timed out (as predicted)        simulator: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them
+tmem/dealloc_repeated                   kernel failed (by design)       GPU: cudaErrorLaunchFailure at synchronize; the simulator's kernel returns
+tmem/dealloc_mismatch                   identical                       both refuse the kernel; GPU: cudaErrorTensorMemoryLeak at synchronize; simulator: tcgen05.dealloc of 32 columns at column 0 does not match an allocation
+tmem/alloc_leak                         identical                       both refuse the kernel; GPU: cudaErrorTensorMemoryLeak at synchronize; simulator: kernel `tmem_alloc_script` returned with tensor memory still allocated: 256 tens
+mma/operand_layouts                     identical                       
+mma/operand_layouts.tf32_mn             informational                   the GPU ran what the simulator refuses (unsupported instruction `tcgen05.mma.cta_group::1.kind::tf32` (MN-majo)
+mma/accumulation_order                  identical                       
+mma/negate                              identical                       
+mma/tf32_low_bits                       identical                       
+mma/scale_input_d                       identical                       
+mma/disable_lanes                       identical                       
+mma/commit_arrival                      identical                       
+mma/swizzle_mismatch                    identical                       
+mma/base_offset                         identical                       
+mma/base_offset.field.0                 informational                   no prediction; 12 line(s) recorded
+mma/base_offset.field.1                 informational                   no prediction; 12 line(s) recorded
+mma/base_offset.field.2                 informational                   no prediction; 12 line(s) recorded
+mma/base_offset.field.3                 informational                   no prediction; 12 line(s) recorded
+mma/base_offset.field.4                 informational                   no prediction; 12 line(s) recorded
+mma/base_offset.field.5                 informational                   no prediction; 12 line(s) recorded
+mma/base_offset.field.6                 informational                   no prediction; 12 line(s) recorded
+mma/base_offset.field.7                 informational                   no prediction; 12 line(s) recorded
+cluster/barrier                         identical                       
+cluster/multicast                       identical                       
+cluster/multicast.outside               identical                       both refuse the kernel; GPU: cudaErrorLaunchFailure at synchronize; simulator: CTA rank 4 does not exist in a cluster of 4 CTA(s)
+cluster/pair_accounting                 identical                       
+cluster/max_size                        identical                       
+cluster/max_size.nonportable            identical                       
+cluster/address_dump                    identical                       
+cluster/remote_arrive                   identical                       
+cluster/pair_mma.m256_issuer0           identical                       
+cluster/pair_mma.m128_issuer0           identical                       
+cluster/pair_mma.m256_issuer1           identical                       
+cluster/pair_mma.m128_issuer1           identical                       
+cluster/clc_tx_bytes                    identical                       
+cluster/clc_multicast                   identical                       
+cluster/clc_failed_response             identical                       
+cluster/clc_per_thread                  identical                       
+cluster/clc_order                       identical                       
+cluster/clc_first_ctaid                 identical                       
+cluster/clc_failures                    identical                       
+cluster/clc_failed_response.again       identical                       
+cluster/clc_failed_response.again_grid  identical                       
+formats/fp8_codes                       identical                       
+formats/fp4_codes                       identical                       
+formats/e8m0_ties                       GPU faulted, not modelled       GPU: cudaErrorAssert at synchronize; the simulator does not model this (unsupported instruction `call.uni` (call to `__assertfail`; only printf is imple)
+formats/special_inputs                  GPU faulted, not modelled       GPU: cudaErrorAssert at synchronize; the simulator does not model this (unsupported instruction `call.uni` (call to `__assertfail`; only printf is imple)
+formats/tf32_modes                      identical                       
+formats/ftz                             identical                       
+formats/fma                             identical                       
+formats/fma.all                         informational                   no prediction; 20000 line(s) recorded
+formats/scalar_edges                    identical                       
+formats/ampere_replay.minmax_cvt        identical                       
+formats/ampere_replay.intdiv            identical                       
+formats/ampere_replay.bitfield          identical                       
+formats/ampere_replay.nan               identical                       
+formats/ampere_replay.cvt_ftz           identical                       
+e2e/cutlass_tutorials.tutorial_01       bit-identical                   1 tensor(s) compared with the simulator's, below
+e2e/cutlass_tutorials.tutorial_02       bit-identical                   1 tensor(s) compared with the simulator's, below
+e2e/cutlass_tutorials.tutorial_03       bit-identical                   1 tensor(s) compared with the simulator's, below
+e2e/cutlass_tutorials.tutorial_04       bit-identical                   1 tensor(s) compared with the simulator's, below
+e2e/triton                              bit-identical                   2 tensor(s) compared with the simulator's, below
+e2e/unchanged_scripts.tirx              bit-identical                   1 tensor(s) compared with the simulator's, below
+e2e/unchanged_scripts.cute_dsl          bit-identical                   1 tensor(s) compared with the simulator's, below
+e2e/book_hgemm                          bit-identical                   9 tensor(s) compared with the simulator's, below
+
+103 identical, 16 informational, 8 bit-identical, 5 GPU faulted, not modelled, 3 kernel failed (by design), 2 timed out (as predicted), 1 DIFFERS
+
+149 kernel log line(s) naming Xid or NVRM appeared during the run (xid.log, under the run after which each was first seen); 143 name an Xid, the first:
+    formats/e8m0_ties	Nov 25 01:31:54 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=22524, name=small_formats, channel 0x00000002
+    formats/special_inputs	Nov 25 01:31:55 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=22540, name=small_formats, channel 0x00000002
+    e2e/elect.all	Nov 25 01:34:50 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Illegal Instruction Parameter
+    e2e/elect.all	Nov 25 01:34:50 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0xb 0x507734=0x20 0x507728=0x1f81fb60 0x50772c=0x1174
+    e2e/elect.all	Nov 25 01:34:50 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=24925, name=elect, channel 0x00000002
+    tma/swizzle_misaligned.sixteen	Nov 25 01:34:52 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics SM Warp Exception on (GPC 0, TPC 2, SM 0): Misaligned Address
+    tma/swizzle_misaligned.sixteen	Nov 25 01:34:52 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 13, Graphics Exception: ESR 0x507730=0x1600000f 0x507734=0x20 0x507728=0x1f81fb60 
+    tma/swizzle_misaligned.sixteen	Nov 25 01:34:52 computeinstance-u00ssfeayqd3wpenff kernel: NVRM: Xid (PCI:0000:8d:00): 43, pid=24961, name=swizzle, channel 0x00000002
+
+Details
+tma/swizzle_misaligned.thirtytwo: the GPU reported a failed kernel; outputs differ
+    line 1
+      predicted: swizzle none, box 16 rows x 128 bytes = 2048 bytes (128 chunks), destination = buffer + 1024 + 32
+      GPU:       KERNEL FAILED: tma_dump
+    line 2
+      predicted:   buffer address % 1024 = 0; phase completed 1
+      GPU:       <end of output>
+    line 3
+      predicted:   buffer row (128 bytes each): source chunk found in each of its eight 16-byte chunks
+      GPU:       <end of output>
+    60 line(s) differ; predicted 60 line(s), GPU 1
+tma/swizzle_misaligned.sixtyfour: the GPU reported a failed kernel; outputs differ
+    line 1
+      predicted: swizzle none, box 16 rows x 128 bytes = 2048 bytes (128 chunks), destination = buffer + 1024 + 64
+      GPU:       KERNEL FAILED: tma_dump
+    line 2
+      predicted:   buffer address % 1024 = 0; phase completed 1
+      GPU:       <end of output>
+    line 3
+      predicted:   buffer row (128 bytes each): source chunk found in each of its eight 16-byte chunks
+      GPU:       <end of output>
+    60 line(s) differ; predicted 60 line(s), GPU 1
+mbarrier/expect_tx_small.pieces: MB-05: a load reports its bytes in pieces of 64 (an assumption): an undersized expect_tx completes the phase only when it is a whole number of pieces
+    line 40
+      predicted:      2  poll parity              0                    1                    0
+      GPU:            2  poll parity              0                    0                    1
+    line 41
+      predicted:      3  settle                                        1                    0
+      GPU:            3  settle                                        0                    1
+    line 47
+      predicted:      2  poll parity              0                    0                    1
+      GPU:            2  poll parity              0                    1                    0
+    6 line(s) differ; predicted 63 line(s), GPU 63
+tmem/alloc_addresses.size_48: GPU output (the simulator refuses this kernel)
+    script: an allocation of 48 columns
+      step  0  alloc   48 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+      step  1  dealloc allocation 0: executed
+tmem/alloc_after_relinquish: GPU output (the simulator refuses this kernel)
+    script: relinquish the permit, then allocate
+      step  0  relinquish_alloc_permit: executed
+      step  1  alloc   32 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+      step  2  dealloc allocation 0: executed
+tmem/dealloc_repeated: the GPU reported a failed kernel; outputs differ
+    line 2
+      predicted:   step  0  alloc   32 columns -> allocation 0 at address 00000000 (lane 0, column 0)
+      GPU:       KERNEL FAILED: release the same allocation twice
+    line 3
+      predicted:   step  1  dealloc allocation 0: executed
+      GPU:       <end of output>
+    line 4
+      predicted:   step  2  dealloc allocation 0: executed
+      GPU:       <end of output>
+    6 line(s) differ; predicted 7 line(s), GPU 2
+mma/operand_layouts.tf32_mn: GPU output (the simulator refuses this kernel)
+    kind::tf32, M = 128, N = 64, K = 8, swizzle 128B, A MN-major, B K-major
+      descriptors (relative to the operand buffer): A 4000408000400000, B 4000404000010400, instruction 08108910
+      D[0][0] = 00000000, expected 41800000 (16)
+      D[0][1] = 00000000, expected c0800000 (-4)
+      D[0][2] = 00000000, expected 40000000 (2)
+      D[0][3] = 00000000, expected c1b80000 (-23)
+      D[0][4] = 00000000, expected 41700000 (15)
+      D[0][5] = 00000000, expected 41a00000 (20)
+      elements equal to A B^T bit for bit: 179 of 8192
+    kind::tf32, M = 128, N = 64, K = 8, swizzle 128B, A K-major, B MN-major
+      descriptors (relative to the operand buffer): A 4000404000010000, B 4000404000400400, instruction 08110910
+      D[0][0] = 00000000, expected 41800000 (16)
+e2e/cutlass_tutorials.tutorial_01: tensors, GPU against simulator
+    cutlass_tutorial_01: bit-identical [RT-06: every element within 1e-05 * max|sim|; simulator replay of the GPU's PTX; GPU output sha256 f82f3ffc5b78]
+e2e/cutlass_tutorials.tutorial_01: result lines, GPU then simulator
+    GPU: Relative error: 0.000000e+00
+    GPU: Execution is successful.
+    sim: Relative error: 0.000000e+00
+    sim: Execution is successful.
+e2e/cutlass_tutorials.tutorial_02: tensors, GPU against simulator
+    cutlass_tutorial_02: bit-identical [RT-06: every element within 1e-05 * max|sim|; simulator replay of the GPU's PTX; GPU output sha256 f82f3ffc5b78]
+e2e/cutlass_tutorials.tutorial_02: result lines, GPU then simulator
+    GPU: Relative error: 0.000000e+00
+    GPU: Execution is successful.
+    sim: Relative error: 0.000000e+00
+    sim: Execution is successful.
+e2e/cutlass_tutorials.tutorial_03: tensors, GPU against simulator
+    cutlass_tutorial_03: bit-identical [RT-06: every element within 1e-05 * max|sim|; simulator replay of the GPU's PTX; GPU output sha256 f82f3ffc5b78]
+e2e/cutlass_tutorials.tutorial_03: result lines, GPU then simulator
+    GPU: Relative error: 0.000000e+00
+    GPU: Execution is successful.
+    sim: Relative error: 0.000000e+00
+    sim: Execution is successful.
+e2e/cutlass_tutorials.tutorial_04: tensors, GPU against simulator
+    cutlass_tutorial_04: bit-identical [RT-06: every element within 1e-05 * max|sim|; simulator replay of the GPU's PTX; GPU output sha256 f82f3ffc5b78]
+e2e/cutlass_tutorials.tutorial_04: result lines, GPU then simulator
+    GPU: Relative error: 0.000000e+00
+    GPU: Execution is successful.
+    sim: Relative error: 0.000000e+00
+    sim: Execution is successful.
+e2e/triton: tensors, GPU against simulator
+    triton_vector_add: bit-identical [RT-07: bit-identical; simulator replay of the GPU's PTX; GPU output sha256 8038d879c6ae]
+    triton_matmul: bit-identical [RT-07: every element within 1e-05 * max|sim|; simulator replay of the GPU's PTX; GPU output sha256 38adabec08ce]
+e2e/triton: result lines, GPU then simulator
+    GPU: vector add: max abs error vs NumPy 0
+    GPU: matmul: max abs error vs NumPy 5.72e-06
+    sim: vector add: max abs error vs NumPy 0; 8 CTA(s), 672 warp-instructions, 0 finding(s)
+    sim: matmul: max abs error vs NumPy 5.25e-06; 4 CTA(s), 8480 warp-instructions, 0 finding(s)
+e2e/unchanged_scripts.tirx: tensors, GPU against simulator
+    tirx_saxpy: bit-identical [RT-09: every element within 1e-06 relative; simulator replay of the GPU's PTX; GPU output sha256 84535125a801]
+e2e/unchanged_scripts.tirx: result lines, GPU then simulator
+    GPU: saxpy over 256 elements on compute capability 10.0: matches NumPy
+    sim: saxpy over 256 elements on compute capability 10.0: matches NumPy
+e2e/unchanged_scripts.cute_dsl: tensors, GPU against simulator
+    cute_dsl_saxpy: bit-identical [RT-09: every element within 1e-06 relative; simulator replay of the GPU's PTX; GPU output sha256 84535125a801]
+e2e/unchanged_scripts.cute_dsl: result lines, GPU then simulator
+    GPU: saxpy over 256 elements: matches NumPy
+    sim: saxpy over 256 elements: matches NumPy
+e2e/book_hgemm: tensors, GPU against simulator
+    book_hgemm_v1: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 0c52d5f04297]
+    book_hgemm_v2: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 0c52d5f04297]
+    book_hgemm_v3: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 0c52d5f04297]
+    book_hgemm_v4: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 0c52d5f04297]
+    book_hgemm_v5: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 0c52d5f04297]
+    book_hgemm_v6: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 d42ee81de374]
+    book_hgemm_v7: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 d42ee81de374]
+    book_hgemm_v8: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 a2e6e132ae83]
+    book_hgemm_v9: bit-identical [RT-08: every element within 1 unit(s) in the last place, and within rtol=2e-2, atol=1e-2 of NumPy; simulator replay of the GPU's PTX; GPU output sha256 4fa3378322ce]
+e2e/book_hgemm: result lines, GPU then simulator
+    GPU: hgemm_v1 128x128x64: matches NumPy (max error 0.0156)
+    GPU: hgemm_v2 128x128x64: matches NumPy (max error 0.0156)
+    GPU: hgemm_v3 128x128x64: matches NumPy (max error 0.0156)
+    GPU: hgemm_v4 128x128x64: matches NumPy (max error 0.0156)
+    GPU: hgemm_v5 128x128x64: matches NumPy (max error 0.0156)
+    GPU: hgemm_v6 128x128x256: matches NumPy (max error 0.0156)
+    GPU: hgemm_v7 128x128x256: matches NumPy (max error 0.0156)
+    GPU: hgemm_v8 256x256x256: matches NumPy (max error 0.0312)
+    GPU: hgemm_v9 512x256x256: matches NumPy (max error 0.0156)
+    sim: hgemm_v1 128x128x64: matches NumPy (max error 0.0039)
+    sim: hgemm_v2 128x128x64: matches NumPy (max error 0.0039)
+    sim: hgemm_v3 128x128x64: matches NumPy (max error 0.0039)
+    sim: hgemm_v4 128x128x64: matches NumPy (max error 0.0039)
+    sim: hgemm_v5 128x128x64: matches NumPy (max error 0.0039)
+    sim: hgemm_v6 128x128x256: matches NumPy (max error 0.0156)
+    sim: hgemm_v7 128x128x256: matches NumPy (max error 0.0156)
+    sim: hgemm_v8 256x256x256: matches NumPy (max error 0.0312)
+    sim: hgemm_v9 512x256x256: matches NumPy (max error 0.0156)
+    the same claims: a max error is the distance to NumPy's result on the machine that ran the script, and that depends on its BLAS
+ERROR conda.cli.main_run:execute(148): `conda run python validation/blackwell/compare.py /home/frank/warplens-b200-rental/rental2/fallback/warplens-b200-20261125T012055Z-312fe4836d/out/blackwell --predicted /home/frank/warplens-b200-rental/rental2/fallback/warplens-b200-20261125T012055Z-312fe4836d/out/predicted-toolkit/blackwell` failed. (See above for error)

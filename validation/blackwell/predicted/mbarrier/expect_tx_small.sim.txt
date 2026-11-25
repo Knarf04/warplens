@@ -2,7 +2,7 @@ status: ok
 warplens: 6 kernel launch(es) simulated on B200, 1 finding(s)
   mbar_expect_tx: 1 CTA(s), 202 warp-instructions
   mbar_expect_tx: 1 CTA(s), 232 warp-instructions
-    [mbarrier-tx-mismatch] a copy of 256 byte(s) landed on the mbarrier at shared offset 1024, which expected only 128 more: the phase completed after 128 byte(s), so a wait on it returns before the other 128 are there; expect_tx is too small
+    [mbarrier-tx-mismatch] a copy of 256 byte(s) landed on the mbarrier at shared offset 1024, which expected only 128 more: the phase accounts for 128 of the copy's 256 byte(s), so a wait on it cannot establish that the whole copy is there; expect_tx is too small. Shown here: the phase completed after 128 byte(s), so a wait on it returns before the other 128 are there. A B200 does that in some runs and in others never completes the phase, and the wait hangs
       line 421: cp.async.bulk.tensor.1d.shared::cluster.global.mbarrier::complete_tx::bytes [%r44], [%rd10, {%r46}], [%r45];
       first in CTA (0, 0, 0), warp 0, lanes 0
   mbar_expect_tx: 1 CTA(s), 180269 warp-instructions

@@ -276,9 +276,9 @@ run is isolated for that reason.
 | --- | --- | --- | --- | --- | --- |
 | `swizzle_aligned` | `swizzle aligned` | TMA-01 | a swizzled load XORs the 16-byte chunk index with the low 1/2/3 bits of the 128-byte row index | runs | - |
 | `swizzle_misaligned` | `swizzle misaligned` | TMA-02 | the swizzle is a function of the shared ADDRESS, not of the offset into the buffer | runs (6 finding(s)) | - |
-| `swizzle_misaligned.sixteen` | `swizzle sixteen` | TMA-02 | a destination 16 bytes into a 128-byte row is refused | **refuses**: a TMA tensor copy needs a shared-memory address aligned to 32 bytes, got offset 1040: a GPU ends the kernel here with cu | fault |
-| `swizzle_misaligned.thirtytwo` | `swizzle thirtytwo` | TMA-02 | a destination 32 bytes into a 128-byte row runs (an assumption: the alignment a tensor copy needs is between 32 and 128 bytes) | runs (3 finding(s)) | fault |
-| `swizzle_misaligned.sixtyfour` | `swizzle sixtyfour` | TMA-02 | a destination 64 bytes into a 128-byte row runs (the same assumption) | runs (3 finding(s)) | fault |
+| `swizzle_misaligned.sixteen` | `swizzle sixteen` | TMA-02 | a destination 16 bytes into a 128-byte row is refused | **refuses**: a TMA tensor copy needs a shared-memory address aligned to 128 bytes, got offset 1040: a GPU ends the kernel here with c | fault |
+| `swizzle_misaligned.thirtytwo` | `swizzle thirtytwo` | TMA-02 | a destination 32 bytes into a 128-byte row is refused: a tensor copy needs a shared address aligned to 128 bytes | **refuses**: a TMA tensor copy needs a shared-memory address aligned to 128 bytes, got offset 1056: a GPU ends the kernel here with c | fault |
+| `swizzle_misaligned.sixtyfour` | `swizzle sixtyfour` | TMA-02 | a destination 64 bytes into a 128-byte row is refused | **refuses**: a TMA tensor copy needs a shared-memory address aligned to 128 bytes, got offset 1088: a GPU ends the kernel here with c | fault |
 | `ranks` | `ranks` | TMA-03, TMA-15 | rank 1-5 boxes land densely, dimension 0 fastest; complete_tx reports box bytes; the tensor map is a by-value kernel parameter | runs | - |
 | `misaligned_requests` | `ranks unaligned` | TMA-10 | an innermost coordinate that is not a multiple of 16 bytes is refused | **refuses**: TMA innermost coordinate must give a 16-byte aligned bounding box (coordinate 1, element size 4) | fault |
 | `oob_fill` | `oob_fill` | TMA-04, TMA-05, TMA-06 | out-of-bounds elements are zero or the default quiet NaN; complete_tx counts the whole box | runs | - |
@@ -314,7 +314,7 @@ run is isolated for that reason.
 | `over_arrival` | `script over` | MB-04 | arrivals beyond the pending count end the kernel | **refuses**: 3 arrival(s) on the mbarrier at shared offset 0, which needed only 2 more in this phase: a GPU ends the kernel here with | fault |
 | `expect_tx_small` | `expect_tx` | MB-05, MB-06, MB-07, MB-08 | undersized, oversized and missing expect_tx against real TMA loads, with bounded polls | runs (1 finding(s)) | - |
 | `expect_tx_small.wait` | `expect_tx wait-small` | MB-05, MB-11 | an undersized expect_tx with one load completes part of the way through it: the usual wait loop returns | runs (1 finding(s)) | hang |
-| `expect_tx_small.pieces` | `expect_tx pieces` | MB-05 | a load reports its bytes in pieces of 64 (an assumption): an undersized expect_tx completes the phase only when it is a whole number of pieces | runs (23 finding(s)) | - |
+| `expect_tx_small.pieces` | `expect_tx pieces` | MB-05 | a load reports its bytes in pieces that vary from run to run: an undersized expect_tx completes the phase only at a multiple of 32 bytes, and there in some runs and not in others (measured; no single output to predict) | not run (no prediction) | - |
 | `expect_tx_large` | `expect_tx wait-large` | MB-08, MB-11 | an oversized expect_tx never completes: the usual wait loop deadlocks | **refuses**: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them | hang |
 
 ### `tmem/`

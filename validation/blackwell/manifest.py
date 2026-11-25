@@ -46,10 +46,10 @@ def _tma() -> list[Probe]:
         Probe("tma/swizzle_misaligned.sixteen", "tma/swizzle", ("sixteen",), ("TMA-02",),
               "a destination 16 bytes into a 128-byte row is refused", risk="fault"),
         Probe("tma/swizzle_misaligned.thirtytwo", "tma/swizzle", ("thirtytwo",), ("TMA-02",),
-              "a destination 32 bytes into a 128-byte row runs (an assumption: the alignment a tensor copy "
-              "needs is between 32 and 128 bytes)", risk="fault"),
+              "a destination 32 bytes into a 128-byte row is refused: a tensor copy needs a shared address "
+              "aligned to 128 bytes", risk="fault"),
         Probe("tma/swizzle_misaligned.sixtyfour", "tma/swizzle", ("sixtyfour",), ("TMA-02",),
-              "a destination 64 bytes into a 128-byte row runs (the same assumption)", risk="fault"),
+              "a destination 64 bytes into a 128-byte row is refused", risk="fault"),
         Probe("tma/ranks", "tma/ranks", (), ("TMA-03", "TMA-15"),
               "rank 1-5 boxes land densely, dimension 0 fastest; complete_tx reports box bytes; "
               "the tensor map is a by-value kernel parameter"),
@@ -127,8 +127,9 @@ def _mbarrier() -> list[Probe]:
               "an undersized expect_tx with one load completes part of the way through it: the usual wait "
               "loop returns", risk="hang", timeout=30),
         Probe("mbarrier/expect_tx_small.pieces", "mbarrier/expect_tx", ("pieces",), ("MB-05",),
-              "a load reports its bytes in pieces of 64 (an assumption): an undersized expect_tx completes "
-              "the phase only when it is a whole number of pieces"),
+              "a load reports its bytes in pieces that vary from run to run: an undersized expect_tx completes "
+              "the phase only at a multiple of 32 bytes, and there in some runs and not in others (measured; "
+              "no single output to predict)", predict="none"),
         Probe("mbarrier/expect_tx_large", "mbarrier/expect_tx", ("wait-large",), ("MB-08", "MB-11"),
               "an oversized expect_tx never completes: the usual wait loop deadlocks", risk="hang", timeout=30),
     ]

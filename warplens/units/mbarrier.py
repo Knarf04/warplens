@@ -199,12 +199,16 @@ def token_of(phase: int) -> int:
     return (phase & 1) << 63 | phase & 0xFFFFFFFF
 
 
-# The size of the pieces in which a TMA copy reports its bytes to an mbarrier (Mbarrier.deliver).
-# What was measured on a B200 fixes only that it divides 64 (a 256-byte load against
-# expect_tx 128, and a 128-byte box against expect_tx 64, both complete the phase): 64 is
-# an ASSUMPTION, the largest size the measurements allow, and so the one that completes
-# the fewest phases early. validation/blackwell/mbarrier/expect_tx `pieces` asks a GPU.
-TX_PIECE_BYTES = 64
+# The unit in which a TMA copy reports its bytes to an mbarrier (Mbarrier.deliver). Measured on
+# a B200 (validation/blackwell/measured/b200/mbarrier/expect_tx_sweep.txt): an undersized
+# expect_tx completes the phase early only when it is a multiple of 32 bytes, and then in
+# some runs and not in others. The copy reports in pieces whose sizes vary from run to run
+# and are multiples of 32: of 40 runs of a 256-byte load, expect_tx 32 completed the phase
+# in 39, 128 in 30, 64 in 23, 96 in 1, and 16, 48, 80, ... in none. The simulator has one
+# schedule, and takes the one in which every multiple of 32 is passed through: the phase
+# completes early wherever a GPU can complete it, which is the outcome the finding is
+# about. Before the second rental this was 64, an assumption.
+TX_PIECE_BYTES = 32
 
 
 class Mbarrier:
@@ -277,17 +281,26 @@ class Mbarrier:
         copy larger than what was expected therefore completes the phase when the count
         reaches zero part of the way through, and the rest of its bytes count against the
         next phase. Measured on a B200 (validation/blackwell/measured/b200/mbarrier/
-        expect_tx_small.txt, tma/oob_complete_tx.txt; docs/architecture.md, "TMA and mbarriers"):
-        a waiter is released before all the data is there, which is reported."""
+        expect_tx_small.txt, expect_tx_sweep.txt, tma/oob_complete_tx.txt; docs/architecture.md,
+        "TMA and mbarriers"): a waiter is released before all the data is there, which is
+        reported. On a GPU the pieces vary from run to run, so the same kernel there
+        completes the phase early in one run and waits for ever in the next; here it always
+        completes early (TX_PIECE_BYTES)."""
         before = self.tx
         if not (0 < before < n and before % TX_PIECE_BYTES == 0 and self.pending <= 0):
             self.complete_tx(n, warp, ins, lanes)
             return
+        # Two things, kept apart. The diagnosis is the accounting, and does not depend on a
+        # schedule: the phase accounts for fewer bytes than the copy delivers. The outcome shown
+        # is one of those a GPU has, chosen because it is the dangerous one: the early release.
         self.cta.findings.add(
             "mbarrier-tx-mismatch",
             f"a copy of {n} byte(s) landed on the mbarrier at shared offset {self.offset}, which expected "
-            f"only {before} more: the phase completed after {before} byte(s), so a wait on it returns "
-            f"before the other {n - before} are there; expect_tx is too small", warp, ins, lanes)
+            f"only {before} more: the phase accounts for {before} of the copy's {n} byte(s), so a wait on it "
+            f"cannot establish that the whole copy is there; expect_tx is too small. Shown here: the phase "
+            f"completed after {before} byte(s), so a wait on it returns before the other {n - before} are there. "
+            "A B200 does that in some runs and in others never completes the phase, and the wait hangs",
+            warp, ins, lanes)
         self.tx = 0
         self._check()
         self.complete_tx(n - before, warp, ins, lanes)

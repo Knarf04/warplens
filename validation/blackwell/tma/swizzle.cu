@@ -22,8 +22,10 @@
 //                            A B200 ends the kernel: cudaErrorMisalignedAddress (2026-11-25)
 //   swizzle thirtytwo        offset 32, and
 //   swizzle sixtyfour        offset 64: where between 16 (faults) and 128 (runs) the line is.
-//                            The simulator refuses what is not a multiple of 32, which is an
-//                            assumption; each is its own process, as either may fault
+//                            A B200 ends the kernel for both, as for 16 (2026-11-25, second
+//                            rental): the alignment is 128. Each is its own process
+//   swizzle offset BYTES     any other offset. Not in the manifest: run by hand in the second
+//                            rental for 16 to 256 (measured/b200/tma/swizzle_offsets.txt)
 #include "tma_dump.h"
 #include <utility>
 
@@ -87,6 +89,10 @@ int main(int argc, char** argv) {
             for (int mode = 0; mode < 4; ++mode) run(mode, one.second, d_tensor);
             return 0;
         }
+    if (argc > 2 && !strcmp(argv[1], "offset")) {  // offset BYTES: not in the manifest
+        for (int mode = 0; mode < 4; ++mode) run(mode, atoi(argv[2]), d_tensor);
+        return 0;
+    }
     bool aligned = argc > 1 && !strcmp(argv[1], "aligned");
     for (int mode = 0; mode < 4; ++mode)
         for (int offset : {0, 128, 256, 512})

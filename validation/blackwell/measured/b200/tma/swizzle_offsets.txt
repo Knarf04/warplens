@@ -1,0 +1,19 @@
+# Which offsets into a 1024-byte-aligned shared buffer a TMA tensor load accepts, on a B200.
+#
+# Second rental, 2026-11-25, driver 610.57.04, nvcc 13.3.73. The program is
+# validation/blackwell/tma/swizzle.cu, script `offset BYTES` (swizzle none first; a fault ends
+# the process there). The raw outputs are in ../rental-2-sweeps.raw.txt. Offsets 128, 256 and
+# 512 also ran for every swizzle mode in tma/swizzle_misaligned, in both rentals.
+#
+#  offset  result
+      16  the kernel ended: cudaErrorMisalignedAddress
+      32  the kernel ended: cudaErrorMisalignedAddress
+      48  the kernel ended: cudaErrorMisalignedAddress
+      64  the kernel ended: cudaErrorMisalignedAddress
+      80  the kernel ended: cudaErrorMisalignedAddress
+      96  the kernel ended: cudaErrorMisalignedAddress
+     112  the kernel ended: cudaErrorMisalignedAddress
+     128  ran, all four swizzle modes
+     144  the kernel ended: cudaErrorMisalignedAddress
+     192  the kernel ended: cudaErrorMisalignedAddress
+     256  ran, all four swizzle modes

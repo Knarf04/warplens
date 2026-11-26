@@ -18,8 +18,8 @@ clusters. No GPU is involved at any point. A run gives you
 ## Quick start
 
 ```bash
-git clone https://github.com/Knarf04/warplens && cd warplens
-pip install -e ".[dev]"
+pip install warplens
+git clone https://github.com/Knarf04/warplens && cd warplens   # for the examples below
 ```
 
 <!-- test: run -->
@@ -49,9 +49,9 @@ script.
 
 ## Install
 
-warplens is not on PyPI yet; install it from a checkout. The base install is
-the simulator and its Python API. Each frontend is an extra, and every package
-an extra names is on PyPI:
+`pip install warplens` is the simulator and its Python API, and needs Python
+3.11 or newer. Each frontend is an extra, and every package an extra names is
+on PyPI:
 
 | Extra | Installs | For |
 | --- | --- | --- |
@@ -63,10 +63,14 @@ an extra names is on PyPI:
 | `all` | all of the above | |
 
 ```bash
-pip install -e ".[dev]"             # the simulator and its tests
-pip install -e ".[triton,tirx]"     # with the frontends you use
-pip install -e ".[all]"             # everything
+pip install warplens                    # the simulator
+pip install "warplens[triton,tirx]"     # with the frontends you use
+pip install "warplens[all]"             # everything
+pip install -e ".[dev]"                 # from a checkout, to run its tests
 ```
+
+The examples, the tests and the validation programs are in the repository and
+in the source distribution, not in the wheel.
 
 The frontend versions are the ones the tests run against; older ones have not
 been tried. Three things a frontend needs do not come from pip:
@@ -105,7 +109,7 @@ details.
 
 ## Status
 
-Version 0.0.1; not on PyPI. What runs today, unmodified and matching its
+Version 1.0.0. What runs today, unmodified and matching its
 reference: the first four CUTLASS Blackwell tutorials (the last two on
 clusters of 16 CTAs, with TMA multicast and a two-CTA MMA), a Triton matmul,
 and the nine GEMM kernels of the book, which are written in TIRx. CuTe DSL

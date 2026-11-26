@@ -17,8 +17,8 @@ __version__ = "1.0.0"
 ```
 
 It is written in the form PyPI shows (PEP 440): `1.0.0`, a release candidate `1.0.0rc1`, a
-development version `1.0.0.dev0`. `PLAN.md` names two versions and no others: `0.0.1`, a
-placeholder to reserve the PyPI name, and `1.0`, the public release. The tree is at `0.0.1`.
+development version `1.0.0.dev0`. The tree carried `0.0.1` until the first release, `1.0.0`;
+the placeholder upload that number was meant for was skipped by the owner's decision.
 
 ## Before the release
 
@@ -44,9 +44,9 @@ put the files it lists into the sdist again, whatever `MANIFEST.in` says.
 1. Bump `__version__` in `warplens/__init__.py` (the one line above).
 2. In `CHANGELOG.md`, give the version its section: `## <version> (<date>)`, with what changed
    since the last release. `tests/packaging/test_packaging.py` fails while the section is missing.
-3. For `1.0.0`: in `pyproject.toml`, change the classifier `Development Status :: 3 - Alpha`
-   to the status the owner chooses (`5 - Production/Stable` or `4 - Beta`), and strike
-   "Reserve the PyPI name" in `PLAN.md` once the upload is done.
+3. For `1.0.0`: the classifier in `pyproject.toml` is `Development Status :: 4 - Beta`, the
+   owner's choice (it was `3 - Alpha`). Strike "The release itself" in `PLAN.md` once the
+   upload is done.
 4. Commit, open a pull request, wait for CI, merge.
 5. Build, in a fresh clone of the merged commit and a virtual environment of its own:
 

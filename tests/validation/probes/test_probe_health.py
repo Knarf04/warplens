@@ -149,11 +149,11 @@ def suite(tmp_path):
     script(root / "bin" / "mbarrier" / "script", f'''echo "$1" >> {state}/calls
 case "$1" in
   basic) n=$(cat {state}/dead)
-         if [ "$n" -gt 0 ]; then echo $((n - 1)) > {state}/dead
+         if [ "$n" -gt 0 ]; then echo $((n - 1)) > {state}/dead.new; mv {state}/dead.new {state}/dead
            echo "HOST ERROR: cudaMalloc(&p, 4) returned cudaErrorUnknown"; exit 2; fi
          cat {predicted}/mbarrier/phase_parity.txt ;;
   negative) cat {predicted}/mbarrier/complete_before_expect.txt ;;
-  over) [ "$(cat {state}/break-with)" -gt 0 ] && cat {state}/break-with > {state}/dead
+  over) [ "$(cat {state}/break-with)" -gt 0 ] && cp {state}/break-with {state}/dead.new && mv {state}/dead.new {state}/dead
         echo "KERNEL FAILED: mbar_script"; echo "info: error cudaErrorLaunchFailure"
         echo "KERNEL FAILED: mbar_script: cudaErrorLaunchFailure at synchronize (unspecified launch failure)" >&2
         exit 3 ;;

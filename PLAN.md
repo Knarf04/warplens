@@ -61,14 +61,18 @@ The amendment added `tcgen05.mma` with `.collector::a::discard` and
 Non-goals for v1: cycle accuracy; multi-GPU, NVLink, NVSHMEM, NCCL; SASS
 input; graphics, texture units, consumer Blackwell (`sm_120`).
 
-The project has two version numbers and no others: `0.0.1`, a placeholder to
-reserve the PyPI name, and `1.0`, the public release
-([RELEASING.md](RELEASING.md)).
+The tree is at `1.0.0`, the first release ([RELEASING.md](RELEASING.md)). It
+carried `0.0.1` until then; the placeholder upload that number was meant for
+was skipped (decided by the owner on 2026-11-26).
 
 ## Still owed for v1.0
 
-1. **Reserve the PyPI name** with the `0.0.1` placeholder.
-2. What [RELEASING.md](RELEASING.md) lists under "Before the release".
+1. **The release itself**, which is the owner's to make: the tag `v1.0.0`, the
+   upload to PyPI (which also claims the name) and the GitHub release
+   ([RELEASING.md](RELEASING.md), steps 7 to 9). The version, the changelog
+   section, the classifier (`4 - Beta`, the owner's choice) and the install
+   instructions are in the tree, and the files of that commit were built and
+   checked as steps 5 and 6 say.
 
 Decided by the owner on 2026-11-25:
 

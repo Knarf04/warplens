@@ -201,7 +201,14 @@ MMA arithmetic passed every NumPy comparison while differing from hardware.
 
 ## 3. Installation
 
-warplens is not on PyPI yet. Install it from a checkout:
+```bash
+pip install warplens
+```
+
+That needs Python 3.11 or newer and installs NumPy and PyYAML. It is enough
+for the Python API on PTX files (section 5.1). The examples this guide runs,
+with their `.ptx` files, are in the repository, and so are the tests; from a
+checkout, `pip install -e ".[dev]"` installs the package in place with pytest:
 
 ```bash
 git clone https://github.com/Knarf04/warplens
@@ -209,19 +216,17 @@ cd warplens
 pip install -e ".[dev]"
 ```
 
-That needs Python 3.11 or newer and installs NumPy, PyYAML and pytest. It is
-enough for the Python API on PTX files (section 5.1), including every `.ptx`
-file checked in under `examples/`. The other ways in need more:
+The other ways in need more:
 
 | To do this | You also need |
 | --- | --- |
 | Compile your own CUDA C++ to PTX | `nvcc` from CUDA 12.8 or newer (it must know `sm_100a`). No GPU or driver. |
 | `warplens run` on a compiled program, a TIRx script or a CuTe DSL script | Linux, a C compiler, and the CUDA toolkit headers. Two small shim libraries are compiled on first use (see below). |
-| Triton | `pip install -e ".[triton]"` (Triton 3.9 is what is tested). No shim: where it cannot be built, `warplens run script.py` says so and runs the script in its own process, with only the Triton driver. |
-| TIRx | `pip install -e ".[tirx]"` (`apache-tvm-tirx` and `cuda-bindings`; 0.1.0 and 13.5.0 are what is tested), and an NVRTC library that knows `sm_100a` (CUDA 12.8 or newer; the conda env has 13.5). |
-| The CuTe DSL | `pip install -e ".[cute-dsl]"` (`nvidia-cutlass-dsl`; 4.8.1 is what is tested). |
-| The tutorial notebook (`examples/08_book/book_tour.ipynb`) | The TIRx row above and a clone of the book. To open it in Jupyter, `pip install -e ".[jupyter]"` (Jupyter's `notebook`, `nbclient`, `nbformat` and `ipykernel`, and the TIRx packages); without Jupyter its cells run as a plain Python script ([examples/08_book/README.md](../examples/08_book/README.md)). |
-| All of the above | `pip install -e ".[all]"`. Every package the extras name is on PyPI. |
+| Triton | `pip install "warplens[triton]"` (Triton 3.9 is what is tested). No shim: where it cannot be built, `warplens run script.py` says so and runs the script in its own process, with only the Triton driver. |
+| TIRx | `pip install "warplens[tirx]"` (`apache-tvm-tirx` and `cuda-bindings`; 0.1.0 and 13.5.0 are what is tested), and an NVRTC library that knows `sm_100a` (CUDA 12.8 or newer; the conda env has 13.5). |
+| The CuTe DSL | `pip install "warplens[cute-dsl]"` (`nvidia-cutlass-dsl`; 4.8.1 is what is tested). |
+| The tutorial notebook (`examples/08_book/book_tour.ipynb`) | The TIRx row above and a clone of the book. To open it in Jupyter, `pip install "warplens[jupyter]"` (Jupyter's `notebook`, `nbclient`, `nbformat` and `ipykernel`, and the TIRx packages); without Jupyter its cells run as a plain Python script ([examples/08_book/README.md](../examples/08_book/README.md)). |
+| All of the above | `pip install "warplens[all]"`. Every package the extras name is on PyPI. |
 
 The repository's conda env, created by `env/setup.sh`, has the compiler side
 of CUDA 13.5 (`nvcc`, headers, NVRTC) and nothing that needs a GPU;

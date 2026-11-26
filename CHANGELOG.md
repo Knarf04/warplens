@@ -5,13 +5,13 @@ the `v<version>` tag it was built from; `RELEASING.md` is how one is made. The s
 version in `warplens/__init__.py` must exist (`tests/packaging/test_packaging.py` checks), so the
 heading is written when the version is bumped, and the date when the tag is.
 
-## 0.0.1 (not released)
+## 1.0.0 (not released)
 
-The version the repository has carried since its first commit. `PLAN.md` reserves it for a
-placeholder upload that claims the PyPI name; no upload has been made.
+The first release. The repository carried `0.0.1` from its first commit until this one; that
+number was meant for a placeholder upload to claim the PyPI name, which was not made.
 
-What the tree holds at this version (milestones M0 to M6 of `docs/history/plan.md`; the user
-guide is `docs/guide.md`, and what is and is not modeled is in `docs/coverage.md`):
+What the release holds (milestones M0 to M6 of `docs/history/plan.md`; the user guide is
+`docs/guide.md`, and what is and is not modeled is in `docs/coverage.md`):
 
 - A PTX parser and a SIMT executor for kernels compiled for `sm_100a` and `sm_103a`, with
   global and shared memory, named barriers and a bank-conflict report.

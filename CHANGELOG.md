@@ -5,10 +5,11 @@ the `v<version>` tag it was built from; `RELEASING.md` is how one is made. The s
 version in `warplens/__init__.py` must exist (`tests/packaging/test_packaging.py` checks), so the
 heading is written when the version is bumped, and the date when the tag is.
 
-## 1.0.0 (not released)
+## 1.0.0 (2026-11-26)
 
-The first release. The repository carried `0.0.1` from its first commit until this one; that
-number was meant for a placeholder upload to claim the PyPI name, which was not made.
+The first release, on PyPI as `warplens`. The repository carried `0.0.1` from its first commit
+until this one; that number was meant for a placeholder upload to claim the PyPI name, which
+was not made.
 
 What the release holds (milestones M0 to M6 of `docs/history/plan.md`; the user guide is
 `docs/guide.md`, and what is and is not modeled is in `docs/coverage.md`):

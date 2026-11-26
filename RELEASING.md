@@ -22,7 +22,7 @@ the placeholder upload that number was meant for was skipped by the owner's deci
 
 ## Before the release
 
-1. What `PLAN.md` still lists under "Still owed for v1.0" is done, or the owner has decided to
+1. What `PLAN.md` lists as owed for the release is done, or the owner has decided to
    release without it. What has and has not been checked against hardware is said in the
    README ("Status") and in section 2 of `docs/guide.md`; the release does not change that.
 2. CI is green on the commit to be tagged, in all four jobs: `test` (the core suite on each
@@ -45,8 +45,8 @@ put the files it lists into the sdist again, whatever `MANIFEST.in` says.
 2. In `CHANGELOG.md`, give the version its section: `## <version> (<date>)`, with what changed
    since the last release. `tests/packaging/test_packaging.py` fails while the section is missing.
 3. For `1.0.0`: the classifier in `pyproject.toml` is `Development Status :: 4 - Beta`, the
-   owner's choice (it was `3 - Alpha`). Strike "The release itself" in `PLAN.md` once the
-   upload is done.
+   owner's choice (it was `3 - Alpha`). `PLAN.md` says what is released and what is owed
+   for the next one.
 4. Commit, open a pull request, wait for CI, merge.
 5. Build, in a fresh clone of the merged commit and a virtual environment of its own:
 

@@ -103,7 +103,7 @@ details.
   agreed and what did not. [docs/validation-matrix.md](https://github.com/Knarf04/warplens/blob/main/docs/validation-matrix.md):
   every claim that run tested. [validation/README.md](https://github.com/Knarf04/warplens/blob/main/validation/README.md):
   the comparisons with an RTX 3080 Ti.
-- [PLAN.md](https://github.com/Knarf04/warplens/blob/main/PLAN.md): what is still owed for v1.0, and the roadmap.
+- [PLAN.md](https://github.com/Knarf04/warplens/blob/main/PLAN.md): what was decided for v1.0, what stayed open, and the roadmap.
   [docs/history/](https://github.com/Knarf04/warplens/blob/main/docs/history/README.md) keeps the plan as first written and
   the write-up of each milestone.
 

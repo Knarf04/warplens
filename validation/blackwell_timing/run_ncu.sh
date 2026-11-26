@@ -312,7 +312,14 @@ else
     mkdir -p bin/ncu
     TRANSPOSE=bin/ncu/transpose_hw
     read -r -a nvcc <<<"${HW_NVCC:-${NVCC:-nvcc}}"
-    run_limited 120 "${nvcc[@]}" -o "$TRANSPOSE" ../ampere/transpose_hw.cu > "$OUT/transpose_build.log" 2>&1 \
+    # Machine code for this GPU and no PTX. nvcc's default is PTX for the driver to compile,
+    # and a driver older than the toolkit refuses it: on the B200 (driver for CUDA 13.3,
+    # nvcc 13.5) every launch was cudaErrorUnsupportedPtxVersion and ncu had nothing to count,
+    # in both rentals. The benchmarks in bin/hw are built this way for the same reason.
+    arch=()
+    capability="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | head -n 1 | tr -d ' .')"
+    [[ "$capability" =~ ^[0-9]+$ ]] && arch=(-gencode "arch=compute_$capability,code=sm_$capability")
+    run_limited 120 "${nvcc[@]}" "${arch[@]}" -o "$TRANSPOSE" ../ampere/transpose_hw.cu > "$OUT/transpose_build.log" 2>&1 \
       || echo "transpose_hw: build failed, see $OUT/transpose_build.log" >&2
   fi
   for name in "${AMPERE_GROUP[@]}" "${BLACKWELL_GROUP[@]}"; do

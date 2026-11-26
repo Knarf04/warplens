@@ -435,3 +435,30 @@ def test_stopping_the_script_stops_ncu_and_the_program_it_profiles(work, signum,
     assert lines[0].startswith("ncu partial: 2 benchmark(s) profiled, 0 failed, 9 not profiled; no counter table from: "
                                "alu_chain (not reached: run_ncu.sh was stopped, or is still running), ")
     assert f"ncu: run_ncu.sh was stopped by {name}" in lines
+
+
+@pytest.mark.parametrize("capability,flags", [("10.0", "-gencode arch=compute_100,code=sm_100"),
+                                              ("8.6", "-gencode arch=compute_86,code=sm_86"), (None, "")])
+def test_the_transpose_program_is_built_as_machine_code_for_the_gpu(work, tmp_path, capability, flags):
+    """Both B200 rentals: with nvcc 13.5 on a driver for CUDA 13.3 this one program was built
+    with nvcc's defaults, as PTX, which the driver refused (cudaErrorUnsupportedPtxVersion on
+    every launch; ncu exit 1, no counter table for `transpose`). The benchmarks were machine
+    code and ran. With no nvidia-smi to ask, the build is as it was."""
+    (work / "validation" / "ampere" / "bin" / "transpose_hw").unlink()   # not built yet
+    (work / "validation" / "ampere" / "transpose_hw.cu").write_text("// stand-in\n")
+    tools = tmp_path / "tools"
+    tools.mkdir()
+    built = tmp_path / "nvcc-arguments"
+    nvcc = tools / "nvcc"
+    nvcc.write_text(f'#!/bin/sh\necho "$*" > "{built}"\nwhile [ "$1" != -o ]; do shift; done\n'
+                    'printf "#!/bin/sh\\necho BENCH id=stand_in\\n" > "$2"; chmod +x "$2"\n')
+    smi = tools / "nvidia-smi"
+    smi.write_text("#!/bin/sh\nexit 9\n" if capability is None else f'#!/bin/sh\necho "{capability}"\n')
+    for tool in (nvcc, smi):
+        tool.chmod(0o755)
+    done, _ = run_ncu(work, "bin/hw", str(work / "out"), NVCC=str(nvcc), HW_NVCC="",
+                      PATH=f"{tools}:{os.environ['PATH']}")
+    assert done.returncode == 0, done.stdout + done.stderr
+    arguments = built.read_text().strip()
+    assert arguments.endswith("-o bin/ncu/transpose_hw ../ampere/transpose_hw.cu")
+    assert arguments == f"{flags} -o bin/ncu/transpose_hw ../ampere/transpose_hw.cu".strip()

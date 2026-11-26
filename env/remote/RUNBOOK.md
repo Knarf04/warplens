@@ -1218,7 +1218,9 @@ Did not, and what to do the next time:
   the machine was unreachable for the last copy and the disk had to be
   mounted on another VM.
 - **The pinned pass's `ncu`** profiled 10 of 11 benchmarks (`transpose`
-  failed, `ncu` exit 1); the fallback pass had all 11. Not looked into.
+  failed, `ncu` exit 1); the fallback pass had all 11. The second rental showed why:
+  `run_ncu.sh` built that program as PTX, which this driver refuses from nvcc
+  13.5. It is built as machine code since (`docs/b200-rental-2.md`).
 - The self-test under a fallback toolkit: 20 failed, 4 errors. Those read
   are the compiler's (the two E8M0 predictions, `.version 9.5` fixtures that
   ptxas 13.3 refuses, timing instruction counts) or tests that assume no

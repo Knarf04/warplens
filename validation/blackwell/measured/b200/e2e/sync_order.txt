@@ -1,0 +1,21 @@
+# bar.warp.sync (kind 0), shfl.sync (kind 1), vote.sync.ballot (kind 2) with the other half of the warp on a branch; flags read before and after.
+# nvcc 13.3.73, PTX compiled by the driver (low 0: lanes 16-31 call; low 1: lanes 0-15):
+kind 0 variant 0 low 0 mask ffff0000: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 0 variant 0 low 0 mask ffffffff: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+kind 0 variant 0 low 1 mask 0000ffff: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 0 variant 0 low 1 mask ffffffff: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+kind 1 variant 0 low 0 mask ffff0000: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 1 variant 0 low 0 mask ffffffff: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 1 variant 0 low 1 mask 0000ffff: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 1 variant 0 low 1 mask ffffffff: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 0 mask ffff0000: got ffff0000 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 0 mask ffffffff: got ffff0000 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 1 mask 0000ffff: got ffff before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 1 mask ffffffff: got ffff before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+# nvcc 13.5.37, machine code:
+kind 0 variant 0 low 0 mask ffff0000: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 
+kind 0 variant 0 low 0 mask ffffffff: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 1 1 1 1 1 1 1 1 1 1 
+kind 1 variant 0 low 0 mask ffff0000: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0
+kind 1 variant 0 low 0 mask ffffffff: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 0 mask ffff0000: got ffff0000 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 
+kind 2 variant 0 low 0 mask ffffffff: got ffff0000 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 

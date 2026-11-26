@@ -1,0 +1,1 @@
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice: cudaErrorLaunchFailure at synchronize (unspecified launch failure)

@@ -218,8 +218,9 @@ program with nvcc's defaults, which is PTX for the driver to compile, and
 this driver refuses PTX from nvcc 13.5 (every launch was
 `cudaErrorUnsupportedPtxVersion`, in `ncu/transpose.err` of the archive). The
 script now builds it as machine code for the GPU it finds, as the benchmarks
-are built. That is checked on the RTX 3080 Ti and by compiling for `sm_100`;
-it has not run on a B200.
+are built. That was checked on the RTX 3080 Ti and by compiling for `sm_100`,
+and on the third rental `ncu` profiled all 11 in the pinned run
+([b200-rental-3.md](b200-rental-3.md)).
 
 ## What was not done
 

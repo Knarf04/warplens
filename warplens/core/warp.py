@@ -235,11 +235,10 @@ class Warp:
     @staticmethod
     def _member_mask(ins):
         """The member-mask operand of an instruction that waits for the lanes it names, or
-        None: `vote.sync`, `shfl.sync` and `bar.warp.sync`."""
+        None: `vote.sync` and `bar.warp.sync`. Not `shfl.sync` and `elect.sync`: on a B200
+        neither waited for lanes of its mask that were on another branch (below)."""
         if ins.opcode == "vote" and ins.mods[:1] == ("sync",) and len(ins.operands) == 3:
             return ins.operands[2]
-        if ins.opcode == "shfl" and ins.mods[:1] == ("sync",) and len(ins.operands) == 5:
-            return ins.operands[4]
         if ins.opcode == "bar" and ins.mods[:2] == ("warp", "sync") and len(ins.operands) == 1:
             return ins.operands[0]
         return None
@@ -247,12 +246,16 @@ class Warp:
     def _mask_waits(self, ins, active: np.ndarray) -> bool:
         """Whether an instruction with a member mask has to wait: a lane the masks name has
         not returned and is not executing it. The lanes of the mask act together, so the
-        others run first, until they arrive or return (see `SimtStack.rendezvous_at`). A GPU
-        does the same, measured on an RTX 3080 Ti for all three: validation/ampere/
-        vote_golden.txt has masks that name lanes which return, and every such lane was gone
-        from the vote; in sync_other_3080ti.txt a `bar.warp.sync` whose mask names lanes on
-        another branch goes on only after they have finished it, and two groups at a
-        `shfl.sync` each exchange values across the groups."""
+        others run first, until they arrive or return (see `SimtStack.rendezvous_at`).
+
+        What was measured. `bar.warp.sync` goes on only after the lanes of its mask that are
+        on another branch have finished it, on an RTX 3080 Ti and on a B200 (validation/
+        ampere/sync_other_3080ti.txt; validation/blackwell/measured/b200/e2e/sync_order.txt).
+        `vote.sync.all/any/uni` never return where two groups wait for each other, on both
+        (vote_other_3080ti.txt, measured/b200/e2e/vote_other.txt). `shfl.sync`, `elect.sync`
+        and one `vote.sync.ballot` did not wait on the B200 in the one program that could
+        show it, and are not made to here; a shuffle reads 0 from a lane that is not there
+        either way."""
         operand = self._member_mask(ins)
         if operand is None:
             return False
@@ -295,7 +298,7 @@ class Warp:
                 except UnsupportedError as error:
                     raise UnsupportedError(f"{ins.name}: {error}") from None
                 continue
-            if ins.opcode in ("vote", "shfl", "bar") and active.any() and self._mask_waits(ins, active):
+            if ins.opcode in ("vote", "bar") and active.any() and self._mask_waits(ins, active):
                 try:
                     stack.rendezvous_at(pc, active)
                 except UnsupportedError as error:

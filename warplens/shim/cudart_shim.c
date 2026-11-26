@@ -334,7 +334,11 @@ static cudaError_t launch(const void *host, dim3 grid, dim3 block, dim3 cluster,
   if (status && status != WL_INVALID_VALUE && status != WL_INVALID_CONFIGURATION &&
       status != WL_INVALID_CLUSTER_SIZE)
     kernel_error = (cudaError_t)status;
-  return result(status);
+  /* A block or grid the launch refuses: the runtime of CUDA 13 on a B200 passes on the
+   * driver's "invalid value" (validation/blackwell/measured/b200/e2e/launch_errors.txt). The
+   * runtime of CUDA 12.4 on an RTX 3080 Ti said cudaErrorInvalidConfiguration for the same six
+   * launches (validation/ampere/launch_errors_3080ti.txt); this shim stands in for the first. */
+  return result(status == WL_INVALID_CONFIGURATION ? cudaErrorInvalidValue : status);
 }
 
 static const dim3 no_cluster = {0, 0, 0};
@@ -514,6 +518,7 @@ const char *cudaGetErrorName(cudaError_t error) {
     case cudaErrorInvalidValue: return "cudaErrorInvalidValue";
     case cudaErrorMemoryAllocation: return "cudaErrorMemoryAllocation";
     case cudaErrorInvalidDeviceFunction: return "cudaErrorInvalidDeviceFunction";
+    case cudaErrorInvalidResourceHandle: return "cudaErrorInvalidResourceHandle";
     case cudaErrorInvalidConfiguration: return "cudaErrorInvalidConfiguration";
     case cudaErrorInvalidDevice: return "cudaErrorInvalidDevice";
     case cudaErrorInvalidMemcpyDirection: return "cudaErrorInvalidMemcpyDirection";
@@ -612,12 +617,19 @@ cudaError_t cudaGetDeviceProperties(struct cudaDeviceProp *prop, int device) {
 
 /* A function that is no kernel of the program has no attributes (cudaErrorInvalidDevice-
  * Function, measured). */
+/* An attribute asked of a function that is not a kernel: cudaErrorInvalidResourceHandle from
+ * the runtime of CUDA 13 on a B200 (measured/b200/e2e/launch_errors.txt), where that of CUDA
+ * 12.4 said cudaErrorInvalidDeviceFunction (validation/ampere/launch_errors_3080ti.txt). */
+static int not_a_kernel(int status) {
+  return status == cudaErrorInvalidDeviceFunction ? cudaErrorInvalidResourceHandle : status;
+}
+
 cudaError_t cudaFuncGetAttributes(struct cudaFuncAttributes *attr, const void *func) {
   TRACE("cudaFuncGetAttributes(%p)", func);
   int fixed = 0, max_dynamic = 0;
   memset(attr, 0, sizeof *attr);
   int status = warplens_function_shared_memory(func, &fixed, &max_dynamic);
-  if (status) return result(status);
+  if (status) return result(not_a_kernel(status));
   attr->sharedSizeBytes = (size_t)fixed;
   attr->maxThreadsPerBlock = 1024;
   attr->maxDynamicSharedSizeBytes = max_dynamic;
@@ -630,7 +642,7 @@ cudaError_t cudaFuncGetAttributes(struct cudaFuncAttributes *attr, const void *f
  * the kernel are held to; or any other maximum, a smaller one included. */
 cudaError_t cudaFuncSetAttribute(const void *func, enum cudaFuncAttribute attr, int value) {
   TRACE("cudaFuncSetAttribute(%p, %d, %d)", func, (int)attr, value);
-  return result(warplens_set_function_attribute(func, (int)attr, value));
+  return result(not_a_kernel(warplens_set_function_attribute(func, (int)attr, value)));
 }
 
 /* -- driver API entry points ----------------------------------------------------------- */

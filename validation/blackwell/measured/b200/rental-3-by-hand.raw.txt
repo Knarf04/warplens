@@ -1,0 +1,1061 @@
+==> out/dealloc_who.once.rep1.stderr.txt <==
+
+==> out/dealloc_who.once.rep1.txt <==
+script: one warp releases the allocation once
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.once.rep2.stderr.txt <==
+
+==> out/dealloc_who.once.rep2.txt <==
+script: one warp releases the allocation once
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.once.rep3.stderr.txt <==
+
+==> out/dealloc_who.once.rep3.txt <==
+script: one warp releases the allocation once
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.relinquish-once.rep1.stderr.txt <==
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice: cudaErrorLaunchFailure at synchronize (unspecified launch failure)
+
+==> out/dealloc_who.relinquish-once.rep1.txt <==
+script: one warp relinquishes the permit, then releases the same allocation twice
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice
+info: error cudaErrorLaunchFailure
+
+==> out/dealloc_who.relinquish-once.rep2.stderr.txt <==
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice: cudaErrorLaunchFailure at synchronize (unspecified launch failure)
+
+==> out/dealloc_who.relinquish-once.rep2.txt <==
+script: one warp relinquishes the permit, then releases the same allocation twice
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice
+info: error cudaErrorLaunchFailure
+
+==> out/dealloc_who.relinquish-once.rep3.stderr.txt <==
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice: cudaErrorLaunchFailure at synchronize (unspecified launch failure)
+
+==> out/dealloc_who.relinquish-once.rep3.txt <==
+script: one warp relinquishes the permit, then releases the same allocation twice
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice
+info: error cudaErrorLaunchFailure
+
+==> out/dealloc_who.relinquish-two.rep1.stderr.txt <==
+
+==> out/dealloc_who.relinquish-two.rep1.txt <==
+script: two warps each relinquish the permit, then release the same allocation
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.relinquish-two.rep2.stderr.txt <==
+
+==> out/dealloc_who.relinquish-two.rep2.txt <==
+script: two warps each relinquish the permit, then release the same allocation
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.relinquish-two.rep3.stderr.txt <==
+
+==> out/dealloc_who.relinquish-two.rep3.txt <==
+script: two warps each relinquish the permit, then release the same allocation
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.two-warps.rep1.stderr.txt <==
+
+==> out/dealloc_who.two-warps.rep1.txt <==
+script: two warps release the same allocation once each
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.two-warps.rep2.stderr.txt <==
+
+==> out/dealloc_who.two-warps.rep2.txt <==
+script: two warps release the same allocation once each
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.two-warps.rep3.stderr.txt <==
+
+==> out/dealloc_who.two-warps.rep3.txt <==
+script: two warps release the same allocation once each
+  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
+script: a fresh launch afterwards
+  512 columns at address 00000000
+
+==> out/dealloc_who.two-warps-order.rep1.stderr.txt <==
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier: cudaErrorLaunchFailure at synchronize (unspecified launch failure)
+
+==> out/dealloc_who.two-warps-order.rep1.txt <==
+script: two warps release the same allocation once each, the second after a barrier
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier
+info: error cudaErrorLaunchFailure
+
+==> out/dealloc_who.two-warps-order.rep2.stderr.txt <==
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier: cudaErrorLaunchFailure at synchronize (unspecified launch failure)
+
+==> out/dealloc_who.two-warps-order.rep2.txt <==
+script: two warps release the same allocation once each, the second after a barrier
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier
+info: error cudaErrorLaunchFailure
+
+==> out/dealloc_who.two-warps-order.rep3.stderr.txt <==
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier: cudaErrorLaunchFailure at synchronize (unspecified launch failure)
+
+==> out/dealloc_who.two-warps-order.rep3.txt <==
+script: two warps release the same allocation once each, the second after a barrier
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier
+info: error cudaErrorLaunchFailure
+
+==> out/elect.default.stderr.txt <==
+
+==> out/elect.default.txt <==
+member mask 0xffffffff, executed by the lanes of 0xffffffff
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  lanes with a true predicate: 1
+member mask 0xffff0000, executed by the lanes of 0xffff0000
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  lanes with a true predicate: 1
+member mask 0x80000001, executed by the lanes of 0x80000001
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0
+  predicate:   1  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0
+  lanes with a true predicate: 1
+member mask 0xaaaaaaaa, executed by the lanes of 0xaaaaaaaa
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1  .  1
+  predicate:   .  1  .  0  .  0  .  0  .  0  .  0  .  0  .  0  .  0  .  0  .  0  .  0  .  0  .  0  .  0  .  0
+  lanes with a true predicate: 1
+
+==> out/elect2.other-branch.rep1.stderr.txt <==
+
+==> out/elect2.other-branch.rep1.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+member mask 0xffffffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag seen:   1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> out/elect2.other-branch.rep2.stderr.txt <==
+
+==> out/elect2.other-branch.rep2.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+member mask 0xffffffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag seen:   1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> out/elect2.other-branch.rep3.stderr.txt <==
+
+==> out/elect2.other-branch.rep3.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+member mask 0xffffffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag seen:   1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> out/elect2.other-callers.rep1.stderr.txt <==
+
+==> out/elect2.other-callers.rep1.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+member mask 0x0000ffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag seen:   1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> out/elect2.other-callers.rep2.stderr.txt <==
+
+==> out/elect2.other-callers.rep2.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+member mask 0x0000ffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag seen:   1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> out/elect2.other-callers.rep3.stderr.txt <==
+
+==> out/elect2.other-callers.rep3.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+member mask 0x0000ffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag seen:   1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> out/elect.other-branch.rep1.stderr.txt <==
+
+==> out/elect.other-branch.rep1.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect.other-branch.rep2.stderr.txt <==
+
+==> out/elect.other-branch.rep2.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect.other-branch.rep3.stderr.txt <==
+
+==> out/elect.other-branch.rep3.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect.other-callers.rep1.stderr.txt <==
+
+==> out/elect.other-callers.rep1.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect.other-callers.rep2.stderr.txt <==
+
+==> out/elect.other-callers.rep2.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect.other-callers.rep3.stderr.txt <==
+
+==> out/elect.other-callers.rep3.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect.other-sites.rep1.stderr.txt <==
+
+==> out/elect.other-sites.rep1.txt <==
+member mask 0xffffffff at two call sites: lanes 0-15 at one, lanes 16-31 at the other
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect.other-sites.rep2.stderr.txt <==
+
+==> out/elect.other-sites.rep2.txt <==
+member mask 0xffffffff at two call sites: lanes 0-15 at one, lanes 16-31 at the other
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect.other-sites.rep3.stderr.txt <==
+
+==> out/elect.other-sites.rep3.txt <==
+member mask 0xffffffff at two call sites: lanes 0-15 at one, lanes 16-31 at the other
+  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:      0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  predicate:   1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1  1
+
+==> out/elect_order.txt <==
+variant 0 low 0 mask ffff0000: leader 16 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+variant 0 low 0 mask ffffffff: leader 16 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+variant 0 low 1 mask 0000ffff: leader 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+variant 0 low 1 mask ffffffff: leader 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+variant 1 low 0 mask ffff0000: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 1 low 0 mask ffffffff: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 1 low 1 mask 0000ffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 1 low 1 mask ffffffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 2 low 0 mask ffff0000: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 2 low 0 mask ffffffff: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 2 low 1 mask 0000ffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 2 low 1 mask ffffffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 3 low 0 mask ffff0000: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 3 low 0 mask ffffffff: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 3 low 1 mask 0000ffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 3 low 1 mask ffffffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+
+==> out/elect_order_pinned.txt <==
+variant 0 low 0 mask ffff0000: leader 16 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 
+variant 0 low 0 mask ffffffff: leader 16 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 
+
+==> out/launch_errors.stderr.txt <==
+
+==> out/launch_errors.txt <==
+NVIDIA B200: sharedMemPerBlock 49152, sharedMemPerBlockOptin 232448, sharedMemPerMultiprocessor 233472
+launch, no opt-in, default maximum                         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, no opt-in, default maximum + 16                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, no opt-in, opt-in maximum                          returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 49152)    returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 232432)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 232448)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 232449)   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 232464)   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 233472)   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 1073741824) returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, -1)       returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 0)        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, 50)    returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, 100)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, 101)   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, -1)    returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, -2)    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(attribute 99, 0)                      returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(opt-in maximum)                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, opted in, opt-in maximum                           returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, opted in, opt-in maximum + 16                      returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, opted in, opt-in maximum + 1024                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(with_static, opt-in maximum)          returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(with_static, opt-in maximum - 1024)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 1024 static + opt-in maximum - 1024                returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 1024 static + opt-in maximum - 1008                returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block of 1025 threads                              returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (33, 32, 1)                                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (1, 1, 65)                                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (0, 1, 1)                                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, grid (0, 1, 1)                                     returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, grid (1, 65536, 1)                                 returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, ordinary                                           returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaLaunchKernelEx, grid 4, cluster (1, 1, 1)              returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaLaunchKernelEx, grid 4, cluster (2, 1, 1)              returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaLaunchKernelEx, grid 3, cluster (2, 1, 1)              returned cudaErrorInvalidClusterSize    peek cudaErrorInvalidClusterSize    sync cudaSuccess    getLast cudaErrorInvalidClusterSize    again cudaSuccess
+launch, ordinary, afterwards                               returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, fresh kernel                                   cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 49152
+attributes, kernel opted in to the maximum above           cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 232448
+launch, fresh kernel, default maximum                      returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, fresh kernel, default maximum + 1                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, fresh kernel, default maximum + 16                 returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(fresh, 60000)                         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, opted in to 60000                              cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 60000
+launch, opted in to 60000, 60000                           returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, opted in to 60000, 60001                           returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, opted in to 60000, 60016                           returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, another fresh kernel, default maximum + 16         returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(fresh, 1024)                          returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, set to 1024                                    cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 1024
+launch, set to 1024, 1024                                  returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, set to 1024, 1040                                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, set to 1024, default maximum                       returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, set to 1024, default maximum + 16                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(the same, 60000)                      returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(the same, 0)                          returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, set to 60000 and then to 0                     cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 0
+launch, set to 60000 and then to 0, default maximum        returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, set to 60000 and then to 0, default maximum + 16   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 40960 static                                   cudaSuccess: sharedSizeBytes 40960, maxDynamicSharedSizeBytes 8192
+launch, 40960 static + 0, no opt-in                        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 8192 (default maximum), no opt-in   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 8208, no opt-in                     returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(40960 static, 8208)                   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, 40960 static, set to 8208                      cudaSuccess: sharedSizeBytes 40960, maxDynamicSharedSizeBytes 8208
+launch, 40960 static + 8208, set to 8208                   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 8224, set to 8208                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(40960 static (another), 1024)         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 1024, set to 1024                   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 8192, set to 1024                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, 40960 static + 8208, set to 1024                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 61440 static                                   cudaSuccess: sharedSizeBytes 61440, maxDynamicSharedSizeBytes 0
+launch, 61440 static + 0, no opt-in                        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 16, no opt-in                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 39936 (opt-in maximum), no opt-in   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 39952, no opt-in                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(61440 static (another), 0)            returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, 61440 static, set to 0                         cudaSuccess: sharedSizeBytes 61440, maxDynamicSharedSizeBytes 0
+launch, 61440 static + 0, set to 0                         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 16, set to 0                        returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(61440 static (a third), 1024)         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, 61440 static, set to 1024                      cudaSuccess: sharedSizeBytes 61440, maxDynamicSharedSizeBytes 1024
+launch, 61440 static + 1024, set to 1024                   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 1040, set to 1024                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(61440 static (a third), 39936)        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(61440 static (a third), 39937)        returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 61440 static, after the refused 39937          cudaSuccess: sharedSizeBytes 61440, maxDynamicSharedSizeBytes 171008
+attributes, 49152 static                                   cudaSuccess: sharedSizeBytes 49152, maxDynamicSharedSizeBytes 0
+launch, 49152 static + 0, no opt-in                        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 49152 static + 16, no opt-in                       returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 49168 static                                   cudaSuccess: sharedSizeBytes 49168, maxDynamicSharedSizeBytes 0
+launch, 49168 static + 0, no opt-in                        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 49168 static + 16, no opt-in                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 49168 static + 52208 (opt-in maximum), no opt-in   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 49168 static + 52224, no opt-in                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 101376 static                                  cudaSuccess: sharedSizeBytes 101376, maxDynamicSharedSizeBytes 0
+launch, 101376 static + 0, no opt-in                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 101376 static + 16, no opt-in                      returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(a host function, 1024)                returned cudaErrorInvalidResourceHandle peek cudaErrorInvalidResourceHandle sync cudaSuccess    getLast cudaErrorInvalidResourceHandle again cudaSuccess
+attributes, a host function                                cudaErrorInvalidResourceHandle: sharedSizeBytes 0, maxDynamicSharedSizeBytes 0
+launch, ordinary, at the end                               returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+
+==> out/subnormals.stderr.txt <==
+
+==> out/subnormals.txt <==
+part 1: one product per element, A[m][0] * B[n]; half-precision bits of B for n = 0..7 are 3c00 0001 03ff 0400 7bff 8001 4000 3800
+  A = 0001: 33800000 27800000 2c7fc000 2c800000 3b7fe000 a7800000 34000000 33000000
+  A = 0002: 34000000 28000000 2cffc000 2d000000 3bffe000 a8000000 34800000 33800000
+  A = 0200: 38000000 2c000000 30ffc000 31000000 3fffe000 ac000000 38800000 37800000
+  A = 03ff: 387fc000 2c7fc000 317f8010 317fc000 407fa008 ac7fc000 38ffc000 37ffc000
+  A = 0400: 38800000 2c800000 317fc000 31800000 407fe000 ac800000 39000000 38000000
+  A = 0401: 38802000 2c802000 317ffff0 31802000 40800ffc ac802000 39002000 38002000
+  A = 8001: b3800000 a7800000 ac7fc000 ac800000 bb7fe000 27800000 b4000000 b3000000
+  A = 83ff: b87fc000 ac7fc000 b17f8010 b17fc000 c07fa008 2c7fc000 b8ffc000 b7ffc000
+  A = 3c00: 3f800000 33800000 387fc000 38800000 477fe000 b3800000 40000000 3f000000
+  A = bc00: bf800000 b3800000 b87fc000 b8800000 c77fe000 33800000 c0000000 bf000000
+  A = 7bff: 477fe000 3b7fe000 407fa008 407fe000 4f7fc004 bb7fe000 47ffe000 46ffe000
+  A = 0000: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+  A = 8000: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+  A = 0155: 37aa8000 2baa8000 30aa5560 30aa8000 3faa6ab0 abaa8000 382a8000 372a8000
+  A = 82aa: b82a8000 ac2a8000 b12a5560 b12a8000 c02a6ab0 2c2a8000 b8aa8000 b7aa8000
+  A = 3555: 3eaaa000 32aaa000 37aa7558 37aaa000 46aa8aac b2aaa000 3f2aa000 3e2aa000
+part 2: 1.0 at k = 0 and the value at k = 1, B = 1.0; the exact sum is 1 + the value (3f800000 is 1.0)
+  1.0 + 0001: 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000
+  1.0 + 0002: 3f800001 3f800001 3f800001 3f800001 3f800001 3f800001 3f800001 3f800001
+  1.0 + 0200: 3f800100 3f800100 3f800100 3f800100 3f800100 3f800100 3f800100 3f800100
+  1.0 + 03ff: 3f8001ff 3f8001ff 3f8001ff 3f8001ff 3f8001ff 3f8001ff 3f8001ff 3f8001ff
+  1.0 + 0400: 3f800200 3f800200 3f800200 3f800200 3f800200 3f800200 3f800200 3f800200
+  1.0 + 0401: 3f800200 3f800200 3f800200 3f800200 3f800200 3f800200 3f800200 3f800200
+  1.0 + 8001: 3f7fffff 3f7fffff 3f7fffff 3f7fffff 3f7fffff 3f7fffff 3f7fffff 3f7fffff
+  1.0 + 83ff: 3f7ffc01 3f7ffc01 3f7ffc01 3f7ffc01 3f7ffc01 3f7ffc01 3f7ffc01 3f7ffc01
+  1.0 + 3c00: 40000000 40000000 40000000 40000000 40000000 40000000 40000000 40000000
+  1.0 + bc00: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+  1.0 + 7bff: 477fe100 477fe100 477fe100 477fe100 477fe100 477fe100 477fe100 477fe100
+  1.0 + 0000: 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000
+  1.0 + 8000: 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000 3f800000
+  1.0 + 0155: 3f8000aa 3f8000aa 3f8000aa 3f8000aa 3f8000aa 3f8000aa 3f8000aa 3f8000aa
+  1.0 + 82aa: 3f7ffd56 3f7ffd56 3f7ffd56 3f7ffd56 3f7ffd56 3f7ffd56 3f7ffd56 3f7ffd56
+  1.0 + 3555: 3faaa800 3faaa800 3faaa800 3faaa800 3faaa800 3faaa800 3faaa800 3faaa800
+
+==> out/sync_order.txt <==
+kind 0 variant 0 low 0 mask ffff0000: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 0 variant 0 low 0 mask ffffffff: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+kind 0 variant 0 low 1 mask 0000ffff: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 0 variant 0 low 1 mask ffffffff: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+kind 1 variant 0 low 0 mask ffff0000: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 1 variant 0 low 0 mask ffffffff: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 1 variant 0 low 1 mask 0000ffff: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 1 variant 0 low 1 mask ffffffff: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 0 mask ffff0000: got ffff0000 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 0 mask ffffffff: got ffff0000 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 1 mask 0000ffff: got ffff before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 1 mask ffffffff: got ffff before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+
+==> out/sync_order_pinned.txt <==
+kind 0 variant 0 low 0 mask ffff0000: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 
+kind 0 variant 0 low 0 mask ffffffff: got ee before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 1 1 1 1 1 1 1 1 1 1 
+kind 1 variant 0 low 0 mask ffff0000: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0
+kind 1 variant 0 low 0 mask ffffffff: got 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0
+kind 2 variant 0 low 0 mask ffff0000: got ffff0000 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 
+kind 2 variant 0 low 0 mask ffffffff: got ffff0000 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 
+
+==> out/sync_other_b200.txt <==
+mode 0 (shfl.sync): every lane, full mask (the ordinary case): role 0 got 0:74 1:75 2:76 3:77 4:78 5:79 6:7a 7:7b 8:7c 9:7d 10:7e 11:7f 12:80 13:81 14:82 15:83 16:64 17:65 18:66 19:67 20:68 21:69 22:6a 23:6b 24:6c 25:6d 26:6e 27:6f 28:70 29:71 30:72 31:73; role 3 got
+mode 0 (shfl.sync): lanes 0-15 returned, full mask: role 0 got 16:0 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got
+mode 0 (shfl.sync): lanes 0-15 on a branch without the instruction, full mask: role 0 got 16:0 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got
+mode 0 (shfl.sync): lane 0 on a branch without the instruction, full mask: role 0 got 1:75 2:76 3:77 4:78 5:79 6:7a 7:7b 8:7c 9:7d 10:7e 11:7f 12:80 13:81 14:82 15:83 16:0 17:65 18:66 19:67 20:68 21:69 22:6a 23:6b 24:6c 25:6d 26:6e 27:6f 28:70 29:71 30:72 31:73; role 3 got
+mode 0 (shfl.sync): lanes 0-15 at a call site of their own, both with the full mask: role 0 got 16:3e8 17:3e9 18:3ea 19:3eb 20:3ec 21:3ed 22:3ee 23:3ef 24:3f0 25:3f1 26:3f2 27:3f3 28:3f4 29:3f5 30:3f6 31:3f7; role 3 got 0:74 1:75 2:76 3:77 4:78 5:79 6:7a 7:7b 8:7c 9:7d 10:7e 11:7f 12:80 13:81 14:82 15:83
+mode 0 (shfl.sync): lanes 0-15 at a call site of their own, each group with its own lanes as the mask: role 0 got 16:0 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got 0:0 1:0 2:0 3:0 4:0 5:0 6:0 7:0 8:0 9:0 10:0 11:0 12:0 13:0 14:0 15:0
+mode 0 (shfl.sync): lanes 0-15 on a branch without the instruction, the mask names only the callers: role 0 got 16:0 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got
+mode 0 (shfl.sync): every lane, the mask names only lanes 0-15: role 0 got 0:74 1:75 2:76 3:77 4:78 5:79 6:7a 7:7b 8:7c 9:7d 10:7e 11:7f 12:80 13:81 14:82 15:83 16:64 17:65 18:66 19:67 20:68 21:69 22:6a 23:6b 24:6c 25:6d 26:6e 27:6f 28:70 29:71 30:72 31:73; role 3 got
+mode 1 (bar.warp.sync): every lane, full mask (the ordinary case): role 0 got 0:0 1:0 2:0 3:0 4:0 5:0 6:0 7:0 8:0 9:0 10:0 11:0 12:0 13:0 14:0 15:0 16:0 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got
+mode 1 (bar.warp.sync): lanes 0-15 returned, full mask: role 0 got 16:0 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got
+mode 1 (bar.warp.sync): lanes 0-15 on a branch without the instruction, full mask: role 0 got 16:1 17:1 18:1 19:1 20:1 21:1 22:1 23:1 24:1 25:1 26:1 27:1 28:1 29:1 30:1 31:1; role 3 got
+mode 1 (bar.warp.sync): lane 0 on a branch without the instruction, full mask: role 0 got 1:0 2:0 3:0 4:0 5:0 6:0 7:0 8:0 9:0 10:0 11:0 12:0 13:0 14:0 15:0 16:1 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got
+mode 1 (bar.warp.sync): lanes 0-15 at a call site of their own, both with the full mask: role 0 got 16:1 17:1 18:1 19:1 20:1 21:1 22:1 23:1 24:1 25:1 26:1 27:1 28:1 29:1 30:1 31:1; role 3 got 0:0 1:0 2:0 3:0 4:0 5:0 6:0 7:0 8:0 9:0 10:0 11:0 12:0 13:0 14:0 15:0
+mode 1 (bar.warp.sync): lanes 0-15 at a call site of their own, each group with its own lanes as the mask: role 0 got 16:0 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got 0:0 1:0 2:0 3:0 4:0 5:0 6:0 7:0 8:0 9:0 10:0 11:0 12:0 13:0 14:0 15:0
+mode 1 (bar.warp.sync): lanes 0-15 on a branch without the instruction, the mask names only the callers: role 0 got 16:1 17:1 18:1 19:1 20:1 21:1 22:1 23:1 24:1 25:1 26:1 27:1 28:1 29:1 30:1 31:1; role 3 got
+mode 1 (bar.warp.sync): every lane, the mask names only lanes 0-15: role 0 got 0:0 1:0 2:0 3:0 4:0 5:0 6:0 7:0 8:0 9:0 10:0 11:0 12:0 13:0 14:0 15:0 16:0 17:0 18:0 19:0 20:0 21:0 22:0 23:0 24:0 25:0 26:0 27:0 28:0 29:0 30:0 31:0; role 3 got
+
+==> out/vote_other_b200.txt <==
+0 32 20000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+0 32 20000000000000000000000000000000 11010000101001101010011000110101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+0 32 22222222222222220000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+0 32 22222222222222220000000000000000 00111100011010110010101011111101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+0 32 30000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+0 32 30000000000000000000000000000000 11110101111001111111111100100001 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+0 32 33333333333333330000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+0 32 33333333333333330000000000000000 11101001001111110011011110101100 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+0 32 00000000000000000000000000000000 00000000000000000000000000000000 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 11111111111111111111111111111111 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 00100101111100101011101111001100 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 00000000000000000000000000000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 11111111111111111111111111111111 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 11101100010010100110011000010000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 00000000000000000000000000000000 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 11111111111111111111111111111111 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 01111000100001110010111010011001 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 00000000000000000000000000000000 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 11111111111111111111111111111111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+0 32 00000000000000000000000000000000 10110100010010011010000101010111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+1 32 20000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+1 32 20000000000000000000000000000000 11010000101001101010011000110101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+1 32 22222222222222220000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+1 32 22222222222222220000000000000000 00111100011010110010101011111101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+1 32 30000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+1 32 30000000000000000000000000000000 11110101111001111111111100100001 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+1 32 33333333333333330000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+1 32 33333333333333330000000000000000 11101001001111110011011110101100 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+1 32 00000000000000000000000000000000 00000000000000000000000000000000 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 11111111111111111111111111111111 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 00100101111100101011101111001100 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 00000000000000000000000000000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 11111111111111111111111111111111 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 11101100010010100110011000010000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 00000000000000000000000000000000 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 11111111111111111111111111111111 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 01111000100001110010111010011001 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 00000000000000000000000000000000 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 11111111111111111111111111111111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+1 32 00000000000000000000000000000000 10110100010010011010000101010111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+2 32 20000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+2 32 20000000000000000000000000000000 11010000101001101010011000110101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+2 32 22222222222222220000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+2 32 22222222222222220000000000000000 00111100011010110010101011111101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+2 32 30000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+2 32 30000000000000000000000000000000 11110101111001111111111100100001 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+2 32 33333333333333330000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+2 32 33333333333333330000000000000000 11101001001111110011011110101100 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff no result after 3 s
+2 32 00000000000000000000000000000000 00000000000000000000000000000000 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 11111111111111111111111111111111 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 00100101111100101011101111001100 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 00000000000000000000000000000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 11111111111111111111111111111111 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 11101100010010100110011000010000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 00000000000000000000000000000000 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 11111111111111111111111111111111 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 01111000100001110010111010011001 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 00000000000000000000000000000000 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 11111111111111111111111111111111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+2 32 00000000000000000000000000000000 10110100010010011010000101010111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+3 32 20000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 22220000 ffffffff ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe ffffffff eeeeeeee fffffffe
+3 32 20000000000000000000000000000000 11010000101001101010011000110101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 22220000 ac65650b ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a ac65650b eeeeeeee ac65650a
+3 32 22222222222222220000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 22220000 ffffffff eeeeeeee 22220001 ffffffff eeeeeeee 22220002 ffffffff eeeeeeee 22220003 ffffffff eeeeeeee 22220004 ffffffff eeeeeeee 22220005 ffffffff eeeeeeee 22220006 ffffffff eeeeeeee 22220007 ffffffff eeeeeeee 22220008 ffffffff eeeeeeee 22220009 ffffffff eeeeeeee 2222000a ffffffff eeeeeeee 2222000b ffffffff eeeeeeee 2222000c ffffffff eeeeeeee 2222000d ffffffff eeeeeeee 2222000e ffffffff eeeeeeee 2222000f ffffffff ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000 ffffffff eeeeeeee ffff0000
+3 32 22222222222222220000000000000000 00111100011010110010101011111101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 22220000 bf54d63c eeeeeeee 22220001 bf54d63c eeeeeeee 22220002 bf54d63c eeeeeeee 22220003 bf54d63c eeeeeeee 22220004 bf54d63c eeeeeeee 22220005 bf54d63c eeeeeeee 22220006 bf54d63c eeeeeeee 22220007 bf54d63c eeeeeeee 22220008 bf54d63c eeeeeeee 22220009 bf54d63c eeeeeeee 2222000a bf54d63c eeeeeeee 2222000b bf54d63c eeeeeeee 2222000c bf54d63c eeeeeeee 2222000d bf54d63c eeeeeeee 2222000e bf54d63c eeeeeeee 2222000f bf54d63c bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000 bf54d63c eeeeeeee bf540000
+3 32 30000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee ffffffff ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff
+3 32 30000000000000000000000000000000 11110101111001111111111100100001 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 84ffe7af 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af 84ffe7af eeeeeeee 84ffe7af
+3 32 33333333333333330000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff
+3 32 33333333333333330000000000000000 11101001001111110011011110101100 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97 35ecfc97 eeeeeeee 35ecfc97
+3 32 00000000000000000000000000000000 00000000000000000000000000000000 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000
+3 32 00000000000000000000000000000000 11111111111111111111111111111111 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff
+3 32 00000000000000000000000000000000 00100101111100101011101111001100 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4 33dd4fa4 eeeeeeee 33dd4fa4
+3 32 00000000000000000000000000000000 00000000000000000000000000000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000 00000000 eeeeeeee 00000000
+3 32 00000000000000000000000000000000 11111111111111111111111111111111 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff ffffffff eeeeeeee ffffffff
+3 32 00000000000000000000000000000000 11101100010010100110011000010000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237 08665237 eeeeeeee 08665237
+3 32 00000000000000000000000000000000 00000000000000000000000000000000 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+3 32 00000000000000000000000000000000 11111111111111111111111111111111 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+3 32 00000000000000000000000000000000 01111000100001110010111010011001 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+3 32 00000000000000000000000000000000 00000000000000000000000000000000 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+3 32 00000000000000000000000000000000 11111111111111111111111111111111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+3 32 00000000000000000000000000000000 10110100010010011010000101010111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+4 32 20000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 22220000 00000001 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe 00000001 eeeeeeee fffffffe
+4 32 20000000000000000000000000000000 11010000101001101010011000110101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 22220000 539a9af5 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a 539a9af5 eeeeeeee ac65650a
+4 32 22222222222222220000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 22220000 0000ffff eeeeeeee 22220001 0000ffff eeeeeeee 22220002 0000ffff eeeeeeee 22220003 0000ffff eeeeeeee 22220004 0000ffff eeeeeeee 22220005 0000ffff eeeeeeee 22220006 0000ffff eeeeeeee 22220007 0000ffff eeeeeeee 22220008 0000ffff eeeeeeee 22220009 0000ffff eeeeeeee 2222000a 0000ffff eeeeeeee 2222000b 0000ffff eeeeeeee 2222000c 0000ffff eeeeeeee 2222000d 0000ffff eeeeeeee 2222000e 0000ffff eeeeeeee 2222000f 0000ffff 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000 0000ffff eeeeeeee ffff0000
+4 32 22222222222222220000000000000000 00111100011010110010101011111101 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 22220000 40abd63c eeeeeeee 22220001 40abd63c eeeeeeee 22220002 40abd63c eeeeeeee 22220003 40abd63c eeeeeeee 22220004 40abd63c eeeeeeee 22220005 40abd63c eeeeeeee 22220006 40abd63c eeeeeeee 22220007 40abd63c eeeeeeee 22220008 40abd63c eeeeeeee 22220009 40abd63c eeeeeeee 2222000a 40abd63c eeeeeeee 2222000b 40abd63c eeeeeeee 2222000c 40abd63c eeeeeeee 2222000d 40abd63c eeeeeeee 2222000e 40abd63c eeeeeeee 2222000f 40abd63c 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000 40abd63c eeeeeeee bf540000
+4 32 30000000000000000000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 00000001 ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff 00000001 eeeeeeee ffffffff
+4 32 30000000000000000000000000000000 11110101111001111111111100100001 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 7b001851 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af 7b001851 eeeeeeee 84ffe7af
+4 32 33333333333333330000000000000000 11111111111111111111111111111111 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff eeeeeeee 0000ffff ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff 0000ffff eeeeeeee ffffffff
+4 32 33333333333333330000000000000000 11101001001111110011011110101100 ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff ffffffff eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 eeeeeeee ca13fc97 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97 ca13fc97 eeeeeeee 35ecfc97
+4 32 00000000000000000000000000000000 00000000000000000000000000000000 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000
+4 32 00000000000000000000000000000000 11111111111111111111111111111111 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff
+4 32 00000000000000000000000000000000 00100101111100101011101111001100 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff 0000ffff cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4 cc22b05b eeeeeeee 33dd4fa4
+4 32 00000000000000000000000000000000 00000000000000000000000000000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000 ffffffff eeeeeeee 00000000
+4 32 00000000000000000000000000000000 11111111111111111111111111111111 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff 00000000 eeeeeeee ffffffff
+4 32 00000000000000000000000000000000 11101100010010100110011000010000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237 f799adc8 eeeeeeee 08665237
+4 32 00000000000000000000000000000000 00000000000000000000000000000000 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+4 32 00000000000000000000000000000000 11111111111111111111111111111111 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+4 32 00000000000000000000000000000000 01111000100001110010111010011001 00000002 00000004 00000008 00000010 00000020 00000040 00000080 00000100 00000200 00000400 00000800 00001000 00002000 00004000 00008000 00010000 00020000 00040000 00080000 00100000 00200000 00400000 00800000 01000000 02000000 04000000 08000000 10000000 20000000 40000000 80000000 00000001 cudaErrorIllegalInstruction
+4 32 00000000000000000000000000000000 00000000000000000000000000000000 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+4 32 00000000000000000000000000000000 11111111111111111111111111111111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+4 32 00000000000000000000000000000000 10110100010010011010000101010111 fffffffe fffffffd fffffffb fffffff7 ffffffef ffffffdf ffffffbf ffffff7f fffffeff fffffdff fffffbff fffff7ff ffffefff ffffdfff ffffbfff ffff7fff fffeffff fffdffff fffbffff fff7ffff ffefffff ffdfffff ffbfffff ff7fffff feffffff fdffffff fbffffff f7ffffff efffffff dfffffff bfffffff 7fffffff cudaErrorIllegalInstruction
+
+==> final/elect.other-branch.rep1.stderr.txt <==
+
+==> final/elect.other-branch.rep1.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+member mask 0xffffffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag before:   0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag after:    0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> final/elect.other-branch.rep2.stderr.txt <==
+
+==> final/elect.other-branch.rep2.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+member mask 0xffffffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag before:   0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag after:    0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> final/elect.other-branch.rep3.stderr.txt <==
+
+==> final/elect.other-branch.rep3.txt <==
+member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+member mask 0xffffffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag before:   0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag after:    0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> final/elect.other-callers.rep1.stderr.txt <==
+
+==> final/elect.other-callers.rep1.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+member mask 0x0000ffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag before:   0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag after:    0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> final/elect.other-callers.rep2.stderr.txt <==
+
+==> final/elect.other-callers.rep2.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+member mask 0x0000ffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag before:   0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag after:    0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> final/elect.other-callers.rep3.stderr.txt <==
+
+==> final/elect.other-callers.rep3.txt <==
+member mask 0xffff0000, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
+  predicate:     .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+member mask 0x0000ffff, executed by lanes 0-15; lanes 16-31 set a flag on a branch of their own
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag before:   0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+  flag after:    0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .
+
+==> final/elect.other-sites.rep1.stderr.txt <==
+
+==> final/elect.other-sites.rep1.txt <==
+member mask 0xffffffff at two call sites: lanes 0-15 at one, lanes 16-31 at the other
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+==> final/elect.other-sites.rep2.stderr.txt <==
+
+==> final/elect.other-sites.rep2.txt <==
+member mask 0xffffffff at two call sites: lanes 0-15 at one, lanes 16-31 at the other
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+==> final/elect.other-sites.rep3.stderr.txt <==
+
+==> final/elect.other-sites.rep3.txt <==
+member mask 0xffffffff at two call sites: lanes 0-15 at one, lanes 16-31 at the other
+  lane:          0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
+  leader:        0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  predicate:     1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag before:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+  flag after:    .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+
+==> final/expect_tx_small.txt <==
+script: exact: expect_tx 256, one load
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       256                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+script: too large: expect_tx 512, one load; then a second load
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       512                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  load 256 bytes                                -                    -
+     4  poll parity              0                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+  load 1: first word 10000040, last word 1000007f (expected 10000040, 1000007f)
+script: expect_tx 256, two loads: the first completion ends the phase
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       256                    0                    1
+     1  load 256 bytes                                -                    -
+     2  load 256 bytes                                -                    -
+     3  poll parity              0                    1                    0
+     4  settle                                        1                    0
+     5  arrive.expect_tx       256                    0                    1
+     6  arrive                                        1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+  load 1: first word 10000040, last word 1000007f (expected 10000040, 1000007f)
+script: no expect_tx at all: arrive, one load; then expect_tx 256 and an arrival
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive                                        1                    0
+     1  load 256 bytes                                -                    -
+     2  settle                                        1                    0
+     3  expect_tx              256                    1                    0
+     4  arrive                                        0                    1
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+script: expect_tx after the data has landed: load, settle, arrive.expect_tx 256
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  load 256 bytes                                -                    -
+     1  settle                                        0                    1
+     2  arrive.expect_tx       256                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep1.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep2.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep3.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep4.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep5.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep6.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep7.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep8.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep9.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/expect_tx_small.too_small.rep10.txt <==
+script: too small: expect_tx 128, one load; then expect_tx for the other 128
+  step  operation                    test_wait(parity 0)  test_wait(parity 1)
+     0  arrive.expect_tx       128                    0                    1
+     1  load 256 bytes                                -                    -
+     2  poll parity              0                    0                    1
+     3  expect_tx              128                    1                    0
+  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
+
+==> final/launch_errors.stderr.txt <==
+
+==> final/launch_errors.txt <==
+the device: sharedMemPerBlock 49152, sharedMemPerBlockOptin 232448, sharedMemPerMultiprocessor 233472
+launch, no opt-in, default maximum                         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, no opt-in, default maximum + 16                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, no opt-in, opt-in maximum                          returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 49152)    returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 232432)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 232448)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 232449)   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 232464)   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 233472)   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 1073741824) returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, -1)       returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(MaxDynamicSharedMemorySize, 0)        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, 50)    returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, 100)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, 101)   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, -1)    returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(PreferredSharedMemoryCarveout, -2)    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(attribute 99, 0)                      returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(opt-in maximum)                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, opted in, opt-in maximum                           returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, opted in, opt-in maximum + 16                      returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, opted in, opt-in maximum + 1024                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(with_static, opt-in maximum)          returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(with_static, opt-in maximum - 1024)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 1024 static + opt-in maximum - 1024                returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 1024 static + opt-in maximum - 1008                returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block of 1025 threads                              returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (33, 32, 1)                                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (1, 1, 65)                                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (0, 1, 1)                                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, grid (0, 1, 1)                                     returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, grid (1, 65536, 1)                                 returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, ordinary                                           returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaLaunchKernelEx, grid 4, cluster (1, 1, 1)              returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaLaunchKernelEx, grid 4, cluster (2, 1, 1)              returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaLaunchKernelEx, grid 3, cluster (2, 1, 1)              returned cudaErrorInvalidClusterSize    peek cudaErrorInvalidClusterSize    sync cudaSuccess    getLast cudaErrorInvalidClusterSize    again cudaSuccess
+launch, ordinary, afterwards                               returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, fresh kernel                                   cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 49152
+attributes, kernel opted in to the maximum above           cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 232448
+launch, fresh kernel, default maximum                      returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, fresh kernel, default maximum + 1                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, fresh kernel, default maximum + 16                 returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(fresh, 60000)                         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, opted in to 60000                              cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 60000
+launch, opted in to 60000, 60000                           returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, opted in to 60000, 60001                           returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, opted in to 60000, 60016                           returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, another fresh kernel, default maximum + 16         returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(fresh, 1024)                          returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, set to 1024                                    cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 1024
+launch, set to 1024, 1024                                  returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, set to 1024, 1040                                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, set to 1024, default maximum                       returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, set to 1024, default maximum + 16                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(the same, 60000)                      returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(the same, 0)                          returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, set to 60000 and then to 0                     cudaSuccess: sharedSizeBytes 0, maxDynamicSharedSizeBytes 0
+launch, set to 60000 and then to 0, default maximum        returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, set to 60000 and then to 0, default maximum + 16   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 40960 static                                   cudaSuccess: sharedSizeBytes 40960, maxDynamicSharedSizeBytes 8192
+launch, 40960 static + 0, no opt-in                        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 8192 (default maximum), no opt-in   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 8208, no opt-in                     returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(40960 static, 8208)                   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, 40960 static, set to 8208                      cudaSuccess: sharedSizeBytes 40960, maxDynamicSharedSizeBytes 8208
+launch, 40960 static + 8208, set to 8208                   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 8224, set to 8208                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(40960 static (another), 1024)         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 1024, set to 1024                   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 40960 static + 8192, set to 1024                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, 40960 static + 8208, set to 1024                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 61440 static                                   cudaSuccess: sharedSizeBytes 61440, maxDynamicSharedSizeBytes 0
+launch, 61440 static + 0, no opt-in                        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 16, no opt-in                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 39936 (opt-in maximum), no opt-in   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 39952, no opt-in                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(61440 static (another), 0)            returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, 61440 static, set to 0                         cudaSuccess: sharedSizeBytes 61440, maxDynamicSharedSizeBytes 0
+launch, 61440 static + 0, set to 0                         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 16, set to 0                        returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(61440 static (a third), 1024)         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+attributes, 61440 static, set to 1024                      cudaSuccess: sharedSizeBytes 61440, maxDynamicSharedSizeBytes 1024
+launch, 61440 static + 1024, set to 1024                   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 61440 static + 1040, set to 1024                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+cudaFuncSetAttribute(61440 static (a third), 39936)        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(61440 static (a third), 39937)        returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 61440 static, after the refused 39937          cudaSuccess: sharedSizeBytes 61440, maxDynamicSharedSizeBytes 171008
+attributes, 49152 static                                   cudaSuccess: sharedSizeBytes 49152, maxDynamicSharedSizeBytes 0
+launch, 49152 static + 0, no opt-in                        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 49152 static + 16, no opt-in                       returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 49168 static                                   cudaSuccess: sharedSizeBytes 49168, maxDynamicSharedSizeBytes 0
+launch, 49168 static + 0, no opt-in                        returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 49168 static + 16, no opt-in                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 49168 static + 52208 (opt-in maximum), no opt-in   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 49168 static + 52224, no opt-in                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+attributes, 101376 static                                  cudaSuccess: sharedSizeBytes 101376, maxDynamicSharedSizeBytes 0
+launch, 101376 static + 0, no opt-in                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+launch, 101376 static + 16, no opt-in                      returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+cudaFuncSetAttribute(a host function, 1024)                returned cudaErrorInvalidResourceHandle peek cudaErrorInvalidResourceHandle sync cudaSuccess    getLast cudaErrorInvalidResourceHandle again cudaSuccess
+attributes, a host function                                cudaErrorInvalidResourceHandle: sharedSizeBytes 0, maxDynamicSharedSizeBytes 0
+launch, ordinary, at the end                               returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
+
+==> source: e2e/elect_order.cu <==
+// Which structure makes the electing half run before the other half? before/after flags.
+#include "../common.h"
+#define ELECT() asm volatile("{\n.reg .pred p;\nelect.sync %0|p, %2;\nselp.u32 %1, 1, 0, p;\n}" : "=r"(leader), "=r"(chosen) : "r"(mask))
+extern "C" __global__ void v(uint32_t mask, int variant, int low, int* flag, uint32_t* out) {
+    uint32_t lane = threadIdx.x, leader = 0xEEu, chosen = 0xEEu, before = 0xEEu, after = 0xEEu;
+    const bool electing = low ? lane < 16 : lane >= 16;
+    if (variant == 0) {
+        if (electing) { before = flag[lane ^ 16]; ELECT(); after = flag[lane ^ 16]; }
+        else { flag[lane] = 1; }
+    } else if (variant == 1) {
+        if (!electing) { flag[lane] = 1; }
+        else { before = flag[lane ^ 16]; ELECT(); after = flag[lane ^ 16]; }
+    } else if (variant == 2) {   // the other half returns early after its store
+        if (!electing) { flag[lane] = 1; out[lane * 4] = 0xAA; return; }
+        before = flag[lane ^ 16]; ELECT(); after = flag[lane ^ 16];
+    } else {                     // the other half spins first, so its store comes late
+        if (!electing) { volatile int x = 0; for (int i = 0; i < 2000; ++i) x += i; flag[lane] = 1 + (x & 0); }
+        else { before = flag[lane ^ 16]; ELECT(); after = flag[lane ^ 16]; }
+    }
+    out[lane * 4] = leader; out[lane * 4 + 1] = chosen; out[lane * 4 + 2] = before; out[lane * 4 + 3] = after;
+}
+int main(int argc, char** argv) {
+    int variant = atoi(argv[1]), low = atoi(argv[2]), full = atoi(argv[3]);
+    uint32_t mask = full ? 0xFFFFFFFFu : (low ? 0x0000FFFFu : 0xFFFF0000u);
+    uint32_t out[128]; int flag[32] = {};
+    uint32_t* d_out = dev_alloc<uint32_t>(128); int* d_flag = dev_copy(flag, 32);
+    dev_fill(d_out, 128, 0);
+    v<<<1, 32>>>(mask, variant, low, d_flag, d_out);
+    probe_sync("elect order");
+    dev_read(out, d_out, 128);
+    int l = low ? 0 : 16;
+    printf("variant %d low %d mask %08x: leader %u before", variant, low, mask, out[l * 4]);
+    for (int i = l; i < l + 16; ++i) printf(" %x", out[i * 4 + 2]);
+    printf(" after");
+    for (int i = l; i < l + 16; ++i) printf(" %x", out[i * 4 + 3]);
+    printf("\n");
+    return 0;
+}
+
+==> source: e2e/sync_order.cu <==
+// Which structure makes the electing half run before the other half? before/after flags.
+#include "../common.h"
+#define ELECT() do { if (kind == 0) __syncwarp(mask); else if (kind == 1) leader = __shfl_xor_sync(mask, 100 + lane, 16); else leader = __ballot_sync(mask, 1); } while (0)
+extern "C" __global__ void v(uint32_t mask, int variant, int low, int* flag, uint32_t* out, int kind) {
+    uint32_t lane = threadIdx.x, leader = 0xEEu, chosen = 0xEEu, before = 0xEEu, after = 0xEEu;
+    const bool electing = low ? lane < 16 : lane >= 16;
+    if (variant == 0) {
+        if (electing) { before = flag[lane ^ 16]; ELECT(); after = flag[lane ^ 16]; }
+        else { flag[lane] = 1; }
+    } else if (variant == 1) {
+        if (!electing) { flag[lane] = 1; }
+        else { before = flag[lane ^ 16]; ELECT(); after = flag[lane ^ 16]; }
+    } else if (variant == 2) {   // the other half returns early after its store
+        if (!electing) { flag[lane] = 1; out[lane * 4] = 0xAA; return; }
+        before = flag[lane ^ 16]; ELECT(); after = flag[lane ^ 16];
+    } else {                     // the other half spins first, so its store comes late
+        if (!electing) { volatile int x = 0; for (int i = 0; i < 2000; ++i) x += i; flag[lane] = 1 + (x & 0); }
+        else { before = flag[lane ^ 16]; ELECT(); after = flag[lane ^ 16]; }
+    }
+    out[lane * 4] = leader; out[lane * 4 + 1] = chosen; out[lane * 4 + 2] = before; out[lane * 4 + 3] = after;
+}
+int main(int argc, char** argv) {
+    int variant = atoi(argv[1]), low = atoi(argv[2]), full = atoi(argv[3]), kind = atoi(argv[4]);
+    uint32_t mask = full ? 0xFFFFFFFFu : (low ? 0x0000FFFFu : 0xFFFF0000u);
+    uint32_t out[128]; int flag[32] = {};
+    uint32_t* d_out = dev_alloc<uint32_t>(128); int* d_flag = dev_copy(flag, 32);
+    dev_fill(d_out, 128, 0);
+    v<<<1, 32>>>(mask, variant, low, d_flag, d_out, kind);
+    probe_sync("elect order");
+    dev_read(out, d_out, 128);
+    int l = low ? 0 : 16;
+    printf("kind %d variant %d low %d mask %08x: got %x before", kind, variant, low, mask, out[l * 4]);
+    for (int i = l; i < l + 16; ++i) printf(" %x", out[i * 4 + 2]);
+    printf(" after");
+    for (int i = l; i < l + 16; ++i) printf(" %x", out[i * 4 + 3]);
+    printf("\n");
+    return 0;
+}
+

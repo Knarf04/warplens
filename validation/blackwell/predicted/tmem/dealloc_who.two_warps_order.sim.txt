@@ -1,0 +1,7 @@
+status: exit 3
+warplens: tcgen05.dealloc of 32 columns at column 0, which an earlier tcgen05.dealloc that this one comes after has already released: a GPU ends the kernel here with cudaErrorLaunchFailure (tmem-dealloc-repeated)
+  at module0.ptx:61: tcgen05.dealloc.cta_group::1.sync.aligned.b32 %r11, %r9;
+  in kernel `tmem_dealloc_who`, CTA (0, 0, 0), warp 1
+  lane 0 (thread (32, 0, 0)) and 31 more lane(s)
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier: cudaErrorLaunchFailure at launch (error 719 from the warplens CUDA runtime shim; see any warplens message above)
+warplens: the program launched no kernels

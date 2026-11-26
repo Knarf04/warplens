@@ -43,6 +43,14 @@ the outputs that differed from a prediction and the timing measurements):
   completes the phase early wherever those bytes are a multiple of 32 (it was 64), with a
   finding that states the accounting first and says that a B200 does this in some runs and
   hangs in others.
+- A third run (`docs/b200-rental-3.md`, 2026-11-26) answered the open questions that needed
+  a B200. A second `tcgen05.dealloc` of the same columns ends the kernel when it comes after
+  the first and is reported when nothing orders the two, which is what tells the book's
+  kernels from the probe that failed. `bar.warp.sync` waits for the lanes its mask names
+  that are elsewhere, on an RTX 3080 Ti and on a B200; `shfl.sync` and `elect.sync` do not.
+  A refused block or grid is `cudaErrorInvalidValue` and an attribute of a function that is
+  not a kernel `cudaErrorInvalidResourceHandle`, as the runtime of CUDA 13 has them.
+  Half-precision subnormals in an MMA were identical to the prediction.
 - Tensor maps in the driver's own layout are read, from that run's encoder sweep.
 - `tcgen05.mma` with `.collector::a::discard` and `cvt.rn.f16x2.f32` are implemented, for the
   kernel of CUTLASS's `fp16_gemm_0.py`, which replays byte for byte from its B200 capture.

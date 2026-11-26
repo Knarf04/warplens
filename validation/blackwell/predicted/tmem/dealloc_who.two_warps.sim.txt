@@ -1,0 +1,7 @@
+status: ok
+warplens: 2 kernel launch(es) simulated on B200, 1 finding(s)
+  tmem_dealloc_who: 1 CTA(s), 58 warp-instructions
+    [tmem-dealloc-repeated] tensor memory at column 0 (32 columns) was already released by a tcgen05.dealloc of another warp that nothing orders before this one; this one is ignored. A B200 runs such a kernel, and ends one in which the second release comes after the first
+      line 86: tcgen05.dealloc.cta_group::1.sync.aligned.b32 %r11, %r10;
+      first in CTA (0, 0, 0), warp 1, lanes 0-31
+  tmem_fresh: 1 CTA(s), 14 warp-instructions

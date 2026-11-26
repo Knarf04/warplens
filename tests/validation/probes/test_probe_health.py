@@ -122,7 +122,8 @@ def test_rt11_runs_first_and_the_optional_rows_get_minutes(tmp_path, monkeypatch
 # ---------------------------------------------------------------------------------------------
 
 SAFE, FAULT_FIRST, FAULT, HANG, HANG_LATER = ("mbarrier/phase_parity", "mbarrier/complete_before_expect",
-                                              "mbarrier/over_arrival", "mbarrier/expect_tx_large", "tmem/dealloc_repeated")
+                                              "mbarrier/over_arrival", "mbarrier/expect_tx_large",
+                                              "cluster/clc_failed_response.again")
 
 
 @pytest.fixture
@@ -160,7 +161,8 @@ esac
 ''')
     script(root / "bin" / "mbarrier" / "expect_tx", f'echo "$1" >> {state}/calls\n'
            f'cat {predicted}/mbarrier/expect_tx_large.txt\nexit 3\n')
-    script(root / "bin" / "tmem" / "alloc", f'echo "$1" >> {state}/calls\ncat {predicted}/tmem/dealloc_repeated.txt\n')
+    script(root / "bin" / "cluster" / "clc_failed_response",
+           f'echo "$1" >> {state}/calls\ncat {predicted}/cluster/clc_failed_response.again.txt\n')
     nvcc = json.loads((SUITE / "predicted" / "provenance.json").read_text())["nvcc_version"]
     (root / "bin" / "toolkit.txt").write_text(f"nvcc_version={nvcc}\n")
     # The machine: a kernel log that names an Xid once the 'GPU' is dead, and an nvidia-smi.
@@ -224,7 +226,7 @@ def test_a_gpu_that_does_not_come_back_stops_the_run(suite):
     assert [row[0] for row in rows] == [SAFE, FAULT_FIRST, FAULT, HANG, HANG_LATER]      # every run has a line
     assert [row[1] for row in rows] == ["ok", "ok", "exit 3"] + [f"not run (GPU unhealthy after {FAULT})"] * 2
     calls = (state / "calls").read_text().split()
-    assert "wait-large" not in calls and "dealloc-twice" not in calls                          # nothing was launched after it
+    assert "wait-large" not in calls and "again" not in calls                          # nothing was launched after it
     last = table(out / "health.tsv")[-1]
     assert last[0] == FAULT and last[1] == "host-error" and last[3] == "5" and last[5].startswith("GPU UNHEALTHY")
     flag = (out / "GPU-UNHEALTHY.txt").read_text()
@@ -239,7 +241,7 @@ def test_a_gpu_that_does_not_come_back_stops_the_run(suite):
     compared = compare(suite)
     assert compared.returncode == 1
     assert compared.stdout.startswith("!" * 100 + f"\nTHE GPU WAS UNHEALTHY AFTER {FAULT}\n")
-    lines = {line.split()[0]: line for line in compared.stdout.splitlines() if line.startswith(("mbarrier/", "tmem/"))}
+    lines = {line.split()[0]: line for line in compared.stdout.splitlines() if line.startswith(("mbarrier/", "tmem/", "cluster/"))}
     for name in (HANG, HANG_LATER):
         assert "NOT RUN, GPU unhealthy" in lines[name] and f"after {FAULT}" in lines[name]
     assert f"{HANG}:" not in compared.stdout.split("Details")[-1]                      # not a finding about the probe
@@ -254,7 +256,7 @@ def test_a_gpu_that_does_not_come_back_stops_the_run(suite):
     assert again.returncode == 0, again.stdout + again.stderr
     assert [row[1] for row in table(out / "status.tsv")] == ["ok", "ok", "exit 3", "exit 3", "ok"]
     calls = (state / "calls").read_text().split()
-    assert "over" not in calls and "negative" not in calls and {"wait-large", "dealloc-twice"} <= set(calls)
+    assert "over" not in calls and "negative" not in calls and {"wait-large", "again"} <= set(calls)
     assert not (out / "GPU-UNHEALTHY.txt").exists()
 
 
@@ -301,9 +303,10 @@ def test_an_unreadable_kernel_log_is_said_once_and_fails_nothing(suite):
 
 
 def test_a_hang_that_is_predicted_to_finish_is_named_by_the_runner(suite):
-    """tmem/dealloc_repeated may hang by design, and the simulator predicts that it returns. A
-    timeout is not a failed collection, but it is said, and the canary runs after it."""
-    script(suite / "bin" / "tmem" / "alloc", "echo 'tmem_alloc_script: first case'\nsleep 60\n")
+    """cluster/clc_failed_response.again may hang by design, and the simulator predicts that it
+    returns. A timeout is not a failed collection, but it is said, and the canary runs after
+    it. (The example was tmem/dealloc_repeated until a B200 showed that its kernel ends.)"""
+    script(suite / "bin" / "cluster" / "clc_failed_response", "echo 'tmem_alloc_script: first case'\nsleep 60\n")
     done = run_all(suite, "--timeout-scale", "0.05", only=(SAFE, HANG_LATER))
     assert done.returncode == 0, done.stdout + done.stderr
     out = suite / "results" / "run"
@@ -311,7 +314,7 @@ def test_a_hang_that_is_predicted_to_finish_is_named_by_the_runner(suite):
     assert f"TIMED OUT, PREDICTED TO FINISH: {HANG_LATER}" in done.stdout
     assert "1 run(s) TIMED OUT, PREDICTED TO FINISH" in done.stdout
     assert [row[0] for row in table(out / "health.tsv")] == ["(start)", HANG_LATER]
-    assert (out / "tmem" / "dealloc_repeated.stdout").read_text() == "tmem_alloc_script: first case\n"
+    assert (out / "cluster" / "clc_failed_response.again.stdout").read_text() == "tmem_alloc_script: first case\n"
     compared = compare(suite)
     line = next(l for l in compared.stdout.splitlines() if l.startswith(HANG_LATER + " "))
     assert "TIMED OUT, predicted to finish" in line and compared.returncode == 1
@@ -468,20 +471,20 @@ def test_a_timeout_is_as_predicted_only_where_the_simulator_predicts_a_deadlock(
     by_verdict = {}
     for name, (verdict, _) in verdicts.items():
         by_verdict.setdefault(verdict, set()).add(name)
-    # Not mbarrier/expect_tx_small.wait any more: a B200 returned from that wait, and so
-    # does the simulator since (the phase completes part of the way through the copy).
     assert by_verdict["timed out (as predicted)"] == {"mbarrier/expect_tx_large", "tmem/alloc_blocks"}
-    # No prediction (try_wait.incomplete), or the simulator predicts a refusal (dealloc_mismatch)
-    # or a failed launch (alloc_leak, as a B200 reports it).
-    assert by_verdict["timed out (by design)"] == {"mbarrier/try_wait.incomplete", "tmem/dealloc_mismatch",
-                                                    "tmem/alloc_leak"}
+    # No prediction (try_wait.incomplete; the undersized expect_tx, which a B200 waits out in
+    # some runs and not in others; the three elect.sync launches whose branch order no rule
+    # fixes), or the simulator predicts a refusal (dealloc_mismatch), a failed launch
+    # (alloc_leak, as a B200 reports it) or a kernel that ends (dealloc_repeated, the same).
+    assert by_verdict["timed out (by design)"] == {
+        "mbarrier/try_wait.incomplete", "mbarrier/expect_tx_small.wait", "tmem/dealloc_mismatch", "tmem/alloc_leak",
+        "tmem/dealloc_repeated", "e2e/elect.other_branch", "e2e/elect.other_callers", "e2e/elect.other_sites"}
     assert verdicts["mbarrier/try_wait.incomplete"][1] == "no prediction"
     assert verdicts["tmem/dealloc_mismatch"][1].startswith("simulator: tcgen05.dealloc of 32 columns")
     finish = by_verdict["TIMED OUT, predicted to finish"]
     assert finish == {f"cluster/pair_mma.m{m}_issuer{i}" for m in (256, 128) for i in (0, 1)} | {
-        "tmem/dealloc_repeated", "cluster/clc_failed_response.again",
-        "cluster/clc_failed_response.again_grid", "mbarrier/expect_tx_small.wait"}
-    assert len(finish) == 8 and len(hang) == 13 and code == 1
+        "cluster/clc_failed_response.again", "cluster/clc_failed_response.again_grid"}
+    assert len(finish) == 6 and len(hang) == 16 and code == 1
     details = printed[printed.index("\nDetails\n"):]
     for name in finish:
         assert f"\n{name}: " in details and "the simulator predicts that it finishes" in details
@@ -567,12 +570,14 @@ def test_a_failed_kernel_without_a_prediction_is_not_plain_informational(tmp_pat
 
 
 def test_a_failed_kernel_that_the_simulator_runs_is_a_difference(tmp_path, monkeypatch, capsys):
-    # A repeated dealloc: the simulator ignores it and goes on, and a B200 ended the kernel.
-    text = "script: release the same allocation twice\nKERNEL FAILED: release the same allocation twice\n"
+    # Two warps that release the same allocation with nothing between them: the simulator
+    # reports it and goes on, as a B200 does. Had the GPU ended the kernel (as it does when the
+    # second release comes after the first, which the simulator ends too):
+    what = "two warps release the same allocation once each"
+    text = f"script: {what}\nKERNEL FAILED: {what}\n"
     code, verdicts, printed = compared(tmp_path, monkeypatch, capsys, {
-        "tmem/dealloc_repeated": ("exit 3", text, failed("release the same allocation twice",
-                                                         "cudaErrorLaunchFailure", "at synchronize"))})
-    assert verdicts["tmem/dealloc_repeated"] == (
+        "tmem/dealloc_who.two_warps": ("exit 3", text, failed(what, "cudaErrorLaunchFailure", "at synchronize"))})
+    assert verdicts["tmem/dealloc_who.two_warps"] == (
         "kernel failed (by design)", "GPU: cudaErrorLaunchFailure at synchronize; the simulator's kernel returns")
     assert code == 0 and "the GPU reported a failed kernel; outputs differ" in printed
 

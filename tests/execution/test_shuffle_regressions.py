@@ -76,28 +76,9 @@ def test_shuffle_does_not_treat_predicated_off_members_as_exited(sim):
         ret;
     """)
     stats = sim.launch(mod, "k", grid=1, block=32)
-    # The mask names lanes 16 to 31, which do not execute the shuffle and are not gone: they
-    # are waited for, as on a GPU (validation/ampere/sync_other_3080ti.txt). Here they return,
-    # so the shuffle then runs among the lanes that are left and there is nothing to report.
-    # (Before that was measured the simulator did not wait, and reported the mask.)
-    assert not stats.findings
-
-
-def test_shuffle_whose_mask_names_a_lane_that_waits_elsewhere_is_refused(sim):
-    """The predicated-off lanes go on to a shuffle of their own that names the first group:
-    each group waits for the other at another instruction."""
-    import pytest
-    import warplens
-    mod = kernel("""
-        .reg .b32 %lane, %value; .reg .pred %p;
-        mov.u32 %lane, %laneid;
-        setp.lt.u32 %p, %lane, 16;
-        @%p shfl.sync.idx.b32 %value, %lane, 0, 31, -1;
-        @!%p shfl.sync.idx.b32 %value, %lane, 0, 31, -1;
-        ret;
-    """)
-    with pytest.raises(warplens.UnsupportedError, match="names a lane that is on another path"):
-        sim.launch(mod, "k", grid=1, block=32)
+    (finding,) = stats.findings
+    assert finding.kind == "shfl-membermask-mismatch"
+    assert finding.lanes == list(range(16))
 
 
 def test_shuffle_source_that_exited_is_still_undefined(sim):

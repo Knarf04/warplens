@@ -29,8 +29,12 @@ file's.
   identical, and the whole programs were bit-identical. Two assumptions were
   answered and taken into the simulator: a tensor copy needs a shared address
   aligned to 128 bytes, and an undersized `expect_tx` completes its phase
-  early only at a multiple of 32 bytes, in some runs and not in others. Those
-  two changes have not been run on hardware again.
+  early only at a multiple of 32 bytes, in some runs and not in others.
+- A third time on 2026-11-26, for the questions that were open
+  ([docs/b200-rental-3.md](docs/b200-rental-3.md); about 40 minutes more of
+  the reserve). The alignment was a prediction and held; the answers are
+  listed below under "Closed by the third rental". What that run changed in
+  the simulator reproduces what it recorded.
 - The timing model's shipped configs hold the values assumed before that
   run, and v1 ships them: a fit of the run is recorded and can be chosen,
   and is not the default (decided below).
@@ -90,17 +94,23 @@ Decided by the owner on 2026-11-25:
 
 Open and recorded, not blocking:
 
-- What separates the repeated `tcgen05.dealloc` that a B200 ended a kernel
-  for from the ones in the book's kernels, which ran (TM-11).
 - NUM-05: ptxas 13.3 and 13.5 have no UE4M3 conversion, so that format has
   nothing on a GPU to be compared with.
-- `elect.sync` does not wait in the simulator for lanes its mask names that
-  are elsewhere; what a GPU does then was not measured. `vote.sync`,
-  `shfl.sync` and `bar.warp.sync` were, on the RTX 3080 Ti, and wait
-  (`validation/README.md`).
-- The launch-error recordings of the RTX 3080 Ti are at Ampere's own limits
-  and were not rerun verbatim on the B200; RT-04 and RT-12 cover them.
-- `kind::i8` arithmetic and half-precision subnormals in an MMA.
+- One `vote.sync.ballot` on a B200 did not wait for lanes of its mask that
+  were on another branch, while `vote.sync.all/any/uni` wait on both GPUs
+  that were asked; the simulator makes every `vote.sync` wait
+  ([docs/b200-rental-3.md](docs/b200-rental-3.md)).
+- The launch-error recordings of the RTX 3080 Ti were made with the runtime
+  of CUDA 12.4. The same program on the B200, with the runtime of CUDA 13,
+  gave two other codes, which the shim now returns; whether the release or
+  the GPU makes the difference was not separated.
+
+Closed by the third rental (2026-11-26,
+[docs/b200-rental-3.md](docs/b200-rental-3.md)): what separates the repeated
+`tcgen05.dealloc` that ends a kernel from the one that runs (order);
+`elect.sync` and `shfl.sync` do not wait for lanes that are elsewhere and
+`bar.warp.sync` does; half-precision subnormals in an MMA; the launch errors
+at a B200's limits. The first rental's self-test failures were all read.
 
 ## After v1
 
@@ -108,7 +118,8 @@ Open and recorded, not blocking:
   engines, multimem / NVLS.
 - Structured sparsity, block-scaled formats (MXFP8/FP4, NVFP4) and the
   `tcgen05.cp` scale-factor paths; MMA kinds other than `f16` and `tf32`;
-  operand A from tensor memory.
+  operand A from tensor memory. `kind::i8` among them: its arithmetic was
+  never compared with a GPU, and the simulator refuses the kind.
 - A non-zero descriptor base offset, and `mbarrier.try_wait` returning false
   (a non-blocking fallback). The B200 recordings both waited for exist now
   (`validation/blackwell/measured/b200/mma/base_offset.field.*.txt`,

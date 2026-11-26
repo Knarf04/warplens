@@ -1,0 +1,3 @@
+script: one warp relinquishes the permit, then releases the same allocation twice
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice
+info: error cudaErrorLaunchFailure

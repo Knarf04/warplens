@@ -1,0 +1,20 @@
+# elect.sync, the same experiment in four source layouts (variant 0 is the one in which the electing half runs first):
+variant 0 low 0 mask ffff0000: leader 16 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+variant 0 low 0 mask ffffffff: leader 16 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+variant 0 low 1 mask 0000ffff: leader 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+variant 0 low 1 mask ffffffff: leader 0 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+variant 1 low 0 mask ffff0000: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 1 low 0 mask ffffffff: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 1 low 1 mask 0000ffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 1 low 1 mask ffffffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 2 low 0 mask ffff0000: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 2 low 0 mask ffffffff: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 2 low 1 mask 0000ffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 2 low 1 mask ffffffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 3 low 0 mask ffff0000: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 3 low 0 mask ffffffff: leader 16 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 3 low 1 mask 0000ffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+variant 3 low 1 mask ffffffff: leader 0 before 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 after 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+# nvcc 13.5.37, machine code, variant 0:
+variant 0 low 0 mask ffff0000: leader 16 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 
+variant 0 low 0 mask ffffffff: leader 16 before 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 after 0 0 0 0 0 0 0 0 0 0 0 0 

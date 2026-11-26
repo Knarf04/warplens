@@ -121,11 +121,14 @@ def _mbarrier() -> list[Probe]:
               "the byte count is signed: complete_tx before expect_tx completes once balanced", risk="fault"),
         Probe("mbarrier/over_arrival", "mbarrier/script", ("over",), ("MB-04",),
               "arrivals beyond the pending count end the kernel", risk="fault"),
-        Probe("mbarrier/expect_tx_small", "mbarrier/expect_tx", (), ("MB-05", "MB-06", "MB-07", "MB-08"),
-              "undersized, oversized and missing expect_tx against real TMA loads, with bounded polls"),
+        Probe("mbarrier/expect_tx_small", "mbarrier/expect_tx", (), ("MB-06", "MB-07", "MB-08"),
+              "exact, oversized and missing expect_tx against real TMA loads, with bounded polls"),
+        Probe("mbarrier/expect_tx_small.too_small", "mbarrier/expect_tx", ("too-small",), ("MB-05",),
+              "an undersized expect_tx with one load completes the phase part of the way through it in some "
+              "runs and not in others (measured; no single output to predict)", predict="none"),
         Probe("mbarrier/expect_tx_small.wait", "mbarrier/expect_tx", ("wait-small",), ("MB-05", "MB-11"),
-              "an undersized expect_tx with one load completes part of the way through it: the usual wait "
-              "loop returns", risk="hang", timeout=30),
+              "the same with the usual wait loop, which returns in some runs and hangs in others (measured; "
+              "no single output to predict)", risk="hang", predict="none", timeout=30),
         Probe("mbarrier/expect_tx_small.pieces", "mbarrier/expect_tx", ("pieces",), ("MB-05",),
               "a load reports its bytes in pieces that vary from run to run: an undersized expect_tx completes "
               "the phase only at a multiple of 32 bytes, and there in some runs and not in others (measured; "
@@ -174,6 +177,18 @@ def _tmem() -> list[Probe]:
         Probe("tmem/dealloc_repeated", "tmem/alloc", ("dealloc-twice",), ("TM-11",),
               "a second dealloc of the same columns is ignored (a B200 ended this kernel, and ran the book's, which "
               "repeat it from other warps: open)", risk="hang", timeout=30),
+        Probe("tmem/dealloc_who.two_warps", "tmem/dealloc_who", ("two-warps",), ("TM-11",),
+              "two warps release the same allocation once each: the second release is ignored and reported",
+              risk="fault", timeout=30),
+        Probe("tmem/dealloc_who.two_warps_order", "tmem/dealloc_who", ("two-warps-order",), ("TM-11",),
+              "the same with a barrier between the two releases", risk="fault", timeout=30),
+        Probe("tmem/dealloc_who.relinquish_two", "tmem/dealloc_who", ("relinquish-two",), ("TM-11",),
+              "two warps each relinquish the permit and then release the same allocation, as the book's kernels "
+              "do: runs to the end", risk="fault", timeout=30),
+        Probe("tmem/dealloc_who.relinquish_once", "tmem/dealloc_who", ("relinquish-once",), ("TM-11",),
+              "one warp relinquishes the permit and then releases the same allocation twice", risk="fault", timeout=30),
+        Probe("tmem/dealloc_who.once", "tmem/dealloc_who", ("once",), ("TM-11",),
+              "one warp of two releases the allocation once", timeout=30),
         Probe("tmem/dealloc_mismatch", "tmem/alloc", ("dealloc-wrong-size",), ("TM-12",),
               "a dealloc with another size than the allocation's is refused", risk="hang", timeout=30),
         Probe("tmem/alloc_leak", "tmem/alloc", ("leak",), (),
@@ -191,6 +206,9 @@ def _mma() -> list[Probe]:
         Probe("mma/accumulation_order", "mma/accumulation_order", (), ("MMA-04", "MMA-05"),
               "none exactly: the simulator sums in float32 in NumPy's order; hardware may differ in the last bits",
               compare="ulp"),
+        Probe("mma/subnormals", "mma/subnormals", (), ("MMA-04",),
+              "half-precision subnormal operands are multiplied like any other number, and lined up and cut in "
+              "a sum like any other term", compare="ulp"),
         Probe("mma/negate", "mma/negate", (), ("MMA-07", "MMA-05"),
               "each negate bit flips the product's sign, both leave it; a second MMA accumulates"),
         Probe("mma/tf32_low_bits", "mma/tf32_low_bits", (), ("MMA-08",),
@@ -352,6 +370,19 @@ def _device() -> list[Probe]:
         Probe("e2e/elect.partial", "e2e/elect", ("partial",), ("RT-05",),
               "the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected",
               risk="fault"),
+        Probe("e2e/elect.other_branch", "e2e/elect", ("other-branch",), ("RT-05",),
+              "elect.sync does not wait for lanes of its mask that are on another branch: the flags read 0 "
+              "before and after it on a B200. No prediction: which of two branches runs first is not a rule, and "
+              "the simulator runs the other one first", risk="hang", predict="none", timeout=30),
+        Probe("e2e/elect.other_callers", "e2e/elect", ("other-callers",), ("RT-05",),
+              "the control: with a mask that names only its callers elect.sync has nothing to wait for",
+              risk="hang", predict="none", timeout=30),
+        Probe("e2e/elect.other_sites", "e2e/elect", ("other-sites",), ("RT-05",),
+              "two groups at two call sites of elect.sync, each naming the other in its mask: on a B200 one "
+              "lane is elected for both, which is the compiler's layout (no prediction)", risk="hang",
+              predict="none", timeout=30),
+        Probe("e2e/launch_errors", "e2e/launch_errors", (), ("RT-04", "RT-12"),
+              "the code of every launch and attribute request the runtime refuses, at this device's own limits"),
     ] + [
         Probe(f"e2e/ampere_replay.{case}", "e2e/ampere_replay", (case,), ids,
               f"as on an RTX 3080 Ti (validation/ampere/{golden}): {what}")

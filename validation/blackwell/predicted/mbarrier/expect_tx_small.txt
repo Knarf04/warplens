@@ -4,13 +4,6 @@ script: exact: expect_tx 256, one load
      1  load 256 bytes                                -                    -
      2  poll parity              0                    1                    0
   load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
-script: too small: expect_tx 128, one load; then expect_tx for the other 128
-  step  operation                    test_wait(parity 0)  test_wait(parity 1)
-     0  arrive.expect_tx       128                    0                    1
-     1  load 256 bytes                                -                    -
-     2  poll parity              0                    1                    0
-     3  expect_tx              128                    1                    0
-  load 0: first word 10000000, last word 1000003f (expected 10000000, 1000003f)
 script: too large: expect_tx 512, one load; then a second load
   step  operation                    test_wait(parity 0)  test_wait(parity 1)
      0  arrive.expect_tx       512                    0                    1

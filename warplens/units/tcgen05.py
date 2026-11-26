@@ -149,6 +149,7 @@ class Tmem:
         self.allocated = np.zeros(COLUMNS, dtype=np.bool_)
         self.allocations: dict[int, tuple[int, object]] = {}  # first column -> (columns, alloc instr)
         self.freed: set[tuple[int, int]] = set()  # (first column, columns) released and not reallocated
+        self.freed_at: dict[tuple[int, int], tuple[int, int]] = {}  # core.clocks stamp of each such release
         self.alloc_permit = True
         self.last_alloc_size = COLUMNS
         self.increased = False  # the last alloc() asked for more columns than the one before it
@@ -658,17 +659,32 @@ def _tcgen05(w, ins, mask):
         tmem = _tmem(cta)
         start = int(addresses[0])
         if start not in tmem.allocations and (start, ncols) in tmem.freed:
-            # Kernels that run on hardware do this: every warpgroup's first warp releases the
-            # one allocation (hgemm_v7 to v9 of the book "Modern GPU Programming for MLSys").
-            # What the hardware does with the repeat is not known; here it does nothing.
+            # Measured on a B200 (validation/blackwell/measured/b200/tmem/dealloc_who.*.txt): a
+            # second release that comes after the first ends the kernel, whether the same warp
+            # releases twice in a row or another warp does after a barrier, with or without
+            # relinquish_alloc_permit before it. Two warps that release with nothing between
+            # them to order one after the other both run to the end. Kernels that run on
+            # hardware do the second: every warpgroup's first warp releases the one allocation
+            # after the last barrier (hgemm_v7 to v9 of the book "Modern GPU Programming for
+            # MLSys"). The simulator runs warps one after another, so what tells the two apart
+            # here is whether the first release is ordered before this one (core.clocks).
+            stamp = tmem.freed_at.get((start, ncols))
+            if stamp is not None and cta.clocks.ordered(stamp, w.sync_id):
+                raise ExecutionError(
+                    f"tcgen05.dealloc of {ncols} columns at column {start}, which an earlier "
+                    "tcgen05.dealloc that this one comes after has already released: a GPU ends "
+                    "the kernel here with cudaErrorLaunchFailure (tmem-dealloc-repeated)")
             cta.findings.add("tmem-dealloc-repeated", f"tensor memory at column {start} ({ncols} "
-                             "columns) was already released by an earlier tcgen05.dealloc; this "
-                             "one is ignored", w, ins, np.flatnonzero(mask))
+                             "columns) was already released by a tcgen05.dealloc of another warp "
+                             "that nothing orders before this one; this one is ignored. A B200 "
+                             "runs such a kernel, and ends one in which the second release comes "
+                             "after the first", w, ins, np.flatnonzero(mask))
             return
         if start in tmem.allocations and tmem.allocations[start][0] == ncols:
             _check_tmem_overwrite(w, ins, tmem.pending[:, start:start + ncols],
                                   np.flatnonzero(mask), dealloc=True)
         tmem.dealloc(start, ncols)
+        tmem.freed_at[(start, ncols)] = cta.clocks.stamp(w.sync_id)
         cta._wake("tensor-memory allocation")
     elif kind == "mma":
         for l in np.flatnonzero(mask):

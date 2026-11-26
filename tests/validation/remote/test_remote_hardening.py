@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.support.remote import (REMOTE, REPO, archive_of, bash, checkout, clean, fake_book, fake_tool, git,
+from tests.support.remote import (REMOTE, REPO, archive_of, bash, checkout, clean, fake_book, fake_tool, git, inherited,
                                   machine, manifest_of, members, read_pins, ready_suites, rental,
                                   setups_record, stand_in_cutlass, suite)
 
@@ -57,7 +57,7 @@ def test_ctrl_c_under_tee_still_writes_the_archive(checkout, tmp_path):
           "echo never\n")
     suite(root, "blackwell_timing", "echo built\n", f'touch "{tmp_path}/timing-ran"\n')
     read_end, write_end = os.pipe()
-    run = subprocess.Popen(["bash", str(root / "env/remote/run.sh"), *args], env={**os.environ, **env},
+    run = subprocess.Popen(["bash", str(root / "env/remote/run.sh"), *args], env={**inherited(), **env},
                            stdout=write_end, stderr=write_end, process_group=0)
     tee = subprocess.Popen(["tee", str(tmp_path / "run.log")], stdin=read_end, stdout=subprocess.DEVNULL,
                            process_group=run.pid)
@@ -123,7 +123,7 @@ def test_an_interrupt_stops_what_the_stage_started_before_packing(checkout, tmp_
     inner = tmp_path / "inner-pid"
     suite(root, "blackwell", INNER_TIMEOUT.format(inner=inner, started=tmp_path / "started"), "echo never\n")
     suite(root, "blackwell_timing", "echo built\n", "echo ran\n")
-    process = subprocess.Popen(["bash", str(root / "env/remote/run.sh"), *args], env={**os.environ, **env},
+    process = subprocess.Popen(["bash", str(root / "env/remote/run.sh"), *args], env={**inherited(), **env},
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     wait_for(inner)
     wait_for(tmp_path / "started")

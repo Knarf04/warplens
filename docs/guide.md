@@ -917,7 +917,7 @@ Every kind, by area:
 | `barrier-in-divergent-code` | an aligned CTA barrier has a divergent guard predicate, or a cluster barrier has partial warp participation |
 | `shfl-inactive-source` | a shuffle read a lane that was not executing it or was outside the member mask |
 | `shfl-membermask-mismatch` | a caller is absent from its own mask, or a named member is not executing with the same mask |
-| `warp-sync-membermask-mismatch` | the same, for `bar.warp.sync` (`__syncwarp()`): lanes on separate divergent paths do not wait for each other |
+| `warp-sync-membermask-mismatch` | the same, for `bar.warp.sync` (`__syncwarp()`). (For both, a member that is elsewhere is waited for, as for `vote.sync` below) |
 | `vote-membermask-mismatch` | a `vote.sync` caller is absent from its own mask, or a member executes it with another mask. (A member that is elsewhere is waited for; if it cannot arrive, the launch is refused) |
 | **mbarrier** | |
 | `mbarrier-tx-mismatch` | completion bytes not balanced by `expect_tx` when the kernel returned or deadlocked |

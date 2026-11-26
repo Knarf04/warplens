@@ -1223,5 +1223,7 @@ Did not, and what to do the next time:
   13.5. It is built as machine code since (`docs/b200-rental-2.md`).
 - The self-test under a fallback toolkit: 20 failed, 4 errors. Those read
   are the compiler's (the two E8M0 predictions, `.version 9.5` fixtures that
-  ptxas 13.3 refuses, timing instruction counts) or tests that assume no
-  `ncu` is installed. `--skip selftest` loses nothing a measurement needs.
+  ptxas 13.3 refuses, timing instruction counts) or tests that took the
+  `NCU_BIN` that `run.sh` exports for their own (they no longer inherit it;
+  `docs/b200-rental-1.md` has all 24). `--skip selftest` loses nothing a
+  measurement needs.

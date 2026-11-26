@@ -172,8 +172,26 @@ So on this GPU `vote.sync` really waits: a mask may name lanes that returned or 
 existed, and must not name a lane that will not come. `tests/validation/golden_replay/test_hardware_golden.py::test_vote_masks_a_gpu_does_not_answer_are_refused_or_reported`
 holds the simulator to the third column. None of these launches is rerun on the B200.
 
-`shfl.sync`, `bar.warp.sync` and `elect.sync` have the same kind of mask and were not
-measured in this way; the simulator does not make them wait.
+## `shfl.sync` and `bar.warp.sync` and lanes that are elsewhere
+
+`validation/ampere/run_sync_other.sh > sync_other_3080ti.txt` runs the 16 launches of
+`sync_other_probe.cu`, one process each under a timeout: one warp in which some lanes
+return, take a branch without the instruction, or execute it at a call site of their own.
+All 16 return, and 25 runs gave the same 16 lines.
+
+| Launch | RTX 3080 Ti | warplens |
+| --- | --- | --- |
+| Lanes 0 to 15 (or lane 0) take a branch without the instruction and set a flag there; the others call `__syncwarp` with the mask `0xffffffff` and then read the flag | the flag is set (16 of 16 lanes; the one lane whose partner was on the branch): the barrier went on only after the named lanes had finished their branch | the same since this was measured; before, the barrier did not wait and the flag read 0 |
+| The same with the mask naming only the callers | the flag is not set: nothing waited | the same |
+| The same with `__shfl_xor_sync(mask, value, 16)` | 0 from a lane that is on the branch or has returned, whatever its register held; the value from a lane that is at the instruction, also when the mask leaves that lane out | the same, with `shfl-inactive-source` and, for a mask that does not match, `shfl-membermask-mismatch` |
+| Two groups at two call sites, each naming the other in its mask | returns: the shuffles exchange values across the groups, and the barrier sees the other group's flag. In the machine code both call sites call one routine (`WARPSYNC mask`, then `SHFL`), so the groups wait at the same machine instruction. This is the compiler's layout, as with the ballots above | refuses the launch, as for `vote.sync` |
+| Two groups at two call sites of `__syncwarp`, each with its own lanes as the mask | the flag of the other group is not set | set: nothing orders the two branches, and the simulator runs the other one first. Not a rule either way |
+
+So `shfl.sync` and `bar.warp.sync` wait as `vote.sync` does: for every lane of the mask
+that has not returned, until it arrives or returns.
+`tests/validation/golden_replay/test_hardware_golden.py::test_shfl_and_warp_barrier_wait_for_the_lanes_their_masks_name_as_on_a_gpu`
+holds the simulator to this. `elect.sync` has the same kind of mask, needs Hopper or newer,
+and was not measured in this way on the B200; the simulator does not make it wait.
 
 ## Running the bank-counter comparison
 

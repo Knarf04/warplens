@@ -94,11 +94,10 @@ Open and recorded, not blocking:
   for from the ones in the book's kernels, which ran (TM-11).
 - NUM-05: ptxas 13.3 and 13.5 have no UE4M3 conversion, so that format has
   nothing on a GPU to be compared with.
-- The self-test on the rented machine under the fallback toolkit: 20 failed,
-  4 errors, of which not all were read.
-- `shfl.sync`, `bar.warp.sync` and `elect.sync` do not wait in the simulator
-  for lanes their masks name that are elsewhere; what a GPU does then was not
-  measured (`vote.sync` was, and waits).
+- `elect.sync` does not wait in the simulator for lanes its mask names that
+  are elsewhere; what a GPU does then was not measured. `vote.sync`,
+  `shfl.sync` and `bar.warp.sync` were, on the RTX 3080 Ti, and wait
+  (`validation/README.md`).
 - The launch-error recordings of the RTX 3080 Ti are at Ampere's own limits
   and were not rerun verbatim on the B200; RT-04 and RT-12 cover them.
 - `kind::i8` arithmetic and half-precision subnormals in an MMA.

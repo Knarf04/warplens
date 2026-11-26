@@ -60,4 +60,7 @@ $PTX_NVCC -arch=sm_100a -ptx vote_probe.cu -o vote_probe.ptx
 "$HW_NVCC" -arch="$HW_ARCH" -ptx vote_probe.cu -o vote_probe_cuda12.ptx
 "$HW_NVCC" -arch=sm_60 -Wno-deprecated-gpu-targets -DVOTE_LEGACY -ptx vote_probe.cu -o vote_legacy_probe.ptx
 $PTX_NVCC -arch=sm_100a -ptx mbarrier_token_probe.cu -o mbarrier_token_probe.ptx
+# shfl.sync and bar.warp.sync with masks that name lanes elsewhere (run_sync_other.sh)
+"$HW_NVCC" -arch="$HW_ARCH" -o bin/sync_other sync_other_probe.cu
+$PTX_NVCC -arch=sm_100a -ptx sync_other_probe.cu -o sync_other_probe.ptx
 echo "built bin/{shfl_golden,transpose_hw,barrier_exit_hw}, shfl_probe.ptx, barrier_exit.ptx"

@@ -91,16 +91,18 @@ def test_warp_sync_of_a_subset_that_all_arrives_is_quiet(sim):
     """) == []
 
 
-def test_warp_sync_that_would_wait_for_another_path_is_reported(sim):
-    # Only the lower half executes it, but the mask names the whole warp, which is still running.
+def test_warp_sync_waits_for_the_lanes_of_its_mask_that_are_on_another_path(sim):
+    # Only the lower half executes it, but the mask names the whole warp, which is still
+    # running: the upper half runs first, to its end here, and nothing is left to report. An
+    # RTX 3080 Ti does the same (validation/ampere/sync_other_3080ti.txt); before that was
+    # measured the simulator did not wait and reported the mask.
     findings = warp_sync(sim, """
         setp.ge.u32 %p, %t, 16;
         @%p bra SKIP;
         bar.warp.sync -1;
       SKIP:
     """)
-    assert [f.kind for f in findings] == ["warp-sync-membermask-mismatch"]
-    assert findings[0].lanes == list(range(16))
+    assert findings == []
 
 
 def test_warp_sync_caller_outside_its_mask_is_reported(sim):

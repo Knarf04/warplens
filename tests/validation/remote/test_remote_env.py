@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 
 from tests.support import REPO
-from tests.support.remote import REMOTE, archive_of, bash, checkout, fake_smi, members, read_pins, suite
+from tests.support.remote import REMOTE, archive_of, bash, checkout, fake_smi, inherited, members, read_pins, suite
 SCRIPTS = ["lib.sh", "setup.sh", "preflight.sh", "run.sh", "predict_toolkit.sh"]
 
 # Recorded: the line of `nvidia-smi` that names the driver, and what ncu printed as a normal user.
@@ -595,7 +595,7 @@ def test_an_interrupted_run_stops_its_stage_and_still_packs(checkout, tmp_path):
     started = tmp_path / "started"
     suite(root, "blackwell", f'touch "{started}"\nsleep 300 & echo $! > "{tmp_path}/pid"\nwait\n', "echo never\n")
     suite(root, "blackwell_timing", "echo built\n", f'touch "{tmp_path}/timing-ran"\n')
-    process = subprocess.Popen(["bash", str(root / "env/remote/run.sh"), *args], env={**os.environ, **env},
+    process = subprocess.Popen(["bash", str(root / "env/remote/run.sh"), *args], env={**inherited(), **env},
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     for _ in range(200):
         if started.exists() and (tmp_path / "pid").exists():

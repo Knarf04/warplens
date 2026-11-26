@@ -16,9 +16,23 @@ from tests.support.paths import REPO
 REMOTE = REPO / "env" / "remote"
 
 
+# What env/remote/run.sh exports to its stages. The suite is one of them (`selftest`), so on a
+# rented machine these are in the environment the tests start with, and a script under test
+# would take the machine's own ncu, results directory or preflight verdicts for the test's.
+# The first B200 rental's self-test failed seven tests of the stand-in machine that way
+# (NCU_BIN named the env's real ncu). A test that wants one of them passes it in `env`.
+EXPORTED_BY_RUN = ("NCU_BIN", "WARPLENS_NCU", "WARPLENS_PTX_JIT", "WARPLENS_PREDICTIONS", "WARPLENS_TORCH_PYTHON",
+                   "WARPLENS_GDB", "WARPLENS_RESULTS_DIR")
+
+
+def inherited(*also_without: str) -> dict:
+    """The environment of the tests without what a run.sh above them exported."""
+    return {k: v for k, v in os.environ.items() if k not in EXPORTED_BY_RUN and k not in also_without}
+
+
 def bash(script: str, *args: str, env: dict | None = None, cwd: Path | None = None):
     """Run one of the scripts; returns the completed process with text output."""
-    full_env = {**os.environ, "PREFLIGHT_OFFLINE": "1", **(env or {})}
+    full_env = {**inherited(), "PREFLIGHT_OFFLINE": "1", **(env or {})}
     return subprocess.run(["bash", str(script), *args], capture_output=True, text=True,
                           env=full_env, cwd=cwd, timeout=120)
 
@@ -137,7 +151,7 @@ BOOK_VARIABLES = ("WARPLENS_BOOK", "WARPLENS_BOOK_URL", "WARPLENS_BLACKWELL_RUN_
 def clean(script, *args, env=None, cwd=None):
     """bash(), but without the book the machine running the tests may have exported (CI does)
     and without the ncu it may have installed outside PATH."""
-    full = {k: v for k, v in os.environ.items() if k not in BOOK_VARIABLES}
+    full = inherited(*BOOK_VARIABLES)
     full.update({"PREFLIGHT_OFFLINE": "1", "PREFLIGHT_NCU_CANDIDATES": "/no/such/ncu", **(env or {})})
     return subprocess.run(["bash", str(script), *args], capture_output=True, text=True, env=full, cwd=cwd,
                           timeout=120)

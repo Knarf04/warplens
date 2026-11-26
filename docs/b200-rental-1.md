@@ -65,7 +65,14 @@ Not in the repository: the 17 end-to-end captures (37 MB) and the RT-11 capture
 - **The self-test** (`selftest`, fallback toolkit): 20 failed, 4 errors, 3083
   passed. Those read are the fallback compiler (the two E8M0 predictions, PTX
   `.version 9.5` fixtures refused by ptxas 13.3, timing instruction counts) or
-  tests that assume no real `ncu` is installed. Not all 24 were read.
+  tests that assume no real `ncu` is installed. All 24 have been read since:
+  16 are the compiler's (4 `atomicAdd` fixtures that expect the PTX spelling
+  of nvcc 13.5, 6 on the two E8M0 probes, 4 CLC kernels that ptxas 13.3 will
+  not assemble, the guide block that prints a CUB kernel's versioned name, the
+  timing instruction counts, and the test that names the compiler); 7 took
+  `NCU_BIN`, which `run.sh` exports to its stages, for their own stand-in, and
+  no longer inherit it; 1 is a test of stopping the runner that depends on
+  timing and also fails on a loaded development machine.
 - **The pinned run's `ncu`** profiled 10 of 11 benchmarks; `transpose` failed
   (`ncu` exit 1). The main run has all 11.
 - **The VM was stopped from outside at least three times** (a power-button

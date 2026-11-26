@@ -232,15 +232,31 @@ class Warp:
                 m in ins.mods for m in ("sync", "arrive"))
         return ins.opcode == "tcgen05" and "sync" in ins.mods and "aligned" in ins.mods
 
-    def _vote_waits(self, ins, active: np.ndarray) -> bool:
-        """Whether a `vote.sync` has to wait: a lane its member masks name has not returned
-        and is not executing it. The lanes of the mask vote together, so the others run
-        first, until they arrive or return (see `SimtStack.rendezvous_at`). A GPU does the
-        same: validation/ampere/vote_golden.txt has masks that name lanes which return, and
-        every such lane was gone from the vote."""
-        if ins.mods[:1] != ("sync",) or len(ins.operands) != 3:
+    @staticmethod
+    def _member_mask(ins):
+        """The member-mask operand of an instruction that waits for the lanes it names, or
+        None: `vote.sync`, `shfl.sync` and `bar.warp.sync`."""
+        if ins.opcode == "vote" and ins.mods[:1] == ("sync",) and len(ins.operands) == 3:
+            return ins.operands[2]
+        if ins.opcode == "shfl" and ins.mods[:1] == ("sync",) and len(ins.operands) == 5:
+            return ins.operands[4]
+        if ins.opcode == "bar" and ins.mods[:2] == ("warp", "sync") and len(ins.operands) == 1:
+            return ins.operands[0]
+        return None
+
+    def _mask_waits(self, ins, active: np.ndarray) -> bool:
+        """Whether an instruction with a member mask has to wait: a lane the masks name has
+        not returned and is not executing it. The lanes of the mask act together, so the
+        others run first, until they arrive or return (see `SimtStack.rendezvous_at`). A GPU
+        does the same, measured on an RTX 3080 Ti for all three: validation/ampere/
+        vote_golden.txt has masks that name lanes which return, and every such lane was gone
+        from the vote; in sync_other_3080ti.txt a `bar.warp.sync` whose mask names lanes on
+        another branch goes on only after they have finished it, and two groups at a
+        `shfl.sync` each exchange values across the groups."""
+        operand = self._member_mask(ins)
+        if operand is None:
             return False
-        named = np.bitwise_or.reduce(self.read(ins.operands[2], "u32")[active])
+        named = np.bitwise_or.reduce(self.read(operand, "u32")[active])
         waited = ((named >> np.arange(WARP_SIZE, dtype=np.uint32)) & 1).astype(bool)
         return bool((waited & self.live_lanes() & ~active).any())
 
@@ -279,14 +295,17 @@ class Warp:
                 except UnsupportedError as error:
                     raise UnsupportedError(f"{ins.name}: {error}") from None
                 continue
-            if ins.opcode == "vote" and active.any() and self._vote_waits(ins, active):
+            if ins.opcode in ("vote", "shfl", "bar") and active.any() and self._mask_waits(ins, active):
                 try:
                     stack.rendezvous_at(pc, active)
                 except UnsupportedError as error:
+                    seen = ("such a kernel did not return" if ins.opcode == "vote" else
+                            "such a kernel returned only where the compiler gave both groups one "
+                            "machine instruction to wait at")
                     raise UnsupportedError(
                         f"{ins.name}: {error}: the member mask names a lane that is on another "
                         "path and does not get here or return without waiting itself; on an RTX "
-                        "3080 Ti such a kernel did not return (validation/README.md)\n"
+                        f"3080 Ti {seen} (validation/README.md)\n"
                         f"  line {ins.line}: {ins.text}") from None
                 continue
             # Once every remaining lane has arrived, ordinary divergence after

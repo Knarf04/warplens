@@ -47,9 +47,10 @@ def _warp_sync(w, ins, mask):
     wait for each other, which orders their memory accesses before and after it.
 
     The lanes of a warp that execute an instruction here execute it together, and everything
-    they did earlier has already happened, so there is nothing to wait for. What is not
-    modeled is a rendezvous between lanes on different divergent paths: those run one path
-    after the other, as for `shfl.sync`, and that case is reported."""
+    they did earlier has already happened. A lane of the mask that is on another path is
+    waited for before this runs: `Warp._mask_waits` lets the other paths run first, to this
+    instruction or to their end, as a GPU does (validation/ampere/sync_other_3080ti.txt). What
+    is left to report here is a mask that does not match the lanes that came."""
     if len(ins.operands) != 1:
         raise unsupported(ins, "expected `bar.warp.sync membermask`")
     if not mask.any():
@@ -59,8 +60,7 @@ def _warp_sync(w, ins, mask):
         w.cta.findings.add(
             "warp-sync-membermask-mismatch",
             "bar.warp.sync caller is absent from its member mask, or a non-exited member is "
-            "not executing it with the same member mask; lanes on separate divergent paths "
-            "do not wait for each other here", w, ins, np.flatnonzero(mismatch))
+            "not executing it with the same member mask", w, ins, np.flatnonzero(mismatch))
 
 
 @op("bar", "barrier")

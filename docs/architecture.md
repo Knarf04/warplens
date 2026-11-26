@@ -90,7 +90,12 @@ The stack also performs a rendezvous at named CTA barriers and `tcgen05`
 reaches the same instruction. This is necessary when the static
 post-dominator lies beyond the actual join, including joins inside cycles.
 Rendezvous at different instruction addresses or across divergent recursive
-activations is not supported.
+activations is not supported. `vote.sync`, `shfl.sync` and `bar.warp.sync`
+use the same mechanism for the lanes their member masks name: a lane of the
+mask that is on another path runs first, until it arrives or returns. That is
+what an RTX 3080 Ti does for all three (`validation/README.md`); where two
+groups would wait for each other at two different instructions, the launch
+is refused.
 
 Four other cases needed care:
 
@@ -240,9 +245,9 @@ Limits of the check:
 - An access from another CTA of the cluster is recorded, and a local access
   that races with it is reported, but no finding is raised at the remote
   access itself, and races between CTAs are not reported.
-- Shuffles do not rendezvous lanes executing separate divergent paths. Such
-  rendezvous is legal on `sm_70+`; the executor reports participation and
-  source findings and does not guarantee those results. Exited or unlaunched
+- A shuffle waits for the lanes of its member mask that are elsewhere (above).
+  A source lane that has returned, or was not at the shuffle, gives 0, and the
+  executor reports participation and source findings. Exited or unlaunched
   lanes may remain in a shuffle's member mask, and disjoint groups with
   different member masks may execute the same instruction together.
 

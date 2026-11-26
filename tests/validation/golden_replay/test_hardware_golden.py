@@ -122,6 +122,62 @@ def test_vote_masks_a_gpu_does_not_answer_are_refused_or_reported(sim):
     assert text.count("no result after") == 24 and text.count("cudaErrorIllegalInstruction") == 30
 
 
+SYNC_OTHER_CASES = [  # sync_other_probe.cu, cases(): role of lanes [from, to), mask of role 0, mask of the others
+    (0, 0, 0, 0xffffffff, 0), (1, 0, 16, 0xffffffff, 0), (2, 0, 16, 0xffffffff, 0), (2, 0, 1, 0xffffffff, 0),
+    (3, 0, 16, 0xffffffff, 0xffffffff), (3, 0, 16, 0xffff0000, 0x0000ffff), (2, 0, 16, 0xffff0000, 0),
+    (0, 0, 0, 0x0000ffff, 0)]
+
+
+def test_shfl_and_warp_barrier_wait_for_the_lanes_their_masks_name_as_on_a_gpu(sim):
+    """sync_other_3080ti.txt is validation/ampere/run_sync_other.sh on an RTX 3080 Ti (the same
+    16 lines in each of 25 runs): `shfl.sync` and `bar.warp.sync` with a member mask that names
+    lanes which are elsewhere. Like `vote.sync`, they wait for those lanes to arrive or return:
+    a warp barrier goes on only after the lanes on the other branch have finished it, and a
+    shuffle then finds them gone and reads 0. Before this was measured the simulator did not
+    make them wait (the flags read 0 in the two launches marked below).
+
+    Where two groups wait for each other at two call sites, the GPU returned because the
+    compiler gave both one machine instruction (`WARPSYNC` then `SHFL` in a routine both call:
+    cuobjdump -sass); the simulator refuses those, as it does for `vote.sync`. One launch has
+    no rule to hold: two groups with disjoint masks and no instruction between them, where
+    which branch runs first decides what a flag reads."""
+    import warplens
+    recorded = (AMPERE / "sync_other_3080ti.txt").read_text().splitlines()
+    assert len(recorded) == 16 and not any("no result" in line or "cudaError" in line for line in recorded)
+    mod = warplens.parse_ptx((AMPERE / "sync_other_probe.ptx").read_text(), name="sync_other_probe.ptx")
+    outcomes = {"same": 0, "refused": 0, "order": 0}
+    for index, line in enumerate(recorded):
+        mode = index // 8
+        other, start, end, mask0, mask1 = SYNC_OTHER_CASES[index % 8]
+        assert line.startswith(f"mode {mode} ")
+        role = np.array([other if start <= t < end else 0 for t in range(32)], dtype=np.int32)
+        mask = np.array([mask1 if role[t] else mask0 for t in range(32)], dtype=np.uint32)
+        out = sim.from_numpy(np.full(64, 0xeeeeeeee, dtype=np.uint32))
+        both_wait = other == 3 and mask0 == mask1
+        try:
+            sim.launch(mod, "sync_other", grid=1, block=32,
+                       args=[out, sim.from_numpy(role), sim.from_numpy(mask), sim.from_numpy(np.zeros(32, dtype=np.int32)), mode])
+        except warplens.UnsupportedError as error:
+            assert both_wait and "names a lane that is on another path" in str(error), line
+            assert "one machine instruction" in str(error)
+            outcomes["refused"] += 1
+            continue
+        assert not both_wait, line
+        got = out.numpy()
+        text = (" role 0 got" + "".join(f" {t}:{got[2 * t]:x}" for t in range(32) if role[t] == 0)
+                + "; role 3 got" + "".join(f" {t}:{got[2 * t + 1]:x}" for t in range(32) if role[t] == 3))
+        if mode == 1 and other == 3:   # disjoint masks: nothing orders the two branches
+            assert line.endswith(text.replace(":1", ":0")), line
+            outcomes["order"] += 1
+            continue
+        assert line.endswith(text), (line, text)
+        outcomes["same"] += 1
+    assert outcomes == {"same": 13, "refused": 2, "order": 1}
+    # The two launches that say a warp barrier waits: lanes on a branch of their own set a flag
+    # there, and the lanes at the barrier read it as set.
+    assert recorded[10].count(":1") == 16 and recorded[11].count(":1") == 1 and " 16:1 " in recorded[11]
+
+
 def test_bank_conflict_counters_match_ncu(sim):
     """transpose_ncu_3080ti_grid64.csv is `ncu --csv` output for bin/transpose_hw 64."""
     import csv

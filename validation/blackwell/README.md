@@ -257,6 +257,10 @@ run is isolated for that reason.
 | `elect` | `elect` | RT-05 | elect.sync elects the lowest lane of the member mask; every executing lane gets its id | runs | - |
 | `elect.all` | `elect all` | RT-05 | a lane outside the member mask that executes elect.sync ends the kernel | **refuses**: elect.sync is executed by lane(s) 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 that its member mask 0xffff0000 d | fault |
 | `elect.partial` | `elect partial` | RT-05 | the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected | runs | fault |
+| `elect.other_branch` | `elect other-branch` | RT-05 | elect.sync does not wait for lanes of its mask that are on another branch (not measured; vote.sync, shfl.sync and bar.warp.sync wait on an RTX 3080 Ti) | runs | hang |
+| `elect.other_callers` | `elect other-callers` | RT-05 | with a mask that names only its callers elect.sync has nothing to wait for | runs | hang |
+| `elect.other_sites` | `elect other-sites` | RT-05 | two groups at two call sites of elect.sync, each naming the other in its mask | runs | hang |
+| `launch_errors` | `launch_errors` | RT-04, RT-12 | the code of every launch and attribute request the runtime refuses, at this device's own limits | runs | - |
 | `ampere_replay.shfl` | `ampere_replay shfl` | RT-01 | as on an RTX 3080 Ti (validation/ampere/shfl_golden.txt): shfl.sync in four modes over widths and distances | runs | - |
 | `ampere_replay.printf` | `ampere_replay printf` | RT-01 | as on an RTX 3080 Ti (validation/ampere/printf_golden.txt, lines in another order): device printf with a by-value struct and a local array | runs | - |
 | `ampere_replay.ldmatrix` | `ampere_replay ldmatrix` | RT-01 | as on an RTX 3080 Ti (validation/ampere/ldmatrix_golden.txt): ldmatrix in six variants, and bfe | runs | - |
@@ -340,6 +344,11 @@ run is isolated for that reason.
 | `alloc_after_relinquish` | `alloc after-relinquish` | TM-09 | no allocation after relinquish_alloc_permit | **refuses**: tcgen05.alloc after this CTA relinquished its allocation permit | fault |
 | `alloc_blocks` | `alloc exhaust` | TM-10 | an allocation that does not fit waits (here: forever) | **refuses**: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them | hang |
 | `dealloc_repeated` | `alloc dealloc-twice` | TM-11 | a second dealloc of the same columns is ignored (a B200 ended this kernel, and ran the book's, which repeat it from other warps: open) | runs (1 finding(s)) | hang |
+| `dealloc_who.two_warps` | `dealloc_who two-warps` | TM-11 | two warps release the same allocation once each: the second release is ignored and reported | runs (1 finding(s)) | fault |
+| `dealloc_who.two_warps_order` | `dealloc_who two-warps-order` | TM-11 | the same with a barrier between the two releases | runs (1 finding(s)) | fault |
+| `dealloc_who.relinquish_two` | `dealloc_who relinquish-two` | TM-11 | two warps each relinquish the permit and then release the same allocation, as the book's kernels do: runs to the end | runs (1 finding(s)) | fault |
+| `dealloc_who.relinquish_once` | `dealloc_who relinquish-once` | TM-11 | one warp relinquishes the permit and then releases the same allocation twice | runs (1 finding(s)) | fault |
+| `dealloc_who.once` | `dealloc_who once` | TM-11 | one warp of two releases the allocation once | runs | - |
 | `dealloc_mismatch` | `alloc dealloc-wrong-size` | TM-12 | a dealloc with another size than the allocation's is refused | **refuses**: tcgen05.dealloc of 32 columns at column 0 does not match an allocation | hang |
 | `alloc_leak` | `alloc leak` | - | columns never released fail the launch (cudaErrorTensorMemoryLeak) | **refuses**: kernel `tmem_alloc_script` returned with tensor memory still allocated: 256 tensor-memory columns allocated here were ne | hang |
 
@@ -350,6 +359,7 @@ run is isolated for that reason.
 | `operand_layouts` | `operand_layouts` | MMA-01, MMA-02, MMA-03 | K-major (f16, tf32) and MN-major (f16) operand addressing in all four swizzle modes; exact results | runs | - |
 | `operand_layouts.tf32_mn` | `operand_layouts tf32-mn` | MMA-03 | MN-major tf32 is refused (needs a 128B swizzle with 32-byte atomicity) | **refuses**: unsupported instruction `tcgen05.mma.cta_group::1.kind::tf32` (MN-major TF32 requires 128B swizzling with 32-byte atomic | fault |
 | `accumulation_order` | `accumulation_order` | MMA-04, MMA-05 | none exactly: the simulator sums in float32 in NumPy's order; hardware may differ in the last bits | runs | - |
+| `subnormals` | `subnormals` | MMA-04 | half-precision subnormal operands are multiplied like any other number, and lined up and cut in a sum like any other term | runs | - |
 | `negate` | `negate` | MMA-07, MMA-05 | each negate bit flips the product's sign, both leave it; a second MMA accumulates | runs | - |
 | `tf32_low_bits` | `tf32_low_bits` | MMA-08 | kind::tf32 multiplies the operands as stored float32 values; low bits take part | runs (1 finding(s)) | - |
 | `scale_input_d` | `scale_input_d` | MMA-06 | scale-input-d = s multiplies the old accumulator by 2^-s before the addition, for s = 0, 1, 7, 15 | runs | - |

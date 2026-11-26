@@ -1,0 +1,61 @@
+status: ok
+warplens: kernel `_Z6touch2jPj` was launched with 49168 bytes of dynamic shared memory, but without opt-in it may use 49152. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 49168), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 49168)
+warplens: kernel `_Z6touch2jPj` was launched with 232448 bytes of dynamic shared memory, but without opt-in it may use 49152. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 232448), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 232448)
+warplens: kernel `_Z5touchjPj` needs 232464 bytes of shared memory per CTA (0 static + 232464 dynamic); the limit is 232448
+warplens: kernel `_Z5touchjPj` needs 233472 bytes of shared memory per CTA (0 static + 233472 dynamic); the limit is 232448
+warplens: kernel `_Z11with_staticjPj`: a maximum of 232448 bytes of dynamic shared memory was refused: with its 1024 bytes of static shared memory the kernel may have 231424, as the device's limit is 232448
+warplens: kernel `_Z11with_staticjPj` needs 232464 bytes of shared memory per CTA (1024 static + 231440 dynamic); the limit is 232448
+warplens: block (1025, 1, 1) has 1025 threads; the limit is 1024
+warplens: block (33, 32, 1) has 1056 threads; the limit is 1024
+warplens: block z-dimension 65 exceeds the limit of 64
+warplens: block must be 1 to 3 positive integers, got (0, 1, 1)
+warplens: grid must be 1 to 3 positive integers, got (0, 1, 1)
+warplens: grid y-dimension 65536 exceeds the limit of 65535
+warplens: grid (3, 1, 1) is not a whole number of clusters of shape (2, 1, 1)
+warplens: kernel `_Z7fresh_ajPj` was launched with 49153 bytes of dynamic shared memory, but without opt-in it may use 49152. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 49153), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 49153)
+warplens: kernel `_Z7fresh_ajPj` was launched with 49168 bytes of dynamic shared memory, but without opt-in it may use 49152. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 49168), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 49168)
+warplens: kernel `_Z7fresh_ajPj` was launched with 60001 bytes of dynamic shared memory, but the program set its maximum to 60000. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 60001), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 60001)
+warplens: kernel `_Z7fresh_ajPj` was launched with 60016 bytes of dynamic shared memory, but the program set its maximum to 60000. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 60016), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 60016)
+warplens: kernel `_Z7fresh_bjPj` was launched with 49168 bytes of dynamic shared memory, but without opt-in it may use 49152. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 49168), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 49168)
+warplens: kernel `_Z7fresh_cjPj` was launched with 1040 bytes of dynamic shared memory, but the program set its maximum to 1024. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 1040), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 1040)
+warplens: kernel `_Z7fresh_cjPj` was launched with 49152 bytes of dynamic shared memory, but the program set its maximum to 1024. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 49152), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 49152)
+warplens: kernel `_Z7fresh_cjPj` was launched with 49168 bytes of dynamic shared memory, but the program set its maximum to 1024. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 49168), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 49168)
+warplens: kernel `_Z7fresh_cjPj` was launched with 49152 bytes of dynamic shared memory, but the program set its maximum to 0. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 49152), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 49152)
+warplens: kernel `_Z7fresh_cjPj` was launched with 49168 bytes of dynamic shared memory, but the program set its maximum to 0. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 49168), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 49168)
+warplens: kernel `_Z10static_40kjPj` was launched with 8208 bytes of dynamic shared memory, but without opt-in it may use 8192 (40960 bytes of static shared memory count against the default). A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 8208), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 8208)
+warplens: kernel `_Z10static_40kjPj` was launched with 8224 bytes of dynamic shared memory, but the program set its maximum to 8208. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 8224), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 8224)
+warplens: kernel `_Z12static_40k_bjPj` was launched with 8192 bytes of dynamic shared memory, but the program set its maximum to 1024. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 8192), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 8192)
+warplens: kernel `_Z12static_40k_bjPj` was launched with 8208 bytes of dynamic shared memory, but the program set its maximum to 1024. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 8208), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 8208)
+warplens: kernel `_Z10static_60kjPj` needs 232464 bytes of shared memory per CTA (61440 static + 171024 dynamic); the limit is 232448
+warplens: kernel `_Z12static_60k_bjPj` was launched with 16 bytes of dynamic shared memory, but the program set its maximum to 0. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 16), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 16)
+warplens: kernel `_Z12static_60k_cjPj` was launched with 1040 bytes of dynamic shared memory, but the program set its maximum to 1024. A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 1040), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 1040)
+warplens: kernel `_Z12static_60k_cjPj`: a maximum of 171009 bytes of dynamic shared memory was refused: with its 61440 bytes of static shared memory the kernel may have 171008, as the device's limit is 232448
+warplens: kernel `_Z10static_48kjPj` was launched with 16 bytes of dynamic shared memory, but without opt-in it may use 0 (49152 bytes of static shared memory count against the default). A GPU refuses this launch with cudaErrorInvalidValue. Before launching, call cudaFuncSetAttribute(kernel, cudaFuncAttributeMaxDynamicSharedMemorySize, 16), or with the driver API cuFuncSetAttribute(function, CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES, 16)
+warplens: kernel `_Z13static_48k_16jPj` needs 232464 bytes of shared memory per CTA (49168 static + 183296 dynamic); the limit is 232448
+warplens: 26 kernel launch(es) simulated on B200, 0 finding(s)
+  _Z6touch2jPj: 1 CTA(s), 16 warp-instructions
+  _Z5touchjPj: 1 CTA(s), 16 warp-instructions
+  _Z11with_staticjPj: 1 CTA(s), 24 warp-instructions
+  _Z5touchjPj: 4 CTA(s), 64 warp-instructions
+  _Z5touchjPj: 4 CTA(s), 64 warp-instructions
+  _Z5touchjPj: 4 CTA(s), 64 warp-instructions
+  _Z5touchjPj: 4 CTA(s), 64 warp-instructions
+  _Z7fresh_ajPj: 1 CTA(s), 16 warp-instructions
+  _Z7fresh_ajPj: 1 CTA(s), 16 warp-instructions
+  _Z7fresh_cjPj: 1 CTA(s), 16 warp-instructions
+  _Z10static_40kjPj: 1 CTA(s), 20 warp-instructions
+  _Z10static_40kjPj: 1 CTA(s), 23 warp-instructions
+  _Z10static_40kjPj: 1 CTA(s), 23 warp-instructions
+  _Z12static_40k_bjPj: 1 CTA(s), 23 warp-instructions
+  _Z10static_60kjPj: 1 CTA(s), 20 warp-instructions
+  _Z10static_60kjPj: 1 CTA(s), 23 warp-instructions
+  _Z10static_60kjPj: 1 CTA(s), 23 warp-instructions
+  _Z12static_60k_bjPj: 1 CTA(s), 20 warp-instructions
+  _Z12static_60k_cjPj: 1 CTA(s), 23 warp-instructions
+  _Z10static_48kjPj: 1 CTA(s), 20 warp-instructions
+  _Z13static_48k_16jPj: 1 CTA(s), 20 warp-instructions
+  _Z13static_48k_16jPj: 1 CTA(s), 23 warp-instructions
+  _Z13static_48k_16jPj: 1 CTA(s), 23 warp-instructions
+  _Z10static_99kjPj: 1 CTA(s), 20 warp-instructions
+  _Z10static_99kjPj: 1 CTA(s), 23 warp-instructions
+  _Z5touchjPj: 4 CTA(s), 64 warp-instructions

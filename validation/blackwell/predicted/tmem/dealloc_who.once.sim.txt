@@ -1,0 +1,4 @@
+status: ok
+warplens: 2 kernel launch(es) simulated on B200, 0 finding(s)
+  tmem_dealloc_who: 1 CTA(s), 62 warp-instructions
+  tmem_fresh: 1 CTA(s), 14 warp-instructions

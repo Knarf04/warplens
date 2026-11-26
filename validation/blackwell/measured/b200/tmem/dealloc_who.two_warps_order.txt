@@ -1,0 +1,3 @@
+script: two warps release the same allocation once each, the second after a barrier
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier
+info: error cudaErrorLaunchFailure

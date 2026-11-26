@@ -323,20 +323,23 @@ int main(int argc, char **argv) {
     CHECK(cudaLaunchKernel(kernel, grid, block, arguments, (size_t)limit + 16, NULL) == cudaErrorInvalidValue);
     CHECK(cudaPeekAtLastError() == cudaErrorInvalidValue && cudaDeviceSynchronize() == cudaSuccess);
     CHECK(cudaGetLastError() == cudaErrorInvalidValue && cudaGetLastError() == cudaSuccess);
-    CHECK(cudaLaunchKernel(kernel, grid, big, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+    /* The runtime of CUDA 13 on a B200 says "invalid value" for a block or grid it refuses
+       (validation/blackwell/measured/b200/e2e/launch_errors.txt); that of CUDA 12.4 on an RTX
+       3080 Ti said cudaErrorInvalidConfiguration, and so did this shim before the third rental. */
+    CHECK(cudaLaunchKernel(kernel, grid, big, arguments, 0, NULL) == cudaErrorInvalidValue);
     dim3 deep = {1, 1, 65};
     dim3 oversized_grids[] = {{2147483648u, 1, 1}, {1, 65536, 1}, {1, 1, 65536}};
-    CHECK(cudaLaunchKernel(kernel, grid, deep, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+    CHECK(cudaLaunchKernel(kernel, grid, deep, arguments, 0, NULL) == cudaErrorInvalidValue);
     CHECK(cuLaunchKernel(kernel, 1, 1, 1, 1, 1, 65, 0, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
     for (unsigned i = 0; i < sizeof oversized_grids / sizeof oversized_grids[0]; ++i) {
       dim3 shape = oversized_grids[i];
-      CHECK(cudaLaunchKernel(kernel, shape, block, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
+      CHECK(cudaLaunchKernel(kernel, shape, block, arguments, 0, NULL) == cudaErrorInvalidValue);
       CHECK(cuLaunchKernel(kernel, shape.x, shape.y, shape.z, 32, 1, 1, 0, NULL, arguments, NULL) ==
             CUDA_ERROR_INVALID_VALUE);
     }
-    CHECK(cudaLaunchKernel(kernel, grid, none, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
-    CHECK(cudaLaunchKernel(kernel, none, block, arguments, 0, NULL) == cudaErrorInvalidConfiguration);
-    CHECK(cudaDeviceSynchronize() == cudaSuccess && cudaGetLastError() == cudaErrorInvalidConfiguration);
+    CHECK(cudaLaunchKernel(kernel, grid, none, arguments, 0, NULL) == cudaErrorInvalidValue);
+    CHECK(cudaLaunchKernel(kernel, none, block, arguments, 0, NULL) == cudaErrorInvalidValue);
+    CHECK(cudaDeviceSynchronize() == cudaSuccess && cudaGetLastError() == cudaErrorInvalidValue);
     CHECK(cuLaunchKernel(kernel, 2, 1, 1, 1025, 1, 1, 0, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
     CHECK(cuLaunchKernel(kernel, 2, 1, 1, 32, 1, 1, (unsigned)limit + 16, NULL, arguments, NULL) == CUDA_ERROR_INVALID_VALUE);
     (void)cudaGetLastError();  /* the two libraries share one last error here */
@@ -437,9 +440,9 @@ int main(int argc, char **argv) {
     (void)cudaGetLastError();
 
     /* a function that is no kernel */
-    CHECK(cudaFuncSetAttribute((const void *)&plain, cudaFuncAttributeMaxDynamicSharedMemorySize, 1024) == cudaErrorInvalidDeviceFunction);
-    CHECK(cudaFuncGetAttributes(&attributes, (const void *)&plain) == cudaErrorInvalidDeviceFunction);
-    CHECK(cudaGetLastError() == cudaErrorInvalidDeviceFunction);
+    CHECK(cudaFuncSetAttribute((const void *)&plain, cudaFuncAttributeMaxDynamicSharedMemorySize, 1024) == cudaErrorInvalidResourceHandle);
+    CHECK(cudaFuncGetAttributes(&attributes, (const void *)&plain) == cudaErrorInvalidResourceHandle);
+    CHECK(cudaGetLastError() == cudaErrorInvalidResourceHandle);
     return 0;
   }
   if (!strcmp(argv[1], "tokens")) {  /* streams, events and host memory, as TVM's runtime uses them */

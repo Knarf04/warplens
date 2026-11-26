@@ -1,0 +1,1 @@
+KERNEL FAILED: two warps release the same allocation once each, the second after a barrier: cudaErrorLaunchFailure at synchronize (unspecified launch failure)

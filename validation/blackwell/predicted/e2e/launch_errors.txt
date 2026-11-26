@@ -1,4 +1,4 @@
-warplens simulated B200: sharedMemPerBlock 49152, sharedMemPerBlockOptin 232448, sharedMemPerMultiprocessor 233472
+the device: sharedMemPerBlock 49152, sharedMemPerBlockOptin 232448, sharedMemPerMultiprocessor 233472
 launch, no opt-in, default maximum                         returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
 launch, no opt-in, default maximum + 16                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
 launch, no opt-in, opt-in maximum                          returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
@@ -25,12 +25,12 @@ cudaFuncSetAttribute(with_static, opt-in maximum)          returned cudaErrorInv
 cudaFuncSetAttribute(with_static, opt-in maximum - 1024)   returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
 launch, 1024 static + opt-in maximum - 1024                returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
 launch, 1024 static + opt-in maximum - 1008                returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
-launch, block of 1025 threads                              returned cudaErrorInvalidConfiguration  peek cudaErrorInvalidConfiguration  sync cudaSuccess    getLast cudaErrorInvalidConfiguration  again cudaSuccess
-launch, block (33, 32, 1)                                  returned cudaErrorInvalidConfiguration  peek cudaErrorInvalidConfiguration  sync cudaSuccess    getLast cudaErrorInvalidConfiguration  again cudaSuccess
-launch, block (1, 1, 65)                                   returned cudaErrorInvalidConfiguration  peek cudaErrorInvalidConfiguration  sync cudaSuccess    getLast cudaErrorInvalidConfiguration  again cudaSuccess
-launch, block (0, 1, 1)                                    returned cudaErrorInvalidConfiguration  peek cudaErrorInvalidConfiguration  sync cudaSuccess    getLast cudaErrorInvalidConfiguration  again cudaSuccess
-launch, grid (0, 1, 1)                                     returned cudaErrorInvalidConfiguration  peek cudaErrorInvalidConfiguration  sync cudaSuccess    getLast cudaErrorInvalidConfiguration  again cudaSuccess
-launch, grid (1, 65536, 1)                                 returned cudaErrorInvalidConfiguration  peek cudaErrorInvalidConfiguration  sync cudaSuccess    getLast cudaErrorInvalidConfiguration  again cudaSuccess
+launch, block of 1025 threads                              returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (33, 32, 1)                                  returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (1, 1, 65)                                   returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, block (0, 1, 1)                                    returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, grid (0, 1, 1)                                     returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
+launch, grid (1, 65536, 1)                                 returned cudaErrorInvalidValue          peek cudaErrorInvalidValue          sync cudaSuccess    getLast cudaErrorInvalidValue          again cudaSuccess
 launch, ordinary                                           returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
 cudaLaunchKernelEx, grid 4, cluster (1, 1, 1)              returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
 cudaLaunchKernelEx, grid 4, cluster (2, 1, 1)              returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
@@ -97,6 +97,6 @@ launch, 49168 static + 52224, no opt-in                    returned cudaErrorInv
 attributes, 101376 static                                  cudaSuccess: sharedSizeBytes 101376, maxDynamicSharedSizeBytes 0
 launch, 101376 static + 0, no opt-in                       returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
 launch, 101376 static + 16, no opt-in                      returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess
-cudaFuncSetAttribute(a host function, 1024)                returned cudaErrorInvalidDeviceFunction peek cudaErrorInvalidDeviceFunction sync cudaSuccess    getLast cudaErrorInvalidDeviceFunction again cudaSuccess
-attributes, a host function                                cudaErrorInvalidDeviceFunction: sharedSizeBytes 0, maxDynamicSharedSizeBytes 0
+cudaFuncSetAttribute(a host function, 1024)                returned cudaErrorInvalidResourceHandle peek cudaErrorInvalidResourceHandle sync cudaSuccess    getLast cudaErrorInvalidResourceHandle again cudaSuccess
+attributes, a host function                                cudaErrorInvalidResourceHandle: sharedSizeBytes 0, maxDynamicSharedSizeBytes 0
 launch, ordinary, at the end                               returned cudaSuccess                    peek cudaSuccess                    sync cudaSuccess    getLast cudaSuccess                    again cudaSuccess

@@ -200,10 +200,38 @@ def test_largest_legal_transfer_covers_expected_rectangle(shape, count, nrows, n
     }
 
 
-def test_repeated_deallocation_is_a_finding_not_a_failure(sim):
-    """hgemm_v7 to v9 of the book release their one allocation from every warpgroup."""
-    stats = launch(sim, ALLOC + LOAD_BASE + FREE + FREE)
+def test_a_second_deallocation_that_comes_after_the_first_ends_the_kernel_as_on_a_b200(sim):
+    """validation/blackwell/measured/b200/tmem/dealloc_repeated.txt, dealloc_who.*.txt: one warp
+    that releases an allocation twice in a row, or a second warp that releases it after a
+    barrier, ends with cudaErrorLaunchFailure. Before the third rental this was a finding."""
+    import pytest
+    import warplens
+    with pytest.raises(warplens.ExecutionError, match="comes after has already released.*cudaErrorLaunchFailure"):
+        launch(sim, ALLOC + LOAD_BASE + FREE + FREE)
+
+
+def test_two_warps_that_release_the_same_allocation_with_nothing_between_them_are_reported(sim):
+    """hgemm_v7 to v9 of the book release their one allocation from the first warp of every
+    warpgroup after the last barrier, and run on a B200 (dealloc_who.two_warps.txt,
+    dealloc_who.relinquish_two.txt): nothing orders one release before the other."""
+    body = """
+        .reg .b32 %dst, %base, %t; .reg .pred %p;
+        .shared .align 4 .b32 slot;
+        mov.b32 %dst, slot;
+        mov.u32 %t, %tid.x;
+        setp.ge.u32 %p, %t, 32;
+        @%p bra READY;
+        tcgen05.alloc.cta_group::1.sync.aligned.shared::cta.b32 [%dst], 32;
+      READY:
+        bar.sync 0;
+        ld.shared.u32 %base, [%dst];
+        {between}
+        tcgen05.dealloc.cta_group::1.sync.aligned.b32 %base, 32;
+        ret;
+    """
+    stats = sim.launch(kernel(body.replace("{between}", "")), "k", grid=1, block=64)
     assert [f.kind for f in stats.findings] == ["tmem-dealloc-repeated"]
+    assert "A B200 runs such a kernel" in stats.findings[0].message
 
 
 def test_deallocation_after_reallocation_is_ordinary(sim):

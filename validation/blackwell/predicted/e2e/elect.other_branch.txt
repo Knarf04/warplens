@@ -1,5 +1,0 @@
-member mask 0xffffffff, executed by lanes 16-31; lanes 0-15 set a flag on a branch of their own
-  lane:        0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31
-  leader:      .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  . 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16 16
-  predicate:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  1  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
-  flag seen:   .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  .  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0  0

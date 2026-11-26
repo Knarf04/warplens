@@ -1,4 +1,3 @@
 script: one warp relinquishes the permit, then releases the same allocation twice
-  allocation at address 00000000; warp 0 ended with 600d0000, warp 1 with 600d0001
-script: a fresh launch afterwards
-  512 columns at address 00000000
+KERNEL FAILED: one warp relinquishes the permit, then releases the same allocation twice
+info: error cudaErrorLaunchFailure

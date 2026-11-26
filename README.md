@@ -95,7 +95,7 @@ details.
 - [docs/coverage.md](https://github.com/Knarf04/warplens/blob/main/docs/coverage.md): the PTX that is supported.
   [docs/numerics.md](https://github.com/Knarf04/warplens/blob/main/docs/numerics.md): what is computed exactly.
   [docs/architecture.md](https://github.com/Knarf04/warplens/blob/main/docs/architecture.md): how the simulator works.
-- [docs/b200-rental-1.md](https://github.com/Knarf04/warplens/blob/main/docs/b200-rental-1.md): the run on a B200, what
+- [docs/b200-rental-1.md](https://github.com/Knarf04/warplens/blob/main/docs/b200-rental-1.md): the first run on a B200 (the second and third are beside it), what
   agreed and what did not. [docs/validation-matrix.md](https://github.com/Knarf04/warplens/blob/main/docs/validation-matrix.md):
   every claim that run tested. [validation/README.md](https://github.com/Knarf04/warplens/blob/main/validation/README.md):
   the comparisons with an RTX 3080 Ti.
@@ -136,8 +136,14 @@ What that rests on:
   also answered two open questions, and both answers changed the simulator
   again: a tensor copy needs a shared address aligned to 128 bytes, and an
   undersized `expect_tx` completes its phase early in some runs of the same
-  kernel and not in others. Those two changes have not been run on hardware
-  again.
+  kernel and not in others.
+- **A third run** ([docs/b200-rental-3.md](https://github.com/Knarf04/warplens/blob/main/docs/b200-rental-3.md))
+  had the first of those as a prediction, which held, and answered the open
+  questions that needed a B200: which repeated `tcgen05.dealloc` ends a
+  kernel, whether `elect.sync`, `shfl.sync` and `bar.warp.sync` wait for
+  lanes that are elsewhere, the launch errors at a B200's limits, and
+  subnormals in an MMA. What it changed in the simulator reproduces what was
+  recorded that day.
 - **Not calibrated**: the timing model. The parameters that ship are mostly
   assumptions. The B200 run measured the benchmarks they would be fitted
   from; the fit is recorded and not applied.

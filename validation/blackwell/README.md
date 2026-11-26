@@ -257,9 +257,9 @@ run is isolated for that reason.
 | `elect` | `elect` | RT-05 | elect.sync elects the lowest lane of the member mask; every executing lane gets its id | runs | - |
 | `elect.all` | `elect all` | RT-05 | a lane outside the member mask that executes elect.sync ends the kernel | **refuses**: elect.sync is executed by lane(s) 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 that its member mask 0xffff0000 d | fault |
 | `elect.partial` | `elect partial` | RT-05 | the member mask names lanes that do not execute elect.sync: the lowest executing lane is elected | runs | fault |
-| `elect.other_branch` | `elect other-branch` | RT-05 | elect.sync does not wait for lanes of its mask that are on another branch (not measured; vote.sync, shfl.sync and bar.warp.sync wait on an RTX 3080 Ti) | runs | hang |
-| `elect.other_callers` | `elect other-callers` | RT-05 | with a mask that names only its callers elect.sync has nothing to wait for | runs | hang |
-| `elect.other_sites` | `elect other-sites` | RT-05 | two groups at two call sites of elect.sync, each naming the other in its mask | runs | hang |
+| `elect.other_branch` | `elect other-branch` | RT-05 | elect.sync does not wait for lanes of its mask that are on another branch: the flags read 0 before and after it on a B200. No prediction: which of two branches runs first is not a rule, and the simulator runs the other one first | not run (no prediction) | hang |
+| `elect.other_callers` | `elect other-callers` | RT-05 | the control: with a mask that names only its callers elect.sync has nothing to wait for | not run (no prediction) | hang |
+| `elect.other_sites` | `elect other-sites` | RT-05 | two groups at two call sites of elect.sync, each naming the other in its mask: on a B200 one lane is elected for both, which is the compiler's layout (no prediction) | not run (no prediction) | hang |
 | `launch_errors` | `launch_errors` | RT-04, RT-12 | the code of every launch and attribute request the runtime refuses, at this device's own limits | runs | - |
 | `ampere_replay.shfl` | `ampere_replay shfl` | RT-01 | as on an RTX 3080 Ti (validation/ampere/shfl_golden.txt): shfl.sync in four modes over widths and distances | runs | - |
 | `ampere_replay.printf` | `ampere_replay printf` | RT-01 | as on an RTX 3080 Ti (validation/ampere/printf_golden.txt, lines in another order): device printf with a by-value struct and a local array | runs | - |
@@ -316,8 +316,9 @@ run is isolated for that reason.
 | `init_count.zero` | `init_count zero` | MB-10 | an arrival count of 0 is refused | **refuses**: mbarrier.init with an arrival count of 0; it must be 1 to 2^20-1 | fault |
 | `complete_before_expect` | `script negative` | MB-07 | the byte count is signed: complete_tx before expect_tx completes once balanced | runs | fault |
 | `over_arrival` | `script over` | MB-04 | arrivals beyond the pending count end the kernel | **refuses**: 3 arrival(s) on the mbarrier at shared offset 0, which needed only 2 more in this phase: a GPU ends the kernel here with | fault |
-| `expect_tx_small` | `expect_tx` | MB-05, MB-06, MB-07, MB-08 | undersized, oversized and missing expect_tx against real TMA loads, with bounded polls | runs (1 finding(s)) | - |
-| `expect_tx_small.wait` | `expect_tx wait-small` | MB-05, MB-11 | an undersized expect_tx with one load completes part of the way through it: the usual wait loop returns | runs (1 finding(s)) | hang |
+| `expect_tx_small` | `expect_tx` | MB-06, MB-07, MB-08 | exact, oversized and missing expect_tx against real TMA loads, with bounded polls | runs | - |
+| `expect_tx_small.too_small` | `expect_tx too-small` | MB-05 | an undersized expect_tx with one load completes the phase part of the way through it in some runs and not in others (measured; no single output to predict) | not run (no prediction) | - |
+| `expect_tx_small.wait` | `expect_tx wait-small` | MB-05, MB-11 | the same with the usual wait loop, which returns in some runs and hangs in others (measured; no single output to predict) | not run (no prediction) | hang |
 | `expect_tx_small.pieces` | `expect_tx pieces` | MB-05 | a load reports its bytes in pieces that vary from run to run: an undersized expect_tx completes the phase only at a multiple of 32 bytes, and there in some runs and not in others (measured; no single output to predict) | not run (no prediction) | - |
 | `expect_tx_large` | `expect_tx wait-large` | MB-08, MB-11 | an oversized expect_tx never completes: the usual wait loop deadlocks | **refuses**: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them | hang |
 
@@ -343,11 +344,11 @@ run is isolated for that reason.
 | `alloc_addresses.size_1024` | `alloc size-1024` | TM-07 | an allocation of 1024 columns is refused | **refuses**: tcgen05.alloc of 1024 columns; the count must be a power of two from 32 to 512 | fault |
 | `alloc_after_relinquish` | `alloc after-relinquish` | TM-09 | no allocation after relinquish_alloc_permit | **refuses**: tcgen05.alloc after this CTA relinquished its allocation permit | fault |
 | `alloc_blocks` | `alloc exhaust` | TM-10 | an allocation that does not fit waits (here: forever) | **refuses**: deadlock in CTA (0, 0, 0): every unfinished warp is blocked and nothing can release them | hang |
-| `dealloc_repeated` | `alloc dealloc-twice` | TM-11 | a second dealloc of the same columns is ignored (a B200 ended this kernel, and ran the book's, which repeat it from other warps: open) | runs (1 finding(s)) | hang |
+| `dealloc_repeated` | `alloc dealloc-twice` | TM-11 | a second dealloc of the same columns is ignored (a B200 ended this kernel, and ran the book's, which repeat it from other warps: open) | **refuses**: tcgen05.dealloc of 32 columns at column 0, which an earlier tcgen05.dealloc that this one comes after has already releas | hang |
 | `dealloc_who.two_warps` | `dealloc_who two-warps` | TM-11 | two warps release the same allocation once each: the second release is ignored and reported | runs (1 finding(s)) | fault |
-| `dealloc_who.two_warps_order` | `dealloc_who two-warps-order` | TM-11 | the same with a barrier between the two releases | runs (1 finding(s)) | fault |
+| `dealloc_who.two_warps_order` | `dealloc_who two-warps-order` | TM-11 | the same with a barrier between the two releases | **refuses**: tcgen05.dealloc of 32 columns at column 0, which an earlier tcgen05.dealloc that this one comes after has already releas | fault |
 | `dealloc_who.relinquish_two` | `dealloc_who relinquish-two` | TM-11 | two warps each relinquish the permit and then release the same allocation, as the book's kernels do: runs to the end | runs (1 finding(s)) | fault |
-| `dealloc_who.relinquish_once` | `dealloc_who relinquish-once` | TM-11 | one warp relinquishes the permit and then releases the same allocation twice | runs (1 finding(s)) | fault |
+| `dealloc_who.relinquish_once` | `dealloc_who relinquish-once` | TM-11 | one warp relinquishes the permit and then releases the same allocation twice | **refuses**: tcgen05.dealloc of 32 columns at column 0, which an earlier tcgen05.dealloc that this one comes after has already releas | fault |
 | `dealloc_who.once` | `dealloc_who once` | TM-11 | one warp of two releases the allocation once | runs | - |
 | `dealloc_mismatch` | `alloc dealloc-wrong-size` | TM-12 | a dealloc with another size than the allocation's is refused | **refuses**: tcgen05.dealloc of 32 columns at column 0 does not match an allocation | hang |
 | `alloc_leak` | `alloc leak` | - | columns never released fail the launch (cudaErrorTensorMemoryLeak) | **refuses**: kernel `tmem_alloc_script` returned with tensor memory still allocated: 256 tensor-memory columns allocated here were ne | hang |

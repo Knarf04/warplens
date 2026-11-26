@@ -126,22 +126,24 @@ back identical, in both of its passes, and the whole programs were
 bit-identical. It also answered two questions the first run had left as
 assumptions, and both answers changed the simulator once more: the alignment
 a tensor copy needs (128 bytes, not 32), and what an undersized `expect_tx`
-does (below, under mbarriers). Those two changes have not been run on a GPU
-again; for the first, what the simulator now does is what the second run
+does (below, under mbarriers). A third run, the day after
+([b200-rental-3.md](b200-rental-3.md)), had the first as a prediction, which
+held, and asked the questions that had been left open: the answers are in the
+rows below marked *third run*, and what they changed reproduces what that run
 recorded.
 
 | Area | On the RTX 3080 Ti | On the B200 (2026-11-25) |
 | --- | --- | --- |
-| `shfl.sync`, `vote`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive), `[reg+offset]` on a wrapped register | recorded outputs, replayed in `tests/validation/golden_replay/test_hardware_golden.py`: match exactly | the same programs rerun: every recorded line reproduced. **Changed since:** `elect.sync` executed by a lane outside its member mask ends the kernel |
+| `shfl.sync`, `vote`, barriers with exited threads, device `printf`, by-value structs, local arrays, calls to device functions (also with struct arguments, through function pointers, and recursive), `[reg+offset]` on a wrapped register | recorded outputs, replayed in `tests/validation/golden_replay/test_hardware_golden.py`: match exactly | the same programs rerun: every recorded line reproduced. **Changed since:** `elect.sync` executed by a lane outside its member mask ends the kernel. *Third run:* `bar.warp.sync` waits for the lanes of its mask that are on another branch, as on the 3080 Ti; `shfl.sync` and `elect.sync` do not |
 | `cvt.rna.tf32.f32`, `ldmatrix`, `bfe`, `bfi`, `shf`, `prmt`, `.ftz` arithmetic and `cvt`, `min`/`max`, float-to-integer `cvt`, NaN bit patterns, integer division by zero, `cp.async` zero fill | the same, bit for bit | the same programs rerun: every recorded line reproduced |
 | Atomic updates (`atom`, `red`): every atomic function on 32- and 64-bit integers, `atomicAdd` on `float` and `double`, in global and shared memory, as compiled by nvcc 13.5 and by nvcc 12.4 | match exactly, for results that do not depend on the order of the threads | rerun: reproduced |
 | Shared-memory bank conflicts | Nsight Compute counters on the transpose example: conflict counters match exactly; the total wavefront counter matches once two per warp and one per CTA per barrier, which hardware also counts, are added | the same comparison: conflict counters equal, and the wavefront counter above the model's by the same amount |
-| Launch errors and the shared-memory opt-in under `warplens run` | codes and the opt-in rule measured at Ampere's limits | the limit, the opt-in and the device attributes identical to the prediction. **Changed since:** what `maxDynamicSharedSizeBytes` reports for a kernel with more than 48 KiB static (0), and that a cluster of more than 8 CTAs needs the non-portable attribute |
+| Launch errors and the shared-memory opt-in under `warplens run` | codes and the opt-in rule measured at Ampere's limits | the limit, the opt-in and the device attributes identical to the prediction. **Changed since:** what `maxDynamicSharedSizeBytes` reports for a kernel with more than 48 KiB static (0), and that a cluster of more than 8 CTAs needs the non-portable attribute. *Third run:* the Ampere program at the B200's limits: the same, but for two codes of the newer runtime, which the shim now returns |
 | mbarriers | arrival tokens and `test_wait` predicates (`try_wait` and byte counts need Hopper or newer) | identical: phases and parity, arrival counts, `expect_tx` with bytes, tokens, `try_wait` on completed phases, completion before `expect_tx`. **Changed since:** a TMA copy larger than the bytes expected completes the phase; over-arrival ends the kernel. The second run showed that the early completion is not the same from run to run: it happens only where the bytes expected are a multiple of 32, and there in some runs and not in others (80 runs counted). The simulator reports the accounting, which does not vary, and shows the early completion `try_wait` on a phase that never completes returned false; the simulator blocks, by decision (section 8) |
 | TMA, tensor maps | not possible | identical: every swizzle mode on aligned and misaligned buffers, ranks 1 to 5, element strides, zero fill, stores and `wait_group`, raw bulk copies, the missing fence. **Changed since:** the NaN of the out-of-bounds fill; two cases the GPU ends the kernel for (a tensor copy at a shared address that is not a multiple of 128 bytes, measured at ten offsets over the two runs; a store at a negative coordinate). The driver's own tensor-map layout is read from this run's encoder sweep |
-| Tensor memory | not possible | identical: allocation addresses and order, the lane window, the layout of MMA results, every transfer shape and repeat count. **Changed since:** a larger allocation after a smaller one is made, as the GPU made it; a leak fails the launch. Still stricter than the GPU, on purpose: 48 columns, and an allocation after the permit was relinquished, are refused. Not modeled: three transfers past a warp's lane window faulted on the GPU and are refused here; tensor memory never written held an earlier launch's values on the GPU |
+| Tensor memory | not possible | identical: allocation addresses and order, the lane window, the layout of MMA results, every transfer shape and repeat count. **Changed since:** a larger allocation after a smaller one is made, as the GPU made it; a leak fails the launch. *Third run:* a second release of the same columns ends the kernel when it comes after the first, and runs when nothing orders the two. Still stricter than the GPU, on purpose: 48 columns, and an allocation after the permit was relinquished, are refused. Not modeled: three transfers past a warp's lane window faulted on the GPU and are refused here; tensor memory never written held an earlier launch's values on the GPU |
 | `tcgen05.mma`: where things go | not possible | identical: operand layouts, negation, `scale-input-d`, disabled lanes, `commit` arrivals, the swizzle mismatch, swizzle by absolute address |
-| `tcgen05.mma`: the arithmetic | not possible | **did not match, changed since.** An element is one sum cut toward zero, not a chain of float32 additions, and `kind::tf32` drops the low 13 bits of its operands. The simulator reproduces both recordings word for word; three rules of the sum were inferred from the book's kernels, and the probe written for them was identical on the second run ([numerics.md](numerics.md)) |
+| `tcgen05.mma`: the arithmetic | not possible | **did not match, changed since.** An element is one sum cut toward zero, not a chain of float32 additions, and `kind::tf32` drops the low 13 bits of its operands. The simulator reproduces both recordings word for word; three rules of the sum were inferred from the book's kernels, and the probe written for them was identical on the second run ([numerics.md](numerics.md)). *Third run:* half-precision subnormal operands, identical |
 | Clusters | not possible | identical: the cluster barrier, multicast, remote arrive, the two-CTA MMA in all four forms, the address dump, every cluster-launch-control run |
 | `cvt.rn.tf32.f32`, `cvt.rz.tf32.f32` | not possible (they need Hopper or newer) | identical for all finite inputs and infinities. **Changed since:** every NaN gives `0x7fffe000` (7 of 715 lines) |
 | FP8 and FP4 `cvt` conversions | not possible | identical: every code of E4M3, E5M2 and E2M1, the E8M0 ties, the special inputs. UE4M3 has no conversion in ptxas 13.3 or 13.5, so nothing to compare |
@@ -178,11 +180,12 @@ What this evidence does not cover:
   written from the simulator's own claims
   ([validation-matrix.md](validation-matrix.md) has one row per claim), and a
   rule nobody thought to state has no probe.
-- **The two changes made after the second run**, as said above: the 128-byte
-  alignment of a tensor copy is what that run recorded, and has not been
-  predicted and then measured; for an undersized `expect_tx` the simulator
-  shows one of the outcomes a GPU has, and does not say how often a GPU
-  takes each ([b200-rental-2.md](b200-rental-2.md)).
+- **The changes made after the third run** reproduce what it recorded and
+  have not been predicted and then measured: the order rule for a repeated
+  `tcgen05.dealloc`, the wait of `bar.warp.sync`, two runtime error codes
+  ([b200-rental-3.md](b200-rental-3.md)). For an undersized `expect_tx` the
+  simulator shows one of the outcomes a GPU has, and does not say how often a
+  GPU takes each ([b200-rental-2.md](b200-rental-2.md)).
 - **What only a race could show**: when exactly a copy reads its source,
   which synchronization a program may rely on. The checkers report these
   instead of modeling an outcome (the matrix, "Claims not turned into a
@@ -732,7 +735,7 @@ hgemm_v7 128x128x256: matches NumPy (max error 0.0078, 1.6 s)
 warplens: 2 kernel launch(es) simulated on B200, 1 finding(s)
   kernel_kernel: 1 CTA(s), 5010 warp-instructions
   kernel_kernel: 148 CTA(s), 48255 warp-instructions
-    [tmem-dealloc-repeated] tensor memory at column 0 (512 columns) was already released by an earlier tcgen05.dealloc; this one is ignored (148 times)
+    [tmem-dealloc-repeated] tensor memory at column 0 (512 columns) was already released by a tcgen05.dealloc of another warp that nothing orders before this one; this one is ignored. A B200 runs such a kernel, and ends one in which the second release comes after the first (148 times)
       line 2009: tcgen05.dealloc.cta_group::1.sync.aligned.b32 %r275, %r276;
       first in CTA (0, 0, 0), warp 4, lanes 0-31
 ```
@@ -917,7 +920,7 @@ Every kind, by area:
 | `barrier-in-divergent-code` | an aligned CTA barrier has a divergent guard predicate, or a cluster barrier has partial warp participation |
 | `shfl-inactive-source` | a shuffle read a lane that was not executing it or was outside the member mask |
 | `shfl-membermask-mismatch` | a caller is absent from its own mask, or a named member is not executing with the same mask |
-| `warp-sync-membermask-mismatch` | the same, for `bar.warp.sync` (`__syncwarp()`). (For both, a member that is elsewhere is waited for, as for `vote.sync` below) |
+| `warp-sync-membermask-mismatch` | the same, for `bar.warp.sync` (`__syncwarp()`). (A member that is elsewhere is waited for, as for `vote.sync` below; a shuffle does not wait) |
 | `vote-membermask-mismatch` | a `vote.sync` caller is absent from its own mask, or a member executes it with another mask. (A member that is elsewhere is waited for; if it cannot arrive, the launch is refused) |
 | **mbarrier** | |
 | `mbarrier-tx-mismatch` | completion bytes not balanced by `expect_tx` when the kernel returned or deadlocked |
@@ -940,7 +943,7 @@ Every kind, by area:
 | `tmem-unallocated` | an MMA, load or store on columns that are not allocated |
 | `tmem-leak` | columns still allocated when the kernel returned. Under `warplens run` the launch then fails with `cudaErrorTensorMemoryLeak`, as on a B200 |
 | `tmem-alloc-increasing` | a `tcgen05.alloc` larger than the one before it, which the PTX contract rules out and a B200 allocates |
-| `tmem-dealloc-repeated` | a second `tcgen05.dealloc` of an allocation already released; the repeat is ignored |
+| `tmem-dealloc-repeated` | a second `tcgen05.dealloc` of an allocation another warp has already released, with nothing that orders the two; the repeat is ignored. (One that comes after the first ends the kernel, as on a B200) |
 | `clc-canceled-cluster-lost` | a cluster finished having canceled another whose coordinate no thread read with `get_first_ctaid`: nobody did that cluster's work |
 | `clc-not-waited` | a CTA returned while its `clusterlaunchcontrol.try_cancel` request was in flight |
 | `clc-response-unsynchronized` | a cancel response was read, or overwritten by another request, by a warp that had not waited on the request's mbarrier |
@@ -953,14 +956,17 @@ Every kind, by area:
 | `mma-swizzle-mismatch` | an operand's descriptor names a different swizzle than the TMA load that wrote the buffer |
 | `mma-tf32-operand-not-converted` | a `kind::tf32` operand has bits below TF32 precision; the MMA drops them, toward zero, as a B200 does |
 
-Two of these report the simulator's uncertainty more than a bug in the kernel:
+Two of these say more about what a GPU tolerates than about a bug that shows:
 
 - **`tmem-dealloc-repeated`.** The book's `hgemm_v7` to `v9` release their
   tensor memory once per warpgroup, and they run on real hardware: on a B200
-  they finished with the outputs warplens computes. A probe in which a single
-  warp releases the same allocation twice was ended by the same GPU
-  (`cudaErrorLaunchFailure`), so the repeat is not always harmless; warplens
-  ignores it and says so ([b200-rental-1.md](b200-rental-1.md)).
+  they finished with the outputs warplens computes. The two releases come
+  after the last barrier, so nothing orders one before the other, and a B200
+  lets both through. Where the second comes after the first (the same warp
+  again, or another warp after a barrier) the same GPU ends the kernel with
+  `cudaErrorLaunchFailure`, and so does warplens. The finding marks a kernel
+  that runs because of how a race falls
+  ([b200-rental-3.md](b200-rental-3.md)).
 - **`mma-tf32-operand-not-converted`.** A B200 drops the low mantissa bits of
   a TF32 operand, toward zero, and warplens does the same
   ([numerics.md](numerics.md)); the finding is there because a kernel that

@@ -21,9 +21,13 @@
 //   * an oversized expect_tx waits for more data.
 // The data itself arrives in every case; the probe prints whether it did.
 //
-//   expect_tx               the polled scripts (never hangs)
-//   expect_tx wait-small    expect_tx 128 for a 256-byte load, then the unbounded
-//                                try_wait loop real kernels use. Returns on a B200.
+//   expect_tx               the polled scripts whose outcome does not vary (never hangs)
+//   expect_tx too-small     expect_tx 128 for a 256-byte load, polled. The phase completed
+//                                early in the first two rentals and not in the third: it
+//                                does in some runs and not in others (`pieces`, below), so
+//                                no prediction is held against this run
+//   expect_tx wait-small    the same, then the unbounded try_wait loop real kernels use.
+//                                Returned on a B200 in two rentals and hung in the third
 //   expect_tx wait-large    expect_tx 512 for a 256-byte load, same loop. Expected to hang.
 //   expect_tx pieces        how large the pieces are: one 256-byte load against expect_tx
 //                                of 4, 8, 16, 32, 48, 64, 96, 192 and 255 bytes, each polled
@@ -136,6 +140,9 @@ int main(int argc, char** argv) {
         RUN("expect_tx 512 for a 256-byte load, then wait without a bound",
             {ARRIVE_EXPECT, 512}, {LOAD, 0}, {WAIT, 0});
         printf("the wait returned\n");
+    } else if (!strcmp(which, "too-small")) {
+        RUN("too small: expect_tx 128, one load; then expect_tx for the other 128",
+            {ARRIVE_EXPECT, 128}, {LOAD, 0}, {POLL, 0}, {EXPECT, 128});
     } else if (!strcmp(which, "sweep") && argc > 4) {  // sweep FROM TO STEP: not in the manifest
         for (int bytes = atoi(argv[2]); bytes <= atoi(argv[3]); bytes += atoi(argv[4])) {
             char title[96];
@@ -150,8 +157,6 @@ int main(int argc, char** argv) {
         }
     } else {
         RUN("exact: expect_tx 256, one load", {ARRIVE_EXPECT, 256}, {LOAD, 0}, {POLL, 0});
-        RUN("too small: expect_tx 128, one load; then expect_tx for the other 128",
-            {ARRIVE_EXPECT, 128}, {LOAD, 0}, {POLL, 0}, {EXPECT, 128});
         RUN("too large: expect_tx 512, one load; then a second load",
             {ARRIVE_EXPECT, 512}, {LOAD, 0}, {POLL, 0}, {LOAD, 0}, {POLL, 0});
         RUN("expect_tx 256, two loads: the first completion ends the phase",

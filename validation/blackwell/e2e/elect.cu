@@ -14,22 +14,22 @@
 //   elect partial    mask 0xFFFFFFFF executed only by the odd lanes, so the mask names
 //                    lanes that do not execute it
 //
-//   elect other-branch   mask 0xFFFFFFFF executed by lanes 16-31 while lanes 0-15 take a
-//                        branch of their own, set a flag there and execute no elect.sync;
-//                        each electing lane then reads the flag of the lane 16 below it.
-//                        A flag that reads 1 says the instruction waited for the lanes its
-//                        mask names until they had finished their branch, as vote.sync,
-//                        shfl.sync and bar.warp.sync do on an RTX 3080 Ti
-//                        (validation/README.md); 0 says it went on without them
-//                        Then the same with the halves exchanged: which branch a GPU runs
-//                        first is not a rule, and a flag tells only where the electing
-//                        half would have run first
-//   elect other-callers  the same two with a mask that names only the callers: nothing to
-//                        wait for. This is the control that shows which half runs first
-//   elect other-sites    lanes 0-15 and lanes 16-31 at two call sites, both with the mask
-//                        0xFFFFFFFF. May never return (each group waits for the other), or
+//   elect other-branch   mask 0xFFFFFFFF executed by one half of the warp while the other
+//                        half is on a branch of its own, where each lane sets a flag and
+//                        executes no elect.sync. Each electing lane reads its partner's
+//                        flag before and after the instruction: "after" 1 with "before" 0
+//                        says the instruction waited for the lanes its mask names until
+//                        they had finished their branch, as bar.warp.sync does; 0 and 0
+//                        says it went on without them. Run for both halves
+//   elect other-callers  the same with a mask that names only the callers: nothing to wait
+//                        for. The control
+//   elect other-sites    both halves at call sites of their own, each with the mask
+//                        0xFFFFFFFF. May never return (each half waits for the other), or
 //                        may elect one lane for both if the compiler gives the two call
 //                        sites one machine instruction
+//
+// Measured on a B200 (2026-11-26): "before" and "after" are 0 in other-branch as in the
+// control. elect.sync does not wait for lanes of its mask that are elsewhere.
 //
 // Claim tested (docs/history/m1.md; warplens/units/alu.py `_elect`): the lowest lane that is in the
 // mask and executes the instruction is elected; every executing lane gets its id, and the
@@ -53,58 +53,53 @@ extern "C" __global__ void elect(uint32_t mask, uint32_t who, uint32_t* out) {
     out[lane * 2 + 1] = chosen;
 }
 
-// One half of the warp is the other group. sites == 0: its lanes set flag[lane] and execute
-// no elect.sync; sites == 1: they set it and execute one of their own with `mask`. The lanes
-// of the electing half execute elect.sync with `mask` and then read the flag of their
-// partner, lane ^ 16. `low` chooses the half that elects: which of two branches a GPU runs
-// first is its own business, and a flag says something only if the electing half would
-// otherwise have run first (the control with a mask of the callers alone shows which).
+// One half of the warp elects and the other half is on another branch, where its lanes set
+// flag[lane] (and, with sites == 1, execute an elect.sync of their own with `mask`). The
+// electing lanes read the flag of their partner, lane ^ 16, before and after the
+// instruction. Which of two branches a GPU runs first is not a rule: this kernel is written
+// so that a B200 runs the electing half first ("before" reads 0), and only then does "after"
+// say whether the instruction waited for the other half (1) or went on without it (0).
 extern "C" __global__ void elect_other(uint32_t mask, int sites, int low, int* flag, uint32_t* out) {
-    uint32_t lane = threadIdx.x, leader = 0xEEu, chosen = 0xEEu, seen = 0xEEu;
+    uint32_t lane = threadIdx.x, leader = 0xEEu, chosen = 0xEEu, before = 0xEEu, after = 0xEEu;
     const bool electing = low ? lane < 16 : lane >= 16;
-    if (!electing) {
+    if (electing) {
+        before = (uint32_t)flag[lane ^ 16];
+        asm volatile("{\n.reg .pred p;\nelect.sync %0|p, %2;\nselp.u32 %1, 1, 0, p;\n}"
+                     : "=r"(leader), "=r"(chosen) : "r"(mask));
+        after = (uint32_t)flag[lane ^ 16];
+    } else {
         flag[lane] = 1;
         if (sites)
             asm volatile("{\n.reg .pred p;\nelect.sync %0|p, %2;\nselp.u32 %1, 1, 0, p;\n}"
                          : "=r"(leader), "=r"(chosen) : "r"(mask));
-    } else {
-        asm volatile("{\n.reg .pred p;\nelect.sync %0|p, %2;\nselp.u32 %1, 1, 0, p;\n}"
-                     : "=r"(leader), "=r"(chosen) : "r"(mask));
-        seen = (uint32_t)flag[lane ^ 16];
     }
-    out[lane * 3] = leader;
-    out[lane * 3 + 1] = chosen;
-    out[lane * 3 + 2] = seen;
+    out[lane * 4] = leader;
+    out[lane * 4 + 1] = chosen;
+    out[lane * 4 + 2] = before;
+    out[lane * 4 + 3] = after;
 }
 
 static void run_other(const char* label, uint32_t mask, int sites, int low) {
-    uint32_t out[96];
+    uint32_t out[128];
     int flag[32] = {};
-    uint32_t* d_out = dev_alloc<uint32_t>(96);
+    uint32_t* d_out = dev_alloc<uint32_t>(128);
     int* d_flag = dev_copy(flag, 32);
-    dev_fill(d_out, 96, 0);
+    dev_fill(d_out, 128, 0);
     printf("%s\n", label);
     fflush(stdout);
     elect_other<<<1, 32>>>(mask, sites, low, d_flag, d_out);
     probe_sync(label);
-    dev_read(out, d_out, 96);
+    dev_read(out, d_out, 128);
     auto electing = [&](int l) { return low ? l < 16 : l >= 16; };
-    printf("  lane:      ");
+    const char* names[] = {"leader:     ", "predicate:  ", "flag before:", "flag after: "};
+    printf("  lane:        ");
     for (int l = 0; l < 32; ++l) printf(" %2d", l);
-    printf("\n  leader:    ");
-    for (int l = 0; l < 32; ++l) {
-        if (electing(l) || sites) printf(" %2u", out[l * 3]);
-        else printf("  .");
-    }
-    printf("\n  predicate: ");
-    for (int l = 0; l < 32; ++l) {
-        if (electing(l) || sites) printf(" %2u", out[l * 3 + 1]);
-        else printf("  .");
-    }
-    printf("\n  flag seen: ");
-    for (int l = 0; l < 32; ++l) {
-        if (electing(l)) printf(" %2u", out[l * 3 + 2]);
-        else printf("  .");
+    for (int field = 0; field < 4; ++field) {
+        printf("\n  %s ", names[field]);
+        for (int l = 0; l < 32; ++l) {
+            if (electing(l) || (sites && field < 2)) printf(" %2u", out[l * 4 + field]);
+            else printf("  .");
+        }
     }
     printf("\n");
     fflush(stdout);

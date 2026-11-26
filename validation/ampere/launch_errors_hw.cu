@@ -80,7 +80,12 @@ int main() {
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);
     int optin = (int)prop.sharedMemPerBlockOptin, plain = (int)prop.sharedMemPerBlock;
-    printf("%s: sharedMemPerBlock %d, sharedMemPerBlockOptin %d, sharedMemPerMultiprocessor %zu\n", prop.name, plain, optin,
+#ifdef LAUNCH_ERRORS_DEVICE_LABEL  // validation/blackwell/e2e/launch_errors.cu: the output is compared with a prediction
+    const char* device = LAUNCH_ERRORS_DEVICE_LABEL;
+#else
+    const char* device = prop.name;
+#endif
+    printf("%s: sharedMemPerBlock %d, sharedMemPerBlockOptin %d, sharedMemPerMultiprocessor %zu\n", device, plain, optin,
            prop.sharedMemPerMultiprocessor);
     uint32_t* out; cudaMalloc(&out, 64);
     char what[128];

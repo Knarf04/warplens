@@ -128,24 +128,29 @@ SYNC_OTHER_CASES = [  # sync_other_probe.cu, cases(): role of lanes [from, to), 
     (0, 0, 0, 0x0000ffff, 0)]
 
 
-def test_shfl_and_warp_barrier_wait_for_the_lanes_their_masks_name_as_on_a_gpu(sim):
+def test_a_warp_barrier_waits_for_the_lanes_its_mask_names_and_a_shuffle_does_not(sim):
     """sync_other_3080ti.txt is validation/ampere/run_sync_other.sh on an RTX 3080 Ti (the same
     16 lines in each of 25 runs): `shfl.sync` and `bar.warp.sync` with a member mask that names
-    lanes which are elsewhere. Like `vote.sync`, they wait for those lanes to arrive or return:
-    a warp barrier goes on only after the lanes on the other branch have finished it, and a
-    shuffle then finds them gone and reads 0. Before this was measured the simulator did not
-    make them wait (the flags read 0 in the two launches marked below).
+    lanes which are elsewhere. A B200 gave the same lines but one, which no rule decides
+    (validation/blackwell/measured/b200/e2e/sync_other.txt).
 
-    Where two groups wait for each other at two call sites, the GPU returned because the
+    A warp barrier waits for those lanes, as `vote.sync` does: it goes on only after the lanes
+    on the other branch have finished it (the flags read 1 in the two launches marked below;
+    on a B200 too, measured/b200/e2e/sync_order.txt). Before this was measured the simulator
+    did not make it wait. A shuffle reads 0 from a lane that is not at it, waited for or not;
+    on the B200 it was seen not to wait, and the simulator does not make it.
+
+    Where two groups name each other at two call sites, both GPUs returned because the
     compiler gave both one machine instruction (`WARPSYNC` then `SHFL` in a routine both call:
-    cuobjdump -sass); the simulator refuses those, as it does for `vote.sync`. One launch has
-    no rule to hold: two groups with disjoint masks and no instruction between them, where
-    which branch runs first decides what a flag reads."""
+    cuobjdump -sass on the 3080 Ti's program): the shuffles exchange values across the
+    groups. The simulator has two instructions there: it refuses the barrier, as it does a
+    `vote.sync`, and its shuffles read 0. Two launches have no rule to hold: nothing orders
+    two branches, and which runs first decides what a flag reads."""
     import warplens
     recorded = (AMPERE / "sync_other_3080ti.txt").read_text().splitlines()
     assert len(recorded) == 16 and not any("no result" in line or "cudaError" in line for line in recorded)
     mod = warplens.parse_ptx((AMPERE / "sync_other_probe.ptx").read_text(), name="sync_other_probe.ptx")
-    outcomes = {"same": 0, "refused": 0, "order": 0}
+    outcomes = {"same": 0, "refused": 0, "order": 0, "layout": 0}
     for index, line in enumerate(recorded):
         mode = index // 8
         other, start, end, mask0, mask1 = SYNC_OTHER_CASES[index % 8]
@@ -158,21 +163,23 @@ def test_shfl_and_warp_barrier_wait_for_the_lanes_their_masks_name_as_on_a_gpu(s
             sim.launch(mod, "sync_other", grid=1, block=32,
                        args=[out, sim.from_numpy(role), sim.from_numpy(mask), sim.from_numpy(np.zeros(32, dtype=np.int32)), mode])
         except warplens.UnsupportedError as error:
-            assert both_wait and "names a lane that is on another path" in str(error), line
+            assert both_wait and mode == 1 and "names a lane that is on another path" in str(error), line
             assert "one machine instruction" in str(error)
             outcomes["refused"] += 1
             continue
-        assert not both_wait, line
         got = out.numpy()
         text = (" role 0 got" + "".join(f" {t}:{got[2 * t]:x}" for t in range(32) if role[t] == 0)
                 + "; role 3 got" + "".join(f" {t}:{got[2 * t + 1]:x}" for t in range(32) if role[t] == 3))
-        if mode == 1 and other == 3:   # disjoint masks: nothing orders the two branches
+        if both_wait:                  # the shuffle: the GPU's two call sites are one instruction
+            assert mode == 0 and set(got[got != 0xeeeeeeee].tolist()) == {0} and " 16:3e8 " in line and " 0:74 " in line
+            outcomes["layout"] += 1
+        elif mode == 1 and other == 3:  # disjoint masks: nothing orders the two branches
             assert line.endswith(text.replace(":1", ":0")), line
             outcomes["order"] += 1
-            continue
-        assert line.endswith(text), (line, text)
-        outcomes["same"] += 1
-    assert outcomes == {"same": 13, "refused": 2, "order": 1}
+        else:
+            assert line.endswith(text), (line, text)
+            outcomes["same"] += 1
+    assert outcomes == {"same": 13, "refused": 1, "order": 1, "layout": 1}
     # The two launches that say a warp barrier waits: lanes on a branch of their own set a flag
     # there, and the lanes at the barrier read it as set.
     assert recorded[10].count(":1") == 16 and recorded[11].count(":1") == 1 and " 16:1 " in recorded[11]

@@ -189,17 +189,18 @@ measured:
 
 | | Within 10 % | Within a factor of two | Of |
 | --- | --- | --- | --- |
-| Shipped config, first rental's measurements | 6 | 53 | 153 |
-| Shipped config, second rental's measurements | 5 | 53 | 153 |
-| First rental's fit, its own measurements | 46 | 104 | 153 |
-| First rental's fit, second rental's measurements | 47 | 105 | 153 |
+| Shipped config, first rental's measurements | 5 | 53 | 152 |
+| Shipped config, second rental's measurements | 4 | 53 | 152 |
+| First rental's fit, its own measurements | 45 | 104 | 152 |
+| First rental's fit, second rental's measurements | 45 | 105 | 152 |
 
-(The first write-up counted 45 and 104 of 152 for the third line; these were
-counted again for this one, with the simulator as it is now.) The fit is as
-good out of sample as in: no configuration that it had within 10 % left that
-band. And it is no better: where it was wrong it is wrong by the same factor.
+Counted as the first write-up counted: "within 10 %" is a ratio of measured
+to predicted between 1/1.1 and 1.1, and the 152 are the configurations that
+have a ratio (`gstream/triad` is predicted to take no time per repetition
+and has none). The fit is as good out of sample as in: the same 45
+configurations are within 10 % of both sets of measurements. And it is no better: where it was wrong it is wrong by the same factor.
 With the fit, all 56 `mma_rate` configurations are within a factor of two
-and 30 within 10 %; `smem_wavefronts` has none of 20 within 10 %, `mbar` is
+and about half within 10 %; `smem_wavefronts` has none of 20 within 10 %, `mbar` is
 off by 3.7 times, a failed cluster-launch-control request on two CTAs by 1.8
 times. Those are the places the first write-up named, where one number per
 mechanism is not enough.
@@ -211,8 +212,14 @@ error is the model's shape and not the data. That is the work listed there
 for after v1.
 
 `ncu` profiled all 11 benchmarks in the main run and 10 of 11 in the pinned
-run, where it failed on `transpose` as it had in the first rental (not looked
-into, in either).
+run, where it had no counter table for `transpose`, as in the first rental.
+The cause is the build, not the profiler: `run_ncu.sh` compiled that one
+program with nvcc's defaults, which is PTX for the driver to compile, and
+this driver refuses PTX from nvcc 13.5 (every launch was
+`cudaErrorUnsupportedPtxVersion`, in `ncu/transpose.err` of the archive). The
+script now builds it as machine code for the GPU it finds, as the benchmarks
+are built. That is checked on the RTX 3080 Ti and by compiling for `sm_100`;
+it has not run on a B200.
 
 ## What was not done
 

@@ -75,7 +75,7 @@ Decided by the owner on 2026-11-25:
   changes, so the second rental's timing run was compared with the same
   predictions as the first: the measurements repeat (127 of 161 configurations
   within 1 %), and the first run's fit predicts the second run as well as its
-  own, 47 of 153 within 10 % ([docs/b200-rental-2.md](docs/b200-rental-2.md),
+  own, 45 of 152 within 10 % ([docs/b200-rental-2.md](docs/b200-rental-2.md),
   "The timing measurements"). What is left is the model's shape. Giving the model what the fit says it lacks is
   after v1 (below; [docs/b200-rental-1.md](docs/b200-rental-1.md), "The
   timing config is a decision, not a fix").

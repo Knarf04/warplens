@@ -1,8 +1,8 @@
-# warplens: what is left
+# warplens: where it stands, and what is next
 
 **Understand a Blackwell GPU by watching it run, on your CPU.**
 
-This file is the release checklist for v1.0 and the roadmap after it. What
+This file records how v1.0 was released and holds the roadmap after it. What
 warplens is and does is in the manual, [docs/guide.md](docs/guide.md); how it
 works is in [docs/architecture.md](docs/architecture.md).
 
@@ -65,14 +65,11 @@ The tree is at `1.0.0`, the first release ([RELEASING.md](RELEASING.md)). It
 carried `0.0.1` until then; the placeholder upload that number was meant for
 was skipped (decided by the owner on 2026-11-26).
 
-## Still owed for v1.0
+## Released
 
-1. **The release itself**, which is the owner's to make: the tag `v1.0.0`, the
-   upload to PyPI (which also claims the name) and the GitHub release
-   ([RELEASING.md](RELEASING.md), steps 7 to 9). The version, the changelog
-   section, the classifier (`4 - Beta`, the owner's choice) and the install
-   instructions are in the tree, and the files of that commit were built and
-   checked as steps 5 and 6 say.
+Version 1.0.0 was tagged (`v1.0.0`) and uploaded to PyPI on 2026-11-26
+([RELEASING.md](RELEASING.md); `pip install warplens`). Nothing is owed for
+it. What was decided on the way, and what stayed open, follows.
 
 Decided by the owner on 2026-11-25:
 

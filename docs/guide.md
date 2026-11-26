@@ -1980,7 +1980,7 @@ Hardware evidence:
 
 The project:
 
-- [PLAN.md](../PLAN.md): what is still owed for v1.0, and the roadmap after
+- [PLAN.md](../PLAN.md): what was decided for v1.0, and the roadmap after
   it.
 - [history/](history/README.md): the plan as first written and the write-up
   of each milestone, M0 to M6. They are records and are not updated; where

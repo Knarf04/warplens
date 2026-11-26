@@ -119,10 +119,14 @@ def test_signalling_cli_terminates_and_reaps_its_child(tmp_path, signum, close_c
     child_pid = None
     try:
         deadline = time.monotonic() + 5
-        while not pidfile.exists() and wrapper.poll() is None and time.monotonic() < deadline:
+        # The child creates the file and then writes its pid: a file that exists may still be
+        # empty (CI read it so once, and int("") failed the test).
+        def written() -> str:
+            return pidfile.read_text() if pidfile.exists() else ""
+        while not written() and wrapper.poll() is None and time.monotonic() < deadline:
             time.sleep(0.01)
-        assert pidfile.exists(), "the CLI's child did not become ready"
-        child_pid = int(pidfile.read_text())
+        assert written(), "the CLI's child did not become ready"
+        child_pid = int(written())
         wrapper.send_signal(signum)
         _, stderr = wrapper.communicate(timeout=5)
         assert wrapper.returncode == 128 + signum
